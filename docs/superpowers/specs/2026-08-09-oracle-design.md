@@ -80,7 +80,7 @@ Judges receive a promo code for Oracle Plus (submission requirement).
 ## 8. Error handling & edge cases
 
 - **Late joiners:** can always play today's round; no back-filling past days.
-- **Timezones:** one global day defined in UTC; drop time chosen for US prime coverage (e.g., noon ET).
+- **Timezones:** one global day defined in UTC; drop time is **noon ET** (16:00 UTC), locks at the next drop.
 - **Void questions:** no points for anyone, labeled "VOID" with a one-line reason; streak credit still granted for having played.
 - **Missed resolution data** (API down): admin resolves manually; round reveal can be late but never wrong.
 - **Offline / flaky network:** round is fetched and cached on open; submissions retry with idempotency keys; a submission after `locks_at` (server clock) is rejected with a friendly "the oracle has closed" state.
