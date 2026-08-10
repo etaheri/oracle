@@ -61,6 +61,15 @@ The fun economy and the truth economy are strictly separated. This wall is simul
 - **Mid-window, if traction — small fixed cash:** "Oracle of the Month wins $500," keyed to **Oracle Score only** (never streaks — see §5a). Monthly horizon, not weekly: a week is ~35 predictions and luck-heavy; a month gives skill room to show, and fewer/bigger prize events are cleaner legally and operationally.
 - **Post-traction roadmap — The Grand Oracle (weekly live show, weeks 5+):** live *results* show, not a prediction show — resolution is where the drama lives (predictions can't be resolved live; this is why HQ-style live doesn't map directly). Sunday 8pm ET: the week's Big Ones revealed dramatically, contrarian heroes named, Oracle of the Week crowned live, and one mega-question that locks during the show — the one true moment of simultaneous commitment.
 
+## 3c. Launch & marketing — two tracks
+
+Pure mystery marketing fails without an existing audience (cryptic posts from unknown accounts get zero reach), and Reddit bans stealth promotion. The oracle still arrives as a character — via two parallel tracks:
+
+- **Track 1 — the builder, transparent (#BuildInPublic, #Shipaton tagged):** Erik's own account documents the build — aesthetic coming alive, scoring math, App Review saga, publicly predicting ORACLE's own metrics. Framed as the character's *discoverer*: "I'm building a machine that tells the future." Honest posts in r/SideProject-class subreddits belong to this track. This wins the $30K award and feeds judges the narrative.
+- **Track 2 — @ORACLE, in character, mystery + receipts:** terminal-styled posts, never breaks character, always anchored to verifiable predictions. **Starts pre-launch (week 1):** one daily Big One-style X poll (`> QUERY 004 · …`), graded publicly next day (`✅ THE CROWD SAW TRULY · 71% said YES`). Poll voters are the seed crowd; by launch the account has a 3-week public track record. Launch post: `> THE ORACLE WAKES` + store link. Post-launch the app feeds the account: daily crowd stats and anonymized contrarian-hero receipts.
+
+**Boot sequence:** cryptic-numbers CRT boot (date, day number, glyphs) ending in a slow-typed famous quote about the future (Berra, Bohr, Kay, Gibson — short, attributed). Anti-fatigue rule: full cinematic boot on first launch only; daily boot is a ~1s tap-skippable micro-boot (glyph flicker + quote); the long sequence returns only for special moments (50th call, title promotion, Grand Oracle).
+
 ## 4. Identity
 
 Play-first: the app is fully playable on first open with device-based identity (anonymous). Creating an account (email magic link / Sign in with Apple / Google) claims the history, enables leaderboard placement, and survives device changes. Device history merges into the account on signup. Sign in with Apple is required by App Review whenever third-party login is offered.
@@ -134,7 +143,7 @@ Hard rules, enforced by design:
 
 ## 10. Timeline (7.5 weeks)
 
-- **Week 1 (Aug 10–16):** Apple Developer + Play accounts *immediately* (approval latency). Expo scaffold, core loop UI (round → predict → lock → crowd reveal), backend schema + endpoints, question pipeline v0 (manual entry acceptable).
+- **Week 1 (Aug 10–16):** Apple Developer + Play accounts *immediately* (approval latency). Create @ORACLE account and start the daily X-poll + receipt ritual (Track 2 needs its 3-week head start). Expo scaffold, core loop UI (round → predict → lock → crowd reveal), backend schema + endpoints, question pipeline v0 (manual entry acceptable).
 - **Week 2 (Aug 17–23):** results/reveal flow, streaks, share cards, RevenueCat + Oracle Plus paywall, OneSignal, PostHog. TestFlight to friends. Store assets (icon, screenshots). **Submit to App Review.**
 - **Week 3 (Aug 24–30):** ship v1.0 publicly (target: live by ~Aug 28). Begin daily question ops for real. Begin #BuildInPublic posting — including the meta-move: publicly predicting ORACLE's own metrics in the app.
 - **Weeks 4–7 (Sept):** iterate on retention/share loop via OTA updates, leaderboard, Oracle Score reveal at 50 calls, Oracle of the Week, growth experiments, LLM question pipeline. If traction: Oracle of the Month cash prize (after §5a checklist + lawyer hour) and a first Grand Oracle live results show as a #BuildInPublic event. Record 2-min demo video, prep Devpost submission (icon 1024², screenshot 1179×2556, promo code, category descriptions, #BuildInPublic post links). **Submit by ~Sept 27** (buffer before the 30th deadline).
