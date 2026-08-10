@@ -30,7 +30,7 @@ The daily round is designed as a *live-feeling event*, not a passive puzzle (but
 1. **The Daily Five** drops at one fixed global time (like Wordle's single daily puzzle). Four quick questions across rotating categories (markets, sports, weather, pop culture, news) plus **The Big One** — always tied to the current news cycle, worth double points, featured on the share card. Every question resolves within 24–48 hours.
 2. For each question the player picks **yes/no plus a confidence level** (slider, 55%–95%). Crowd percentages are hidden until the player locks in, then revealed immediately — dopamine hit #1 ("you vs. the crowd").
 3. **Next day:** results reveal — dopamine hit #2. Points, streak update, Oracle Score movement, and a shareable result card.
-4. **Share card:** an image generated in-app for the OS share sheet, e.g. `🔮 ORACLE #47 — 4/5 · called The Big One with the 22%`. The card carries the App Store link. Receipts culture ("I called it") is the viral engine.
+4. **Share card:** an image generated in-app for the OS share sheet, framed as a **challenge**, e.g. `🔮 ORACLE #47 — 4/5 · called The Big One with the 22% · can you outsee me?`. The link opens straight into today's round; when the recipient finishes, they get a head-to-head compare against the sender. Receipts culture ("I called it") is the viral engine; the challenge frame sharpens it (the 2025–26 boom in settle-it-with-friends apps shows this vein is hot).
 
 A daily round takes about 90 seconds. Because questions resolve fast, every day contains both a predict moment and a reveal moment.
 
@@ -79,7 +79,7 @@ Play-first: the app is fully playable on first open with device-based identity (
 RevenueCat SDK powers all purchases. Free tier keeps the complete daily game; the paywall protects *investment and insight*, never access.
 
 **Oracle Plus subscription (monthly + discounted annual):**
-- **Streak Shield** — miss a day, keep your streak (auto-applied, N per month). The single most proven daily-game monetizer (Duolingo pattern).
+- **Streak Shield** — miss a day, keep your streak. The single most proven daily-game monetizer (Duolingo pattern), with a humane twist: **everyone gets one free auto-shield per month**, delivered in the mystic voice ("the veil was closed to you — the Oracle forgives"); Plus gets more. Duolingo's data shows forgiving streaks *increase* 7-day+ streaks by 40%+, and the free mercy makes the paid shield feel generous rather than extortionate (streak-anxiety resentment is well documented).
 - **Deep stats** — personal calibration curve, category strengths, percentile history, head-to-head vs. the crowd.
 - **Archive access** — browse past questions and your full prediction history.
 - **Cosmetics** — oracle themes/app icons.
@@ -104,6 +104,7 @@ Hard rules, enforced by design:
 - Operator (Erik) approves five per day in a minimal admin web view. Target: under 15 minutes/day. Questions are queued at least 24h ahead so a missed morning never breaks the drop.
 - **Resolution** is semi-automated: market close, weather, and sports scores fetched from APIs; one-click confirm in admin. Anything ambiguous is **voided** — no points, clearly labeled in-app, never argued.
 - Questions must be globally unambiguous (UTC-defined cutoffs, named sources: "per NWS", "per official box score").
+- **Trust is UI:** the resolution source prints on every question card (`resolves per NWS, 5pm ET`) and the result receipt shows the actual source data. This inverts the top user complaint about Manifold (arbitrary owner-resolved markets) into a visible brand promise.
 
 ## 7. Architecture
 
@@ -157,6 +158,8 @@ Hard rules, enforced by design:
 ## 12. Explicitly out of scope (v1)
 
 User-submitted predictions, comments/social feed, real-money anything, private leagues, native widgets, web app, the talent/data business, localization. All wait until the loop proves it retains.
+
+**Earmarked for a week-4/5 OTA drop (validated demand, cheap build):** **Personal Prophecies** — private free-text predictions with a resolve-by date and a reminder push ("Six months ago you prophesied…"). Serves the demonstrated prediction-journal niche (Foresee/PredictionBook-class apps), creates long-tail re-engagement, feeds share receipts, and slots into Oracle Plus.
 
 ## 13. Success criteria
 
