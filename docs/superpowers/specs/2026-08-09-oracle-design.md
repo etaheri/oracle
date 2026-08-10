@@ -55,6 +55,15 @@ The fun economy and the truth economy are strictly separated. This wall is simul
 - **Share cards are terminal printouts:** monospace, timestamped, glow-styled receipts — receipts culture rendered literally (`> ORACLE #47 · SEER CALLED IT · YES @ 85% · CROWD SAID 22%`).
 - **Why strategically:** every prediction product looks like a trading terminal or a SaaS dashboard; this is instantly distinctive, cheap to execute well (animation language is text-based), and squarely aimed at the RevenueCat Design Award's "does the design spark joy" criterion.
 
+## 2a. The Oracle's own prophecy — the machine really does tell the future
+
+The aggregate is the prophecy. Skill-weighted crowd aggregates beat nearly every individual in them (Galton → prediction markets → Good Judgment's weighted aggregates beating intelligence analysts in the IARPA tournaments). ORACLE collects exactly the needed ingredients: daily probability judgments plus a per-person skill weight.
+
+- **The Oracle takes a position** on every question: its skill-weighted aggregate (raw crowd at cold start, weights phasing in as Oracle Scores accumulate). Revealed only **after** a player locks in (same anti-herding wall as crowd percentages — if it spoke first, everyone would copy it and the aggregate would eat itself). The result reveal has three characters: you, the crowd, and THE ORACLE FORESAW.
+- **The machine is graded publicly.** Its calibration and track record are a first-class screen — and @ORACLE's receipts include its own calls. "The Oracle grows stronger with every consultation" is literally true and is both the mystic arc and a #BuildInPublic storyline.
+- **"Beat the Oracle"** is the endgame badge: out-predicting the aggregate over 100+ calls is genuinely elite (the literature says most never will), making it the game's most coveted status.
+- **Business closure:** the public, track-record-verified, skill-weighted daily forecast stream is the sellable asset from the talent/data thesis — and eventually a consumer surface of its own (people opening the app to *ask* the Oracle, not just play it).
+
 ## 3a. Prizes
 
 - **At launch — status only:** title ladder, **Oracle of the Week** (featured profile + permanent badge), all-time Hall of Fame. Legally inert, and status is on-theme: the whole premise is a status game.
