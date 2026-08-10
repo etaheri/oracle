@@ -10,6 +10,8 @@ ORACLE is a free daily prediction game. Every day, five questions about tomorrow
 
 **Positioning:** "Wordle for predictions." Prediction markets (Kalshi, Polymarket, ~50M combined users in 2026) made forecasting mainstream, but every major player is a money/trading product. ORACLE is the free, casual, status-driven on-ramp. No money is ever staked on predictions — it is a status game, not gambling.
 
+**Nearest neighbor (and why it isn't one):** Manifold's *Predictle* is a daily web minigame where players rank five existing markets by their current market probability — it scores you against the *consensus*, instantly, as a funnel into Manifold's trading platform. ORACLE scores you against *reality*, over time, to surface real forecasting skill, as a mobile-native consumer ritual (event drop, streaks, share receipts, push). Its existence validates demand for a casual daily prediction game; no incumbent treats that game as the product itself.
+
 **Primary goal:** Maximize traction (installs, retention, revenue) during the Shipaton window, since the Grand Prize shortlist is built from RevenueCat-reported revenue and growth momentum during Aug 1–Sept 30.
 
 **Target awards:** Grand Prize, Best Game, HAMM, #BuildInPublic, OneSignal "Keep Them Coming Back," Most Viral App.
@@ -43,6 +45,15 @@ The fun economy and the truth economy are strictly separated. This wall is simul
   - Becomes statistically meaningful after ~50 predictions — which is itself a retention mechanic ("your Oracle rank unlocks at 50 calls").
 - **Leaderboards:** global and weekly, by Oracle Score, with streak shown.
 - **Tone — mystic-playful.** The oracle theme with a wink, carried through all copy, notifications, and share cards. Title ladder by Oracle Score percentile (unlocks after 50 calls): **Apprentice → Augur → Seer → Oracle → The Prophet.** Notification voice: "The Oracle speaks in 15 minutes."
+
+## 3b. Visual identity — "haunted mainframe"
+
+**80s terminal × crystal ball.** The oracle is an old machine you consult: CRT phosphor aesthetic (dark-only app), monospace type, typewriter text, blinking cursor, subtle scanline shimmer. Boot-up and loading states are content ("ORACLE OS v1.0 — consulting the void…"). Prophecies print like terminal output.
+
+- **Palette:** phosphor green = the machine; violet/magenta glow = the magic. Never pure monochrome (goes flat); the two-tone split *is* the brand (terminal × crystal ball).
+- **Type:** CRT display font (e.g., VT323 class) for headlines only; a properly legible mono (IBM Plex Mono / JetBrains Mono class) for body and questions. Readability beats theme wherever they conflict.
+- **Share cards are terminal printouts:** monospace, timestamped, glow-styled receipts — receipts culture rendered literally (`> ORACLE #47 · SEER CALLED IT · YES @ 85% · CROWD SAID 22%`).
+- **Why strategically:** every prediction product looks like a trading terminal or a SaaS dashboard; this is instantly distinctive, cheap to execute well (animation language is text-based), and squarely aimed at the RevenueCat Design Award's "does the design spark joy" criterion.
 
 ## 3a. Prizes
 
