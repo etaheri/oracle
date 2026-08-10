@@ -14,7 +14,16 @@ ORACLE is a free daily prediction game. Every day, five questions about tomorrow
 
 **Target awards:** Grand Prize, Best Game, HAMM, #BuildInPublic, OneSignal "Keep Them Coming Back," Most Viral App.
 
-## 2. Core loop
+## 2. Core loop — the event drop
+
+The daily round is designed as a *live-feeling event*, not a passive puzzle (but with a 24h window so no one's day is ever forfeit — the lesson of HQ Trivia's daily-appointment death spiral).
+
+**A day in ORACLE:**
+- **11:45am ET — the summons.** Push: "The Oracle speaks in 15 minutes." Opening early lands in a pre-drop lobby: category teasers, countdown, live counter of waiting players.
+- **12:00pm — the drop.** Yesterday's **results reveal first** (dopamine before commitment, performed with ceremony — not buried in a list), then today's questions animate in.
+- **The reveal.** While answering, players see the live player counter but never the crowd split. On locking the fifth answer, crowd percentages slide in — and keep drifting live as more players lock in all day (a reason to reopen at 9pm; harmless since you're locked).
+- **First hour (until 1pm).** Locking in during the first hour earns the **First Hour Oracle** badge on the share card plus a daily-points bonus. This both drives the noon event culture and compensates early players' information disadvantage (an 11pm answer has strictly more information than a 12:05pm one).
+- The live counter runs on a Durable Object per round; the lobby and reveal are cheap UI, not live-ops.
 
 1. **The Daily Five** drops at one fixed global time (like Wordle's single daily puzzle). Four quick questions across rotating categories (markets, sports, weather, pop culture, news) plus **The Big One** — always tied to the current news cycle, worth double points, featured on the share card. Every question resolves within 24–48 hours.
 2. For each question the player picks **yes/no plus a confidence level** (slider, 55%–95%). Crowd percentages are hidden until the player locks in, then revealed immediately — dopamine hit #1 ("you vs. the crowd").
@@ -23,14 +32,23 @@ ORACLE is a free daily prediction game. Every day, five questions about tomorrow
 
 A daily round takes about 90 seconds. Because questions resolve fast, every day contains both a predict moment and a reveal moment.
 
-## 3. Scoring — two currencies
+## 3. Scoring — two economies, one wall
 
-- **Streak:** incremented by playing every day. Luck-friendly, pure retention fuel.
-- **Oracle Score:** long-run skill metric using a proper scoring rule (Brier-based, surfaced with a human name and 0–1000-style scale). Properties:
+The fun economy and the truth economy are strictly separated. This wall is simultaneously the game-design guardrail (credibility of "who can tell the future") and the legal guardrail (see §5a): **nothing purchasable or hustle-based ever touches the stat that prizes key off.**
+
+- **Fun economy — daily points, streaks, badges.** Luck and hustle welcome: first-hour bonus, contrarian daily bonuses, streak play. Streak Shield (paid) touches only this economy. No cash prize ever keys off it.
+- **Truth economy — Oracle Score:** long-run skill metric using a proper scoring rule (Brier-based, surfaced with a human name and 0–1000-style scale). Pure calibration-weighted accuracy — no earliness bonus, no streak input, nothing purchasable affects it. Properties:
   - Honest confidence is mathematically the optimal strategy (being wrong at 95% hurts far more than at 60%).
   - **Contrarian bonus:** extra points for being right when the crowd majority was wrong. Makes real skill visible fast and generates the best share moments.
   - Becomes statistically meaningful after ~50 predictions — which is itself a retention mechanic ("your Oracle rank unlocks at 50 calls").
-- **Leaderboards:** global and weekly, by Oracle Score, with streak shown. No monetary prizes ever (App Review / gambling hygiene).
+- **Leaderboards:** global and weekly, by Oracle Score, with streak shown.
+- **Tone — mystic-playful.** The oracle theme with a wink, carried through all copy, notifications, and share cards. Title ladder by Oracle Score percentile (unlocks after 50 calls): **Apprentice → Augur → Seer → Oracle → The Prophet.** Notification voice: "The Oracle speaks in 15 minutes."
+
+## 3a. Prizes
+
+- **At launch — status only:** title ladder, **Oracle of the Week** (featured profile + permanent badge), all-time Hall of Fame. Legally inert, and status is on-theme: the whole premise is a status game.
+- **Mid-window, if traction — small fixed cash:** "Oracle of the Month wins $500," keyed to **Oracle Score only** (never streaks — see §5a). Monthly horizon, not weekly: a week is ~35 predictions and luck-heavy; a month gives skill room to show, and fewer/bigger prize events are cleaner legally and operationally.
+- **Post-traction roadmap — The Grand Oracle (weekly live show, weeks 5+):** live *results* show, not a prediction show — resolution is where the drama lives (predictions can't be resolved live; this is why HQ-style live doesn't map directly). Sunday 8pm ET: the week's Big Ones revealed dramatically, contrarian heroes named, Oracle of the Week crowned live, and one mega-question that locks during the show — the one true moment of simultaneous commitment.
 
 ## 4. Identity
 
@@ -50,6 +68,16 @@ RevenueCat SDK powers all purchases. Free tier keeps the complete daily game; th
 
 Judges receive a promo code for Oracle Plus (submission requirement).
 
+## 5a. Legal guardrails (prizes & gambling)
+
+Doctrine: illegal gambling requires **consideration + chance + prize**; remove any one element and it is not gambling. ORACLE's safe harbor is removing *consideration* — free entry always — making any prize competition a promotional sweepstakes (the McDonald's Monopoly category). Do not rely on skill-game exemptions (state-by-state swamp).
+
+Hard rules, enforced by design:
+1. **Paying never improves prize eligibility.** Cash prizes key off Oracle Score only; Oracle Plus (incl. Streak Shield) touches only the fun economy. If payment could enhance contest standing, consideration creeps back in and the structure fails.
+2. **Users never stake money on predictions.** Outcome-contingent payouts of user money are the licensed prediction-market business (CFTC territory). Never.
+3. **When cash prizes launch:** official rules page linked in-app, "no purchase necessary," 18+, void where prohibited, US-only initially, 1099 for winners over $600/year. Fixed modest prizes keep this trivial; registration/bonding thresholds (NY, FL, ~$5K+) only matter at jackpot scale. One hour with a lawyer before the first cash prize.
+4. **App Review:** Apple guideline 5.3 permits developer-sponsored contests with in-app rules. Keep betting vocabulary ("bet," "odds," "wager," "payout") out of the app and store listing entirely.
+
 ## 6. Question operations (the daily treadmill)
 
 - An LLM pipeline drafts ~10 candidate questions each morning from news/sports/markets/weather feeds. **Every candidate includes explicit resolution criteria and a named data source at creation time** — this discipline prevents adjudication fights.
@@ -61,7 +89,7 @@ Judges receive a promo code for Oracle Plus (submission requirement).
 
 **Mobile app:** Expo / React Native, TypeScript. One codebase → iOS + Android. EAS Build for store builds; EAS Update (OTA) for rapid iteration during the traction window without waiting on App Review.
 
-**Backend:** TypeScript API (Hono on Cloudflare Workers) + **Neon Postgres**. Server-authoritative for everything that matters: question open/close times, submission timestamps, scoring, aggregates. The app never computes its own score.
+**Backend:** TypeScript API (Hono on Cloudflare Workers) + **Neon Postgres**. A Durable Object per daily round powers the live player counter and drifting crowd percentages (SSE/WebSocket). Server-authoritative for everything that matters: question open/close times, submission timestamps, scoring, aggregates. The app never computes its own score.
 
 **Services:**
 - **RevenueCat** — subscriptions/IAP (required).
@@ -98,7 +126,7 @@ Judges receive a promo code for Oracle Plus (submission requirement).
 - **Week 1 (Aug 10–16):** Apple Developer + Play accounts *immediately* (approval latency). Expo scaffold, core loop UI (round → predict → lock → crowd reveal), backend schema + endpoints, question pipeline v0 (manual entry acceptable).
 - **Week 2 (Aug 17–23):** results/reveal flow, streaks, share cards, RevenueCat + Oracle Plus paywall, OneSignal, PostHog. TestFlight to friends. Store assets (icon, screenshots). **Submit to App Review.**
 - **Week 3 (Aug 24–30):** ship v1.0 publicly (target: live by ~Aug 28). Begin daily question ops for real. Begin #BuildInPublic posting — including the meta-move: publicly predicting ORACLE's own metrics in the app.
-- **Weeks 4–7 (Sept):** iterate on retention/share loop via OTA updates, leaderboard, Oracle Score reveal at 50 calls, growth experiments, LLM question pipeline. Record 2-min demo video, prep Devpost submission (icon 1024², screenshot 1179×2556, promo code, category descriptions, #BuildInPublic post links). **Submit by ~Sept 27** (buffer before the 30th deadline).
+- **Weeks 4–7 (Sept):** iterate on retention/share loop via OTA updates, leaderboard, Oracle Score reveal at 50 calls, Oracle of the Week, growth experiments, LLM question pipeline. If traction: Oracle of the Month cash prize (after §5a checklist + lawyer hour) and a first Grand Oracle live results show as a #BuildInPublic event. Record 2-min demo video, prep Devpost submission (icon 1024², screenshot 1179×2556, promo code, category descriptions, #BuildInPublic post links). **Submit by ~Sept 27** (buffer before the 30th deadline).
 
 ## 11. Testing
 
