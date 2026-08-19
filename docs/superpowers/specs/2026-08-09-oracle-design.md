@@ -126,6 +126,8 @@ Hard rules, enforced by design:
 
 ## 7. Architecture
 
+> Full dependency choices, versions, monorepo layout, marketing-site tech, CI, and build order: see **`2026-08-19-oracle-tech-spec.md`**.
+
 **Mobile app:** Expo / React Native, TypeScript. One codebase → iOS + Android. EAS Build for store builds; EAS Update (OTA) for rapid iteration during the traction window without waiting on App Review.
 
 **Graphics/motion stack — Reanimated owns motion, Skia owns pixels.** Reanimated 3+ for all UI motion (springs, gestures, transitions, typewriter cadence) on ordinary views — keeps accessibility and layout. `@shopify/react-native-skia` only for what views can't draw: film-grain/aged-paper shader overlay, gold-leaf shimmer shader, the generative text-orb, and **offscreen share-card rendering** (`makeImageSnapshot` — the same components draw the in-app result and the exported PNG). Reanimated values drive Skia uniforms. Discipline: two signature shaders (grain, gold shimmer) reused everywhere — cohesion over effect count; timebox shader work. (EAS dev builds are already required by RevenueCat/OneSignal, so Skia adds no workflow cost.)
