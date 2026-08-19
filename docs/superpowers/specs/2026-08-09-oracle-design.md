@@ -46,14 +46,21 @@ The fun economy and the truth economy are strictly separated. This wall is simul
 - **Leaderboards:** global and weekly, by Oracle Score, with streak shown.
 - **Tone — mystic-playful.** The oracle theme with a wink, carried through all copy, notifications, and share cards. Title ladder by Oracle Score percentile (unlocks after 50 calls): **Apprentice → Augur → Seer → Oracle → The Prophet.** Notification voice: "The Oracle speaks in 15 minutes."
 
-## 3b. Visual identity — "haunted mainframe"
+## 3b. Visual identity — "digital antiquity"
 
-**80s terminal × crystal ball.** The oracle is an old machine you consult: CRT phosphor aesthetic (dark-only app), monospace type, typewriter text, blinking cursor, subtle scanline shimmer. Boot-up and loading states are content ("ORACLE OS v1.0 — consulting the void…"). Prophecies print like terminal output.
+**Classical mythology annotated by a machine.** Reference pair: Waterhouse's *Consulting the Oracle* (1884) × the Palantir/Quartr school of monospace-text-as-image posters. The ancient ritual (consulting an oracle) executed by a machine — the aesthetic states the concept. Evolved from the earlier "haunted mainframe": terminal DNA retained (mono type, typewriter text, receipts, boot sequence), CRT-green kitsch dropped.
 
-- **Palette:** phosphor green = the machine; violet/magenta glow = the magic. Never pure monochrome (goes flat); the two-tone split *is* the brand (terminal × crystal ball).
-- **Type:** CRT display font (e.g., VT323 class) for headlines only; a properly legible mono (IBM Plex Mono / JetBrains Mono class) for body and questions. Readability beats theme wherever they conflict.
-- **Share cards are terminal printouts:** monospace, timestamped, glow-styled receipts — receipts culture rendered literally (`> ORACLE #47 · SEER CALLED IT · YES @ 85% · CROWD SAID 22%`).
-- **Why strategically:** every prediction product looks like a trading terminal or a SaaS dashboard; this is instantly distinctive, cheap to execute well (animation language is text-based), and squarely aimed at the RevenueCat Design Award's "does the design spark joy" criterion.
+**Two voices, strict roles, never blended on one layer:**
+- **Machine voice** (monospace, timestamps, technical annotations) owns all *structure and chrome*: question cards, scoring, stats, daily UI. Terminal-clean on near-black. Paintings never sit behind body text (oil texture under small type is mud; readability beats theme).
+- **Temple voice** (public-domain classical art + Trajan-class serif display type) owns *moments*: first boot, Big One reveals, title promotions, share cards, Grand Oracle. Scarcity keeps it sacred.
+
+**Palette:** obsidian black, bone/parchment, gold leaf, one deep accent (oxblood). Serif × mono, black × gold — antiquity × machine stated typographically.
+
+**Art sourcing:** all-public-domain oracle art (Wikimedia Commons / Met Open Access, hi-res, free). **Title ladder art: Michelangelo's five Sistine sibyls** (Delphic, Cumaean, Erythraean, Persian, Libyan) map one-to-one to Apprentice → Augur → Seer → Oracle → The Prophet.
+
+**Text-as-image:** orb/eye built from repeating micro-text (`THE ORACLE SEES…`) — programmatically generated, unmistakable at thumbnail size; the share-card and marketing motif.
+
+**Guardrails:** mystic-playful voice keeps it warm, not ominous (Berra quote under a sibyl = the wink); it's a consumer game, not defense-tech cosplay. Strategic aim unchanged: instantly distinctive vs. trading-terminal/SaaS incumbents, and squarely at the Design Award's "does the design spark joy."
 
 ## 2a. The Oracle's own prophecy — the machine really does tell the future
 
