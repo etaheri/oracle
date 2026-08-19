@@ -133,4 +133,3 @@ GET  /admin/health              → today's counts, unresolved past-due, agent l
 - **DO lost:** counter resets cosmetic-only; authoritative data is Postgres.
 - **Resolution source down:** question stays `locked` past `resolve_by` → admin alert; resolve late or void. Reveal renders partial results honestly ("1 prophecy pending").
 - **Agent down:** 24h approved buffer + 15:55 preflight page. Drop never depends on Hermes.
-```
