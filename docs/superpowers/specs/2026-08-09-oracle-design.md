@@ -56,7 +56,7 @@ The fun economy and the truth economy are strictly separated. This wall is simul
 
 **Palette:** obsidian black, bone/parchment, gold leaf, one deep accent (oxblood). Serif × mono, black × gold — antiquity × machine stated typographically.
 
-**Type:** **ABC Arizona Flare** (Dinamo) is the display/temple voice — the flare-serif cut: inscriptional, carved-stone antiquity with a modern edge. IBM Plex Mono remains the machine/receipt voice. Licensing: Flare static weights (2, e.g. Regular + Medium) under Dinamo App/Game + Web licenses (one-time, solo tier); trial fonts for mockups only. Optional upgrade if the quote allows: the Arizona variable superfamily unlocks a sans↔serif axis-morph at ritual moments — garnish, not identity; skip without regret.
+**Type:** **Marcellus + Cinzel** (Google Fonts, OFL) split the display/temple voice — Cinzel for carved-caps ritual moments, Marcellus for mixed-case display. IBM Plex Mono is the machine/receipt voice. All-OFL at launch: zero license friction, repo-committable, no ship-date risk. **Traction-triggered upgrade: ABC Arizona Flare** (Dinamo) — the contemporary flare-serif north star (trials in `design/fonts/trial/` for mockups) — licensed and swapped in only once mid-Sept numbers justify it (before the Devpost video if so). Fonts are the most swappable asset in the app; buy polish after the experiment earns it.
 
 **Art sourcing:** all-public-domain oracle art (Wikimedia Commons / Met Open Access, hi-res, free). **Title ladder art: Michelangelo's five Sistine sibyls** (Delphic, Cumaean, Erythraean, Persian, Libyan) map one-to-one to Apprentice → Augur → Seer → Oracle → The Prophet.
 
