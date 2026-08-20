@@ -13,7 +13,7 @@ export function GoldButton({ title, onPress, disabled }: { title: string; onPres
         borderWidth: 1, borderColor: disabled ? colors.line : colors.gold,
         paddingVertical: space(3), alignItems: "center",
         opacity: pressed ? 0.7 : disabled ? 0.4 : 1,
-        backgroundColor: pressed ? "rgba(201,162,75,0.08)" : "transparent",
+        backgroundColor: pressed ? colors.goldWash : "transparent",
       })}
     >
       <Mono size={12} color={disabled ? colors.ash : colors.gold} letterSpacing={6} style={{ textTransform: "uppercase" }}>{title}</Mono>

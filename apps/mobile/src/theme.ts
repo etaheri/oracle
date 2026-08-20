@@ -10,6 +10,8 @@ export const colors = {
   goldBright: "#E4C878",
   oxblood: "#B04A38",
   line: "rgba(201,162,75,0.18)",
+  lineSoft: "rgba(233,225,205,0.10)",
+  goldWash: "rgba(201,162,75,0.08)",
 } as const;
 
 export const fonts = {

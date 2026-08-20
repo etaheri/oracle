@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { View, PanResponder, LayoutChangeEvent } from "react-native";
 import * as Haptics from "expo-haptics";
+import { CONSTANTS as C } from "@oracle/core";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
 import { snapConfidence, confidenceReading } from "../game/confidence";
@@ -28,7 +29,7 @@ export function ConfidenceSlider({ value, onChange }: { value: number; onChange:
     }
   }
 
-  const ratio = (value - 55) / 40;
+  const ratio = (value - C.CONFIDENCE_MIN) / (C.CONFIDENCE_MAX - C.CONFIDENCE_MIN);
   return (
     <View style={{ gap: space(1.5) }}>
       <View
@@ -39,7 +40,7 @@ export function ConfidenceSlider({ value, onChange }: { value: number; onChange:
         accessibilityLabel="Confidence"
         accessibilityValue={{ text: `${value} percent` }}
       >
-        <View style={{ height: 2, backgroundColor: "rgba(233,225,205,0.10)" }}>
+        <View style={{ height: 2, backgroundColor: colors.lineSoft }}>
           <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: ratio * width, backgroundColor: colors.gold }} />
         </View>
         <View style={{
