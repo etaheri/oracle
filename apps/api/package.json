@@ -13,7 +13,8 @@
     "@neondatabase/serverless": "^1.1.0",
     "@oracle/core": "workspace:^",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.3"
+    "hono": "^4.13.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260820.1",
