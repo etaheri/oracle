@@ -39,7 +39,7 @@ export const roundRoutes = new Hono<AppContext>()
       orderBy: [asc(schema.questions.slot)],
     });
     if (qs.length === 0) return c.json({ error: "unknown round" }, 404);
-    if (qs.some((q) => q.status === "open" || q.status === "scheduled")) return c.json({ error: "not locked" }, 409);
+    if (!qs.every((q) => q.status === "locked" || q.status === "resolved" || q.status === "void")) return c.json({ error: "not locked" }, 409);
 
     const mine = await db.query.predictions.findMany({
       where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),

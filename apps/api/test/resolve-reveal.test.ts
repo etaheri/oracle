@@ -90,4 +90,19 @@ describe("resolve + reveal cycle", () => {
     expect(pred!.points).toBe(0);
     expect(pred!.brier).toBeNull();
   });
+
+  it("rejects reveal when any question sits outside locked/resolved/void, even if not open/scheduled", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const a = await playerOn(app);
+
+    vi.setSystemTime(new Date("2026-08-21T16:05:00Z"));
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-20"));
+    // One question slips into "draft" (not open/scheduled, but also not locked/resolved/void) — must still gate.
+    await db.update(schema.questions).set({ status: "draft" }).where(eq(schema.questions.id, qs[0]!.id));
+
+    expect((await a("/v1/round/2026-08-20/reveal")).status).toBe(409);
+  });
 });
