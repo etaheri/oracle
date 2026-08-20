@@ -18,7 +18,7 @@ export const predictionRoutes = new Hono<AppContext>()
     const now = new Date();
     if (now.getTime() >= q.locksAt.getTime()) return c.json({ error: "locked" }, 409);
 
-    const firstHour = now.getTime() < q.opensAt.getTime() + 3_600_000;
+    const firstHour = now.getTime() <= q.opensAt.getTime() + 3_600_000;
     const inserted = await db
       .insert(schema.predictions)
       .values({

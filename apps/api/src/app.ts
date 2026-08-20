@@ -3,6 +3,7 @@ import type { Db } from "./db/client";
 import { authRoutes } from "./routes/auth";
 import { roundRoutes } from "./routes/round";
 import { predictionRoutes } from "./routes/predictions";
+import { adminRoutes } from "./routes/admin";
 export type { Db };
 export interface AppEnv {
   DEVICE_TOKEN_SECRET: string;
@@ -18,5 +19,6 @@ export function createApp(deps: Deps) {
   app.route("/v1/auth", authRoutes);
   app.route("/v1/round", roundRoutes);
   app.route("/v1/predictions", predictionRoutes);
+  app.route("/admin", adminRoutes);
   return app;
 }

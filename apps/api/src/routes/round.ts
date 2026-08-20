@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { asc, eq } from "drizzle-orm";
+import { asc, and, eq, inArray } from "drizzle-orm";
+import { dayPoints } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -27,5 +28,39 @@ export const roundRoutes = new Hono<AppContext>()
         source_name: q.sourceName,
         resolution_criteria: q.resolutionCriteria,
       })),
+    });
+  })
+  .get("/:date/reveal", async (c) => {
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const date = c.req.param("date");
+    const qs = await db.query.questions.findMany({
+      where: eq(schema.questions.roundDate, date),
+      orderBy: [asc(schema.questions.slot)],
+    });
+    if (qs.length === 0) return c.json({ error: "unknown round" }, 404);
+    if (qs.some((q) => q.status === "open" || q.status === "scheduled")) return c.json({ error: "not locked" }, 409);
+
+    const mine = await db.query.predictions.findMany({
+      where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),
+    });
+    const byQ = new Map(mine.map((p) => [p.questionId, p]));
+    const perQuestionPoints = mine.map((p) => p.points ?? 0);
+    const allFirstHour = mine.length > 0 && mine.every((p) => p.firstHour);
+
+    return c.json({
+      date,
+      day_points: dayPoints(perQuestionPoints, allFirstHour),
+      questions: qs.map((q) => {
+        const p = byQ.get(q.id);
+        return {
+          id: q.id,
+          slot: q.slot,
+          text: q.text,
+          outcome: q.outcome,
+          crowd_yes_pct: q.crowdYesPct === null ? null : Number(q.crowdYesPct),
+          my: p ? { answer: p.answer, confidence: p.confidence, points: p.points, brier: p.brier === null ? null : Number(p.brier) } : null,
+        };
+      }),
     });
   });
