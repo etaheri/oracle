@@ -43,6 +43,7 @@ export default function Index() {
             <>
               <Mono size={11} color={colors.gold} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
               <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
+              <Mono size={10} color={colors.gold} style={{ textAlign: "center" }} letterSpacing={2}>THE LEDGER IS READ AT NOON</Mono>
             </>
           )}
           {!round && !today.isLoading && (
