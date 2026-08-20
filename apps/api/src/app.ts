@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Db } from "./db/client";
 import { authRoutes } from "./routes/auth";
+import { roundRoutes } from "./routes/round";
 export type { Db };
 export interface AppEnv {
   DEVICE_TOKEN_SECRET: string;
@@ -14,5 +15,6 @@ export function createApp(deps: Deps) {
   app.use("*", async (c, next) => { c.set("deps", deps); await next(); });
   app.get("/v1/health", (c) => c.json({ ok: true }));
   app.route("/v1/auth", authRoutes);
+  app.route("/v1/round", roundRoutes);
   return app;
 }
