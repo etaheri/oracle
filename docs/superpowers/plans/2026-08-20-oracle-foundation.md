@@ -1768,6 +1768,12 @@ git commit -m "chore: CI workflow (typecheck + tests)"
 - **Plan 3 (Ritual & revenue):** reveal ceremony + Skia share cards, streak surfaces, `POST /v1/auth/merge` (device→Clerk account, transaction), RevenueCat + entitlements webhook + shields, OneSignal pushes, PostHog events, App Review submission.
 - **Plan 4 (Launch surfaces):** Durable Object (live counter, SSE, lock/open alarms), Workers cron jobs (drop, resolution poller, aggregates), oracle_forecasts persistence + reveal integration (core math already done in Task 6), Hermes agent, admin UI, Astro site + OG images, leaderboard + titles, edge caching of `/v1/round/today`.
 
+## Follow-ups carried out of Plan 1's final review (fold into Plans 2–4)
+
+- **Plan 4 (lifecycle):** `resolveQuestion` needs a status guard (409/throw unless question is `locked`) once open→locked transitions exist; make it transactional; unknown-id → 404 not 500. Add spec §1's missing DB artifacts in the Plan 4 migration: confidence CHECK constraint (55..95 step 5) and secondary indexes (`predictions(user_id, created_at)`, `questions(round_date)`, `users(oracle_score desc)`). Consider the SQL-insert-predicate lock check per spec §7 wording. Rate limiting on `/v1/auth/device` is a prod-deploy precondition.
+- **Plan 2/3:** `GET /v1/me` (spec §5) is in no task list yet — schedule it. Decide `idempotency_key`: store it or drop it from the schema. Memoize the Hono app per isolate in worker.ts.
+- **Cosmetic backlog:** zod `z.uuid()` migration, Object.freeze purity test, harness `pg.close()`, dead `beforeEach` import, unknown-device 401 branch test, timing-safe admin-secret compare, idempotent-resubmit stored-values assertion.
+
 ## Self-review notes
 
 - Spec coverage: backend-spec §3 formulas → Tasks 3–5; §4 forecast math → Task 6 (persistence in Plan 4); §1 schema → Task 8 (drafts/forecasts/entitlements tables deferred with their features); §5 endpoints → Tasks 9–12 (merge/leaderboard/live/share deferred as listed); §7 lock-in-SQL + unique index + idempotency → Tasks 8/11.
