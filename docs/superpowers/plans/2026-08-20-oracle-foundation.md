@@ -1353,7 +1353,7 @@ git commit -m "feat(api): GET /v1/round/today without spoilers"
   - resubmission (same user+question) returns the **existing** row with 200 (idempotent — do not error);
   - 409 `{ error: "locked" }` when `now >= locks_at` (checked in the SQL insert predicate);
   - 404 unknown question; 400 invalid body.
-  - `first_hour = createdAt < opensAt + 1h`.
+  - `first_hour = createdAt <= opensAt + 1h` (boundary-inclusive; adjudicated during execution — Task 12's pinned boundary test governs).
 
 - [ ] **Step 1: Write failing tests**
 
