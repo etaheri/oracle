@@ -95,7 +95,13 @@ A **scheduled Worker** (cron, mornings) calling the Anthropic API (Claude Sonnet
 
 Sentry (mobile + Workers), PostHog (product events: `round_opened`, `question_answered`, `round_locked`, `reveal_viewed`, `card_shared`, `paywall_viewed`, `trial_started`, `shield_used`), Workers Logs for the API, RevenueCat dashboard as revenue source-of-truth (also what Shipaton judges read). One PostHog dashboard: D1/D7, share rate, completion, conversion — the four numbers the experiment lives on.
 
-## 10. Build order (compressed for Sept 30)
+## 10. Considered alternatives (decided — don't re-litigate without new facts)
+
+- **Cloudflare D1 instead of Neon:** rejected for v1. D1 lacks interactive transactions (batch only) — the device→account merge and resolution/aggregate batches want them; the noon write spike is a known burst better served by Postgres autoscaling than SQLite single-writer; leaderboard/calibration analytics are window-function-shaped; Neon branching covers dev/preview. Cost accepted: cross-region latency Workers→Neon on writes (Smart Placement mitigates; reads never touch Neon).
+- **Expo Notifications instead of OneSignal:** technically the leaner fit for two daily pushes + simple segments, and remains the fallback if the OneSignal SDK misbehaves near deadline. OneSignal chosen for the Shipaton OneSignal award (requires it), free-tier segmentation, and no-code push-copy A/B.
+- **Braze/Iterable/Customer.io/Knock/Courier:** enterprise or multi-channel overkill. **Raw FCM/APNs:** needless plumbing.
+
+## 11. Build order (compressed for Sept 30)
 
 1. **Today:** Apple Developer enrollment; domain purchase; @ORACLE account + first poll; repo scaffold (`pnpm` + Expo SDK 57 + Hono + Astro skeletons).
 2. **Days 2–7:** `packages/core` scoring w/ tests → api schema + round endpoints → mobile core loop (predict → lock → crowd reveal) with placeholder styling → TestFlight build #1.
