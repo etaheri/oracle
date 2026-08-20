@@ -1,0 +1,5 @@
+design/fonts/trial/
+*.otf
+*.ttf
+!apps/mobile/assets/fonts/*.ttf
+.DS_Store
