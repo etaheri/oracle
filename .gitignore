@@ -1,5 +1,4 @@
+# Dinamo trial fonts — EULA forbids redistribution; never commit (see design/fonts/README.md)
 design/fonts/trial/
-*.otf
-*.ttf
-!apps/mobile/assets/fonts/*.ttf
+# Add licensed Dinamo files here too when purchased, unless license permits repo storage
 .DS_Store
