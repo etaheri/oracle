@@ -2,3 +2,7 @@
 design/fonts/trial/
 # Add licensed Dinamo files here too when purchased, unless license permits repo storage
 .DS_Store
+node_modules/
+dist/
+.wrangler/
+*.tsbuildinfo
