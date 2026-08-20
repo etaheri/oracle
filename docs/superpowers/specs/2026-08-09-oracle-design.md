@@ -56,7 +56,7 @@ The fun economy and the truth economy are strictly separated. This wall is simul
 
 **Palette:** obsidian black, bone/parchment, gold leaf, one deep accent (oxblood). Serif × mono, black × gold — antiquity × machine stated typographically.
 
-**Type:** **ABC Arizona** (Dinamo) is the brand voice — a sans-to-serif variable superfamily whose single axis spans machine (Sans) to temple (Serif/Flare): the brand thesis inside one font file. Signature move: type morphing along the axis at ritual moments (reveals, title promotions). IBM Plex Mono remains the machine/receipt voice. Licensing: Dinamo App/Game + Web licenses (one-time, priced by company size — solo tier); trial fonts for mockups only.
+**Type:** **ABC Arizona Flare** (Dinamo) is the display/temple voice — the flare-serif cut: inscriptional, carved-stone antiquity with a modern edge. IBM Plex Mono remains the machine/receipt voice. Licensing: Flare static weights (2, e.g. Regular + Medium) under Dinamo App/Game + Web licenses (one-time, solo tier); trial fonts for mockups only. Optional upgrade if the quote allows: the Arizona variable superfamily unlocks a sans↔serif axis-morph at ritual moments — garnish, not identity; skip without regret.
 
 **Art sourcing:** all-public-domain oracle art (Wikimedia Commons / Met Open Access, hi-res, free). **Title ladder art: Michelangelo's five Sistine sibyls** (Delphic, Cumaean, Erythraean, Persian, Libyan) map one-to-one to Apprentice → Augur → Seer → Oracle → The Prophet.
 

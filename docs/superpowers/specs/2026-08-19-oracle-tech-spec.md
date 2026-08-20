@@ -44,7 +44,7 @@ oracle/
 | Haptics | `expo-haptics` | Lock-in thunk, reveal tick — ritual feel |
 | Sharing | `expo-sharing` + Skia snapshot | Share sheet with generated PNG |
 
-**Fonts:** **ABC Arizona** (Dinamo; variable superfamily — display + temple voice, incl. axis-morph moments) + **IBM Plex Mono** (machine voice). Loaded via `expo-font` config plugin (embedded at build, no FOUT). Licensing: Dinamo **App/Game license** required before any store build ships the font (trial fonts for local mockups only); **Web license** if the marketing site uses live-text Arizona (or render it into images to skip it). Axis animation: RN Skia variable-axis if workable, else stepped static instances. Fallback if licensing stalls near deadline: Cinzel (open) as temporary display face — ship dates beat fonts.
+**Fonts:** **ABC Arizona Flare** (Dinamo; 2 static weights, display/temple voice) + **IBM Plex Mono** (machine voice). Loaded via `expo-font` config plugin (embedded at build, no FOUT). Licensing: Dinamo **App/Game license** required before any store build ships the font (trial fonts for local mockups only); **Web license** if the marketing site uses live-text Arizona (or render it into images to skip it). Optional: variable superfamily instead of statics unlocks sans↔serif axis-morph (RN Skia variable-axis if workable, else stepped instances) — nice-to-have only. Fallback if licensing stalls near deadline: Cinzel (open) — ship dates beat fonts.
 
 **Store/config:** `app.json` → app.config.ts; iOS `associatedDomains` for universal links; Android intent filters for app links; privacy manifest (Apple requires API-usage declarations); `expo-notifications` entitlements via OneSignal plugin.
 
