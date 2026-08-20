@@ -1,6 +1,5 @@
 import { createApp } from "./app";
-// TODO(task-8): replace with import { makeDb } from "./db/client"
-const makeDb = (_: string) => null as unknown;
+import { makeDb } from "./db/client";
 
 interface WorkerEnv {
   DATABASE_URL: string;

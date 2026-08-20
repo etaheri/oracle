@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-
-export type Db = unknown; // replaced by Drizzle type in Task 8
+import type { Db } from "./db/client";
+export type { Db };
 export interface AppEnv {
   DEVICE_TOKEN_SECRET: string;
   ADMIN_SECRET: string;
