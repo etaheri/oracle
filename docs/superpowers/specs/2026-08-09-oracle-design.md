@@ -43,6 +43,7 @@ The fun economy and the truth economy are strictly separated. This wall is simul
   - Honest confidence is mathematically the optimal strategy (being wrong at 95% hurts far more than at 60%).
   - **Contrarian bonus:** extra points for being right when the crowd majority was wrong. Makes real skill visible fast and generates the best share moments.
   - Becomes statistically meaningful after ~50 predictions — which is itself a retention mechanic ("your Oracle rank unlocks at 50 calls").
+  - **Only complete rounds rate:** answer all five or the day doesn't feed your Oracle Score (partial days still earn points and streak). Kills the answer-only-gimmes exploit; the fun economy remains proper too (daily points are an affine Brier transform — honesty is optimal on both scoreboards).
 - **Leaderboards:** global and weekly, by Oracle Score, with streak shown.
 - **Tone — mystic-playful.** The oracle theme with a wink, carried through all copy, notifications, and share cards. Title ladder by Oracle Score percentile (unlocks after 50 calls): **Apprentice → Augur → Seer → Oracle → The Prophet.** Notification voice: "The Oracle speaks in 15 minutes."
 
@@ -124,6 +125,8 @@ Hard rules, enforced by design:
 - Operator (Erik) approves five per day in a minimal admin web view. Target: under 15 minutes/day. Questions are queued at least 24h ahead so a missed morning never breaks the drop — **the drop must never depend on the agent being alive.**
 - **Resolution** is semi-automated: market close, weather, and sports scores fetched from APIs; one-click confirm in admin. Anything ambiguous is **voided** — no points, clearly labeled in-app, never argued.
 - Questions must be globally unambiguous (UTC-defined cutoffs, named sources: "per NWS", "per official box score").
+- **Leaky questions lock early:** answers gain information through the day (a market question at 11pm is half-resolved). Per-question `locks_at` is the fix — market questions lock at market open/close, game questions at tip-off. The flat first-hour bonus compensates ordinary drift; early locks handle leaks.
+- **Difficulty curve inside the round:** target ≈ one easy win, three genuine tossups, one hard Big One (via the Manifold/Kalshi probability gauge). All-hard rounds make everyone feel dumb daily; most days should deliver at least one "called it."
 - **Trust is UI:** the resolution source prints on every question card (`resolves per NWS, 5pm ET`) and the result receipt shows the actual source data. This inverts the top user complaint about Manifold (arbitrary owner-resolved markets) into a visible brand promise.
 
 ## 7. Architecture

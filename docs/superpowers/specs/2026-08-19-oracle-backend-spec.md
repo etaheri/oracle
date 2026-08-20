@@ -70,11 +70,12 @@ Let `p` = confidence in the player's chosen side (0.55–0.95), `o` = 1 if corre
 
 - **Brier (truth economy):** `b = (p_yes − outcome)²` where `p_yes` = `p` if answered YES else `1−p`. Range 0..0.9025.
 - **Oracle Score:** `1000 × (1 − mean(b) over last ⚙100 resolved, non-void calls)`, shown only when `calls_resolved ≥ ⚙50`. Always-55% coin-flipping ≈ 750; the leaderboard's working range is ~740–950. Tiebreak: crowd-relative mean (player b − crowd b on same questions), which also feeds title percentiles.
-- **Daily points (fun economy), per question:**
-  - correct: `2 × (p×100 − 50)` → 10..90
-  - wrong: `−3 × (p×100 − 50)` → −135..−15 (overconfidence is negative-EV unless you're genuinely right >60% of the time — honesty stays optimal even in the fun economy)
-  - **Contrarian bonus:** ×⚙2 if correct and final `crowd_yes_pct` had your side < ⚙40%
-  - **Big One:** ×2. **First hour:** +⚙10% on the day's positive total.
+- **Complete-rounds rule (anti-abstention):** only predictions from rounds where the player answered **all 5 questions** feed Oracle Score and `calls_resolved`. Prevents farming the rating by answering only easy questions. Enforced at the aggregation query (partial days still earn daily points and streak credit — they just don't rate).
+- **Daily points (fun economy), per question — proper by construction** (affine Brier transform, so honesty is optimal in *both* economies; fixes the corner-solution flaw of a linear payout):
+  - `points = round(mult × ⚙200 × (⚙0.25 − b))`, rounded once at the end (JS `Math.round`, half-up)
+  - Yields wins `+10/+26/+38/+46/+50` and losses `−10/−34/−62/−94/−130` across the 55–95 grid; coin-flip EV = 0
+  - `mult`: **Big One ×2** (wins and losses) × **contrarian ×⚙2** (wins only, when final `crowd_yes_pct` had your side < ⚙40%). The contrarian multiplier mildly rewards overconfidence on contrarian picks — accepted fun-economy distortion; unexploitable pre-lock since the crowd is hidden.
+  - **First hour:** +⚙10% on the day's positive total.
 - **Streak:** played (≥1 lock) each round date = +1. Missed day: consume free monthly shield → hold; else consume paid shield (entitlements.shields_remaining) → hold; else reset. All server-side at drop time for the prior round.
 
 ## 4. The Oracle's forecast (per question, computed at lock)
@@ -124,6 +125,7 @@ GET  /admin/health              → today's counts, unresolved past-due, agent l
 - Server clock is the only clock; `locks_at` enforced in SQL predicate, not app logic.
 - One prediction per (user, question) via unique index; idempotency keys make retries safe.
 - Device tokens: HMAC-signed, per-install, rate-limited minting (sybil cost). Leaderboard/prizes require Clerk account + ⚙50 resolved calls — sybils can inflate crowd % marginally but can't reach status or (later) prizes cheaply; revisit before cash prizes.
+- **Known leak (accepted v1, pre-cash hardening required):** a burner account can lock junk answers to peek at crowd % / oracle forecast and relay to a main account. Low impact at status stakes (being right is still required). Before any cash prize: contrarian classification switches to first-hour crowd only, and/or crowd reveal is delayed.
 - Workers rate limiting on writes (per token + per IP), CORS locked to app/site origins, webhook signature verification, zod on every boundary.
 - PII minimum: email (Clerk-held), display name. No location, no contacts.
 

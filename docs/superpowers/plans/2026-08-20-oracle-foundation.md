@@ -12,7 +12,7 @@
 
 - TypeScript `strict: true` everywhere; no `any` in `packages/core`.
 - All scoring constants live in `packages/core/src/constants.ts` — never inline numbers in formulas elsewhere.
-- Scoring formulas are normative (from backend spec §3): correct → `2×(confidence−50)`; wrong → `−3×(confidence−50)`; Big One ×2 (wins AND losses); contrarian ×2 (wins only, when your side's final crowd % < 40); Brier `b=(p_yes−outcome)²`; Oracle Score `round(1000×(1−mean(b)))` over last 100 resolved non-void, null until 50.
+- Scoring formulas are normative (from backend spec §3): Brier `b=(p_yes−outcome)²`; per-question points `Math.round(mult × 200 × (0.25 − b))` (proper: affine Brier transform; rounded once at the end) where `mult` = Big One ×2 (wins AND losses) × contrarian ×2 (wins only, when your side's final crowd % < 40; "win" = points before rounding > 0); Oracle Score `round(1000×(1−mean(b)))` over last 100 resolved non-void calls **from complete rounds only** (all 5 answered — selection enforced at the aggregation query, Plan 4), null until 50.
 - Confidence is an integer 55–95, step 5, on the *chosen* side.
 - Server clock only; `locks_at` enforced in SQL predicates, not app logic.
 - One prediction per (user, question): DB unique index is the enforcement.
@@ -189,8 +189,8 @@ export const CONSTANTS = {
   CONFIDENCE_MIN: 55,
   CONFIDENCE_MAX: 95,
   CONFIDENCE_STEP: 5,
-  WIN_MULT: 2,          // correct: WIN_MULT × (confidence − 50)
-  LOSS_MULT: 3,         // wrong:  −LOSS_MULT × (confidence − 50)
+  POINTS_SCALE: 200,    // points = round(mult × POINTS_SCALE × (POINTS_BASELINE − brier))
+  POINTS_BASELINE: 0.25, // coin-flip brier — EV of a 50/50 guess is 0 points
   BIG_ONE_MULT: 2,      // applies to wins and losses
   CONTRARIAN_MULT: 2,   // wins only
   CONTRARIAN_CROWD_PCT: 40, // your side's final crowd % must be strictly below this
@@ -282,35 +282,38 @@ describe("brier", () => {
 
 describe("questionPoints", () => {
   const base = { isBigOne: false, crowdYesPct: 50 };
-  it("correct: 2×(confidence−50)", () => {
-    expect(questionPoints({ ...base, answer: true, confidence: 75, outcome: "yes" })).toBe(50);
-    expect(questionPoints({ ...base, answer: true, confidence: 55, outcome: "yes" })).toBe(10);
-    expect(questionPoints({ ...base, answer: true, confidence: 95, outcome: "yes" })).toBe(90);
+  // points = Math.round(mult × 200 × (0.25 − brier)) — proper affine Brier transform.
+  // Win ladder (55..95): 10, 26, 38, 46, 50. Loss ladder: −10, −34, −62, −94, −130.
+  it("correct: round(200×(0.25−brier))", () => {
+    expect(questionPoints({ ...base, answer: true, confidence: 55, outcome: "yes" })).toBe(10);  // b=0.2025 → 9.5 → 10
+    expect(questionPoints({ ...base, answer: true, confidence: 75, outcome: "yes" })).toBe(38);  // b=0.0625 → 37.5 → 38
+    expect(questionPoints({ ...base, answer: true, confidence: 95, outcome: "yes" })).toBe(50);  // b=0.0025 → 49.5 → 50
   });
-  it("wrong: −3×(confidence−50)", () => {
-    expect(questionPoints({ ...base, answer: true, confidence: 75, outcome: "no" })).toBe(-75);
-    expect(questionPoints({ ...base, answer: true, confidence: 95, outcome: "no" })).toBe(-135);
+  it("wrong: same formula, brier > 0.25 goes negative", () => {
+    expect(questionPoints({ ...base, answer: true, confidence: 55, outcome: "no" })).toBe(-10);  // b=0.3025 → −10.5 → −10
+    expect(questionPoints({ ...base, answer: true, confidence: 75, outcome: "no" })).toBe(-62);  // b=0.5625 → −62.5 → −62
+    expect(questionPoints({ ...base, answer: true, confidence: 95, outcome: "no" })).toBe(-130); // b=0.9025 → −130.5 → −130
   });
   it("void: always 0", () => {
     expect(questionPoints({ ...base, answer: true, confidence: 95, outcome: "void" })).toBe(0);
   });
-  it("big one doubles wins and losses", () => {
-    expect(questionPoints({ ...base, isBigOne: true, answer: true, confidence: 75, outcome: "yes" })).toBe(100);
-    expect(questionPoints({ ...base, isBigOne: true, answer: true, confidence: 75, outcome: "no" })).toBe(-150);
+  it("big one doubles wins and losses (multiplied before the single rounding)", () => {
+    expect(questionPoints({ ...base, isBigOne: true, answer: true, confidence: 75, outcome: "yes" })).toBe(75);   // 2×37.5 = 75
+    expect(questionPoints({ ...base, isBigOne: true, answer: true, confidence: 75, outcome: "no" })).toBe(-125);  // 2×−62.5 = −125
   });
   it("contrarian ×2 on wins when your side's crowd % < 40", () => {
-    // answered YES, crowd was 39% YES → contrarian win
-    expect(questionPoints({ isBigOne: false, crowdYesPct: 39, answer: true, confidence: 75, outcome: "yes" })).toBe(100);
+    // answered YES, crowd was 39% YES → contrarian win: 2×37.5 = 75
+    expect(questionPoints({ isBigOne: false, crowdYesPct: 39, answer: true, confidence: 75, outcome: "yes" })).toBe(75);
     // exactly 40 is NOT contrarian
-    expect(questionPoints({ isBigOne: false, crowdYesPct: 40, answer: true, confidence: 75, outcome: "yes" })).toBe(50);
+    expect(questionPoints({ isBigOne: false, crowdYesPct: 40, answer: true, confidence: 75, outcome: "yes" })).toBe(38);
     // NO answer: side pct = 100 − crowdYesPct → 61% YES means 39% NO side
-    expect(questionPoints({ isBigOne: false, crowdYesPct: 61, answer: false, confidence: 75, outcome: "no" })).toBe(100);
+    expect(questionPoints({ isBigOne: false, crowdYesPct: 61, answer: false, confidence: 75, outcome: "no" })).toBe(75);
   });
   it("contrarian never amplifies losses", () => {
-    expect(questionPoints({ isBigOne: false, crowdYesPct: 39, answer: true, confidence: 75, outcome: "no" })).toBe(-75);
+    expect(questionPoints({ isBigOne: false, crowdYesPct: 39, answer: true, confidence: 75, outcome: "no" })).toBe(-62);
   });
   it("big one + contrarian stack: ×4 on a win", () => {
-    expect(questionPoints({ isBigOne: true, crowdYesPct: 39, answer: true, confidence: 75, outcome: "yes" })).toBe(200);
+    expect(questionPoints({ isBigOne: true, crowdYesPct: 39, answer: true, confidence: 75, outcome: "yes" })).toBe(150); // 4×37.5
   });
 });
 ```
@@ -340,18 +343,13 @@ export function questionPoints(input: {
   crowdYesPct: number;
 }): number {
   if (input.outcome === "void") return 0;
-  const correct = (input.outcome === "yes") === input.answer;
-  const magnitude = input.confidence - 50;
-  if (!correct) {
-    return -C.LOSS_MULT * magnitude * (input.isBigOne ? C.BIG_ONE_MULT : 1);
-  }
+  const b = brier({ answer: input.answer, confidence: input.confidence, outcome: input.outcome });
+  const base = C.POINTS_SCALE * (C.POINTS_BASELINE - b); // proper: affine in brier
+  const win = base > 0;
   const sidePct = input.answer ? input.crowdYesPct : 100 - input.crowdYesPct;
-  const contrarian = sidePct < C.CONTRARIAN_CROWD_PCT;
-  return (
-    C.WIN_MULT * magnitude *
-    (input.isBigOne ? C.BIG_ONE_MULT : 1) *
-    (contrarian ? C.CONTRARIAN_MULT : 1)
-  );
+  const contrarian = win && sidePct < C.CONTRARIAN_CROWD_PCT;
+  const mult = (input.isBigOne ? C.BIG_ONE_MULT : 1) * (contrarian ? C.CONTRARIAN_MULT : 1);
+  return Math.round(mult * base); // single rounding at the end
 }
 ```
 
@@ -380,7 +378,7 @@ git commit -m "feat(core): brier and per-question daily points"
 **Interfaces:**
 - Produces:
   - `dayPoints(perQuestion: number[], firstHour: boolean): number` — sums, then adds `round(FIRST_HOUR_BONUS × sum)` only if the sum is positive and firstHour.
-  - `oracleScore(briers: number[]): number | null` — null under `ORACLE_SCORE_MIN_CALLS`; mean over the most recent `ORACLE_SCORE_WINDOW` entries (array ordered oldest→newest); `Math.round(1000 × (1 − mean))`.
+  - `oracleScore(briers: number[]): number | null` — null under `ORACLE_SCORE_MIN_CALLS`; mean over the most recent `ORACLE_SCORE_WINDOW` entries (array ordered oldest→newest); `Math.round(1000 × (1 − mean))`. **Callers must pass briers from complete rounds only** (all 5 answered) — the anti-abstention rule; the selection query lives in Plan 4's aggregation job, this function stays pure.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -1564,9 +1562,9 @@ describe("resolve + reveal cycle", () => {
     const rq = bodyJson.questions.find((x) => x.id === q1)!;
     expect(rq.outcome).toBe("yes");
     expect(rq.crowd_yes_pct).toBe(33);
-    // A: correct, 2×25=50, contrarian ×2 (33% < 40) = 100; first hour: +10% → day 110
-    expect(rq.my!.points).toBe(100);
-    expect(bodyJson.day_points).toBe(110);
+    // A: correct @75 → base 37.5, contrarian ×2 (33% < 40) → round(75) = 75; first hour: +round(7.5)=8 → day 83
+    expect(rq.my!.points).toBe(75);
+    expect(bodyJson.day_points).toBe(83);
   });
 
   it("rejects reveal while any question is still open, and admin without secret", async () => {
