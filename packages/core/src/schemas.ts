@@ -17,3 +17,14 @@ export const PredictionSubmitSchema = z.object({
   idempotency_key: z.string().min(1).max(128),
 });
 export type PredictionSubmit = z.infer<typeof PredictionSubmitSchema>;
+
+export const CrowdSoFarSchema = z.object({
+  questions: z.array(
+    z.object({
+      id: z.string().uuid(),
+      crowd_yes_pct: z.number().int().min(0).max(100),
+      player_count: z.number().int().min(0),
+    }),
+  ),
+});
+export type CrowdSoFar = z.infer<typeof CrowdSoFarSchema>;

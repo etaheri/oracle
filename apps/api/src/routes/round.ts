@@ -30,6 +30,24 @@ export const roundRoutes = new Hono<AppContext>()
       })),
     });
   })
+  .get("/today/crowd", async (c) => {
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
+    if (!round) return c.json({ error: "no open round" }, 404);
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, round.date) });
+    const qIds = qs.map((q) => q.id);
+    const preds = qIds.length
+      ? await db.query.predictions.findMany({ where: inArray(schema.predictions.questionId, qIds) })
+      : [];
+    const mine = new Set(preds.filter((p) => p.userId === userId).map((p) => p.questionId));
+    const questions = [...mine].map((qid) => {
+      const ofQ = preds.filter((p) => p.questionId === qid);
+      const yes = ofQ.filter((p) => p.answer).length;
+      return { id: qid, crowd_yes_pct: Math.round((100 * yes) / ofQ.length), player_count: ofQ.length };
+    });
+    return c.json({ questions });
+  })
   .get("/:date/reveal", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");
