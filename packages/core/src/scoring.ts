@@ -24,3 +24,17 @@ export function questionPoints(input: {
   // Round to high precision first to eliminate floating-point noise, then round to integer
   return Math.round(Math.round(result * 1e10) / 1e10);
 }
+
+export function dayPoints(perQuestion: number[], firstHour: boolean): number {
+  const sum = perQuestion.reduce((a, b) => a + b, 0);
+  if (!firstHour || sum <= 0) return sum;
+  return sum + Math.round(C.FIRST_HOUR_BONUS * sum);
+}
+
+export function oracleScore(briers: number[]): number | null {
+  if (briers.length < C.ORACLE_SCORE_MIN_CALLS) return null;
+  const window = briers.slice(-C.ORACLE_SCORE_WINDOW);
+  const mean = window.reduce((a, b) => a + b, 0) / window.length;
+  const result = 1000 * (1 - mean);
+  return Math.round(Math.round(result * 1e10) / 1e10);
+}
