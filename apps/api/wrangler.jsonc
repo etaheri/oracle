@@ -1,0 +1,8 @@
+{
+  "name": "oracle-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true }
+  // secrets (wrangler secret put): DEVICE_TOKEN_SECRET, ADMIN_SECRET, DATABASE_URL
+}
