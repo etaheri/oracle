@@ -1,9 +1,14 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Screen } from "../ui/Screen";
+import { Serif, Eyebrow } from "../ui/Text";
 
 export default function Index() {
   return (
-    <View style={{ flex: 1, backgroundColor: "#0C0A07", alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ color: "#C9A24B", fontSize: 32, letterSpacing: 12 }}>ORACLE</Text>
-    </View>
+    <Screen>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Eyebrow>Oracle OS v1.0</Eyebrow>
+        <Serif size={40} style={{ marginTop: 24 }}>ORACLE</Serif>
+      </View>
+    </Screen>
   );
 }
