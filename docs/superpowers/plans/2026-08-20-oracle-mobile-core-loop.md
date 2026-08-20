@@ -1213,3 +1213,14 @@ Plan 3: fonts (licensed Arizona/Marcellus+Cinzel via expo-font), Skia (grain/gol
 - Spoiler wall: crowd data flows only through `/today/crowd` (server filters to sealed) and `CrowdReveal` filters to sealed ids client-side; predict screens never query crowd. ✓
 - Type consistency: `RoundToday`/`Reveal`/`CrowdSoFar` defined in core Task 3/5, consumed Tasks 5–10 by those names; `useRoundStore` shape defined Task 7 and consumed in 8–9 as written. `ApiError` defined Task 4, used Task 7. ✓
 - Placeholders: none; every task carries complete code. Task 11 is deliberately a run-through/fix task with evidence artifacts, not code-from-plan.
+
+## Follow-ups carried out of Plan 2's final review (fold into Plan 3)
+
+- **First Plan 3 item — hydrate played/sealed state from the server.** In-memory store resets on relaunch; replayed seals are server-side no-ops (wall holds) but CrowdReveal then shows the replayed local answer, which can contradict server-sealed truth until the next-day ledger. Client must treat server as source of truth on collision.
+- React Query RN wiring: focusManager/onlineManager via AppState; consider refetchInterval on useToday. Fix reveal error-masking (non-409 errors currently render "Return at noon").
+- ConfidenceSlider: pointerEvents="none" on inner views; a11y increment/decrement actions.
+- Swap deprecated react-native SafeAreaView for react-native-safe-area-context.
+- Template cleanup in apps/mobile: README, scripts/reset-project.js, LICENSE decision, app.json name/slug/scheme ("mobile" → oracle), android adaptiveIcon backgroundColor still template blue.
+- Prune unused template deps (@expo/ui, expo-glass-effect, expo-image, expo-symbols, expo-web-browser, expo-device, expo-status-bar, expo-system-ui, react-native-gesture-handler); keep expo-font for Plan 3.
+- Move SubmitResSchema into @oracle/core; ApiError.name + non-JSON guard; dedupe round-questions query; CrowdReveal first-fetch loading state; delete redundant force-counter in round.tsx; +0 prefix consistency.
+- Note: .npmrc node-linker=hoisted exposes phantom-dependency risk repo-wide — declare deps explicitly when adding imports.
