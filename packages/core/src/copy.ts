@@ -90,8 +90,8 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
 ] as const;
 
-// Same char-walk hash as the mobile epigraph: deterministic, and the oracle
-// does not change its mind — one seed key, one line, all day.
+// Char-walk hash (31-multiplier, 32-bit wrapped): deterministic, and the
+// oracle does not change its mind — one seed key, one line, all day.
 export function voiceSeed(key: string): number {
   let h = 0;
   for (const c of key) h = (h * 31 + c.charCodeAt(0)) | 0;
