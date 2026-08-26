@@ -40,20 +40,20 @@ The working tree holds the entire uncommitted parchment retheme (Aug 20 design p
 
 **Files:** everything currently modified/untracked per `git status` (theme, ui components, screens, assets, `design/art-direction/`, `docs/`).
 
-- [ ] **Step 1: Review and stage**
+- [x] **Step 1: Review and stage**
 
 ```bash
 git status --porcelain   # sanity: only expected mobile/design/docs paths
 git add -A
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git commit -m "feat(mobile): parchment art-direction pivot — palette, living icons, night share card"
 ```
 
-- [ ] **Step 3: Verify clean tree**
+- [x] **Step 3: Verify clean tree**
 
 Run: `git status --porcelain` — Expected: empty output.
 
@@ -71,14 +71,14 @@ Convert the VEED alpha webm into the shipping animated WebP, reproducibly.
 **Interfaces:**
 - Produces: `apps/mobile/assets/art/hero-loop.webp` — 1000×562 animated WebP, alpha, 12fps, 60 frames, infinite loop, ≤3MB. Orb center sits at (0.50, 0.47) of the frame. Task 3 requires this exact path.
 
-- [ ] **Step 1: Copy the source into the repo**
+- [x] **Step 1: Copy the source into the repo**
 
 ```bash
 cp "/Users/eriktaheri/Downloads/Oracle Assets_Veed Background Removal_2026-08-26_00-06-10.webm" \
    design/art-direction/hero-loop-source.webm
 ```
 
-- [ ] **Step 2: Write the converter script**
+- [x] **Step 2: Write the converter script**
 
 Create `design/scripts/make-hero-loop.py`:
 
@@ -121,12 +121,12 @@ print(f"{OUT}: {mb:.2f} MB, {len(frames)} frames, {frames[0].size[0]}x{frames[0]
 assert mb <= 3.0, "hero loop too heavy — lower QUALITY or FPS"
 ```
 
-- [ ] **Step 3: Run it and verify output**
+- [x] **Step 3: Run it and verify output**
 
 Run: `python3 design/scripts/make-hero-loop.py` (use a Pillow venv if system python lacks it: `python3 -m venv /tmp/venv && /tmp/venv/bin/pip install pillow && /tmp/venv/bin/python design/scripts/make-hero-loop.py`)
 Expected: prints `hero-loop.webp: ~2.4 MB, 60 frames, 1000x562`, no assert failure.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add design/scripts/make-hero-loop.py design/art-direction/hero-loop-source.webm apps/mobile/assets/art/hero-loop.webp
@@ -147,7 +147,7 @@ Pure functions mapping the crowd's lean to the orb glow color. The anti-herding 
 - Consumes: nothing (pure module — no imports from theme/skia so the test stays node-clean; color anchors are file-local constants matching `theme.ts` `orbLavender`/`orbPeach`).
 - Produces: `crowdLean(entries: ReadonlyArray<{ crowd_yes_pct: number }>): number | null` and `orbGlowRgb(lean: number | null): readonly [number, number, number]`. Task 3 consumes both.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `apps/mobile/test/orbMood.test.ts`:
 
@@ -184,12 +184,12 @@ describe("orbGlowRgb", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm --filter @oracle/mobile test`
 Expected: FAIL — cannot resolve `../src/game/orbMood`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `apps/mobile/src/game/orbMood.ts`:
 
@@ -216,12 +216,12 @@ export function orbGlowRgb(lean: number | null): readonly [number, number, numbe
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm --filter @oracle/mobile test`
 Expected: all pass (11 existing + 7 new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/game/orbMood.ts apps/mobile/test/orbMood.test.ts
@@ -240,7 +240,7 @@ git commit -m "feat(mobile): orb mood — crowd lean to glow color"
 - Consumes: `crowdLean`/`orbGlowRgb` from Task 2; `hero-loop.webp` from Task 1; `useCrowdSoFar(enabled: boolean)` from `src/api/hooks` (returns `{ data?: { questions: { id: string; crowd_yes_pct: number; player_count: number }[] } }`, 10s refetch); `useRoundStore` answers (`Record<string, { sealed: boolean; ... }>`).
 - Produces: `LivingHero({ lean }: { lean: number | null })` — self-sizing full-width hero.
 
-- [ ] **Step 1: Write the component**
+- [x] **Step 1: Write the component**
 
 Create `apps/mobile/src/ui/LivingHero.tsx`:
 
@@ -301,7 +301,7 @@ export function LivingHero({ lean }: { lean: number | null }) {
 }
 ```
 
-- [ ] **Step 2: Wire it into home**
+- [x] **Step 2: Wire it into home**
 
 In `apps/mobile/src/app/index.tsx`:
 - Add imports: `import { LivingHero } from "../ui/LivingHero";`, `import { useCrowdSoFar } from "../api/hooks";` (extend the existing `useToday` import line), `import { crowdLean } from "../game/orbMood";`. Remove the now-unused `Image` import from `expo-image` and `useWindowDimensions` if nothing else uses them.
@@ -319,11 +319,11 @@ const lean = crowdLean(crowd.data?.questions ?? []);
 <LivingHero lean={lean} />
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `pnpm --filter @oracle/mobile exec tsc --noEmit` — Expected: clean.
 
-- [ ] **Step 4: Verify live in simulator**
+- [x] **Step 4: Verify live in simulator**
 
 With wrangler dev (from `apps/api`) and Metro (from `apps/mobile`) running:
 
@@ -338,7 +338,7 @@ sleep 4; kill -INT $REC
 
 Expected: video shows the orb nucleus swirling and hands alive on the parchment; no black box behind the loop (alpha intact); no jank.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/ui/LivingHero.tsx apps/mobile/src/app/index.tsx
@@ -359,7 +359,7 @@ Sealing gets its physical beat: a gold roundel bearing the card's numeral stamps
 - Consumes: `numeral(slot)` from `./CardChrome`; `Ritual` from `./Text`; theme colors.
 - Produces: `SealStamp({ numeral }: { numeral: string })` and `STAMP_MS = 240`. OracleCard's `onSealed()` now fires `STAMP_MS + 320` ms after a successful submit (immediately under reduced motion).
 
-- [ ] **Step 1: Write the stamp component**
+- [x] **Step 1: Write the stamp component**
 
 Create `apps/mobile/src/ui/SealStamp.tsx`:
 
@@ -409,7 +409,7 @@ export function SealStamp({ numeral }: { numeral: string }) {
 }
 ```
 
-- [ ] **Step 2: Wire it into the seal flow**
+- [x] **Step 2: Wire it into the seal flow**
 
 In `apps/mobile/src/ui/OracleCard.tsx`:
 - Imports: `import { CardChrome, numeral } from "./CardChrome";` (extend the existing CardChrome import) and `import { SealStamp, STAMP_MS } from "./SealStamp";`.
@@ -436,16 +436,16 @@ In `apps/mobile/src/ui/OracleCard.tsx`:
 
 (No cleanup needed: the parent keys the card wrapper by question id, so a drawn card remounts fresh and `stamped` resets; `onSealed` only sets parent state, which outlives the timeout.)
 
-- [ ] **Step 3: Typecheck + tests**
+- [x] **Step 3: Typecheck + tests**
 
 Run: `pnpm --filter @oracle/mobile exec tsc --noEmit && pnpm --filter @oracle/mobile test`
 Expected: both clean.
 
-- [ ] **Step 4: Static verification**
+- [x] **Step 4: Static verification**
 
 The stamp end-state can be verified without tapping: temporarily render `<SealStamp numeral="III" />` unconditionally, cold-start, screenshot, confirm roundel centered/rotated over the card, then revert the temp edit. The full seal→stamp→flip sequence in motion needs a hand tap — flag it for the user at handoff.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/ui/SealStamp.tsx apps/mobile/src/ui/OracleCard.tsx
@@ -463,7 +463,7 @@ git commit -m "feat(mobile): wax-seal stamp on SEAL THE PROPHECY"
 - Consumes: the existing `Animated.View key={current.id} entering={...}` wrapper.
 - Produces: cards deal in from the bottom edge with a slight rotation; reduced motion falls back to a short fade.
 
-- [ ] **Step 1: Swap the entering animation**
+- [x] **Step 1: Swap the entering animation**
 
 In `apps/mobile/src/app/round.tsx`:
 - Change the Reanimated import to `import Animated, { Easing, FadeIn, Keyframe } from "react-native-reanimated";` and add `import { useReducedMotion } from "react-native-reanimated";` (same line). Remove `FadeInDown` if now unused.
@@ -487,15 +487,15 @@ const DealIn = new Keyframe({
 
 Fallback if `Keyframe` misbehaves on this Reanimated version (visual jank or a runtime warning): use `SlideInDown.duration(480).easing(Easing.out(Easing.poly(4)))` and drop the rotation.
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `pnpm --filter @oracle/mobile exec tsc --noEmit` — Expected: clean.
 
-- [ ] **Step 3: Verify live**
+- [x] **Step 3: Verify live**
 
 Cold-start to `exp://127.0.0.1:8081/--/round` and record 3s of video (same recipe as Task 3 Step 4). Expected: the first card deals up from the bottom with a settle; no clipping against the progress numerals.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/app/round.tsx
@@ -518,7 +518,7 @@ The share artifact gains Wordle's trick: a text pattern anyone can parse in a fe
 - Consumes: reveal data `d.questions: { slot: number; outcome: string; my: { points: number | null } | null }[]`.
 - Produces: `type QuestionResult = "win" | "loss" | "void" | "none"`; `patternLine(results): string`; `shareMessage({ date, dayPoints, results }): string`. `ShareCardData` becomes `{ date: string; dayPoints: number; bigOneText: string | null; bigOneCrowdPct: number | null; results: ReadonlyArray<QuestionResult> }` — `wins`/`answered` are removed and derived internally.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `apps/mobile/test/sharePattern.test.ts`:
 
@@ -544,12 +544,12 @@ describe("shareMessage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm --filter @oracle/mobile test`
 Expected: FAIL — cannot resolve `../src/game/sharePattern`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `apps/mobile/src/game/sharePattern.ts`:
 
@@ -571,11 +571,11 @@ export function shareMessage(d: { date: string; dayPoints: number; results: Read
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm --filter @oracle/mobile test` — Expected: all pass.
 
-- [ ] **Step 5: Rewire ShareCard**
+- [x] **Step 5: Rewire ShareCard**
 
 In `apps/mobile/src/ui/ShareCard.tsx`:
 - Add `import { shareMessage, type QuestionResult } from "../game/sharePattern";` and delete the local `shareMessage` function.
@@ -624,7 +624,7 @@ const NIGHT_LOSS = "#D9705A"; // text-tier oxblood for the night ground
 
 - Nudge the lower block down to make room: score `y={706}` → `y={724}`, big one `y={790}` → `y={802}`, crowd line `y={830}` → `y={840}`. Rules stay put.
 
-- [ ] **Step 6: Rewire the reveal screen**
+- [x] **Step 6: Rewire the reveal screen**
 
 In `apps/mobile/src/app/reveal/[date].tsx`:
 - Add `import type { QuestionResult } from "../../game/sharePattern";`
@@ -644,16 +644,16 @@ In `apps/mobile/src/app/reveal/[date].tsx`:
 
 - Change the share-button condition `{answered > 0 && (` to `{results.some((r) => r !== "none") && (`.
 
-- [ ] **Step 7: Typecheck + tests**
+- [x] **Step 7: Typecheck + tests**
 
 Run: `pnpm --filter @oracle/mobile exec tsc --noEmit && pnpm --filter @oracle/mobile test`
 Expected: clean; all tests pass.
 
-- [ ] **Step 8: Verify the night card visually**
+- [x] **Step 8: Verify the night card visually**
 
 Temporarily change the ShareCard canvas style `left: -9999` to `left: 0` with `transform: [{ scale: 0.55 }], transformOrigin: "top left"`, cold-start to `exp://127.0.0.1:8081/--/reveal/2026-08-20`, screenshot, confirm: numerals row centered between orb and score, colors legible, no overlap. REVERT the temp edit.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/mobile/src/game/sharePattern.ts apps/mobile/test/sharePattern.test.ts apps/mobile/src/ui/ShareCard.tsx "apps/mobile/src/app/reveal/[date].tsx"
@@ -667,23 +667,23 @@ git commit -m "feat(mobile): wordle-grade share pattern — numerals on card + m
 **Files:**
 - Create: `docs/superpowers/plans/assets/delight-pass/` (screenshots + clips)
 
-- [ ] **Step 1: Clean state**
+- [x] **Step 1: Clean state**
 
 Run: `pnpm --filter @oracle/mobile exec tsc --noEmit && pnpm --filter @oracle/mobile test`
 Expected: clean, all tests green. `git status --porcelain` shows no stray temp edits.
 
-- [ ] **Step 2: Capture evidence**
+- [x] **Step 2: Capture evidence**
 
 With API + Metro up, cold-start and capture: (a) 4s video of home (living hero swirling), (b) 3s video of round entry (deal-in), (c) screenshot of reveal. Copy into `docs/superpowers/plans/assets/delight-pass/`.
 
-- [ ] **Step 3: Commit evidence**
+- [x] **Step 3: Commit evidence**
 
 ```bash
 git add docs/superpowers/plans/assets/delight-pass/
 git commit -m "chore(mobile): delight-pass evidence"
 ```
 
-- [ ] **Step 4: Hand-test handoff**
+- [x] **Step 4: Hand-test handoff**
 
 Tell the user what needs a human hand: (1) seal a card — feel the stamp + heavy haptic, watch stamp→flip; (2) fire the share sheet from a played round and check the pattern message; (3) confirm the hero loop doesn't stutter on device (simulator decode ≠ device decode).
 
