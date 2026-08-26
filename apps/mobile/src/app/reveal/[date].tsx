@@ -10,6 +10,7 @@ import { Serif, Mono, Ritual, Eyebrow } from "../../ui/Text";
 import { GoldButton } from "../../ui/Button";
 import { GoldFrame } from "../../ui/GoldFrame";
 import { TopBar } from "../../ui/TopBar";
+import { AsciiDust } from "../../ui/TerminalPatina";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
 import type { QuestionResult } from "../../game/sharePattern";
 import { useReveal } from "../../api/hooks";
@@ -36,7 +37,15 @@ export default function RevealScreen() {
     return () => clearTimeout(t);
   }, [loaded, reducedMotion]);
 
-  if (reveal.isLoading) return <Screen><TopBar /><Eyebrow>Consulting the void…</Eyebrow></Screen>;
+  if (reveal.isLoading) return (
+    <Screen>
+      <TopBar />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
+        <AsciiDust />
+        <Eyebrow>Consulting the void…</Eyebrow>
+      </View>
+    </Screen>
+  );
   if (!reveal.data || "pending" in reveal.data) {
     return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>

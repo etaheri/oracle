@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { View, ActivityIndicator } from "react-native";
+import { View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
 import { OracleCard } from "../ui/OracleCard";
 import { CrowdReveal } from "../ui/CrowdReveal";
+import { AsciiDust } from "../ui/TerminalPatina";
 import { numeral } from "../ui/CardChrome";
 import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
@@ -28,7 +29,15 @@ export default function Round() {
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
 
-  if (today.isLoading) return <Screen><TopBar /><ActivityIndicator color={colors.agedGold} /></Screen>;
+  if (today.isLoading) return (
+    <Screen>
+      <TopBar />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
+        <AsciiDust />
+        <Eyebrow>The oracle is consulted</Eyebrow>
+      </View>
+    </Screen>
+  );
   if (!today.data) return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}><Eyebrow>The oracle sleeps</Eyebrow><Serif size={20}>No round is open.</Serif></View></Screen>;
 
   const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
