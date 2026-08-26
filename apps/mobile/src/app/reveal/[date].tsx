@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
-import Animated, { FadeIn, FadeInDown, Easing, useReducedMotion } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 import { useCanvasRef } from "@shopify/react-native-skia";
 import { Screen } from "../../ui/Screen";
@@ -12,6 +12,7 @@ import { GoldFrame } from "../../ui/GoldFrame";
 import { TopBar } from "../../ui/TopBar";
 import { AsciiDust } from "../../ui/TerminalPatina";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
+import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
 import { useReveal } from "../../api/hooks";
 import { colors, space } from "../../theme";
@@ -22,6 +23,13 @@ const ROW_STAGGER = 90;
 const POINTS_DELAY = ROW_DELAY + 4 * ROW_STAGGER + 200;
 const BIG_ONE_DELAY = POINTS_DELAY + 350;
 
+// One golden surge through the Big One frame when the player beat the tide.
+const TideFlash = new Keyframe({
+  0: { opacity: 0 },
+  40: { opacity: 1 },
+  100: { opacity: 0, easing: Easing.out(Easing.poly(4)) },
+}).duration(900).delay(BIG_ONE_DELAY + 500);
+
 export default function RevealScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const reveal = useReveal(date ?? null);
@@ -30,12 +38,23 @@ export default function RevealScreen() {
   const [sharing, setSharing] = useState(false);
   const loaded = !!reveal.data && !("pending" in reveal.data);
 
-  // The day-points landing is the ceremony's beat — mark it in the hand.
+  // The day-points landing is the ceremony's beat — the number finishes its
+  // roll, THEN the haptic lands. A contrarian big-one win gets a double
+  // heavy strike at the Big One's entrance.
   useEffect(() => {
     if (!loaded) return;
-    const t = setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), reducedMotion ? 0 : POINTS_DELAY);
-    return () => clearTimeout(t);
-  }, [loaded, reducedMotion]);
+    const d2 = reveal.data;
+    const big2 = d2 && !("pending" in d2) ? d2.questions.find((q) => q.slot === 5) : undefined;
+    const side = big2?.my && big2.crowd_yes_pct !== null ? (big2.my.answer ? big2.crowd_yes_pct : 100 - big2.crowd_yes_pct) : null;
+    const tide = side !== null && side < 40 && (big2?.my?.points ?? 0) > 0;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
+    if (tide && !reducedMotion) {
+      timers.push(setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), BIG_ONE_DELAY + 650));
+      timers.push(setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), BIG_ONE_DELAY + 800));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [loaded, reducedMotion, reveal.data]);
 
   if (reveal.isLoading) return (
     <Screen>
@@ -56,7 +75,8 @@ export default function RevealScreen() {
 
   const d = reveal.data;
   const big = d.questions.find((q) => q.slot === 5);
-  const pos = d.day_points >= 0;
+  const bigSide = big?.my && big.crowd_yes_pct !== null ? (big.my.answer ? big.crowd_yes_pct : 100 - big.crowd_yes_pct) : null;
+  const contrarianWin = bigSide !== null && bigSide < 40 && (big?.my?.points ?? 0) > 0;
   const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult =>
     !q.my ? "none" : q.outcome === "void" ? "void" : (q.my.points ?? 0) > 0 ? "win" : "loss");
   const cardData: ShareCardData = {
@@ -78,7 +98,7 @@ export default function RevealScreen() {
       <ScrollView contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}>
         <Eyebrow>{`Day ${d.date} · the ledger is read`}</Eyebrow>
         <Animated.View entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)} style={{ alignItems: "center", gap: space(1) }}>
-          <Ritual bold size={54} color={pos ? colors.goldText : colors.vermilion} letterSpacing={2}>{pos ? `+${d.day_points}` : String(d.day_points)}</Ritual>
+          <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
           <Mono size={9} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
         </Animated.View>
         <View>
@@ -99,6 +119,9 @@ export default function RevealScreen() {
         {big && (
           <Animated.View entering={FadeInDown.delay(BIG_ONE_DELAY).duration(500).easing(easeOut)}>
           <GoldFrame style={{ backgroundColor: colors.goldWash }}>
+            {contrarianWin && !reducedMotion && (
+              <Animated.View pointerEvents="none" entering={TideFlash} style={[StyleSheet.absoluteFill, { backgroundColor: colors.goldWash }]} />
+            )}
             {/* Temple voice: art sits inside the frame, never behind body text (spec §3b). */}
             <View style={{ height: 110, overflow: "hidden" }}>
               <Image
@@ -113,21 +136,23 @@ export default function RevealScreen() {
             <View style={{ padding: space(3), gap: space(2) }}>
               <Ritual bold size={11} letterSpacing={4}>✶ THE BIG ONE</Ritual>
               <Serif size={17}>{big.text}</Serif>
-              {big.my && big.crowd_yes_pct !== null && (() => {
-                const sidePct = big.my.answer ? big.crowd_yes_pct : 100 - big.crowd_yes_pct;
-                const contrarianWin = sidePct < 40 && (big.my.points ?? 0) > 0;
-                return (
-                  <View style={{ gap: space(1) }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Mono size={11}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
-                      <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
-                        {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
-                      </Mono>
-                    </View>
-                    <Mono size={10} color={colors.mutedInk}>CROWD SAID {big.crowd_yes_pct}% YES{contrarianWin ? " · AGAINST THE TIDE ×2" : ""}</Mono>
+              {big.my && big.crowd_yes_pct !== null && (
+                <View style={{ gap: space(1) }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Mono size={11}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
+                    <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
+                      {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
+                    </Mono>
                   </View>
-                );
-              })()}
+                  <Mono size={10} color={colors.mutedInk}>CROWD SAID {big.crowd_yes_pct}% YES</Mono>
+                  {contrarianWin && (
+                    <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
+                      <Ritual bold size={14} letterSpacing={3}>AGAINST THE TIDE</Ritual>
+                      <Ritual bold size={22} color={colors.agedGold} letterSpacing={1}>×2</Ritual>
+                    </Animated.View>
+                  )}
+                </View>
+              )}
             </View>
           </GoldFrame>
           </Animated.View>
