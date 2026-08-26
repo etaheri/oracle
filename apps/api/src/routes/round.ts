@@ -48,6 +48,21 @@ export const roundRoutes = new Hono<AppContext>()
     });
     return c.json({ questions });
   })
+  .get("/today/mine", async (c) => {
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
+    if (!round) return c.json({ error: "no open round" }, 404);
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, round.date) });
+    const mine = qs.length
+      ? await db.query.predictions.findMany({
+          where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),
+        })
+      : [];
+    return c.json({
+      predictions: mine.map((p) => ({ question_id: p.questionId, answer: p.answer, confidence: p.confidence })),
+    });
+  })
   .get("/:date/reveal", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");

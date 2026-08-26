@@ -47,6 +47,17 @@ export const RoundTodaySchema = z.object({
 });
 export type RoundToday = z.infer<typeof RoundTodaySchema>;
 
+export const MineTodaySchema = z.object({
+  predictions: z.array(
+    z.object({
+      question_id: z.string().uuid(),
+      answer: z.boolean(),
+      confidence: z.number().int(),
+    }),
+  ),
+});
+export type MineToday = z.infer<typeof MineTodaySchema>;
+
 export const RevealSchema = z.object({
   date: z.string(),
   day_points: z.number().int(),
