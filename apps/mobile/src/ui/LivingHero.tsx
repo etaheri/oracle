@@ -4,6 +4,7 @@ import { Canvas, Circle, RadialGradient, vec } from "@shopify/react-native-skia"
 import { useReducedMotion } from "react-native-reanimated";
 import { space } from "../theme";
 import { orbGlowRgb } from "../game/orbMood";
+import { AsciiDust } from "./TerminalPatina";
 
 // The living hero: the VEED alpha loop (both hands + swirling orb) over a
 // Skia glow tinted by the crowd's mood (src/game/orbMood.ts). The loop is
@@ -43,6 +44,15 @@ export function LivingHero({ lean }: { lean: number | null }) {
           />
         </Circle>
       </Canvas>
+      {/* Patina halo: sparse glyphs collect around the orb, between the glow
+          and the loop — the hands and orb paint over them (brief §4: ASCII
+          never obscures anatomy). */}
+      <View
+        pointerEvents="none"
+        style={{ position: "absolute", left: w * ORB_CX - (h * 1.15) / 2, top: h * ORB_CY - (h * 1.15) / 2 }}
+      >
+        <AsciiDust size={h * 1.15} intensity={0.22} gate={0.18} />
+      </View>
       <Image
         source={require("../../assets/art/hero-loop.webp")}
         contentFit="contain"
