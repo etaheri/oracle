@@ -6,6 +6,15 @@ import { schema, type Db } from "../db/client";
 // Deterministic — selectLine hashes userId+date, so a re-run composes the
 // identical batch (safe to retry). The TRIGGER is Plan-4 cron work; nothing
 // in production calls this yet.
+//
+// PLAN-4 OBLIGATIONS (final review 2026-08-26) — the trigger that wires this
+// must also implement, none are expressible here without it:
+//   1. Lapsed pushes fire AT MOST ONCE PER LAPSE, never daily (spec §4) —
+//      needs a last-lapsed-push marker per user.
+//   2. The lapsed tier must only compose after the round actually resolved.
+//   3. hasResults is round-level here; the trigger should pass per-user
+//      resolution state (an all-void player currently satisfies "results").
+//   4. Bound the audience query — users.findMany() is unbounded.
 const NOON = COPY_BANK.filter((l) => l.pool === "noon");
 const NOON_PLAYED = NOON.filter((l) => !l.requires?.includes("lapsed"));
 const NOON_LAPSED = NOON.filter((l) => l.requires?.includes("lapsed"));
