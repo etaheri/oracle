@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View, ActivityIndicator } from "react-native";
-import Animated, { FadeInDown, Easing } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
@@ -11,8 +11,16 @@ import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { colors, space } from "../theme";
 
+// Cards come off a deck: up from the bottom edge, slightly rotated, settling
+// with the house easing. Reduced motion gets a plain 200ms fade.
+const DealIn = new Keyframe({
+  0: { transform: [{ translateY: 560 }, { rotate: "-5deg" }], opacity: 0.9 },
+  100: { transform: [{ translateY: 0 }, { rotate: "0deg" }], opacity: 1, easing: Easing.out(Easing.poly(4)) },
+}).duration(480);
+
 export default function Round() {
   const today = useToday();
+  const reducedMotion = useReducedMotion();
   const answers = useRoundStore((s) => s.answers);
   const [revealedId, setRevealedId] = useState<string | null>(null);
 
@@ -33,7 +41,7 @@ export default function Round() {
       <TopBar label={`DAY ${today.data.date}`} />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         {current ? (
-          <Animated.View key={current.id} entering={FadeInDown.duration(350).easing(Easing.out(Easing.poly(4)))}>
+          <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : DealIn}>
             <OracleCard
               q={current}
               revealed={revealedQ?.id === current.id}

@@ -9,7 +9,8 @@ import { colors, space } from "../theme";
 import { Serif, Mono } from "./Text";
 import { GoldButton } from "./Button";
 import { ConfidenceSlider } from "./ConfidenceSlider";
-import { CardChrome } from "./CardChrome";
+import { CardChrome, numeral } from "./CardChrome";
+import { SealStamp, STAMP_MS } from "./SealStamp";
 import { CrowdBar } from "./CrowdReveal";
 import type { RoundToday } from "@oracle/core";
 
@@ -29,6 +30,7 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
   const entry = answers[q.id];
   const submit = useSubmit();
   const [error, setError] = useState<string | null>(null);
+  const [stamped, setStamped] = useState(false);
   const reducedMotion = useReducedMotion();
   const flip = useSharedValue(revealed ? 180 : 0);
 
@@ -52,8 +54,15 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
     try {
       await submit.mutateAsync({ question_id: q.id, answer: entry.answer, confidence: entry.confidence, idempotency_key: entry.idempotencyKey });
       markSealed(q.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onSealed();
+      if (reducedMotion) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onSealed();
+        return;
+      }
+      // Stamp lands, heavy haptic at its settle, then the flip.
+      setStamped(true);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), STAMP_MS);
+      setTimeout(onSealed, STAMP_MS + 320);
     } catch (e) {
       setError(e instanceof ApiError && e.status === 409 ? "THE ORACLE HAS CLOSED" : "THE CONNECTION WAVERS — TRY AGAIN");
     }
@@ -85,6 +94,7 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
           {error && <Mono size={11} color={colors.vermilion} style={{ textAlign: "center" }}>{error}</Mono>}
           <GoldButton title={submit.isPending ? "SEALING…" : "SEAL THE PROPHECY"} onPress={seal} disabled={!entry || submit.isPending} />
         </CardChrome>
+        {stamped && <SealStamp numeral={numeral(q.slot)} />}
       </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, backStyle]}>
         <CardChrome slot={q.slot} title="The crowd speaks" big={q.is_big_one} fill caption="THE LEDGER IS READ TOMORROW AT NOON">
