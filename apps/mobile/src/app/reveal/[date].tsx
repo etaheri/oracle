@@ -67,6 +67,7 @@ export default function RevealScreen() {
   );
   if (!reveal.data || "pending" in reveal.data) {
     return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
+      <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
       <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
       <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }}>Return at noon.</Mono>

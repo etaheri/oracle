@@ -3,6 +3,7 @@ import { Canvas, Rect, Circle, Line, Fill, vec, Text as SkText, Image as SkImage
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { colors } from "../theme";
+import { PatinaHalo } from "./TerminalPatina";
 import { shareMessage, type QuestionResult } from "../game/sharePattern";
 
 // Offscreen Skia surface (design spec §7) shaped as a literal oracle card
@@ -93,6 +94,20 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       <Circle cx={CARD_W / 2} cy={432} r={280}>
         <RadialGradient c={vec(CARD_W / 2, 432)} r={280} colors={["rgba(247,246,242,0.28)", "rgba(183,169,228,0.12)", "rgba(18,26,43,0)"]} />
       </Circle>
+      {/* Terminal Patina halo atmosphere (brief §4): sparse glass-blue glyphs
+          collect around the orb halo. Drawn UNDER the orb so the rim overdraws
+          the inner cells and the warm center stays completely clear; the outer
+          radius stops short of the divider and the pattern row (copy-safe). */}
+      <PatinaHalo
+        x={CARD_W / 2 - 220}
+        y={432 - 220}
+        width={440}
+        height={440}
+        center={[CARD_W / 2, 432]}
+        innerR={160}
+        outerR={200}
+        seed={[...data.date].reduce((a, c) => a + c.charCodeAt(0), 0) % 97}
+      />
       {orb && <SkImage image={orb} x={CARD_W / 2 - 180} y={252} width={360} height={360} fit="contain" />}
       {/* The pattern row: numerals colored by result (gold win / warm loss / dim
           void+unanswered). Color-only here — Cinzel has no ✓/✗ and Skia has no

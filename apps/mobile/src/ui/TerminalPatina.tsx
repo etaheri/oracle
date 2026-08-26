@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Canvas, Fill, ImageShader, Shader, Skia, useClock, useImage } from "@shopify/react-native-skia";
+import { Canvas, Fill, ImageShader, Rect, Shader, Skia, useClock, useImage } from "@shopify/react-native-skia";
 import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 
 // Terminal Patina (brand brief §4-5, spec 2026-08-26-terminal-patina-shader.md):
@@ -63,6 +63,7 @@ if (!effect) console.error("Terminal Patina SkSL unavailable — ASCII effects d
 
 const LAVENDER = [183, 169, 228] as const;
 const GOLD = [126, 101, 56] as const; // goldText
+const GLASS_BLUE = [156, 181, 209] as const; // glassBlue
 
 // Marked 'worklet' (spec deviation from brief's literal listing): this runs
 // inside useDerivedValue on the UI thread, and Reanimated 4.5.1 does not
@@ -118,6 +119,66 @@ export function AsciiDust({
         </Shader>
       </Fill>
     </Canvas>
+  );
+}
+
+// Terminal Patina proper (spec mode 1): the static museum-artifact treatment,
+// for embedding inside an existing Skia canvas — glyphs collecting around an
+// orb halo (brief §4 "halo atmosphere"). No clock: the mode is "static or
+// nearly static" by definition, and its one consumer is the share-card
+// snapshot, which must render deterministically. `seed` varies the glyph
+// pattern between artifacts without animating it.
+export function PatinaHalo({
+  x,
+  y,
+  width,
+  height,
+  center,
+  innerR,
+  outerR,
+  color = GLASS_BLUE,
+  intensity = 0.34,
+  gate = 0.2,
+  cellW = 12,
+  cellH = 16,
+  seed = 7,
+}: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  center: readonly [number, number];
+  innerR: number;
+  outerR: number;
+  color?: readonly [number, number, number];
+  intensity?: number;
+  gate?: number;
+  cellW?: number;
+  cellH?: number;
+  seed?: number;
+}) {
+  const atlas = useImage(ATLAS);
+  if (!effect || !atlas) return null;
+  return (
+    <Rect x={x} y={y} width={width} height={height}>
+      <Shader
+        source={effect}
+        uniforms={{
+          atlasSize: [ATLAS_W, ATLAS_H],
+          glyphCount: GLYPH_COUNT,
+          cell: [cellW, cellH],
+          intensity,
+          t: seed,
+          tint: tintOf(color),
+          center: [center[0], center[1]],
+          innerR,
+          outerR,
+          gate,
+        }}
+      >
+        <ImageShader image={atlas} rect={{ x: 0, y: 0, width: ATLAS_W, height: ATLAS_H }} />
+      </Shader>
+    </Rect>
   );
 }
 
