@@ -50,7 +50,15 @@ half4 main(float2 xy) {
   return half4(half3(tint.rgb) * a, a);
 }`;
 
-const effect = Skia.RuntimeEffect.Make(PATINA_SKSL)!;
+// Guarded, not asserted (brief §11: the app must remain fully usable if shader
+// effects are disabled) — a compile failure degrades to "no ASCII" rather than
+// crashing the app.
+let effect: ReturnType<typeof Skia.RuntimeEffect.Make> = null;
+try {
+  effect = Skia.RuntimeEffect.Make(PATINA_SKSL);
+} catch (e) {
+  console.error("Terminal Patina SkSL failed to compile:", e);
+}
 
 const LAVENDER = [183, 169, 228] as const;
 const GOLD = [126, 101, 56] as const; // goldText
@@ -100,7 +108,7 @@ export function AsciiDust({
     gate,
   }), [size, color, intensity, gate, innerRatio, outerRatio, reducedMotion]);
 
-  if (!atlas) return null;
+  if (!effect || !atlas) return null;
   return (
     <Canvas style={{ width: size, height: size }} pointerEvents="none">
       <Fill>
@@ -153,7 +161,7 @@ export function AsciiActivation({
     };
   }, [width, height, maxR]);
 
-  if (reducedMotion || !atlas || width === 0 || height === 0) return null;
+  if (reducedMotion || !effect || !atlas || width === 0 || height === 0) return null;
   return (
     <Canvas style={{ position: "absolute", left: 0, top: 0, width, height }} pointerEvents="none">
       <Fill>
