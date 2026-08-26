@@ -64,4 +64,17 @@ describe("sendPushes", () => {
     const out = await sendPushes({}, [{ userId: "u1", text: "THE LEDGER IS READ." }]);
     expect(out).toEqual({ sent: 0, skipped: 1 });
   });
+
+  it("skips the push rather than aborting the batch when fetch throws", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    try {
+      const out = await sendPushes({ ONESIGNAL_APP_ID: "app", ONESIGNAL_API_KEY: "key" }, [
+        { userId: "u1", text: "THE LEDGER IS READ." },
+        { userId: "u2", text: "WHAT WAS SEALED IS NOW SETTLED." },
+      ]);
+      expect(out).toEqual({ sent: 0, skipped: 2 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

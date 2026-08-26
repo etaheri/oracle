@@ -8,17 +8,21 @@ export async function sendPushes(
   if (!env.ONESIGNAL_APP_ID || !env.ONESIGNAL_API_KEY) return { sent: 0, skipped: pushes.length };
   let sent = 0;
   for (const p of pushes) {
-    const res = await fetch("https://onesignal.com/api/v1/notifications", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Basic ${env.ONESIGNAL_API_KEY}` },
-      body: JSON.stringify({
-        app_id: env.ONESIGNAL_APP_ID,
-        include_aliases: { external_id: [p.userId] },
-        target_channel: "push",
-        contents: { en: p.text },
-      }),
-    });
-    if (res.ok) sent++;
+    try {
+      const res = await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Basic ${env.ONESIGNAL_API_KEY}` },
+        body: JSON.stringify({
+          app_id: env.ONESIGNAL_APP_ID,
+          include_aliases: { external_id: [p.userId] },
+          target_channel: "push",
+          contents: { en: p.text },
+        }),
+      });
+      if (res.ok) sent++;
+    } catch {
+      // spec §7: an unreachable OneSignal skips the push, never the batch
+    }
   }
   return { sent, skipped: pushes.length - sent };
 }
