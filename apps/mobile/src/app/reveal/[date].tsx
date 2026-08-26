@@ -11,6 +11,7 @@ import { GoldButton } from "../../ui/Button";
 import { GoldFrame } from "../../ui/GoldFrame";
 import { TopBar } from "../../ui/TopBar";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
+import type { QuestionResult } from "../../game/sharePattern";
 import { useReveal } from "../../api/hooks";
 import { colors, space } from "../../theme";
 
@@ -47,14 +48,14 @@ export default function RevealScreen() {
   const d = reveal.data;
   const big = d.questions.find((q) => q.slot === 5);
   const pos = d.day_points >= 0;
-  const answered = d.questions.filter((q) => q.my).length;
+  const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult =>
+    !q.my ? "none" : q.outcome === "void" ? "void" : (q.my.points ?? 0) > 0 ? "win" : "loss");
   const cardData: ShareCardData = {
     date: d.date,
-    wins: d.questions.filter((q) => q.my && q.outcome !== "void" && (q.my.points ?? 0) > 0).length,
-    answered,
     dayPoints: d.day_points,
     bigOneText: big?.text ?? null,
     bigOneCrowdPct: big?.crowd_yes_pct ?? null,
+    results,
   };
 
   async function onShare() {
@@ -122,7 +123,7 @@ export default function RevealScreen() {
           </GoldFrame>
           </Animated.View>
         )}
-        {answered > 0 && (
+        {results.some((r) => r !== "none") && (
           <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 300).duration(400).easing(easeOut)}>
             <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />
           </Animated.View>

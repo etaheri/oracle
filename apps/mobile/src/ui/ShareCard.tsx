@@ -3,9 +3,10 @@ import { Canvas, Rect, Circle, Line, Fill, vec, Text as SkText, Image as SkImage
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { colors } from "../theme";
+import { shareMessage, type QuestionResult } from "../game/sharePattern";
 
 // Offscreen Skia surface (design spec §7) shaped as a literal oracle card
-// (5:8, frame + register marks). The app lives on parchment by day; the
+// (5:8, frame + register marks). The app lives in the museum by day; the
 // shared prophecy goes out in the night realm — midnight ground, glowing orb
 // (design/art-direction/orb-on-midnight-navy.png).
 export const CARD_W = 640;
@@ -15,19 +16,14 @@ const TICK = 22;
 const OVER = 9;
 const NIGHT_LINE = "rgba(247,246,242,0.16)";
 const NIGHT_DIM = "rgba(247,246,242,0.55)";
+const NIGHT_LOSS = "#D9705A"; // text-tier vermilion for the midnight ground (5.3:1)
 
 export interface ShareCardData {
   date: string;
-  wins: number;
-  answered: number;
   dayPoints: number;
   bigOneText: string | null;
   bigOneCrowdPct: number | null;
-}
-
-export function shareMessage(d: ShareCardData): string {
-  const points = d.dayPoints >= 0 ? `+${d.dayPoints}` : String(d.dayPoints);
-  return `🔮 ORACLE ${d.date} — ${d.wins}/${d.answered} · ${points} · can you outsee me?`;
+  results: ReadonlyArray<QuestionResult>;
 }
 
 export async function shareCard(ref: RefObject<any>, data: ShareCardData): Promise<void> {
@@ -78,7 +74,9 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const mono = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 18);
 
   const points = data.dayPoints >= 0 ? `+${data.dayPoints}` : String(data.dayPoints);
-  const scoreLine = `${data.wins}/${data.answered} · ${points}`;
+  const wins = data.results.filter((r) => r === "win").length;
+  const answered = data.results.filter((r) => r !== "none").length;
+  const scoreLine = `${wins}/${answered} · ${points}`;
   const bigOne = data.bigOneText ? ellipsize(data.bigOneText, display, CARD_W - 130) : null;
   // No "✶" here: Skia text has no font fallback and Plex Mono lacks the glyph.
   const crowdLine = data.bigOneCrowdPct !== null ? `THE BIG ONE · CROWD SAID ${data.bigOneCrowdPct}% YES` : null;
@@ -96,9 +94,26 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
         <RadialGradient c={vec(CARD_W / 2, 432)} r={280} colors={["rgba(247,246,242,0.28)", "rgba(183,169,228,0.12)", "rgba(18,26,43,0)"]} />
       </Circle>
       {orb && <SkImage image={orb} x={CARD_W / 2 - 180} y={252} width={360} height={360} fit="contain" />}
-      {score && <SkText font={score} text={scoreLine} x={centered(score, scoreLine)} y={706} color={colors.warmCenter} />}
-      {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={790} color={colors.museumWhite} />}
-      {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={830} color={NIGHT_DIM} />}
+      {/* The pattern row: numerals colored by result (gold win / warm loss / dim
+          void+unanswered). Color-only here — Cinzel has no ✓/✗ and Skia has no
+          font fallback; the share message string carries the exact marks. */}
+      {numeralFont && (() => {
+        const nums = ["I", "II", "III", "IV", "V"];
+        const gap = 34;
+        const widths = nums.map((n) => numeralFont.measureText(n).width);
+        const total = widths.reduce((a, b) => a + b, 0) + gap * (nums.length - 1);
+        let x = (CARD_W - total) / 2;
+        return nums.map((n, i) => {
+          const r = data.results[i] ?? "none";
+          const color = r === "win" ? colors.agedGold : r === "loss" ? NIGHT_LOSS : NIGHT_DIM;
+          const el = <SkText key={n} font={numeralFont} text={n} x={x} y={672} color={color} />;
+          x += widths[i] + gap;
+          return el;
+        });
+      })()}
+      {score && <SkText font={score} text={scoreLine} x={centered(score, scoreLine)} y={724} color={colors.warmCenter} />}
+      {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={802} color={colors.museumWhite} />}
+      {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
       {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={950} color={colors.agedGold} />}
     </Canvas>
