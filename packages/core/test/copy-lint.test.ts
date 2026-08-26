@@ -21,7 +21,7 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
   });
   it("register: mono caps, no emoji, no exclamation, no CTA verbs", () => {
     for (const l of COPY_BANK) {
-      expect(l.text, l.id).toBe(l.text.toUpperCase());
+      expect(l.text.replace(/\{[a-z]+\}/g, ""), l.id).toBe(l.text.replace(/\{[a-z]+\}/g, "").toUpperCase());
       expect(l.text, l.id).not.toMatch(EMOJI);
       expect(l.text, l.id).not.toContain("!");
       for (const b of BANNED) expect(l.text, l.id).not.toContain(b);

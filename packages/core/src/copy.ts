@@ -19,8 +19,8 @@ export const LITURGY = LITURGY_LINES.join(" ");
 
 export function fillSlots(text: string, slots: { n?: number; streak?: number }): string {
   return text
-    .replace(/\{N\}/g, slots.n === undefined ? "{N}" : String(slots.n))
-    .replace(/\{STREAK\}/g, slots.streak === undefined ? "{STREAK}" : String(slots.streak));
+    .replace(/\{n\}/g, slots.n === undefined ? "{n}" : String(slots.n))
+    .replace(/\{streak\}/g, slots.streak === undefined ? "{streak}" : String(slots.streak));
 }
 
 export const COPY_BANK: ReadonlyArray<CopyLine> = [
@@ -30,7 +30,7 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.generic-3", pool: "noon", text: "THE LEDGER IS READ. THE CROWD IS COUNTING ITS WOUNDS." },
   { id: "noon.generic-4", pool: "noon", text: "WHAT WAS SEALED IS NOW SETTLED." },
   { id: "noon.generic-5", pool: "noon", text: "THE ORB HAS SPOKEN. THE LEDGER AGREES." },
-  { id: "noon.read-1", pool: "noon", text: "THE LEDGER IS READ. {N} OF YOUR ANSWERS DID NOT SURVIVE.", requires: ["results"] },
+  { id: "noon.read-1", pool: "noon", text: "THE LEDGER IS READ. {n} OF YOUR ANSWERS DID NOT SURVIVE.", requires: ["results"] },
   { id: "noon.read-2", pool: "noon", text: "THE LEDGER IS READ. ONE OF YOUR ANSWERS SURPRISED US.", requires: ["results"] },
   { id: "noon.read-3", pool: "noon", text: "THE CROWD MOVED. YOU DID NOT. THE LEDGER REMEMBERS WHO WAS RIGHT.", requires: ["results"] },
   { id: "noon.read-4", pool: "noon", text: "NOON HAS PASSED. YOUR CONVICTION HAS BEEN WEIGHED.", requires: ["results"] },
@@ -46,15 +46,15 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.lapsed-1", pool: "noon", text: "THE LEDGER WAS READ WITHOUT YOU. TOMORROW IT NEED NOT BE.", requires: ["lapsed"] },
   { id: "noon.lapsed-2", pool: "noon", text: "THE CROWD SPOKE. YOUR LINE IS BLANK.", requires: ["lapsed"] },
   { id: "noon.lapsed-3", pool: "noon", text: "NOON CAME AND WENT. THE ORB DID NOT HEAR FROM YOU.", requires: ["lapsed"] },
-  { id: "noon.vigil-1", pool: "noon", text: "{STREAK} DAYS WITHOUT SILENCE. THE ORACLE NOTICES.", requires: ["results", "streak"] },
-  { id: "noon.vigil-2", pool: "noon", text: "DAY {STREAK} OF YOUR VIGIL IS WRITTEN.", requires: ["results", "streak"] },
-  { id: "noon.vigil-3", pool: "noon", text: "THE LEDGER IS READ. YOUR VIGIL HOLDS AT {STREAK} DAYS.", requires: ["results", "streak"] },
-  { id: "noon.vigil-4", pool: "noon", text: "ANOTHER NOON, ANOTHER PAGE. {STREAK} WITHOUT A GAP.", requires: ["results", "streak"] },
+  { id: "noon.vigil-1", pool: "noon", text: "{streak} DAYS WITHOUT SILENCE. THE ORACLE NOTICES.", requires: ["results", "streak"] },
+  { id: "noon.vigil-2", pool: "noon", text: "DAY {streak} OF YOUR VIGIL IS WRITTEN.", requires: ["results", "streak"] },
+  { id: "noon.vigil-3", pool: "noon", text: "THE LEDGER IS READ. YOUR VIGIL HOLDS AT {streak} DAYS.", requires: ["results", "streak"] },
+  { id: "noon.vigil-4", pool: "noon", text: "ANOTHER NOON, ANOTHER PAGE. {streak} WITHOUT A GAP.", requires: ["results", "streak"] },
   // ── closing: the call. Unsealed players only, hours before lock. ──
   { id: "closing.call-1", pool: "closing", text: "FIVE QUESTIONS. THE ORB IS OPEN UNTIL NOON." },
   { id: "closing.call-2", pool: "closing", text: "THE QUESTIONS ARE POSTED. THE CROWD IS ALREADY MOVING." },
   { id: "closing.call-3", pool: "closing", text: "TODAY'S LEDGER IS BLANK. IT WILL NOT STAY THAT WAY." },
-  { id: "closing.call-4", pool: "closing", text: "{N} ORACLES HAVE ALREADY SPOKEN. THE ORB WAITS FOR YOU.", requires: ["players"] },
+  { id: "closing.call-4", pool: "closing", text: "{n} ORACLES HAVE ALREADY SPOKEN. THE ORB WAITS FOR YOU.", requires: ["players"] },
   { id: "closing.call-5", pool: "closing", text: "THE BIG ONE IS WORTH THE MOST. IT IS ALSO THE HARDEST. THIS IS NOT A COINCIDENCE." },
   { id: "closing.call-6", pool: "closing", text: "THE ORB CLOSES AT NOON. IT DOES NOT REOPEN." },
   { id: "closing.call-7", pool: "closing", text: "THREE HOURS REMAIN. THE CROWD HAS NOT WAITED." },
@@ -72,11 +72,11 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "closing.call-19", pool: "closing", text: "SPEAK BEFORE NOON OR HOLD YOUR PEACE UNTIL TOMORROW." },
   { id: "closing.call-20", pool: "closing", text: "THE LEDGER TAKES NO LATE ENTRIES." },
   // ── streak: vigil lines for in-app surfaces. ──
-  { id: "streak.vigil-1", pool: "streak", text: "{STREAK} DAYS WITHOUT SILENCE.", requires: ["streak"] },
-  { id: "streak.vigil-2", pool: "streak", text: "YOUR VIGIL HOLDS. {STREAK} DAYS AND COUNTING.", requires: ["streak"] },
-  { id: "streak.vigil-3", pool: "streak", text: "THE ORACLE KEEPS COUNT. {STREAK}.", requires: ["streak"] },
-  { id: "streak.vigil-4", pool: "streak", text: "{STREAK} CONSECUTIVE NOONS. THE LEDGER APPROVES.", requires: ["streak"] },
-  { id: "streak.vigil-5", pool: "streak", text: "A VIGIL OF {STREAK} DAYS IS NOT LUCK.", requires: ["streak"] },
+  { id: "streak.vigil-1", pool: "streak", text: "{streak} DAYS WITHOUT SILENCE.", requires: ["streak"] },
+  { id: "streak.vigil-2", pool: "streak", text: "YOUR VIGIL HOLDS. {streak} DAYS AND COUNTING.", requires: ["streak"] },
+  { id: "streak.vigil-3", pool: "streak", text: "THE ORACLE KEEPS COUNT. {streak}.", requires: ["streak"] },
+  { id: "streak.vigil-4", pool: "streak", text: "{streak} CONSECUTIVE NOONS. THE LEDGER APPROVES.", requires: ["streak"] },
+  { id: "streak.vigil-5", pool: "streak", text: "A VIGIL OF {streak} DAYS IS NOT LUCK.", requires: ["streak"] },
   { id: "streak.lapse-1", pool: "streak", text: "YESTERDAY THE ORB WENT UNCONSULTED. IT DID NOT GO UNREAD." },
   { id: "streak.lapse-2", pool: "streak", text: "A GAP IN THE LEDGER IS NOT THE END OF IT." },
   { id: "streak.lapse-3", pool: "streak", text: "STREAKS END. RECORDS REMAIN." },
