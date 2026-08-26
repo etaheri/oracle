@@ -13,7 +13,7 @@ export function CrowdBar({ pct }: { pct: number }) {
   const style = useAnimatedStyle(() => ({ transform: [{ scaleX: scale.value }] }));
   return (
     <View style={{ height: 3, backgroundColor: colors.lineSoft }}>
-      <Animated.View style={[{ position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", transformOrigin: "left", backgroundColor: colors.gold }, style]} />
+      <Animated.View style={[{ position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", transformOrigin: "left", backgroundColor: colors.agedGold }, style]} />
     </View>
   );
 }
@@ -35,11 +35,11 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
           return (
             <View key={q.id} style={{ gap: space(1.5) }}>
-              <Serif size={15} color={colors.inkDim} numberOfLines={2}>{q.text}</Serif>
+              <Serif size={15} color={colors.mutedInk} numberOfLines={2}>{q.text}</Serif>
               <CrowdBar pct={c.crowd_yes_pct} />
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Mono size={10} color={colors.goldDeep}>{c.crowd_yes_pct}% SAY YES</Mono>
-                <Mono size={10} color={mySidePct < 40 ? colors.goldDeep : colors.umber}>
+                <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>
+                <Mono size={10} color={mySidePct < 40 ? colors.goldText : colors.mutedInk}>
                   {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{mySidePct < 40 ? " · AGAINST THE TIDE" : ""}
                 </Mono>
               </View>
@@ -47,10 +47,10 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           );
         })}
       </View>
-      <Mono size={11} color={colors.goldDeep} style={{ textAlign: "center" }} letterSpacing={2}>
+      <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
         {playerCount} ORACLES CONSULTED
       </Mono>
-      <Mono size={10} color={colors.umber} style={{ textAlign: "center" }}>
+      <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>
         The ledger is read tomorrow at noon.
       </Mono>
     </View>

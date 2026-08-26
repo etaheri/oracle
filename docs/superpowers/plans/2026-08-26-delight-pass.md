@@ -10,6 +10,15 @@
 
 **Spec:** `docs/superpowers/specs/` (design 2026-08-09 §3b/§7) + art direction in `design/art-direction/` + the approved delight ideation (this plan's parent conversation, 2026-08-26).
 
+## Rev 2 — Brand Brief Reconciliation (2026-08-26)
+
+The brand brief (`docs/superpowers/specs/2026-08-26-oracle-brand-brief.md`) landed after this plan was written and supersedes the parchment-era tokens. A **brand-v2 retheme executes between Task 0 and Task 1** (museumWhite `#F7F6F2` ground, frescoWhite `#F3F0E9` cards, ink `#17191F`/mutedInk `#666A73` text, agedGold `#AA8A50` borders + derived goldText `#7E6538` text tier, ultramarine `#243D78` = YES, vermilion `#A84B35` = NO, midnightMuseum `#121A2B` night, glassBlue/lavender/warmCenter decorative; chrome quiets per the approved "card = artifact" ruling — Cinzel survives only in wordmark, numerals, day points, and the card/share artifacts; buttons go mono). Apply these substitutions when executing later tasks:
+
+- Task 2 `orbMood.ts` anchors: NEUTRAL = lavender `[183,169,228]`, WARM = warmCenter `[242,190,145]`, COOL = glassBlue-leaning `[156,181,209]`. Update test expectations accordingly.
+- Task 4 SealStamp: `colors.gold` → `colors.agedGold`, `colors.goldDeep` → `colors.goldText`.
+- Task 6 night card: `NIGHT_LINE`/`NIGHT_DIM` are museumWhite-based rgba; `NIGHT_LOSS = "#D9705A"` (5.3:1 on midnightMuseum); win = `colors.agedGold`.
+- Terminal Patina phase 1 (per `2026-08-26-terminal-patina-shader.md`) is scheduled AFTER this plan completes.
+
 ## Global Constraints
 
 - Expo SDK 57 exact — read https://docs.expo.dev/versions/v57.0.0/ before using any Expo API (per `apps/mobile/AGENTS.md`).

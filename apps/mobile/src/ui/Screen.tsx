@@ -5,7 +5,7 @@ import { Grain } from "./Grain";
 
 export function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.parchment }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.museumWhite }}>
       <View style={{ flex: 1, padding: space(5) }}>{children}</View>
       <Grain />
     </SafeAreaView>

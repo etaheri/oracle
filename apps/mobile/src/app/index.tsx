@@ -39,14 +39,14 @@ export default function Index() {
         />
         <Ritual bold size={52} color={colors.ink} letterSpacing={14} style={{ marginRight: -14 }}>ORACLE</Ritual>
         <View style={{ gap: space(2), alignItems: "center" }}>
-          <Mono size={12} color={colors.inkDim} style={{ textAlign: "center", lineHeight: 20 }}>{QUOTE}</Mono>
-          <Mono size={10} color={colors.goldDeep} letterSpacing={3}>— YOGI BERRA</Mono>
+          <Mono size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }}>{QUOTE}</Mono>
+          <Mono size={10} color={colors.goldText} letterSpacing={3}>— YOGI BERRA</Mono>
         </View>
       </View>
       <View style={{ gap: space(3), paddingBottom: space(2) }}>
         {round && !allSealed && (
           <>
-            <Mono size={11} color={colors.goldDeep} style={{ textAlign: "center" }} letterSpacing={2}>
+            <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
               {round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
             </Mono>
             <GoldButton title="ENTER" onPress={() => router.push("/round")} />
@@ -54,13 +54,13 @@ export default function Index() {
         )}
         {round && allSealed && (
           <>
-            <Mono size={11} color={colors.goldDeep} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
+            <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
             <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
-            <Mono size={10} color={colors.umber} style={{ textAlign: "center" }} letterSpacing={2}>THE LEDGER IS READ AT NOON</Mono>
+            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE LEDGER IS READ AT NOON</Mono>
           </>
         )}
         {!round && !today.isLoading && (
-          <Mono size={11} color={colors.umber} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
+          <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
         )}
         <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />
       </View>

@@ -19,7 +19,7 @@ export function GoldFrame({ children, style, ...rest }: ViewProps) {
   }, []);
 
   if (reducedMotion) {
-    return <View {...rest} style={[{ borderWidth: 1, borderColor: colors.gold }, style]}>{children}</View>;
+    return <View {...rest} style={[{ borderWidth: 1, borderColor: colors.agedGold }, style]}>{children}</View>;
   }
 
   return (
@@ -31,7 +31,7 @@ export function GoldFrame({ children, style, ...rest }: ViewProps) {
             <LinearGradient
               start={vec(0, 0)}
               end={vec(size.w, size.h)}
-              colors={[colors.gold, colors.goldBright, colors.gold]}
+              colors={[colors.agedGold, colors.warmCenter, colors.agedGold]}
               positions={positions}
             />
           </Rect>

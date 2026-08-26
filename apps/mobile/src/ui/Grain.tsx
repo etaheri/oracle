@@ -2,8 +2,10 @@ import { StyleSheet, useWindowDimensions } from "react-native";
 import { Canvas, Fill, Shader, Skia, useClock } from "@shopify/react-native-skia";
 import { useDerivedValue, useReducedMotion } from "react-native-reanimated";
 
-// Signature shader #1 (design spec §7): paper grain + foxing mottle + aged-edge
-// vignette. One full-screen pass over every screen; the parchment stops being flat #hex.
+// Signature shader #1 (design spec §7, quieted per brief §3): mineral grain +
+// faint plaster mottle + gentle ambient falloff. Perceived subconsciously —
+// the museum white stops being flat #hex without the texture ever reading as
+// a feature.
 const GRAIN_SKSL = `
 uniform float2 res;
 uniform float t;
@@ -30,13 +32,13 @@ half4 main(float2 xy) {
   float2 c = uv - 0.5;
   float vig = smoothstep(0.62, 1.15, length(c) * 1.6);
 
-  half4 sepia = half4(0.16, 0.12, 0.07, 1.0);
-  half4 cream = half4(0.99, 0.97, 0.92, 1.0);
+  half4 mineral = half4(0.09, 0.10, 0.12, 1.0);
+  half4 plaster = half4(1.0, 0.995, 0.975, 1.0);
 
   half fleck = half(g - 0.5);
-  half4 col = fleck > 0.0 ? cream * fleck * 0.05 : sepia * (-fleck) * 0.06;
-  col += sepia * half(mottle) * 0.028;
-  col += sepia * half(vig) * 0.10;
+  half4 col = fleck > 0.0 ? plaster * fleck * 0.035 : mineral * (-fleck) * 0.04;
+  col += mineral * half(mottle) * 0.014;
+  col += mineral * half(vig) * 0.05;
   return col;
 }`;
 

@@ -40,7 +40,7 @@ export default function RevealScreen() {
     return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
       <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
-      <Mono size={11} color={colors.umber} style={{ textAlign: "center" }}>Return at noon.</Mono>
+      <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }}>Return at noon.</Mono>
     </View></Screen>;
   }
 
@@ -68,19 +68,19 @@ export default function RevealScreen() {
       <ScrollView contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}>
         <Eyebrow>{`Day ${d.date} · the ledger is read`}</Eyebrow>
         <Animated.View entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)} style={{ alignItems: "center", gap: space(1) }}>
-          <Ritual bold size={54} color={pos ? colors.goldDeep : colors.oxblood} letterSpacing={2}>{pos ? `+${d.day_points}` : String(d.day_points)}</Ritual>
-          <Mono size={9} color={colors.umber} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
+          <Ritual bold size={54} color={pos ? colors.goldText : colors.vermilion} letterSpacing={2}>{pos ? `+${d.day_points}` : String(d.day_points)}</Ritual>
+          <Mono size={9} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
         </Animated.View>
         <View>
           {d.questions.filter((q) => q.slot !== 5).map((q, i) => {
             const won = q.my && q.outcome !== "void" && q.my.points !== null && q.my.points > 0;
             const mark = q.outcome === "void" ? "∅" : won ? "✓" : q.my ? "✗" : "·";
-            const color = q.outcome === "void" ? colors.umber : won ? colors.goldDeep : q.my ? colors.oxblood : colors.umber;
+            const color = q.outcome === "void" ? colors.mutedInk : won ? colors.goldText : q.my ? colors.vermilion : colors.mutedInk;
             return (
               <Animated.View key={q.id} entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
                 style={{ flexDirection: "row", gap: space(2), paddingVertical: space(2), borderBottomWidth: 1, borderBottomColor: colors.lineSoft, alignItems: "baseline" }}>
                 <Mono size={12} color={color}>{mark}</Mono>
-                <Mono size={11} color={colors.inkDim} style={{ flex: 1 }} numberOfLines={2}>{q.text}</Mono>
+                <Mono size={11} color={colors.mutedInk} style={{ flex: 1 }} numberOfLines={2}>{q.text}</Mono>
                 <Mono size={12} color={color}>{q.my?.points != null ? (q.my.points > 0 ? `+${q.my.points}` : String(q.my.points)) : "—"}</Mono>
               </Animated.View>
             );
@@ -110,11 +110,11 @@ export default function RevealScreen() {
                   <View style={{ gap: space(1) }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                       <Mono size={11}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
-                      <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldDeep : colors.oxblood}>
+                      <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
                         {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
                       </Mono>
                     </View>
-                    <Mono size={10} color={colors.umber}>CROWD SAID {big.crowd_yes_pct}% YES{contrarianWin ? " · AGAINST THE TIDE ×2" : ""}</Mono>
+                    <Mono size={10} color={colors.mutedInk}>CROWD SAID {big.crowd_yes_pct}% YES{contrarianWin ? " · AGAINST THE TIDE ×2" : ""}</Mono>
                   </View>
                 );
               })()}

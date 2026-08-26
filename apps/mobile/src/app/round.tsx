@@ -20,7 +20,7 @@ export default function Round() {
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
 
-  if (today.isLoading) return <Screen><TopBar /><ActivityIndicator color={colors.gold} /></Screen>;
+  if (today.isLoading) return <Screen><TopBar /><ActivityIndicator color={colors.agedGold} /></Screen>;
   if (!today.data) return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}><Eyebrow>The oracle sleeps</Eyebrow><Serif size={20}>No round is open.</Serif></View></Screen>;
 
   const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
@@ -49,12 +49,12 @@ export default function Round() {
       </View>
       <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
         {qs.map((q) => (
-          <Ritual key={q.id} size={12} color={answers[q.id]?.sealed ? colors.goldDeep : "rgba(42,33,24,0.25)"} letterSpacing={1}>
+          <Ritual key={q.id} size={12} color={answers[q.id]?.sealed ? colors.goldText : "rgba(23,25,31,0.22)"} letterSpacing={1}>
             {numeral(q.slot)}
           </Ritual>
         ))}
       </View>
-      <Mono size={9} color={colors.umber} style={{ textAlign: "center", paddingTop: space(2) }}>
+      <Mono size={9} color={colors.mutedInk} style={{ textAlign: "center", paddingTop: space(2) }}>
         The crowd's leaning is hidden until you commit.
       </Mono>
     </Screen>

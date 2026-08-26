@@ -13,8 +13,8 @@ export const CARD_H = 1024;
 const INSET = 30;
 const TICK = 22;
 const OVER = 9;
-const NIGHT_LINE = "rgba(233,225,205,0.18)";
-const NIGHT_DIM = "rgba(233,225,205,0.55)";
+const NIGHT_LINE = "rgba(247,246,242,0.16)";
+const NIGHT_DIM = "rgba(247,246,242,0.55)";
 
 export interface ShareCardData {
   date: string;
@@ -63,7 +63,7 @@ function RegisterMarks() {
   return (
     <>
       {lines.map((l, i) => (
-        <Line key={i} p1={vec(l.p1[0], l.p1[1])} p2={vec(l.p2[0], l.p2[1])} color={colors.gold} strokeWidth={1.5} opacity={0.9} />
+        <Line key={i} p1={vec(l.p1[0], l.p1[1])} p2={vec(l.p2[0], l.p2[1])} color={colors.agedGold} strokeWidth={1.5} opacity={0.9} />
       ))}
     </>
   );
@@ -85,22 +85,22 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
 
   return (
     <Canvas ref={canvasRef} style={{ position: "absolute", left: -9999, top: 0, width: CARD_W, height: CARD_H }}>
-      <Fill color={colors.night} />
+      <Fill color={colors.midnightMuseum} />
       <Rect x={INSET + 0.5} y={INSET + 0.5} width={CARD_W - 2 * INSET - 1} height={CARD_H - 2 * INSET - 1} style="stroke" strokeWidth={1} color={NIGHT_LINE} />
       <RegisterMarks />
-      {numeralFont && <SkText font={numeralFont} text="V" x={centered(numeralFont, "V")} y={92} color={colors.gold} />}
-      {ritual && <SkText font={ritual} text="ORACLE" x={centered(ritual, "ORACLE")} y={152} color={colors.nightBone} />}
-      {mono && <SkText font={mono} text={`DAY ${data.date}`} x={centered(mono, `DAY ${data.date}`)} y={192} color={colors.gold} />}
+      {numeralFont && <SkText font={numeralFont} text="V" x={centered(numeralFont, "V")} y={92} color={colors.agedGold} />}
+      {ritual && <SkText font={ritual} text="ORACLE" x={centered(ritual, "ORACLE")} y={152} color={colors.museumWhite} />}
+      {mono && <SkText font={mono} text={`DAY ${data.date}`} x={centered(mono, `DAY ${data.date}`)} y={192} color={colors.agedGold} />}
       <Line p1={vec(INSET + 40, 218)} p2={vec(CARD_W - INSET - 40, 218)} color={NIGHT_LINE} strokeWidth={1} />
       <Circle cx={CARD_W / 2} cy={432} r={280}>
-        <RadialGradient c={vec(CARD_W / 2, 432)} r={280} colors={["rgba(233,225,205,0.30)", "rgba(178,166,203,0.10)", "rgba(6,16,32,0)"]} />
+        <RadialGradient c={vec(CARD_W / 2, 432)} r={280} colors={["rgba(247,246,242,0.28)", "rgba(183,169,228,0.12)", "rgba(18,26,43,0)"]} />
       </Circle>
       {orb && <SkImage image={orb} x={CARD_W / 2 - 180} y={252} width={360} height={360} fit="contain" />}
-      {score && <SkText font={score} text={scoreLine} x={centered(score, scoreLine)} y={706} color={colors.goldBright} />}
-      {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={790} color={colors.nightBone} />}
+      {score && <SkText font={score} text={scoreLine} x={centered(score, scoreLine)} y={706} color={colors.warmCenter} />}
+      {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={790} color={colors.museumWhite} />}
       {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={830} color={NIGHT_DIM} />}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
-      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={950} color={colors.gold} />}
+      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={950} color={colors.agedGold} />}
     </Canvas>
   );
 }

@@ -35,16 +35,16 @@ export function CardChrome({ slot, title, caption, big = false, fill = false, ch
   slot: number; title: string; caption?: string; big?: boolean; fill?: boolean; children: React.ReactNode;
 }) {
   return (
-    <View style={{ borderWidth: 1, borderColor: big ? colors.gold : colors.line, backgroundColor: colors.vellum, padding: space(6), paddingVertical: space(5), ...(fill ? { flex: 1 } : null) }}>
+    <View style={{ borderWidth: 1, borderColor: big ? colors.agedGold : colors.line, backgroundColor: colors.frescoWhite, padding: space(6), paddingVertical: space(5), ...(fill ? { flex: 1 } : null) }}>
       <RegisterMarks />
       <View style={{ alignItems: "center", gap: space(1) }}>
-        <Ritual bold size={13} color={colors.goldDeep} letterSpacing={4} style={{ marginRight: -4 }}>{numeral(slot)}</Ritual>
+        <Ritual bold size={13} color={colors.goldText} letterSpacing={4} style={{ marginRight: -4 }}>{numeral(slot)}</Ritual>
         <Eyebrow>{title}</Eyebrow>
         <View style={{ height: 1, alignSelf: "stretch", backgroundColor: colors.lineSoft, marginTop: space(1) }} />
       </View>
       <View style={{ gap: space(3), paddingVertical: space(3), ...(fill ? { flex: 1 } : null) }}>{children}</View>
       {caption ? (
-        <Mono size={9} color={colors.umber} letterSpacing={2} style={{ textAlign: "center" }}>{caption}</Mono>
+        <Mono size={9} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{caption}</Mono>
       ) : null}
     </View>
   );
