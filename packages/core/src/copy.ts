@@ -89,3 +89,22 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.creed-1", pool: "system", text: "NOTHING IS REVISED. NOTHING IS FORGOTTEN." },
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
 ] as const;
+
+// Same char-walk hash as the mobile epigraph: deterministic, and the oracle
+// does not change its mind — one seed key, one line, all day.
+export function voiceSeed(key: string): number {
+  let h = 0;
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return Math.abs(h);
+}
+
+export function selectLine(
+  lines: ReadonlyArray<CopyLine>,
+  seedKey: string,
+  satisfied: ReadonlyArray<Requirement>,
+): CopyLine | null {
+  const have = new Set(satisfied);
+  const eligible = lines.filter((l) => (l.requires ?? []).every((r) => have.has(r)));
+  if (eligible.length === 0) return null;
+  return eligible[voiceSeed(seedKey) % eligible.length]!;
+}
