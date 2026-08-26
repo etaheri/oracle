@@ -1,10 +1,11 @@
-import { View, useWindowDimensions } from "react-native";
-import { Image } from "expo-image";
+import { View } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { GoldButton, QuietLink } from "../ui/Button";
-import { useToday } from "../api/hooks";
+import { LivingHero } from "../ui/LivingHero";
+import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { crowdLean } from "../game/orbMood";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
 
@@ -19,24 +20,21 @@ export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
   const router = useRouter();
-  const { width } = useWindowDimensions();
 
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
   const yesterday = yesterdayOf(round?.date);
+  const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
+  const crowd = useCrowdSoFar(anySealed);
+  const lean = crowdLean(crowd.data?.questions ?? []);
 
   return (
     <Screen>
       <Eyebrow>Oracle OS v1.0</Eyebrow>
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(6) }}>
-        {/* Temple moment: the near-touch, unframed — the art's parchment merges
-            with the app ground so the hands float on the page itself. */}
-        <Image
-          source={require("../../assets/art/creation-hands-orb.jpg")}
-          contentFit="cover"
-          style={{ width: width - space(6), aspectRatio: 1408 / 768 }}
-          accessible={false}
-        />
+        {/* Temple moment: the near-touch, alive — transparent loop over the
+            museum ground, glow tinted by the crowd's mood. */}
+        <LivingHero lean={lean} />
         <Ritual bold size={52} color={colors.ink} letterSpacing={14} style={{ marginRight: -14 }}>ORACLE</Ritual>
         <View style={{ gap: space(2), alignItems: "center" }}>
           <Mono size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }}>{QUOTE}</Mono>
