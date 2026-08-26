@@ -80,3 +80,16 @@ export const RevealSchema = z.object({
   ),
 });
 export type Reveal = z.infer<typeof RevealSchema>;
+
+export const MeLedgerSchema = z.object({
+  oracle_score: z.number().int().nullable(),
+  days_consulted: z.number().int(),
+  streak: z.number().int(),
+  accuracy_pct: z.number().int().nullable(),
+  avg_confidence: z.number().int().nullable(),
+  tide_wins: z.number().int(),
+  majority_rate: z.number().nullable(),
+  epithet: z.object({ id: z.string(), title: z.string(), receipt: z.string() }),
+  computed_through: z.string(),
+});
+export type MeLedger = z.infer<typeof MeLedgerSchema>;
