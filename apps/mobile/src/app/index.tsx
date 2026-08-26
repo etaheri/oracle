@@ -8,10 +8,9 @@ import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
+import { epigraphFor } from "../game/epigraph";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
-
-const QUOTE = `"It's tough to make predictions,\nespecially about the future."`;
 
 function yesterdayOf(date: string | undefined): string {
   const base = date ? new Date(`${date}T00:00:00Z`) : new Date();
@@ -30,6 +29,9 @@ export default function Index() {
   const crowd = useCrowdSoFar(anySealed);
   const lean = crowdLean(crowd.data?.questions ?? []);
   useHydratePlayedState(!!round);
+  // The daily placard: keyed to the round's date when the oracle is awake,
+  // the device's otherwise — same date, same line, all day.
+  const epigraph = epigraphFor(round?.date ?? new Date().toISOString().slice(0, 10));
 
   return (
     <Screen>
@@ -39,9 +41,9 @@ export default function Index() {
             museum ground, glow tinted by the crowd's mood. */}
         <LivingHero lean={lean} />
         <Ritual bold size={52} color={colors.ink} letterSpacing={14} style={{ marginRight: -14 }}>ORACLE</Ritual>
-        <View style={{ gap: space(2), alignItems: "center" }}>
-          <Mono size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }}>{QUOTE}</Mono>
-          <Mono size={10} color={colors.goldText} letterSpacing={3}>— YOGI BERRA</Mono>
+        <View style={{ gap: space(2), alignItems: "center", paddingHorizontal: space(5) }}>
+          <Mono size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }}>{`"${epigraph.text}"`}</Mono>
+          <Mono size={10} color={colors.goldText} letterSpacing={3}>{`— ${epigraph.source.toUpperCase()}`}</Mono>
         </View>
       </View>
       <View style={{ gap: space(3), paddingBottom: space(2) }}>
