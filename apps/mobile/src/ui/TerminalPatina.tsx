@@ -59,6 +59,7 @@ try {
 } catch (e) {
   console.error("Terminal Patina SkSL failed to compile:", e);
 }
+if (!effect) console.error("Terminal Patina SkSL unavailable — ASCII effects disabled");
 
 const LAVENDER = [183, 169, 228] as const;
 const GOLD = [126, 101, 56] as const; // goldText
@@ -152,7 +153,7 @@ export function AsciiActivation({
       glyphCount: GLYPH_COUNT,
       cell: [CELL_W, CELL_H],
       intensity: 0.8 * (1 - Math.abs(2 * p - 1)),
-      t: Math.floor(clock.value / 125),
+      t: p >= 1 ? 0 : Math.floor(clock.value / 125),
       tint: tintOf(GOLD),
       center: [width / 2, height / 2],
       innerR: Math.max(0, outerR - width * 0.45),
