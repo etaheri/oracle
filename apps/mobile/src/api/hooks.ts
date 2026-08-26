@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, type PredictionSubmit } from "@oracle/core";
 import { z } from "zod";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
@@ -28,6 +28,22 @@ export function useCrowdSoFar(enabled: boolean) {
   });
 }
 
+export function useMineToday(enabled: boolean) {
+  return useQuery({
+    queryKey: ["round", "mine"],
+    enabled,
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      try {
+        return await api("/v1/round/today/mine", MineTodaySchema, { token });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
+}
+
 export function useReveal(date: string | null) {
   return useQuery({
     queryKey: ["reveal", date],
@@ -53,6 +69,7 @@ export function useSubmit() {
       api("/v1/predictions", SubmitResSchema, { method: "POST", body: JSON.stringify(p), token: await getDeviceToken() }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["round", "crowd"] });
+      qc.invalidateQueries({ queryKey: ["round", "mine"] });
     },
   });
 }

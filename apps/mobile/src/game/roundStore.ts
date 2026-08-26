@@ -10,6 +10,7 @@ interface RoundState {
   setAnswer(qid: string, answer: boolean): void;
   setConfidence(qid: string, confidence: number): void;
   markSealed(qid: string): void;
+  hydrate(predictions: ReadonlyArray<{ question_id: string; answer: boolean; confidence: number }>): void;
   reset(): void;
 }
 
@@ -31,5 +32,21 @@ export const useRoundStore = create<RoundState>((set) => ({
   }),
   setConfidence: (qid, confidence) => set((s) => s.answers[qid] ? ({ answers: { ...s.answers, [qid]: { ...s.answers[qid]!, confidence } } }) : s),
   markSealed: (qid) => set((s) => s.answers[qid] ? ({ answers: { ...s.answers, [qid]: { ...s.answers[qid]!, sealed: true } } }) : s),
+  hydrate: (predictions) => set((s) => {
+    const answers = { ...s.answers };
+    for (const p of predictions) {
+      const existing = answers[p.question_id];
+      // Server is the source of truth (Plan-3 carry-over): a server-known
+      // prediction is sealed, and its answer/confidence overwrite any local
+      // draft or divergent replay.
+      answers[p.question_id] = {
+        answer: p.answer,
+        confidence: p.confidence,
+        sealed: true,
+        idempotencyKey: existing?.idempotencyKey ?? makeIdempotencyKey(p.question_id),
+      };
+    }
+    return { answers };
+  }),
   reset: () => set({ answers: {} }),
 }));

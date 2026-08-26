@@ -5,6 +5,7 @@ import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
 import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
@@ -27,6 +28,7 @@ export default function Index() {
   const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
   const lean = crowdLean(crowd.data?.questions ?? []);
+  useHydratePlayedState(!!round);
 
   return (
     <Screen>

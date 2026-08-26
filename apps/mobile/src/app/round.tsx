@@ -10,6 +10,7 @@ import { AsciiDust } from "../ui/TerminalPatina";
 import { numeral } from "../ui/CardChrome";
 import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { colors, space } from "../theme";
 
 // Cards come off a deck: up from the bottom edge, slightly rotated, settling
@@ -28,6 +29,7 @@ export default function Round() {
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
+  useHydratePlayedState(!!today.data);
 
   if (today.isLoading) return (
     <Screen>
