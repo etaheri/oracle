@@ -46,3 +46,13 @@ export function assignEpithet(s: EpithetInput): Epithet {
   }
   return { id: "keeper", title: "KEEPER OF THE LEDGER", receipt: "THE LEDGER GROWS. SO DO YOU." };
 }
+
+// The plaque verdict line (spec §6): a second receipt, independent of the
+// epithet, that names the shape of the gap between claimed and earned.
+export function calibrationVerdict(avgConfidence: number | null, accuracyPct: number | null): string | null {
+  if (avgConfidence === null || accuracyPct === null) return null;
+  const gap = avgConfidence - accuracyPct;
+  if (gap > 10) return "YOUR CONFIDENCE OUTRUNS YOUR ACCURACY";
+  if (gap < -10) return "YOU KNOW MORE THAN YOU CLAIM";
+  return "YOUR CONFIDENCE IS HONEST";
+}

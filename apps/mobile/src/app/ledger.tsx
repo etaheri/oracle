@@ -10,7 +10,7 @@ import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
 import { colors, space } from "../theme";
-import { LITURGY_LINES } from "@oracle/core";
+import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
 
 // The Forecaster's Ledger (voice spec §6): a museum specimen plaque. Stats in
 // machine voice, one epithet with its receipt — identity only with evidence.
@@ -58,6 +58,11 @@ export default function Ledger() {
             <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
             <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
             <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
+            {calibrationVerdict(d.avg_confidence, d.accuracy_pct) && (
+              <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}>
+                {calibrationVerdict(d.avg_confidence, d.accuracy_pct)}
+              </Mono>
+            )}
           </View>
         </View>
         <View style={{ gap: space(1) }}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assignEpithet, type EpithetInput } from "../src/epithet";
+import { assignEpithet, calibrationVerdict, type EpithetInput } from "../src/epithet";
 
 const base: EpithetInput = {
   completeRounds: 10, tideWins: 0, avgConfidence: 75,
@@ -40,5 +40,24 @@ describe("assignEpithet (spec §6 — priority order, first match wins)", () => 
     const e = assignEpithet({ completeRounds: 6, tideWins: 0, avgConfidence: null, accuracyPct: null, majorityRate: null, streakCurrent: 0 });
     expect(e.id).toBe("keeper");
     expect(e.receipt).toBe("THE LEDGER GROWS. SO DO YOU.");
+  });
+});
+
+describe("calibrationVerdict (spec §6 — plaque verdict line)", () => {
+  it("returns null when either input is null", () => {
+    expect(calibrationVerdict(null, 70)).toBe(null);
+    expect(calibrationVerdict(70, null)).toBe(null);
+    expect(calibrationVerdict(null, null)).toBe(null);
+  });
+  it("gap of 11 (confidence outruns accuracy)", () => {
+    expect(calibrationVerdict(81, 70)).toBe("YOUR CONFIDENCE OUTRUNS YOUR ACCURACY");
+  });
+  it("gap of -11 (knows more than it claims)", () => {
+    expect(calibrationVerdict(59, 70)).toBe("YOU KNOW MORE THAN YOU CLAIM");
+  });
+  it("gaps of 10, -10, and 0 are honest (boundary is exclusive)", () => {
+    expect(calibrationVerdict(80, 70)).toBe("YOUR CONFIDENCE IS HONEST");
+    expect(calibrationVerdict(60, 70)).toBe("YOUR CONFIDENCE IS HONEST");
+    expect(calibrationVerdict(70, 70)).toBe("YOUR CONFIDENCE IS HONEST");
   });
 });
