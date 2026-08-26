@@ -1,7 +1,8 @@
-import { View } from "react-native";
+import { View, useWindowDimensions } from "react-native";
+import { Image } from "expo-image";
 import { Screen } from "../ui/Screen";
-import { Serif, Mono, Eyebrow } from "../ui/Text";
-import { GoldButton } from "../ui/Button";
+import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
+import { GoldButton, QuietLink } from "../ui/Button";
 import { useToday } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { colors, space } from "../theme";
@@ -18,6 +19,7 @@ export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
   const router = useRouter();
+  const { width } = useWindowDimensions();
 
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
@@ -25,32 +27,42 @@ export default function Index() {
 
   return (
     <Screen>
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}>
-        <Eyebrow>Oracle OS v1.0</Eyebrow>
-        <Serif size={44} style={{ letterSpacing: 12 }}>ORACLE</Serif>
-        <Mono size={12} color={colors.boneDim} style={{ textAlign: "center", lineHeight: 20 }}>{QUOTE}</Mono>
-        <Mono size={10} color={colors.gold} letterSpacing={3}>— YOGI BERRA</Mono>
-        <View style={{ width: "100%", gap: space(3), paddingTop: space(4) }}>
-          {round && !allSealed && (
-            <>
-              <Mono size={11} color={colors.gold} style={{ textAlign: "center" }} letterSpacing={2}>
-                {round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
-              </Mono>
-              <GoldButton title="ENTER" onPress={() => router.push("/round")} />
-            </>
-          )}
-          {round && allSealed && (
-            <>
-              <Mono size={11} color={colors.gold} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
-              <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
-              <Mono size={10} color={colors.gold} style={{ textAlign: "center" }} letterSpacing={2}>THE LEDGER IS READ AT NOON</Mono>
-            </>
-          )}
-          {!round && !today.isLoading && (
-            <Mono size={11} color={colors.ash} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
-          )}
-          <GoldButton title="YESTERDAY'S LEDGER" onPress={() => router.push(`/reveal/${yesterday}`)} />
+      <Eyebrow>Oracle OS v1.0</Eyebrow>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(6) }}>
+        {/* Temple moment: the near-touch, unframed — the art's parchment merges
+            with the app ground so the hands float on the page itself. */}
+        <Image
+          source={require("../../assets/art/creation-hands-orb.jpg")}
+          contentFit="cover"
+          style={{ width: width - space(6), aspectRatio: 1408 / 768 }}
+          accessible={false}
+        />
+        <Ritual bold size={52} color={colors.ink} letterSpacing={14} style={{ marginRight: -14 }}>ORACLE</Ritual>
+        <View style={{ gap: space(2), alignItems: "center" }}>
+          <Mono size={12} color={colors.inkDim} style={{ textAlign: "center", lineHeight: 20 }}>{QUOTE}</Mono>
+          <Mono size={10} color={colors.goldDeep} letterSpacing={3}>— YOGI BERRA</Mono>
         </View>
+      </View>
+      <View style={{ gap: space(3), paddingBottom: space(2) }}>
+        {round && !allSealed && (
+          <>
+            <Mono size={11} color={colors.goldDeep} style={{ textAlign: "center" }} letterSpacing={2}>
+              {round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
+            </Mono>
+            <GoldButton title="ENTER" onPress={() => router.push("/round")} />
+          </>
+        )}
+        {round && allSealed && (
+          <>
+            <Mono size={11} color={colors.goldDeep} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
+            <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
+            <Mono size={10} color={colors.umber} style={{ textAlign: "center" }} letterSpacing={2}>THE LEDGER IS READ AT NOON</Mono>
+          </>
+        )}
+        {!round && !today.isLoading && (
+          <Mono size={11} color={colors.umber} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
+        )}
+        <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />
       </View>
     </Screen>
   );

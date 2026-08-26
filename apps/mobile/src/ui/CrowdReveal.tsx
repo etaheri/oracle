@@ -1,19 +1,19 @@
 import { useEffect } from "react";
 import { View } from "react-native";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated";
 import { colors, space } from "../theme";
 import { Serif, Mono, Eyebrow } from "./Text";
 import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import type { RoundToday } from "@oracle/core";
 
-function Bar({ pct }: { pct: number }) {
-  const w = useSharedValue(0);
-  useEffect(() => { w.value = withTiming(pct, { duration: 900 }); }, [pct, w]);
-  const style = useAnimatedStyle(() => ({ width: `${w.value}%` }));
+export function CrowdBar({ pct }: { pct: number }) {
+  const scale = useSharedValue(0);
+  useEffect(() => { scale.value = withTiming(pct / 100, { duration: 600, easing: Easing.out(Easing.poly(4)) }); }, [pct, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scaleX: scale.value }] }));
   return (
     <View style={{ height: 3, backgroundColor: colors.lineSoft }}>
-      <Animated.View style={[{ position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.gold }, style]} />
+      <Animated.View style={[{ position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", transformOrigin: "left", backgroundColor: colors.gold }, style]} />
     </View>
   );
 }
@@ -35,11 +35,11 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
           return (
             <View key={q.id} style={{ gap: space(1.5) }}>
-              <Serif size={15} color={colors.boneDim} numberOfLines={1}>{q.text}</Serif>
-              <Bar pct={c.crowd_yes_pct} />
+              <Serif size={15} color={colors.inkDim} numberOfLines={2}>{q.text}</Serif>
+              <CrowdBar pct={c.crowd_yes_pct} />
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Mono size={10} color={colors.gold}>{c.crowd_yes_pct}% SAY YES</Mono>
-                <Mono size={10} color={mySidePct < 40 ? colors.goldBright : colors.ash}>
+                <Mono size={10} color={colors.goldDeep}>{c.crowd_yes_pct}% SAY YES</Mono>
+                <Mono size={10} color={mySidePct < 40 ? colors.goldDeep : colors.umber}>
                   {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{mySidePct < 40 ? " · AGAINST THE TIDE" : ""}
                 </Mono>
               </View>
@@ -47,10 +47,10 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           );
         })}
       </View>
-      <Mono size={11} color={colors.gold} style={{ textAlign: "center" }} letterSpacing={2}>
+      <Mono size={11} color={colors.goldDeep} style={{ textAlign: "center" }} letterSpacing={2}>
         {playerCount} ORACLES CONSULTED
       </Mono>
-      <Mono size={10} color={colors.ash} style={{ textAlign: "center" }}>
+      <Mono size={10} color={colors.umber} style={{ textAlign: "center" }}>
         The ledger is read tomorrow at noon.
       </Mono>
     </View>

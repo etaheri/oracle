@@ -35,23 +35,29 @@ export function ConfidenceSlider({ value, onChange }: { value: number; onChange:
       <View
         {...pan.panHandlers}
         onLayout={(e: LayoutChangeEvent) => { setWidth(e.nativeEvent.layout.width); widthRef.current = e.nativeEvent.layout.width; }}
-        style={{ height: 36, justifyContent: "center" }}
+        style={{ height: 44, justifyContent: "center" }}
         accessibilityRole="adjustable"
         accessibilityLabel="Confidence"
-        accessibilityValue={{ text: `${value} percent` }}
+        accessibilityValue={{ min: C.CONFIDENCE_MIN, max: C.CONFIDENCE_MAX, now: value, text: `${value} percent` }}
+        accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+        onAccessibilityAction={(e) => {
+          const delta = e.nativeEvent.actionName === "increment" ? C.CONFIDENCE_STEP : -C.CONFIDENCE_STEP;
+          const next = Math.min(C.CONFIDENCE_MAX, Math.max(C.CONFIDENCE_MIN, valueRef.current + delta));
+          if (next !== valueRef.current) { Haptics.selectionAsync(); onChange(next); }
+        }}
       >
         <View style={{ height: 2, backgroundColor: colors.lineSoft }}>
           <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: ratio * width, backgroundColor: colors.gold }} />
         </View>
         <View style={{
           position: "absolute", left: Math.max(0, ratio * width - 8), width: 16, height: 16, borderRadius: 8,
-          backgroundColor: colors.obsidian, borderWidth: 1.5, borderColor: colors.gold,
+          backgroundColor: colors.vellum, borderWidth: 1.5, borderColor: colors.goldDeep,
         }} />
       </View>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        {[55, 65, 75, 85, 95].map((t) => <Mono key={t} size={9} color={colors.ash}>{String(t)}</Mono>)}
+        {[55, 65, 75, 85, 95].map((t) => <Mono key={t} size={9} color={colors.umber}>{String(t)}</Mono>)}
       </View>
-      <Mono size={11} color={colors.gold} letterSpacing={2} style={{ textAlign: "center" }}>
+      <Mono size={11} color={colors.goldDeep} letterSpacing={2} style={{ textAlign: "center" }}>
         {value}% · {confidenceReading(value)}
       </Mono>
     </View>

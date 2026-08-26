@@ -1,36 +1,60 @@
 import { useState } from "react";
 import { View, ActivityIndicator } from "react-native";
+import Animated, { FadeInDown, Easing } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
-import { Serif, Mono, Eyebrow } from "../ui/Text";
-import { QuestionCard } from "../ui/QuestionCard";
+import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
+import { TopBar } from "../ui/TopBar";
+import { OracleCard } from "../ui/OracleCard";
 import { CrowdReveal } from "../ui/CrowdReveal";
-import { useToday } from "../api/hooks";
+import { numeral } from "../ui/CardChrome";
+import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { colors, space } from "../theme";
 
 export default function Round() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
-  const [, force] = useState(0);
+  const [revealedId, setRevealedId] = useState<string | null>(null);
 
-  if (today.isLoading) return <Screen><ActivityIndicator color={colors.gold} /></Screen>;
-  if (!today.data) return <Screen><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}><Eyebrow>The oracle sleeps</Eyebrow><Serif size={20}>No round is open.</Serif></View></Screen>;
+  const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
+  const anySealed = qs.some((q) => answers[q.id]?.sealed);
+  const crowd = useCrowdSoFar(anySealed);
 
-  const qs = [...today.data.questions].sort((a, b) => a.slot - b.slot);
-  const current = qs.find((q) => !answers[q.id]?.sealed);
+  if (today.isLoading) return <Screen><TopBar /><ActivityIndicator color={colors.gold} /></Screen>;
+  if (!today.data) return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}><Eyebrow>The oracle sleeps</Eyebrow><Serif size={20}>No round is open.</Serif></View></Screen>;
+
+  const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
+  const revealedQ = revealedId ? qs.find((q) => q.id === revealedId) : undefined;
+  const current = revealedQ ?? qs.find((q) => !answers[q.id]?.sealed);
+  const allSealed = qs.length > 0 && qs.every((q) => answers[q.id]?.sealed);
 
   return (
     <Screen>
-      <Eyebrow>{`Oracle OS v1.0 · Day ${today.data.date}`}</Eyebrow>
+      <TopBar label={`DAY ${today.data.date}`} />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
-        {current ? <QuestionCard q={current} onSealed={() => force((n) => n + 1)} /> : <CrowdReveal round={today.data} />}
+        {current ? (
+          <Animated.View key={current.id} entering={FadeInDown.duration(350).easing(Easing.out(Easing.poly(4)))}>
+            <OracleCard
+              q={current}
+              revealed={revealedQ?.id === current.id}
+              crowd={crowdById.get(current.id)}
+              isLast={allSealed}
+              onSealed={() => setRevealedId(current.id)}
+              onNext={() => setRevealedId(null)}
+            />
+          </Animated.View>
+        ) : (
+          <CrowdReveal round={today.data} />
+        )}
       </View>
-      <View style={{ flexDirection: "row", gap: space(1.5), justifyContent: "center", paddingTop: space(2) }}>
+      <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
         {qs.map((q) => (
-          <View key={q.id} style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: answers[q.id]?.sealed ? colors.gold : colors.line }} />
+          <Ritual key={q.id} size={12} color={answers[q.id]?.sealed ? colors.goldDeep : "rgba(42,33,24,0.25)"} letterSpacing={1}>
+            {numeral(q.slot)}
+          </Ritual>
         ))}
       </View>
-      <Mono size={9} color={colors.ash} style={{ textAlign: "center", paddingTop: space(2) }}>
+      <Mono size={9} color={colors.umber} style={{ textAlign: "center", paddingTop: space(2) }}>
         The crowd's leaning is hidden until you commit.
       </Mono>
     </Screen>
