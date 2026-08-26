@@ -16,8 +16,8 @@ export const CARD_H = 1024;
 const INSET = 30;
 const TICK = 22;
 const OVER = 9;
-const NIGHT_LINE = "rgba(247,246,242,0.16)";
-const NIGHT_DIM = "rgba(247,246,242,0.55)";
+export const NIGHT_LINE = "rgba(247,246,242,0.16)";
+export const NIGHT_DIM = "rgba(247,246,242,0.55)";
 const NIGHT_LOSS = "#D9705A"; // text-tier vermilion for the midnight ground (5.3:1)
 
 export interface ShareCardData {
@@ -28,14 +28,18 @@ export interface ShareCardData {
   results: ReadonlyArray<QuestionResult>;
 }
 
-export async function shareCard(ref: RefObject<any>, data: ShareCardData): Promise<void> {
+export async function shareSnapshot(ref: RefObject<any>, filename: string, dialogTitle: string): Promise<void> {
   const image = ref.current?.makeImageSnapshot();
   if (!image) throw new Error("card not ready");
   const bytes = image.encodeToBytes();
-  const file = new File(Paths.cache, `oracle-${data.date}.png`);
+  const file = new File(Paths.cache, filename);
   if (file.exists) file.delete();
   file.write(bytes);
-  await Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle: shareMessage(data) });
+  await Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle });
+}
+
+export async function shareCard(ref: RefObject<any>, data: ShareCardData): Promise<void> {
+  await shareSnapshot(ref, `oracle-${data.date}.png`, shareMessage(data));
 }
 
 function ellipsize(text: string, font: { measureText(t: string): { width: number } } | null, maxWidth: number): string {
@@ -50,7 +54,7 @@ function centered(font: { measureText(t: string): { width: number } } | null, te
   return font ? (CARD_W - font.measureText(text).width) / 2 : CARD_W / 2;
 }
 
-function RegisterMarks() {
+export function RegisterMarks() {
   const xs = [INSET, CARD_W - INSET];
   const ys = [INSET, CARD_H - INSET];
   const lines: { p1: [number, number]; p2: [number, number] }[] = [];

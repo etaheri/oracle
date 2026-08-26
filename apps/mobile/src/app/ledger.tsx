@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { View } from "react-native";
+import { useCanvasRef } from "@shopify/react-native-skia";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
 import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { AsciiDust } from "../ui/TerminalPatina";
+import { GoldButton } from "../ui/Button";
+import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
+import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
 import { colors, space } from "../theme";
 import { LITURGY_LINES } from "@oracle/core";
@@ -20,6 +25,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function Ledger() {
   const ledger = useMeLedger();
+  const canvasRef = useCanvasRef();
+  const [sharing, setSharing] = useState(false);
 
   if (!ledger.data) return (
     <Screen>
@@ -58,6 +65,14 @@ export default function Ledger() {
             <Mono key={line} size={9} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
+        <GoldButton
+          title={sharing ? "PREPARING…" : "DECLARE YOURSELF"}
+          onPress={async () => {
+            setSharing(true);
+            try { await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title); } catch {} finally { setSharing(false); }
+          }}
+        />
+        <PlaqueShareCanvas canvasRef={canvasRef} data={d} />
       </View>
     </Screen>
   );
