@@ -50,9 +50,8 @@ export async function composeHingePushes(db: Db, date: string) {
     if (hasResults) satisfied.push("results");
     if (tideWin) satisfied.push("tideWin");
     if (u.streakCurrent >= 2) satisfied.push("streak");
-    // a "{n} DID NOT SURVIVE" line with n=0 is true but absurd — gate it out
-    const pool = wrong === 0 ? NOON_PLAYED.filter((l) => !l.text.includes("{n}")) : NOON_PLAYED;
-    const line = selectLine(pool, seedKey, satisfied);
+    if (wrong >= 1) satisfied.push("wrong");
+    const line = selectLine(NOON_PLAYED, seedKey, satisfied);
     if (line) out.push({ userId: u.id, lineId: line.id, text: fillSlots(line.text, { n: wrong, streak: u.streakCurrent }) });
   }
   return out;

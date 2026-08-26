@@ -11,9 +11,10 @@ afterEach(() => vi.useRealTimers());
 
 async function player(app: ReturnType<typeof createApp>) {
   const res = await app.request("/v1/auth/device", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ platform: "ios" }) });
-  const { token } = (await res.json()) as { token: string };
-  return (path: string, init: RequestInit = {}) =>
+  const { token, user_id } = (await res.json()) as { token: string; user_id: string };
+  const req = (path: string, init: RequestInit = {}) =>
     app.request(path, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${token}`, "content-type": "application/json" } });
+  return Object.assign(req, { userId: user_id });
 }
 const body = (q: string, answer: boolean) => JSON.stringify({ question_id: q, answer, confidence: 85, idempotency_key: "k" });
 
@@ -40,6 +41,9 @@ describe("composeHingePushes", () => {
     // a was wrong nowhere (crowd 33% yes, outcome yes): no {n}-line with n=0
     const aPush = pushes.find((p) => p.text.includes("0 OF YOUR"));
     expect(aPush).toBeUndefined();
+    // a was right everywhere: its push never asserts "NOT ALL OF THEM STOOD" either
+    const aOwnPush = pushes.find((p) => p.userId === a.userId);
+    expect(aOwnPush?.lineId).not.toBe("noon.read-9");
   });
 
   it("gives users with no prediction this round the lapsed tier", async () => {

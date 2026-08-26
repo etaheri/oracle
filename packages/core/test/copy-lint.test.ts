@@ -32,7 +32,14 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
   });
   it("every slot is backed by a requirement, and expansion clears all slots", () => {
     for (const l of COPY_BANK) {
-      if (l.text.includes("{n}")) expect(l.requires ?? [], l.id).toContain(l.pool === "closing" ? "players" : "results");
+      if (l.text.includes("{n}")) {
+        if (l.pool === "closing") {
+          expect(l.requires ?? [], l.id).toContain("players");
+        } else {
+          expect(l.requires ?? [], l.id).toContain("results");
+          expect(l.requires ?? [], l.id).toContain("wrong");
+        }
+      }
       if (l.text.includes("{streak}")) expect(l.requires ?? [], l.id).toContain("streak");
       expect(worst(l), l.id).not.toMatch(/[{}]/);
     }

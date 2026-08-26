@@ -2,7 +2,7 @@
 // Hand-written, linted, versioned. No generated copy — the meme value of a
 // voice comes from one unmistakable register sustained for years.
 
-export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed";
+export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed" | "wrong";
 
 export interface CopyLine {
   id: string;
@@ -30,15 +30,15 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.generic-3", pool: "noon", text: "THE LEDGER IS READ. THE CROWD IS COUNTING ITS WOUNDS." },
   { id: "noon.generic-4", pool: "noon", text: "WHAT WAS SEALED IS NOW SETTLED." },
   { id: "noon.generic-5", pool: "noon", text: "THE ORB HAS SPOKEN. THE LEDGER AGREES." },
-  { id: "noon.read-1", pool: "noon", text: "THE LEDGER IS READ. {n} OF YOUR ANSWERS DID NOT SURVIVE.", requires: ["results"] },
+  { id: "noon.read-1", pool: "noon", text: "THE LEDGER IS READ. {n} OF YOUR ANSWERS DID NOT SURVIVE.", requires: ["results", "wrong"] },
   { id: "noon.read-2", pool: "noon", text: "THE LEDGER IS READ. ONE OF YOUR ANSWERS SURPRISED US.", requires: ["results"] },
   { id: "noon.read-3", pool: "noon", text: "THE CROWD MOVED. YOU DID NOT. THE LEDGER REMEMBERS WHO WAS RIGHT.", requires: ["results"] },
   { id: "noon.read-4", pool: "noon", text: "NOON HAS PASSED. YOUR CONVICTION HAS BEEN WEIGHED.", requires: ["results"] },
   { id: "noon.read-5", pool: "noon", text: "THE OUTCOMES ARE IN. YOUR LEDGER HAS CHANGED SHAPE.", requires: ["results"] },
-  { id: "noon.read-6", pool: "noon", text: "THE LEDGER IS READ. YOU AND THE CROWD DID NOT AGREE EVERYWHERE.", requires: ["results"] },
+  { id: "noon.read-6", pool: "noon", text: "THE CROWD CHOSE ITS SIDES. SO DID YOU. THE LEDGER KNOWS WHO CHOSE WELL.", requires: ["results"] },
   { id: "noon.read-7", pool: "noon", text: "FIVE QUESTIONS WERE ASKED. THE ANSWERS ARE NO LONGER YOURS TO CHOOSE.", requires: ["results"] },
-  { id: "noon.read-8", pool: "noon", text: "THE LEDGER IS READ. SOME OF IT WILL PLEASE YOU.", requires: ["results"] },
-  { id: "noon.read-9", pool: "noon", text: "YOUR ANSWERS MET THEIR OUTCOMES AT NOON. NOT ALL OF THEM STOOD.", requires: ["results"] },
+  { id: "noon.read-8", pool: "noon", text: "THE LEDGER IS READ. IT DOES NOT FLATTER. IT DOES NOT LIE.", requires: ["results"] },
+  { id: "noon.read-9", pool: "noon", text: "YOUR ANSWERS MET THEIR OUTCOMES AT NOON. NOT ALL OF THEM STOOD.", requires: ["results", "wrong"] },
   { id: "noon.read-10", pool: "noon", text: "THE INK IS DRY. THE LEDGER HOLDS YOUR RECKONING.", requires: ["results"] },
   { id: "noon.tide-1", pool: "noon", text: "YOU STOOD AGAINST THE TIDE. THE TIDE BROKE.", requires: ["tideWin"] },
   { id: "noon.tide-2", pool: "noon", text: "THE CROWD WENT ONE WAY. YOU WENT THE OTHER. THE LEDGER BOWED TO YOU.", requires: ["tideWin"] },
