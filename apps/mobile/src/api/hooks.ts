@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, type PredictionSubmit } from "@oracle/core";
 import { z } from "zod";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
@@ -56,6 +56,16 @@ export function useReveal(date: string | null) {
         if (e instanceof ApiError && e.status === 409) return { pending: true } as const;
         throw e;
       }
+    },
+  });
+}
+
+export function useMeLedger() {
+  return useQuery({
+    queryKey: ["me", "ledger"],
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      return api("/v1/me/ledger", MeLedgerSchema, { token });
     },
   });
 }

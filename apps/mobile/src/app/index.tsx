@@ -66,6 +66,7 @@ export default function Index() {
         {!round && !today.isLoading && (
           <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
         )}
+        <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
         <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />
       </View>
     </Screen>

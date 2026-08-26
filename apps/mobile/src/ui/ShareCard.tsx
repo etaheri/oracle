@@ -5,6 +5,7 @@ import * as Sharing from "expo-sharing";
 import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { shareMessage, type QuestionResult } from "../game/sharePattern";
+import { LITURGY_LINES } from "@oracle/core";
 
 // Offscreen Skia surface (design spec §7) shaped as a literal oracle card
 // (5:8, frame + register marks). The app lives in the museum by day; the
@@ -73,6 +74,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const score = useFont(require("../../assets/fonts/Cinzel-SemiBold.ttf"), 40);
   const display = useFont(require("../../assets/fonts/Marcellus-Regular.ttf"), 24);
   const mono = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 18);
+  const monoSmall = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 12);
 
   const points = data.dayPoints >= 0 ? `+${data.dayPoints}` : String(data.dayPoints);
   const wins = data.results.filter((r) => r === "win").length;
@@ -130,7 +132,9 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={802} color={colors.museumWhite} />}
       {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
-      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={950} color={colors.agedGold} />}
+      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={938} color={colors.agedGold} />}
+      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centered(monoSmall, LITURGY_LINES[0])} y={968} color={NIGHT_DIM} />}
+      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[1]} x={centered(monoSmall, LITURGY_LINES[1])} y={986} color={NIGHT_DIM} />}
     </Canvas>
   );
 }
