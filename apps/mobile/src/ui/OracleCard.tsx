@@ -12,6 +12,7 @@ import { ConfidenceSlider } from "./ConfidenceSlider";
 import { CardChrome, numeral } from "./CardChrome";
 import { SealStamp, STAMP_MS } from "./SealStamp";
 import { CrowdBar } from "./CrowdReveal";
+import { AsciiActivation } from "./TerminalPatina";
 import type { RoundToday } from "@oracle/core";
 
 export interface CrowdEntry { crowd_yes_pct: number; player_count: number }
@@ -31,6 +32,7 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
   const submit = useSubmit();
   const [error, setError] = useState<string | null>(null);
   const [stamped, setStamped] = useState(false);
+  const [cardSize, setCardSize] = useState({ w: 0, h: 0 });
   const reducedMotion = useReducedMotion();
   const flip = useSharedValue(revealed ? 180 : 0);
 
@@ -73,7 +75,7 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
 
   return (
     <View>
-      <Animated.View style={frontStyle}>
+      <Animated.View style={frontStyle} onLayout={(e) => setCardSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         <CardChrome slot={q.slot} title={title} big={q.is_big_one} caption={`resolves per ${q.source_name}`.toUpperCase()}>
           <Serif size={22} style={{ lineHeight: 30 }}>{q.text}</Serif>
           <View style={{ flexDirection: "row", gap: space(2) }}>
@@ -94,6 +96,7 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
           {error && <Mono size={11} color={colors.vermilion} style={{ textAlign: "center" }}>{error}</Mono>}
           <GoldButton title={submit.isPending ? "SEALING…" : "SEAL THE PROPHECY"} onPress={seal} disabled={!entry || submit.isPending} />
         </CardChrome>
+        {stamped && <AsciiActivation width={cardSize.w} height={cardSize.h} />}
         {stamped && <SealStamp numeral={numeral(q.slot)} />}
       </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, backStyle]}>
