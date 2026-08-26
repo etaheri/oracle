@@ -3,6 +3,7 @@ import { Screen } from "../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
+import { Countdown } from "../ui/Countdown";
 import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
@@ -50,13 +51,14 @@ export default function Index() {
               {round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
             </Mono>
             <GoldButton title="ENTER" onPress={() => router.push("/round")} />
+            <Countdown until={round.locks_at} prefix="THE ORACLE CLOSES IN" />
           </>
         )}
         {round && allSealed && (
           <>
             <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
             <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
-            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE LEDGER IS READ AT NOON</Mono>
+            <Countdown until={round.locks_at} prefix="THE LEDGER IS READ IN" fallback="THE LEDGER IS READ AT NOON" />
           </>
         )}
         {!round && !today.isLoading && (
