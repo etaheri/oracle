@@ -4,6 +4,7 @@ import { makeTestDb, seedRound } from "./helpers/db";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import { resolveQuestion } from "../src/resolution";
 import * as schema from "../src/db/schema";
+import { buildPipelineDeps, type WorkerEnv } from "../src/worker";
 
 function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
   const sent: string[] = [];
@@ -79,5 +80,60 @@ describe("runTick", () => {
     const done = await runTick(deps); // stub authorRound throws "authoring not wired"
     expect(done.some((d) => d.startsWith("author"))).toBe(false);
     expect(sent.some((t) => t.includes("author failed"))).toBe(true);
+  });
+});
+
+function baseEnv(overrides: Partial<WorkerEnv> = {}): WorkerEnv {
+  return {
+    DATABASE_URL: "postgres://user:pass@localhost:5432/db",
+    DEVICE_TOKEN_SECRET: "s",
+    ADMIN_SECRET: "s",
+    ...overrides,
+  };
+}
+
+describe("buildPipelineDeps", () => {
+  it("is undefined when PIPELINE_ENABLED is unset", () => {
+    expect(buildPipelineDeps(baseEnv())).toBeUndefined();
+  });
+
+  it("is undefined when PIPELINE_ENABLED is not exactly \"true\"", () => {
+    expect(buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "1" }))).toBeUndefined();
+    expect(buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "TRUE" }))).toBeUndefined();
+  });
+
+  it("is defined with claude null when only PIPELINE_ENABLED=true is set", () => {
+    const deps = buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "true" }));
+    expect(deps).toBeDefined();
+    expect(deps!.claude).toBeNull();
+  });
+
+  it("gives claude a client when ANTHROPIC_API_KEY is set", () => {
+    const deps = buildPipelineDeps(
+      baseEnv({ PIPELINE_ENABLED: "true", ANTHROPIC_API_KEY: "sk-test" }),
+    );
+    expect(deps!.claude).not.toBeNull();
+  });
+
+  it("defaults models to the standard author/resolve constants", () => {
+    const deps = buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "true" }));
+    expect(deps!.models).toEqual({ author: "claude-opus-5", resolve: "claude-sonnet-5" });
+  });
+
+  it("honors PIPELINE_AUTHOR_MODEL / PIPELINE_RESOLVE_MODEL overrides", () => {
+    const deps = buildPipelineDeps(
+      baseEnv({
+        PIPELINE_ENABLED: "true",
+        PIPELINE_AUTHOR_MODEL: "claude-opus-custom",
+        PIPELINE_RESOLVE_MODEL: "claude-sonnet-custom",
+      }),
+    );
+    expect(deps!.models).toEqual({ author: "claude-opus-custom", resolve: "claude-sonnet-custom" });
+  });
+
+  it("telegram client is present (no-op) even without bot token/chat id", () => {
+    const deps = buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "true" }));
+    expect(deps!.telegram).toBeDefined();
+    expect(typeof deps!.telegram.send).toBe("function");
   });
 });
