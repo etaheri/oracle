@@ -52,7 +52,7 @@ export function useReveal(date: string | null) {
       try {
         return await api(`/v1/round/${date}/reveal`, RevealSchema, { token });
       } catch (e) {
-        if (e instanceof ApiError && e.status === 409) return { pending: true } as const;
+        if (e instanceof ApiError && (e.status === 409 || e.status === 404)) return { pending: true } as const;
         throw e;
       }
     },
