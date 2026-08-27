@@ -13,10 +13,10 @@ const CATEGORIES = ["markets", "sports", "weather", "culture", "news"] as const;
 const draftQuestionProperties = {
   slot: { type: "integer", minimum: 1, maximum: 5 },
   category: { type: "string", enum: [...CATEGORIES] },
-  text: { type: "string" },
-  resolution_criteria: { type: "string" },
-  source_name: { type: "string" },
-  source_url: { type: "string" },
+  text: { type: "string", minLength: 10 },
+  resolution_criteria: { type: "string", minLength: 10 },
+  source_name: { type: "string", minLength: 1 },
+  source_url: { type: "string", format: "uri" },
   author_probability: { type: "number", minimum: 0.3, maximum: 0.7 },
   is_big_one: { type: "boolean" },
 };

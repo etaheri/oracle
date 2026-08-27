@@ -43,7 +43,7 @@ describe("authorRound", () => {
 
   it("a) valid draft on first try: rows scheduled + telegram message has all texts and /reroll", async () => {
     const { db } = await makeTestDb();
-    const { claude } = fakeClaude([validDraft]);
+    const { claude, calls } = fakeClaude([validDraft]);
     const { deps, sent } = fakeDeps(db, claude);
 
     await authorRound(deps, "2026-08-27");
@@ -58,6 +58,15 @@ describe("authorRound", () => {
       expect(sent[0]).toContain(q.text);
     }
     expect(sent[0]).toContain("/reroll");
+
+    // The JSON Schema handed to Claude must genuinely mirror DraftQuestionSchema's
+    // zod constraints, or a schema-valid-but-zod-invalid response (e.g. 3-char text)
+    // needlessly burns the single retry.
+    const itemSchema = (calls[0]!.schema as any).properties.questions.items;
+    expect(itemSchema.properties.text.minLength).toBe(10);
+    expect(itemSchema.properties.resolution_criteria.minLength).toBe(10);
+    expect(itemSchema.properties.source_name.minLength).toBe(1);
+    expect(itemSchema.properties.source_url.format).toBe("uri");
   });
 
   it("b) invalid then valid: retries exactly once, second prompt cites failed validation, rows scheduled", async () => {
