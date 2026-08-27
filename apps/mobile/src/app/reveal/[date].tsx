@@ -65,6 +65,11 @@ export default function RevealScreen() {
       </View>
     </Screen>
   );
+  if (reveal.isError) return (
+    <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
+      <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE ORB IS BEYOND REACH. IT WILL RETURN.</Mono>
+    </View></Screen>
+  );
   if (!reveal.data || "pending" in reveal.data) {
     return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <View style={{ alignItems: "center" }}><AsciiDust /></View>

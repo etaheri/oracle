@@ -3,7 +3,10 @@ import type { z } from "zod";
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
 export async function api<T>(
@@ -21,5 +24,11 @@ export async function api<T>(
     },
   });
   if (!res.ok) throw new ApiError(res.status, `API ${res.status} on ${path}`);
-  return schema.parse(await res.json());
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    throw new ApiError(res.status, "invalid response body");
+  }
+  return schema.parse(body);
 }

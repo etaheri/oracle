@@ -82,6 +82,9 @@ export const RevealSchema = z.object({
 });
 export type Reveal = z.infer<typeof RevealSchema>;
 
+export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean() });
+export type SubmitRes = z.infer<typeof SubmitResSchema>;
+
 export const MeLedgerSchema = z.object({
   oracle_score: z.number().int().nullable(),
   days_consulted: z.number().int(),

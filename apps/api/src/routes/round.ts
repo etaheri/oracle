@@ -2,19 +2,26 @@ import { Hono } from "hono";
 import { asc, and, eq, inArray } from "drizzle-orm";
 import { dayPoints } from "@oracle/core";
 import type { AppContext } from "../app";
-import { schema } from "../db/client";
+import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
+
+async function openRound(db: Db) {
+  const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
+  if (!round) return null;
+  const qs = await db.query.questions.findMany({
+    where: eq(schema.questions.roundDate, round.date),
+    orderBy: [asc(schema.questions.slot)],
+  });
+  return { round, qs };
+}
 
 export const roundRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
   .get("/today", async (c) => {
     const { db } = c.get("deps");
-    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
-    if (!round) return c.json({ error: "no open round" }, 404);
-    const qs = await db.query.questions.findMany({
-      where: eq(schema.questions.roundDate, round.date),
-      orderBy: [asc(schema.questions.slot)],
-    });
+    const found = await openRound(db);
+    if (!found) return c.json({ error: "no open round" }, 404);
+    const { round, qs } = found;
     return c.json({
       date: round.date,
       locks_at: qs[0]?.locksAt ?? null,
@@ -33,9 +40,9 @@ export const roundRoutes = new Hono<AppContext>()
   .get("/today/crowd", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");
-    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
-    if (!round) return c.json({ error: "no open round" }, 404);
-    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, round.date) });
+    const found = await openRound(db);
+    if (!found) return c.json({ error: "no open round" }, 404);
+    const { qs } = found;
     const qIds = qs.map((q) => q.id);
     const preds = qIds.length
       ? await db.query.predictions.findMany({ where: inArray(schema.predictions.questionId, qIds) })
@@ -51,9 +58,9 @@ export const roundRoutes = new Hono<AppContext>()
   .get("/today/mine", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");
-    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
-    if (!round) return c.json({ error: "no open round" }, 404);
-    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, round.date) });
+    const found = await openRound(db);
+    if (!found) return c.json({ error: "no open round" }, 404);
+    const { qs } = found;
     const mine = qs.length
       ? await db.query.predictions.findMany({
           where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),

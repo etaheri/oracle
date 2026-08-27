@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, type PredictionSubmit } from "@oracle/core";
-import { z } from "zod";
+import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -69,8 +68,6 @@ export function useMeLedger() {
     },
   });
 }
-
-const SubmitResSchema = z.object({ id: z.string(), first_hour: z.boolean() });
 
 export function useSubmit() {
   const qc = useQueryClient();

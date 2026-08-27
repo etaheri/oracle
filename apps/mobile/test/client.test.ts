@@ -27,6 +27,13 @@ describe("api()", () => {
     const fetchFn = (async () => new Response(JSON.stringify({ nope: 1 }), { status: 200 })) as typeof fetch;
     await expect(api("/v1/health", z.object({ ok: z.boolean() }), { fetchFn, token: "t" })).rejects.toThrow();
   });
+  it("throws ApiError with status on a non-JSON body", async () => {
+    const fetchFn = (async () => new Response("not json", { status: 200 })) as typeof fetch;
+    await expect(api("/v1/health", z.object({ ok: z.boolean() }), { fetchFn, token: "t" })).rejects.toMatchObject({
+      status: 200,
+      name: "ApiError",
+    });
+  });
 });
 
 describe("getDeviceToken()", () => {
