@@ -108,3 +108,14 @@ export function selectLine(
   if (eligible.length === 0) return null;
   return eligible[voiceSeed(seedKey) % eligible.length]!;
 }
+
+// The home vigil: one quiet line while a streak holds. Only streak-pool lines
+// that REQUIRE a streak are eligible — the lapse/shield lines are for other
+// moments. Streak 1 is every first day; the oracle starts counting at 2.
+const VIGIL_LINES = COPY_BANK.filter((l) => l.pool === "streak" && (l.requires ?? []).includes("streak"));
+
+export function vigilLine(streak: number, seedKey: string): string | null {
+  if (streak < 2) return null;
+  const line = selectLine(VIGIL_LINES, seedKey, ["streak"]);
+  return line ? fillSlots(line.text, { streak }) : null;
+}

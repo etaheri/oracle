@@ -4,11 +4,12 @@ import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
 import { Countdown } from "../ui/Countdown";
-import { useToday, useCrowdSoFar } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMeLedger } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
 import { epigraphFor } from "../game/epigraph";
+import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
 
@@ -32,6 +33,8 @@ export default function Index() {
   // The daily placard: keyed to the round's date when the oracle is awake,
   // the device's otherwise — same date, same line, all day.
   const epigraph = epigraphFor(round?.date ?? new Date().toISOString().slice(0, 10));
+  const ledger = useMeLedger();
+  const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
 
   return (
     <Screen>
@@ -65,6 +68,9 @@ export default function Index() {
         )}
         {!round && !today.isLoading && (
           <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
+        )}
+        {vigil && (
+          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{vigil}</Mono>
         )}
         <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
         <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />

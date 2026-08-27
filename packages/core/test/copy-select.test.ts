@@ -34,3 +34,23 @@ describe("selectLine", () => {
     expect(selectLine(tideOnly, "seed", [])).toBeNull();
   });
 });
+
+import { vigilLine } from "../src/copy";
+
+describe("vigilLine", () => {
+  it("is null below a 2-day streak", () => {
+    expect(vigilLine(0, "k")).toBeNull();
+    expect(vigilLine(1, "k")).toBeNull();
+  });
+  it("fills the streak into a vigil line and never draws a lapse line", () => {
+    for (let i = 0; i < 30; i++) {
+      const line = vigilLine(7, `seed-${i}`);
+      expect(line).not.toBeNull();
+      expect(line).toContain("7");
+      expect(line).not.toMatch(/UNCONSULTED|GAP|STREAKS END|SHIELD|BEGIN AGAIN/);
+    }
+  });
+  it("is deterministic per seed", () => {
+    expect(vigilLine(4, "home:2026-08-27:4")).toBe(vigilLine(4, "home:2026-08-27:4"));
+  });
+});
