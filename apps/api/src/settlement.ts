@@ -9,6 +9,13 @@ import { schema, type Db } from "./db/client";
 // PLAN-4 NOTE: the audience is users-with-streak ∪ users-who-played; both
 // queries are unbounded and per-user scoring is N queries — fine at current
 // scale, revisit with the DO alarm.
+// PLAN-4 PRECONDITION (final review 2026-08-27): settleRound is not atomic —
+// users settle one at a time and the round flips to "resolved" only at the
+// end. A mid-loop crash + retry would double-settle already-processed users
+// (streak +2, or a second shield burned). Safe while the trigger is one
+// manual admin call; BEFORE the DO alarm automates (and retries) this, make
+// it retry-safe per user — e.g. a users.streak_settled_through date checked
+// in the loop. Also note: neon-http has no interactive transactions.
 export async function settleRound(db: Db, date: string): Promise<{ already: boolean; settled: number }> {
   const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (!round) throw new Error("unknown round");
