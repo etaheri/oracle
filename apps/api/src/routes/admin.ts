@@ -23,6 +23,8 @@ export const adminRoutes = new Hono<AppContext>()
       return c.json({ ok: true, ...out });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "settle failed";
-      return c.json({ error: msg }, msg === "unknown round" ? 404 : 409);
+      if (msg === "unknown round") return c.json({ error: msg }, 404);
+      if (msg === "not fully resolved") return c.json({ error: msg }, 409);
+      return c.json({ error: "settle failed" }, 500);
     }
   });

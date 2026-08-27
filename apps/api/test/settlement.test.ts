@@ -129,4 +129,20 @@ describe("POST /admin/rounds/:date/settle", () => {
     await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-20T17:00:00Z") });
     expect((await admin("/admin/rounds/2026-08-20/settle")).status).toBe(409); // questions still open
   });
+
+  it("returns 500 and leaks nothing on an internal failure", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db, pg } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
+    await pg.exec("DROP TABLE entitlements");
+
+    const admin = (path: string) => app.request(path, { method: "POST", headers: { "x-admin-secret": "admin" } });
+    const res = await admin("/admin/rounds/2026-08-20/settle");
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json).toEqual({ error: "settle failed" });
+    expect(JSON.stringify(json).toLowerCase()).not.toContain("select");
+  });
 });
