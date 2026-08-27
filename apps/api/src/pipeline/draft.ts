@@ -21,6 +21,9 @@ export const DraftQuestionSchema = z.object({
   source_url: z.string().url(),
   author_probability: z.number().min(0.3).max(0.7),
   is_big_one: z.boolean(),
+  // Set when the question was adapted from a live prediction market (feeds.ts);
+  // stamped into questions.market_prob for later reveal display.
+  market_prob: z.number().min(0).max(1).nullable().default(null),
 });
 
 export const DraftSchema = z
@@ -72,6 +75,7 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
       resolutionCriteria: q.resolution_criteria,
       sourceName: q.source_name,
       sourceUrl: q.source_url,
+      marketProb: q.market_prob == null ? null : String(q.market_prob),
       opensAt,
       locksAt,
       resolveBy,

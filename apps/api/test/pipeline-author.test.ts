@@ -28,6 +28,9 @@ function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null) {
     models: { author: "m-a", resolve: "m-r" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date("2026-08-27T12:00:00Z"),
+    // Feeds must never reach the network in tests; a rejecting fetch makes
+    // every feed fail cleanly and authoring proceed market-blind.
+    marketFetch: (async () => { throw new Error("no market feeds in tests"); }) as unknown as typeof fetch,
   };
   return { deps, sent };
 }
@@ -232,5 +235,58 @@ describe("draftMessage", () => {
     ]);
     expect(msg).not.toContain("%");
     expect(msg).toContain("1 [markets] Will X?");
+  });
+});
+
+describe("market-informed authoring", () => {
+  const signalFetch = ((async (url: any) => {
+    const u = String(url);
+    if (u.includes("manifold.markets")) {
+      return new Response(JSON.stringify([
+        { question: "Will the Fed cut rates tomorrow?", probability: 0.42, closeTime: new Date("2026-08-28T10:00:00Z").getTime(), volume: 5400, uniqueBettorCount: 40, outcomeType: "BINARY", url: "https://manifold.markets/x/fed" },
+      ]), { status: 200 });
+    }
+    return new Response("[]", { status: 200 });
+  }) as unknown) as typeof fetch;
+
+  it("feeds market signals into the authoring prompt with the never-resolve-by-market rule", async () => {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    deps.marketFetch = signalFetch;
+
+    await authorRound(deps, "2026-08-27");
+
+    expect(calls[0]!.system).toContain("LIVE MARKET SIGNALS");
+    expect(calls[0]!.system).toContain("Will the Fed cut rates tomorrow?");
+    expect(calls[0]!.system).toContain("42% YES");
+    expect(calls[0]!.system).toContain("NEVER cite a prediction market as the resolution source");
+  });
+
+  it("stamps market_prob through to the questions table", async () => {
+    const { db } = await makeTestDb();
+    const withMarket = { questions: validDraft.questions.map((q) => (q.slot === 5 ? { ...q, market_prob: 0.42 } : { ...q, market_prob: null })) };
+    const { claude } = fakeClaude([withMarket]);
+    const { deps } = fakeDeps(db, claude);
+    deps.marketFetch = signalFetch;
+
+    await authorRound(deps, "2026-08-27");
+
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    const big = qs.find((q) => q.slot === 5)!;
+    expect(Number(big.marketProb)).toBeCloseTo(0.42);
+    expect(qs.find((q) => q.slot === 1)!.marketProb).toBeNull();
+  });
+
+  it("authoring proceeds market-blind when every feed fails (no signals block)", async () => {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude); // default marketFetch rejects
+
+    await authorRound(deps, "2026-08-27");
+
+    expect(calls[0]!.system).not.toContain("LIVE MARKET SIGNALS");
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    expect(qs).toHaveLength(5);
   });
 });

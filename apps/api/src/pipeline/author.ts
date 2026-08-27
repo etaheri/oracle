@@ -7,6 +7,7 @@ import type { PipelineDeps } from "./index";
 import { DraftSchema, DraftQuestionSchema, type Draft } from "./draft";
 import { upsertDraft } from "./draft";
 import { addDays } from "./clock";
+import { fetchMarketSignals, type MarketSignal } from "./feeds";
 
 const CATEGORIES = ["markets", "sports", "weather", "culture", "news"] as const;
 
@@ -19,6 +20,7 @@ const draftQuestionProperties = {
   source_url: { type: "string", format: "uri" },
   author_probability: { type: "number", minimum: 0.3, maximum: 0.7 },
   is_big_one: { type: "boolean" },
+  market_prob: { type: ["number", "null"], minimum: 0, maximum: 1 },
 };
 
 const draftQuestionRequired = [
@@ -30,6 +32,7 @@ const draftQuestionRequired = [
   "source_url",
   "author_probability",
   "is_big_one",
+  "market_prob",
 ];
 
 const draftQuestionJsonSchema = {
@@ -53,14 +56,27 @@ const draftRoundJsonSchema = {
   additionalProperties: false,
 };
 
-function authorSystemPrompt(date: string, recentTexts: string): string {
+function marketSignalsBlock(signals: MarketSignal[]): string {
+  if (signals.length === 0) return "";
+  const lines = signals.map(
+    (s) => `- [${s.source}] "${s.question}" — ${Math.round(s.prob * 100)}% YES — closes ${s.closesAt}`,
+  );
+  return `
+LIVE MARKET SIGNALS — real prediction markets closing within 36 hours. These are contested by actual bettors:
+${lines.join("\n")}
+- Prefer adapting market-backed candidates where they fit the category skeleton, especially THE BIG ONE.
+- When a question is adapted from a listed market, set market_prob to that market's probability (0-1); otherwise set market_prob to null.
+- NEVER cite a prediction market as the resolution source — resolution always names a primary public source.`;
+}
+
+function authorSystemPrompt(date: string, recentTexts: string, signals: MarketSignal[]): string {
   return `You author the daily round for ORACLE, a prediction game. Produce exactly 5 yes/no questions for the round dated ${date} (ET). Rules:
 - Slots 1-4: four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the day's most contested story from any category.
 - Each question must be binary YES/NO in plain English, resolvable by 11:00 AM ET on ${addDays(date, 1)} from ONE named public source.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement, the exact source page, and the deadline. Zero ambiguity: a stranger must be able to resolve it identically.
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
-- Avoid repeating these recent questions: ${recentTexts}
+- Avoid repeating these recent questions: ${recentTexts}${marketSignalsBlock(signals)}
 Search the web for today's actual news before writing. When your draft is final, call the draft_round tool exactly once.`;
 }
 
@@ -84,7 +100,10 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
   const claude = deps.claude;
 
   const recentTexts = await recentQuestionTexts(deps.db, date);
-  const system = authorSystemPrompt(date, recentTexts);
+  // Market feeds are advisory: any failure logs inside fetchMarketSignals and
+  // authoring proceeds market-blind on an empty list.
+  const { signals } = await fetchMarketSignals(deps.marketFetch ?? fetch, deps.now());
+  const system = authorSystemPrompt(date, recentTexts, signals);
   const baseUser = `Produce today's ORACLE round for ${date}.`;
 
   const first = await claude.structured({
@@ -187,6 +206,7 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
       sourceName: q.source_name,
       sourceUrl: q.source_url,
       category: q.category,
+      marketProb: q.market_prob == null ? null : String(q.market_prob),
     })
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
 

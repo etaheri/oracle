@@ -19,6 +19,9 @@ export interface PipelineDeps {
   claude: ClaudeClient | null;
   models: { author: string; resolve: string };
   now(): Date;
+  // Fetch used for market signal feeds (feeds.ts); defaults to global fetch.
+  // Injectable so tests never touch the network.
+  marketFetch?: typeof fetch;
 }
 
 function errorMessage(err: unknown): string {
