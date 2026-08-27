@@ -5,12 +5,13 @@ import { roundRoutes } from "./routes/round";
 import { predictionRoutes } from "./routes/predictions";
 import { adminRoutes } from "./routes/admin";
 import { meRoutes } from "./routes/me";
+import type { PipelineDeps } from "./pipeline";
 export type { Db };
 export interface AppEnv {
   DEVICE_TOKEN_SECRET: string;
   ADMIN_SECRET: string;
 }
-export interface Deps { db: Db; env: AppEnv; }
+export interface Deps { db: Db; env: AppEnv; pipeline?: PipelineDeps }
 export type AppContext = { Variables: { deps: Deps; userId: string } };
 
 export function createApp(deps: Deps) {
