@@ -12,11 +12,11 @@ Captured 2026-08-27 from design conversation (Erik + Claude), while the round pi
 
 **To build:** the persona playbook — `SOUL.md`/`AGENTS.md` for Hermes Agent carrying the machine-voice register rules (copy-bank constraints, liturgy verbatim, no emoji/CTA-verbs), what it may post autonomously vs. what needs Erik's eyes (outreach/DMs always), and its daily rhythm (post the hinge, post the day report highlights, against-the-tide celebrations). Unwritten as of 2026-08-27.
 
-## 0.5 Market-informed authoring (Manifold/Polymarket — phase 1 proposed, awaiting go/park)
+## 0.5 Market-informed authoring — PHASE 1 SHIPPED 2026-08-27 (commit 7643148)
 
-Phase 1 (backend-only, drops into `author.ts`): during evening authoring, fetch markets closing within ~36h from Manifold's keyless public API (`/v0/search-markets`; breadth on culture/sports) and optionally Polymarket's public gamma API (real-money weight); filter to contested (30–70%) with liquidity/trader floors; feed top ~15 into the authoring prompt as candidate signals; stamp the dormant `questions.market_prob` column when a question derives from a market. Fetch failure → author market-blind with a WARN (today's behavior).
+`apps/api/src/pipeline/feeds.ts`: pluggable `MarketFeed` interface; Manifold (`/v0/search-markets`, binary + ≥5 bettors) and Polymarket gamma (`end_date`-bounded, volume ≥500) fetch keyless, filter to the 36h horizon, rank by trust (real money 1.0 > play money 0.6) × contestedness × log-volume, cap 15. Signals enter the authoring system prompt as a LIVE MARKET SIGNALS block; `market_prob` (0–1, nullable) rides the draft schema into the formerly dormant `questions.market_prob` column. Per-feed failure isolation; all-feeds-down → authoring proceeds market-blind. **Kalshi deferred:** its public endpoints null all prices without an RSA-signed key (verified live 2026-08-27) — joins as a drop-in `MarketFeed` when credentials exist.
 
-**Rules:** markets are a selection signal, never a resolution source (play-money, user-resolved — resolution stays on primary named sources); markets feed the category skeleton, never replace it (weather/box-office questions keep existing without markets). Phase 2: player-visible "THE MARKET SAID {n}%" on reveal + share card. Phase 3: resolution cross-check.
+**Rules (standing):** markets are a selection signal, never a resolution source; markets feed the category skeleton, never replace it. Phase 2 (unbuilt): player-visible "THE MARKET SAID {n}%" on reveal + share card. Phase 3 (unbuilt): resolution cross-check.
 
 ## 1. Oracle Pools (Duolingo-style leagues) — the D7 lever
 
