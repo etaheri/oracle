@@ -54,6 +54,21 @@ describe("makeClaudeClient", () => {
     expect(seen[1]!.body.messages[1].role).toBe("assistant");
   });
 
+  it("merges consecutive pause_turn continuations into one trailing assistant turn", async () => {
+    const paused1 = new Response(JSON.stringify({ stop_reason: "pause_turn", content: [{ type: "text", text: "searching one…" }] }), { status: 200 });
+    const paused2 = new Response(JSON.stringify({ stop_reason: "pause_turn", content: [{ type: "text", text: "searching two…" }] }), { status: 200 });
+    const { fn, seen } = capturingFetch([paused1, paused2, toolResp({ ok: true })]);
+    const out = await makeClaudeClient("key", fn).structured(call);
+    expect(out).toEqual({ ok: true });
+    expect(seen.length).toBe(3);
+    expect(seen[1]!.body.messages.length).toBe(2); // user + single assistant continuation
+    expect(seen[1]!.body.messages[1].role).toBe("assistant");
+    expect(seen[2]!.body.messages.length).toBe(2); // still a single trailing assistant message
+    expect(seen[2]!.body.messages[1].role).toBe("assistant");
+    const mergedTexts = seen[2]!.body.messages[1].content.map((b: any) => b.text);
+    expect(mergedTexts).toEqual(["searching one…", "searching two…"]);
+  });
+
   it("throws when no structured output block is returned", async () => {
     const { fn } = capturingFetch([new Response(JSON.stringify({ stop_reason: "end_turn", content: [{ type: "text", text: "sorry" }] }), { status: 200 })]);
     await expect(makeClaudeClient("key", fn).structured(call)).rejects.toThrow("no structured output");

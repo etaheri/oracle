@@ -82,7 +82,12 @@ export function makeClaudeClient(apiKey: string, fetchFn: typeof fetch = fetch):
           if (attempt === MAX_CONTINUATIONS) {
             throw new Error("claude: pause_turn limit");
           }
-          messages.push({ role: "assistant", content });
+          const last = messages[messages.length - 1];
+          if (last && last.role === "assistant") {
+            (last.content as unknown[]).push(...content);
+          } else {
+            messages.push({ role: "assistant", content: [...content] });
+          }
           continue;
         }
 
