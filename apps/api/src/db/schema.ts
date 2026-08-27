@@ -61,3 +61,13 @@ export const predictions = pgTable("predictions", {
   brier: numeric("brier"),
   points: integer("points"),
 }, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId)]);
+
+// Oracle Plus entitlements (backend spec L55). Written by the RevenueCat
+// webhook (Plan 3b); read by streak settlement for paid shields.
+export const entitlements = pgTable("entitlements", {
+  userId: uuid("user_id").primaryKey().references(() => users.id),
+  plusActive: boolean("plus_active").notNull().default(false),
+  shieldsRemaining: integer("shields_remaining").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
