@@ -1,0 +1,134 @@
+// Hermes pipeline decision core (spec §2, §9). loadPipelineState reads the DB
+// into a plain snapshot; decideActions is a pure function of ET wall-clock +
+// that snapshot — no Date.now, no I/O, so the cron's every-tick decisions are
+// fully testable and replayable.
+import { and, eq } from "drizzle-orm";
+import { schema, type Db } from "../db/client";
+import { addDays, type ETNow } from "./clock";
+
+export type Action =
+  | { kind: "lock"; date: string }
+  | { kind: "publish"; date: string }
+  | { kind: "resolve"; date: string; questionIds: string[] }
+  | { kind: "void"; date: string; questionIds: string[] }
+  | { kind: "settle"; date: string }
+  | { kind: "author"; date: string }
+  | { kind: "alert"; level: "warn" | "critical"; message: string };
+
+export interface PipelineState {
+  openRound: { date: string; lockPassed: boolean } | null; // status='open'; lockPassed = now >= questions' locksAt
+  lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
+  scheduledDates: string[]; // rounds with status='scheduled'
+}
+
+export async function loadPipelineState(db: Db, now: Date): Promise<PipelineState> {
+  const [openRoundRow, lockedRoundRow, scheduledRounds] = await Promise.all([
+    db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") }),
+    db.query.rounds.findFirst({ where: eq(schema.rounds.status, "locked") }),
+    db.query.rounds.findMany({ where: eq(schema.rounds.status, "scheduled") }),
+  ]);
+
+  let openRound: PipelineState["openRound"] = null;
+  if (openRoundRow) {
+    const questions = await db.query.questions.findMany({
+      where: eq(schema.questions.roundDate, openRoundRow.date),
+    });
+    const maxLocksAt = questions.reduce(
+      (max, q) => (q.locksAt.getTime() > max ? q.locksAt.getTime() : max),
+      0,
+    );
+    openRound = { date: openRoundRow.date, lockPassed: now.getTime() >= maxLocksAt };
+  }
+
+  let lockedRound: PipelineState["lockedRound"] = null;
+  if (lockedRoundRow) {
+    const unresolved = await db.query.questions.findMany({
+      where: and(
+        eq(schema.questions.roundDate, lockedRoundRow.date),
+        eq(schema.questions.status, "locked"),
+      ),
+      orderBy: (questions, { asc }) => [asc(questions.slot)],
+    });
+    lockedRound = { date: lockedRoundRow.date, unresolvedIds: unresolved.map((q) => q.id) };
+  }
+
+  return {
+    openRound,
+    lockedRound,
+    scheduledDates: scheduledRounds.map((r) => r.date),
+  };
+}
+
+export function decideActions(now: ETNow, state: PipelineState): Action[] {
+  const actions: Action[] = [];
+  const { date: today, hour, minute } = now;
+  const tomorrow = addDays(today, 1);
+
+  // LOCK
+  if (state.openRound?.lockPassed) {
+    actions.push({ kind: "lock", date: state.openRound.date });
+  }
+
+  // PUBLISH — noon or later, today has a draft, and no still-open round blocking it
+  // (the round we just decided to lock above no longer blocks, since it locks first).
+  const openBlocksPublish = state.openRound !== null && !state.openRound.lockPassed;
+  if (hour >= 12 && state.scheduledDates.includes(today) && !openBlocksPublish) {
+    actions.push({ kind: "publish", date: today });
+  }
+
+  // RESOLVE / VOID / SETTLE on the locked round
+  if (state.lockedRound) {
+    if (state.lockedRound.unresolvedIds.length > 0) {
+      if (hour >= 13) {
+        actions.push({ kind: "void", date: state.lockedRound.date, questionIds: state.lockedRound.unresolvedIds });
+      } else {
+        actions.push({ kind: "resolve", date: state.lockedRound.date, questionIds: state.lockedRound.unresolvedIds });
+      }
+    } else {
+      actions.push({ kind: "settle", date: state.lockedRound.date });
+    }
+  }
+
+  // AUTHOR tomorrow — hourly throttle at minute<10
+  if (!state.scheduledDates.includes(tomorrow) && hour >= 17 && minute < 10) {
+    actions.push({ kind: "author", date: tomorrow });
+  }
+
+  // ALERTS — each throttled to one tick per hour by minute window
+  if (hour >= 23 && minute < 10 && !state.scheduledDates.includes(tomorrow)) {
+    actions.push({
+      kind: "alert",
+      level: "critical",
+      message: `no draft for tomorrow — seed manually: POST /admin/rounds/${tomorrow}`,
+    });
+  }
+
+  if (
+    hour >= 12 &&
+    minute >= 10 &&
+    minute < 20 &&
+    !state.scheduledDates.includes(today) &&
+    state.openRound?.date !== today
+  ) {
+    actions.push({
+      kind: "alert",
+      level: "critical",
+      message: `no round published for today — POST /admin/rounds/${today}/publish (or seed a draft first)`,
+    });
+  }
+
+  if (
+    state.lockedRound &&
+    (hour > 13 || (hour === 13 && minute >= 30)) &&
+    minute >= 30 &&
+    minute < 40
+  ) {
+    actions.push({
+      kind: "alert",
+      level: "critical",
+      message: `round ${state.lockedRound.date} locked but unsettled`,
+    });
+  }
+
+  return actions;
+}
