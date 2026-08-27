@@ -22,7 +22,7 @@ Captured 2026-08-27 from design conversation (Erik + Claude), while the round pi
 
 `apps/api/src/pipeline/feeds.ts`: pluggable `MarketFeed` interface; Manifold (`/v0/search-markets`, binary + ≥5 bettors) and Polymarket gamma (`end_date`-bounded, volume ≥500) fetch keyless, filter to the 36h horizon, rank by trust (real money 1.0 > play money 0.6) × contestedness × log-volume, cap 15. Signals enter the authoring system prompt as a LIVE MARKET SIGNALS block; `market_prob` (0–1, nullable) rides the draft schema into the formerly dormant `questions.market_prob` column. Per-feed failure isolation; all-feeds-down → authoring proceeds market-blind. **Kalshi deferred:** its public endpoints null all prices without an RSA-signed key (verified live 2026-08-27) — joins as a drop-in `MarketFeed` when credentials exist.
 
-**Rules (standing):** markets are a selection signal, never a resolution source; markets feed the category skeleton, never replace it. Phase 2 (unbuilt): player-visible "THE MARKET SAID {n}%" on reveal + share card. Phase 3 (unbuilt): resolution cross-check.
+**Rules (standing):** markets are a selection signal, never a resolution source; markets feed the category skeleton, never replace it. Phase 2 SHIPPED 2026-08-27 (commit 277d828): market_prob flows through the reveal API into the Big One block ("THE MARKET SAID 42% YES" under the crowd line) and the night share card. Phase 3 (unbuilt): resolution cross-check.
 
 ## 1. Oracle Pools (Duolingo-style leagues) — the D7 lever
 
