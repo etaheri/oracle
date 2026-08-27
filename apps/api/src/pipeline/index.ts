@@ -70,6 +70,11 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
               await deps.telegram.send(`⚠ resolve failed: ${errorMessage(err)}`);
             }
           }
+          // "resolve:<date>" means the tick ATTEMPTED resolution for every
+          // still-locked question in this round — not that all of them
+          // resolved. resolveWithClaude returns false (and unresolved
+          // questions stay locked for the next tick, then void at 13:00 ET)
+          // whenever Claude can't produce a sourced yes/no.
           done.push(`resolve:${action.date}`);
           break;
 
