@@ -61,6 +61,7 @@ export type MineToday = z.infer<typeof MineTodaySchema>;
 export const RevealSchema = z.object({
   date: z.string(),
   day_points: z.number().int(),
+  first_hour: z.boolean(),
   questions: z.array(
     z.object({
       id: z.string().uuid(),

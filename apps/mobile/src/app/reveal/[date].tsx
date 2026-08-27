@@ -101,6 +101,9 @@ export default function RevealScreen() {
         <Animated.View entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)} style={{ alignItems: "center", gap: space(1) }}>
           <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
           <Mono size={9} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
+          {d.first_hour && d.day_points > 0 && (
+            <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
+          )}
         </Animated.View>
         <View>
           {d.questions.filter((q) => q.slot !== 5).map((q, i) => {

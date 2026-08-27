@@ -84,6 +84,7 @@ export const roundRoutes = new Hono<AppContext>()
     return c.json({
       date,
       day_points: dayPoints(perQuestionPoints, allFirstHour),
+      first_hour: allFirstHour,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);
         return {
