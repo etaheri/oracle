@@ -40,7 +40,7 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
     // Complete-rounds rule: all 5 answered → the round rates.
     if (byUser.get(u.id) === qs.length) {
       patch.callsResolved = u.callsResolved + nonVoid;
-      patch.oracleScore = await recomputeOracleScore(db, u.id);
+      patch.oracleScore = oracleScore(await completeRoundBriers(db, u.id, date));
     }
     await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
     if (result.usedPaidShield && ent) {
@@ -54,8 +54,16 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
   return { already: false, settled: audience.size };
 }
 
-// Oracle Score over the user's complete rounds only, in round/slot order.
-async function recomputeOracleScore(db: Db, userId: string): Promise<number | null> {
+// Brier scores over the user's complete rounds only (all 5 slots answered),
+// in round/slot order — feeds oracleScore(). A round only counts once it is
+// fully resolved ("resolved" status) or is the round being settled right now
+// (its status flips to "resolved" only after this settlement pass finishes,
+// so `settlingDate` covers that gap without letting a still-in-progress round
+// leak partial briers into some OTHER user's score recompute).
+export async function completeRoundBriers(db: Db, userId: string, settlingDate: string): Promise<number[]> {
+  const resolvedRounds = await db.query.rounds.findMany({ where: eq(schema.rounds.status, "resolved") });
+  const eligibleDates = new Set([...resolvedRounds.map((r) => r.date), settlingDate]);
+
   const rows = await db
     .select({ brier: schema.predictions.brier, roundDate: schema.questions.roundDate, locksAt: schema.questions.locksAt, slot: schema.questions.slot })
     .from(schema.predictions)
@@ -68,9 +76,8 @@ async function recomputeOracleScore(db: Db, userId: string): Promise<number | nu
     .innerJoin(schema.questions, eq(schema.predictions.questionId, schema.questions.id))
     .where(eq(schema.predictions.userId, userId));
   for (const r of all) perRound.set(r.roundDate, (perRound.get(r.roundDate) ?? 0) + 1);
-  const briers = rows
-    .filter((r) => perRound.get(r.roundDate) === 5)
+  return rows
+    .filter((r) => perRound.get(r.roundDate) === 5 && eligibleDates.has(r.roundDate))
     .sort((x, y) => x.locksAt.getTime() - y.locksAt.getTime() || x.slot - y.slot)
     .map((r) => Number(r.brier));
-  return oracleScore(briers);
 }

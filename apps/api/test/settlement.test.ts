@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { resolveQuestion } from "../src/resolution";
-import { settleRound } from "../src/settlement";
+import { settleRound, completeRoundBriers } from "../src/settlement";
 import * as schema from "../src/db/schema";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
@@ -95,6 +95,26 @@ describe("settleRound", () => {
     await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1, 2] }]);
     await settleRound(db, "2026-08-20");
     expect((await db.query.users.findMany())[0]!).toMatchObject({ streakCurrent: 1, callsResolved: 0 });
+  });
+
+  it("oracle score only counts fully resolved rounds, or the round being settled now", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+
+    // Round A: fully played and resolved, then settled.
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1, 2, 3, 4, 5] }]);
+    await settleRound(db, "2026-08-20");
+    const uid = (await db.query.users.findMany())[0]!.id;
+
+    // Round B: same player answers all 5, but only 3 questions get resolved — round B is NOT settled.
+    const qsB = await seedRound(db, { date: "2026-08-21", opensAt: new Date("2026-08-21T16:00:00Z"), locksAt: new Date("2026-08-21T17:00:00Z") });
+    for (const s of [1, 2, 3, 4, 5]) await a("/v1/predictions", { method: "POST", body: body(qsB.find((q) => q.slot === s)!.id, true) });
+    for (const q of qsB.filter((q) => q.slot <= 3)) await resolveQuestion(db, q.id, "yes");
+
+    expect(await completeRoundBriers(db, uid, "2026-08-20")).toHaveLength(5); // B's 3 resolved briers do not leak in
+    expect(await completeRoundBriers(db, uid, "2026-08-21")).toHaveLength(8); // A's 5 + B's 3, since B is the round being settled now
   });
 });
 
