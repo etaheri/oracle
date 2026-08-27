@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
+import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
 import { Countdown } from "../ui/Countdown";
@@ -9,6 +11,7 @@ import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
 import { epigraphFor } from "../game/epigraph";
+import { onBootDone } from "../game/bootGate";
 import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
@@ -35,6 +38,10 @@ export default function Index() {
   const epigraph = epigraphFor(round?.date ?? new Date().toISOString().slice(0, 10));
   const ledger = useMeLedger();
   const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
+  // Hold the print-in until the boot rite lifts — the static resolves in
+  // view as the overlay fades, instead of playing unseen behind it.
+  const [booted, setBooted] = useState(false);
+  useEffect(() => onBootDone(() => setBooted(true)), []);
 
   return (
     <Screen>
@@ -45,29 +52,31 @@ export default function Index() {
         <LivingHero lean={lean} />
         <Ritual bold size={52} color={colors.ink} letterSpacing={14} style={{ marginRight: -14 }}>ORACLE</Ritual>
         <View style={{ gap: space(2), alignItems: "center", paddingHorizontal: space(5) }}>
-          <Mono size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }}>{`"${epigraph.text}"`}</Mono>
-          <Mono size={10} color={colors.goldText} letterSpacing={3}>{`— ${epigraph.source.toUpperCase()}`}</Mono>
+          <DecodeLine active={booted} text={`"${epigraph.text}"`} seed={epigraph.text} durationMs={700} size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }} />
+          <DecodeLine active={booted} text={`— ${epigraph.source.toUpperCase()}`} seed={epigraph.source} delayMs={500} size={10} color={colors.goldText} letterSpacing={3} />
         </View>
       </View>
       <View style={{ gap: space(3), paddingBottom: space(2) }}>
         {round && !allSealed && (
           <>
-            <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
-              {round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
-            </Mono>
+            <DecodeLine
+              active={booted}
+              text={round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
+              size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}
+            />
             <GoldButton title="ENTER" onPress={() => router.push("/round")} />
             <Countdown until={round.locks_at} prefix="THE ORACLE CLOSES IN" />
           </>
         )}
         {round && allSealed && (
           <>
-            <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>THE PROPHECY IS SEALED</Mono>
+            <DecodeLine active={booted} text="THE PROPHECY IS SEALED" size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2} />
             <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
             <Countdown until={round.locks_at} prefix="THE LEDGER IS READ IN" fallback="THE LEDGER IS READ AT NOON" />
           </>
         )}
         {!round && !today.isLoading && (
-          <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE ORACLE SLEEPS</Mono>
+          <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
         )}
         {vigil && (
           <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{vigil}</Mono>

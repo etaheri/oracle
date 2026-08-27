@@ -5,6 +5,7 @@ import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
 import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { AsciiDust } from "../ui/TerminalPatina";
+import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton } from "../ui/Button";
 import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
@@ -33,7 +34,7 @@ export default function Ledger() {
       <TopBar />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
-        <Eyebrow>The ledger is consulted</Eyebrow>
+        <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
       </View>
     </Screen>
   );
@@ -59,9 +60,11 @@ export default function Ledger() {
             <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
             <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
             {calibrationVerdict(d.avg_confidence, d.accuracy_pct) && (
-              <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}>
-                {calibrationVerdict(d.avg_confidence, d.accuracy_pct)}
-              </Mono>
+              <DecodeLine
+                text={calibrationVerdict(d.avg_confidence, d.accuracy_pct)!}
+                delayMs={300} durationMs={600}
+                size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}
+              />
             )}
           </View>
         </View>

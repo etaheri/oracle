@@ -11,6 +11,7 @@ import { GoldButton } from "../../ui/Button";
 import { GoldFrame } from "../../ui/GoldFrame";
 import { TopBar } from "../../ui/TopBar";
 import { AsciiDust } from "../../ui/TerminalPatina";
+import { DecodeLine } from "../../ui/DecodeText";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
@@ -61,13 +62,13 @@ export default function RevealScreen() {
       <TopBar />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
-        <Eyebrow>Consulting the void…</Eyebrow>
+        <DecodeLine text="CONSULTING THE VOID…" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
       </View>
     </Screen>
   );
   if (reveal.isError) return (
     <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
-      <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>THE ORB IS BEYOND REACH. IT WILL RETURN.</Mono>
+      <DecodeLine text="THE ORB IS BEYOND REACH. IT WILL RETURN." size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
     </View></Screen>
   );
   if (!reveal.data || "pending" in reveal.data) {
@@ -75,7 +76,7 @@ export default function RevealScreen() {
       <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
       <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
-      <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }}>Return at noon.</Mono>
+      <DecodeLine text="RETURN AT NOON." cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
     </View></Screen>;
   }
 

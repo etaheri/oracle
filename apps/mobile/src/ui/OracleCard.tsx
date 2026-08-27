@@ -13,6 +13,7 @@ import { CardChrome, numeral } from "./CardChrome";
 import { SealStamp, STAMP_MS } from "./SealStamp";
 import { CrowdBar } from "./CrowdReveal";
 import { AsciiActivation } from "./TerminalPatina";
+import { DecodeLine } from "./DecodeText";
 import type { RoundToday } from "@oracle/core";
 
 export interface CrowdEntry { crowd_yes_pct: number; player_count: number }
@@ -117,7 +118,7 @@ export function OracleCard({ q, revealed, crowd, isLast, onSealed, onNext }: {
                 </Mono>
               </>
             ) : (
-              <Mono size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>CONSULTING THE CROWD…</Mono>
+              <DecodeLine text="CONSULTING THE CROWD…" cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
             )}
           </View>
           <GoldButton title={isLast ? "BEHOLD THE SPREAD" : "DRAW THE NEXT CARD"} onPress={onNext} />

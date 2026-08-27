@@ -1,20 +1,41 @@
-import { useEffect } from "react";
-import { View } from "react-native";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated";
+import { useEffect, useState } from "react";
+import { Text, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { colors, space } from "../theme";
 import { Serif, Mono, Eyebrow } from "./Text";
 import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { asciiGauge } from "../game/terminalPrint";
 import type { RoundToday } from "@oracle/core";
 
+// The crowd bar in the machine's own alphabet: [#######·····], the fill
+// printing cell by cell. Stepped at 50ms — a gauge prints, it doesn't slide.
+const GAUGE_MS = 600;
+
 export function CrowdBar({ pct }: { pct: number }) {
-  const scale = useSharedValue(0);
-  useEffect(() => { scale.value = withTiming(pct / 100, { duration: 600, easing: Easing.out(Easing.poly(4)) }); }, [pct, scale]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scaleX: scale.value }] }));
+  const reducedMotion = useReducedMotion();
+  const [progress, setProgress] = useState(reducedMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (reducedMotion) { setProgress(1); return; }
+    setProgress(0);
+    const t0 = Date.now();
+    const id = setInterval(() => {
+      const p = Math.min(1, (Date.now() - t0) / GAUGE_MS);
+      setProgress(p);
+      if (p >= 1) clearInterval(id);
+    }, 50);
+    return () => clearInterval(id);
+  }, [pct, reducedMotion]);
+
+  const gauge = asciiGauge(pct, progress);
+  const fillEnd = Math.max(1, gauge.lastIndexOf("#") + 1);
   return (
-    <View style={{ height: 3, backgroundColor: colors.lineSoft }}>
-      <Animated.View style={[{ position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", transformOrigin: "left", backgroundColor: colors.agedGold }, style]} />
-    </View>
+    <Mono size={11} color={colors.goldText} letterSpacing={1}>
+      {gauge.slice(0, fillEnd)}
+      <Text style={{ color: colors.lineSoft }}>{gauge.slice(fillEnd, -1)}</Text>
+      {"]"}
+    </Mono>
   );
 }
 

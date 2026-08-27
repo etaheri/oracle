@@ -7,6 +7,7 @@ import { TopBar } from "../ui/TopBar";
 import { OracleCard } from "../ui/OracleCard";
 import { CrowdReveal } from "../ui/CrowdReveal";
 import { AsciiDust } from "../ui/TerminalPatina";
+import { DecodeLine } from "../ui/DecodeText";
 import { numeral } from "../ui/CardChrome";
 import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
@@ -36,7 +37,7 @@ export default function Round() {
       <TopBar />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
-        <Eyebrow>The oracle is consulted</Eyebrow>
+        <DecodeLine text="THE ORACLE IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
       </View>
     </Screen>
   );
