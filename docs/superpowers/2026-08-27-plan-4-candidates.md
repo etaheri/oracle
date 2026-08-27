@@ -1,6 +1,22 @@
-# Plan 4 Candidates
+# Plan 4 Candidates & Extensions
 
-Captured 2026-08-27 from design conversation (Erik + Claude), while the Hermes pipeline was mid-build. These are candidates to spec via brainstorming when Plan 4 opens — not commitments.
+Captured 2026-08-27 from design conversation (Erik + Claude), while the round pipeline was mid-build. These are candidates to spec via brainstorming when their turn comes — not commitments.
+
+## 0. Hermes Agent operator (persona playbook — nearest-term, pre-launch useful)
+
+"Hermes" = the Hermes Agent platform running as ORACLE's operator: Twitter/@ORACLE, outreach, marketing, ops companionship. Architecture decision (2026-08-27): the deadline-critical game loop lives in the Worker pipeline and never inside an agent harness; Hermes Agent gets the voice and hands, driving the pipeline through its built-for-this control surface:
+
+- `POST /admin/rounds/:date` (author/override drafts), `GET /admin/rounds/:date` (state), admin secret is the only credential needed
+- Telegram commands `/reroll <slot> [guidance]`, `/status`
+- The daily Telegram day report (outcomes, voids, tide-winner counts) as raw posting material
+
+**To build:** the persona playbook — `SOUL.md`/`AGENTS.md` for Hermes Agent carrying the machine-voice register rules (copy-bank constraints, liturgy verbatim, no emoji/CTA-verbs), what it may post autonomously vs. what needs Erik's eyes (outreach/DMs always), and its daily rhythm (post the hinge, post the day report highlights, against-the-tide celebrations). Unwritten as of 2026-08-27.
+
+## 0.5 Market-informed authoring (Manifold/Polymarket — phase 1 proposed, awaiting go/park)
+
+Phase 1 (backend-only, drops into `author.ts`): during evening authoring, fetch markets closing within ~36h from Manifold's keyless public API (`/v0/search-markets`; breadth on culture/sports) and optionally Polymarket's public gamma API (real-money weight); filter to contested (30–70%) with liquidity/trader floors; feed top ~15 into the authoring prompt as candidate signals; stamp the dormant `questions.market_prob` column when a question derives from a market. Fetch failure → author market-blind with a WARN (today's behavior).
+
+**Rules:** markets are a selection signal, never a resolution source (play-money, user-resolved — resolution stays on primary named sources); markets feed the category skeleton, never replace it (weather/box-office questions keep existing without markets). Phase 2: player-visible "THE MARKET SAID {n}%" on reveal + share card. Phase 3: resolution cross-check.
 
 ## 1. Oracle Pools (Duolingo-style leagues) — the D7 lever
 
