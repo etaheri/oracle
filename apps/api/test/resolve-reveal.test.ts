@@ -106,3 +106,21 @@ describe("resolve + reveal cycle", () => {
     expect((await a("/v1/round/2026-08-20/reveal")).status).toBe(409);
   });
 });
+
+describe("market_prob in reveal", () => {
+  it("passes a stamped market probability through as a number, null otherwise", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    await db.update(schema.questions).set({ marketProb: "0.42", status: "locked" }).where(eq(schema.questions.id, qs[4]!.id));
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-20"));
+
+    const p = await playerOn(app);
+    const res = await p("/v1/round/2026-08-20/reveal");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { questions: Array<{ slot: number; market_prob: number | null }> };
+    expect(body.questions.find((q) => q.slot === 5)!.market_prob).toBeCloseTo(0.42);
+    expect(body.questions.find((q) => q.slot === 1)!.market_prob).toBeNull();
+  });
+});

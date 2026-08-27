@@ -100,6 +100,7 @@ export const roundRoutes = new Hono<AppContext>()
           text: q.text,
           outcome: q.outcome,
           crowd_yes_pct: q.crowdYesPct === null ? null : Number(q.crowdYesPct),
+          market_prob: q.marketProb === null ? null : Number(q.marketProb),
           my: p ? { answer: p.answer, confidence: p.confidence, points: p.points, brier: p.brier === null ? null : Number(p.brier) } : null,
         };
       }),

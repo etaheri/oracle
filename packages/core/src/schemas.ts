@@ -69,6 +69,7 @@ export const RevealSchema = z.object({
       text: z.string(),
       outcome: z.enum(["yes", "no", "void"]).nullable(),
       crowd_yes_pct: z.number().nullable(),
+      market_prob: z.number().nullable(),
       my: z
         .object({
           answer: z.boolean(),

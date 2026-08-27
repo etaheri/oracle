@@ -25,6 +25,7 @@ export interface ShareCardData {
   dayPoints: number;
   bigOneText: string | null;
   bigOneCrowdPct: number | null;
+  bigOneMarketPct: number | null;
   results: ReadonlyArray<QuestionResult>;
 }
 
@@ -87,6 +88,8 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const bigOne = data.bigOneText ? ellipsize(data.bigOneText, display, CARD_W - 130) : null;
   // No "✶" here: Skia text has no font fallback and Plex Mono lacks the glyph.
   const crowdLine = data.bigOneCrowdPct !== null ? `THE BIG ONE · CROWD SAID ${data.bigOneCrowdPct}% YES` : null;
+  // Phase 2 market display: only when the question was adapted from a live market.
+  const marketLine = data.bigOneMarketPct !== null ? `THE MARKET SAID ${data.bigOneMarketPct}% YES` : null;
 
   return (
     <Canvas ref={canvasRef} style={{ position: "absolute", left: -9999, top: 0, width: CARD_W, height: CARD_H }}>
@@ -135,6 +138,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       {score && <SkText font={score} text={scoreLine} x={centered(score, scoreLine)} y={724} color={colors.warmCenter} />}
       {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={802} color={colors.museumWhite} />}
       {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
+      {monoSmall && marketLine && <SkText font={monoSmall} text={marketLine} x={centered(monoSmall, marketLine)} y={866} color={NIGHT_DIM} />}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
       {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={938} color={colors.agedGold} />}
       {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centered(monoSmall, LITURGY_LINES[0])} y={968} color={NIGHT_DIM} />}

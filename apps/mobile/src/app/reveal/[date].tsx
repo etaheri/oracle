@@ -91,6 +91,7 @@ export default function RevealScreen() {
     dayPoints: d.day_points,
     bigOneText: big?.text ?? null,
     bigOneCrowdPct: big?.crowd_yes_pct ?? null,
+    bigOneMarketPct: big?.market_prob != null ? Math.round(big.market_prob * 100) : null,
     results,
   };
 
@@ -155,6 +156,9 @@ export default function RevealScreen() {
                     </Mono>
                   </View>
                   <Mono size={10} color={colors.mutedInk}>CROWD SAID {big.crowd_yes_pct}% YES</Mono>
+                  {big.market_prob != null && (
+                    <Mono size={10} color={colors.mutedInk}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
+                  )}
                   {contrarianWin && (
                     <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
                       <Ritual bold size={14} letterSpacing={3}>AGAINST THE TIDE</Ritual>

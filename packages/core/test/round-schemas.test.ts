@@ -33,6 +33,7 @@ describe("round schemas", () => {
           text: "Q?",
           outcome: "void",
           crowd_yes_pct: null,
+          market_prob: null,
           my: null,
         },
       ],
