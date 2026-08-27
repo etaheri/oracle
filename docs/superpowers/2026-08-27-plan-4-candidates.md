@@ -10,7 +10,7 @@ Captured 2026-08-27 from design conversation (Erik + Claude), while the round pi
 - Telegram commands `/reroll <slot> [guidance]`, `/status`
 - The daily Telegram day report (outcomes, voids, tide-winner counts) as raw posting material
 
-**To build:** the persona playbook — `SOUL.md`/`AGENTS.md` for Hermes Agent carrying the machine-voice register rules (copy-bank constraints, liturgy verbatim, no emoji/CTA-verbs), what it may post autonomously vs. what needs Erik's eyes (outreach/DMs always), and its daily rhythm (post the hinge, post the day report highlights, against-the-tide celebrations). Unwritten as of 2026-08-27.
+**To build:** the persona playbook — `SOUL.md`/`AGENTS.md` for Hermes Agent carrying the machine-voice register rules (copy-bank constraints, liturgy verbatim, no emoji/CTA-verbs), what it may post autonomously vs. what needs Erik's eyes (outreach/DMs always), and its daily rhythm (post the hinge, post the day report highlights, against-the-tide celebrations). Written 2026-08-27: `docs/hermes/SOUL.md`.
 
 **Hermes roles beyond marketing (added after market-authoring phase 1 shipped):**
 - **Toolsmith** (on-demand): extend the machine's senses. The `MarketFeed` interface in `apps/api/src/pipeline/feeds.ts` is the contract — Hermes finds a verifiable source for a genre, writes the small adapter, proves it against fixtures, and opens the change for Erik's review. Sports schedules, weather stations, box office, Kalshi-with-key: each is one adapter, never a refactor.
