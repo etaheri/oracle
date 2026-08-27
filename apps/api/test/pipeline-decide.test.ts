@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { decideActions, loadPipelineState, type PipelineState } from "../src/pipeline/state";
 import { makeTestDb, seedRound } from "./helpers/db";
+import * as schema from "../src/db/schema";
 
 const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [] };
 const at = (hour: number, minute = 0) => ({ date: "2026-08-27", hour, minute });
@@ -64,5 +66,20 @@ describe("loadPipelineState", () => {
     expect(st.openRound).toEqual({ date: "2026-08-26", lockPassed: true });
     const st2 = await loadPipelineState(db, new Date("2026-08-27T15:00:00Z"));
     expect(st2.openRound).toEqual({ date: "2026-08-26", lockPassed: false });
+  });
+
+  it("picks the oldest locked round when more than one is locked", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-08-25", opensAt: new Date("2026-08-25T16:00:00Z"), locksAt: new Date("2026-08-26T16:00:00Z") });
+    await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    // Both rounds ended up locked (an anomaly the pipeline should still
+    // recover from cleanly, oldest first).
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-25"));
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-26"));
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-25"));
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
+
+    const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"));
+    expect(st.lockedRound?.date).toBe("2026-08-25");
   });
 });

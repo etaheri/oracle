@@ -82,6 +82,13 @@ export async function resolveWithClaude(deps: PipelineDeps, questionId: string):
   if (outcome === "unverifiable") return false;
   if (quotes.length === 0) return false; // yes/no with no receipts — treat as unverifiable
 
+  // The Claude call above can take minutes across chained web searches, and
+  // cron ticks can overlap: another tick may have voided this question (or
+  // otherwise moved it off "locked") while this call was in flight. Re-check
+  // right before writing so a late resolve never clobbers a void.
+  const current = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+  if (!current || current.status !== "locked") return false;
+
   await resolveQuestion(deps.db, questionId, outcome, {
     outcome,
     quotes,

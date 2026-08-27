@@ -16,11 +16,15 @@ export function makeTelegramClient(
         return;
       }
       try {
-        await fetchFn(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        const res = await fetchFn(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, text }),
         });
+        if (!res.ok) {
+          const bodyText = await res.text().catch(() => "");
+          console.error("[telegram] send failed:", res.status, bodyText);
+        }
       } catch (err) {
         console.error("[telegram] send failed:", err);
       }

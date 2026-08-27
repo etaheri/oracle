@@ -136,6 +136,32 @@ describe("resolveWithClaude", () => {
     expect(q!.status).toBe("locked");
   });
 
+  it("returns false and writes nothing when the question is voided while the claude call is in flight", async () => {
+    const { db } = await makeTestDb();
+    const id = await lockedQuestion(db);
+
+    // A concurrent tick (e.g. the 13:00 ET void sweep) resolves this
+    // question to void partway through our own resolve call's Claude round
+    // trip, which can take minutes across chained web searches.
+    const claude: ClaudeClient = {
+      async structured() {
+        await db.update(schema.questions)
+          .set({ status: "void", outcome: "void", resolutionEvidence: { reason: "voided concurrently" } })
+          .where(eq(schema.questions.id, id));
+        return { outcome: "yes", quotes: [{ url: "https://x", quote: "It happened." }], reasoning: "clear" };
+      },
+    };
+    const { deps } = fakeDeps(db, claude);
+
+    const result = await resolveWithClaude(deps, id);
+    expect(result).toBe(false);
+
+    const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, id) });
+    expect(q!.status).toBe("void");
+    expect(q!.outcome).toBe("void"); // not overwritten with "yes"
+    expect((q!.resolutionEvidence as any).reason).toBe("voided concurrently");
+  });
+
   it("d) allowedDomains strips www. from source_url's hostname, and is absent when source_url is null", async () => {
     const { db } = await makeTestDb();
 

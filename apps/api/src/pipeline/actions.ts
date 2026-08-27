@@ -47,11 +47,19 @@ export async function voidQuestions(
   ids: string[],
   nowIso: string,
 ): Promise<void> {
+  // Re-fetch right before voiding: a concurrent tick's in-flight resolve
+  // (resolve.ts:resolveWithClaude) may have already resolved one of these
+  // questions since decideActions snapshotted its status as "locked". Only
+  // void questions that are still locked, so a late-arriving resolve never
+  // gets stomped by a stale void.
   const rows = await db.query.questions.findMany({ where: inArray(schema.questions.id, ids) });
-  const texts = ids.map((id) => rows.find((r) => r.id === id)?.text ?? id);
+  const stillLocked = rows.filter((r) => r.status === "locked");
+  if (stillLocked.length === 0) return;
 
-  for (const id of ids) {
-    await resolveQuestion(db, id, "void", {
+  const texts = stillLocked.map((r) => r.text);
+
+  for (const row of stillLocked) {
+    await resolveQuestion(db, row.id, "void", {
       unverifiable: true,
       checked_at: nowIso,
       reason: "unverifiable by 13:00 ET",

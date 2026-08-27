@@ -169,6 +169,35 @@ describe("POST /v1/telegram/:secret", () => {
     expect(sent[1]).toContain(replacement.text);
   });
 
+  it("/reroll with multiple scheduled drafts targets the earliest date, not insertion order", async () => {
+    const { db } = await makeTestDb();
+    // Inserted out of date order — the later date first.
+    await upsertDraft(db, "2026-08-29", validDraft);
+    await upsertDraft(db, "2026-08-28", validDraft);
+    const replacement = {
+      slot: 3,
+      category: "weather" as const,
+      text: "Will it rain in NYC before midnight?",
+      resolution_criteria: "NWS observed precipitation at Central Park station by 23:59 ET",
+      source_name: "NWS",
+      source_url: "https://weather.gov/nyc",
+      author_probability: 0.45,
+      is_big_one: false,
+    };
+    const { claude } = fakeClaude([replacement]);
+    const { deps, sent } = fakePipeline(db, claude, "2026-08-27T12:00:00Z");
+    const app = createApp({ db, env, pipeline: deps });
+
+    const res = await post(app, "hook", msg("/reroll 3 make it about weather"));
+    expect(res.status).toBe(200);
+    expect(sent[0]).toBe("rerolling slot 3…");
+
+    const earlier = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-28") });
+    const later = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-29") });
+    expect(earlier.find((q) => q.slot === 3)!.text).toBe(replacement.text);
+    expect(later.find((q) => q.slot === 3)!.text).toBe(validDraft.questions[2]!.text); // untouched
+  });
+
   it("/reroll with no standing draft replies 'no draft standing'", async () => {
     const { db } = await makeTestDb();
     const { deps, sent } = fakePipeline(db, null, "2026-08-27T12:00:00Z");

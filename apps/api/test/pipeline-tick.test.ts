@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { runTick, type PipelineDeps } from "../src/pipeline";
+import { voidQuestions } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
 import * as schema from "../src/db/schema";
 import { buildPipelineDeps, type WorkerEnv } from "../src/worker";
@@ -80,6 +81,48 @@ describe("runTick", () => {
     const done = await runTick(deps); // stub authorRound throws "authoring not wired"
     expect(done.some((d) => d.startsWith("author"))).toBe(false);
     expect(sent.some((t) => t.includes("author failed"))).toBe(true);
+  });
+});
+
+describe("voidQuestions", () => {
+  it("skips a question already resolved by a concurrent tick", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
+    const [already, stillLocked] = qs;
+
+    // Simulate: a concurrent resolveWithClaude finished for `already` in
+    // between decideActions snapshotting the locked ids and voidQuestions
+    // actually running.
+    await resolveQuestion(db, already!.id, "yes");
+
+    const { deps, sent } = fakeDeps(db, "2026-08-27T17:15:00Z");
+    await voidQuestions(db, deps.telegram, [already!.id, stillLocked!.id], "2026-08-27T17:15:00Z");
+
+    const rows = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
+    const alreadyRow = rows.find((r) => r.id === already!.id)!;
+    const lockedRow = rows.find((r) => r.id === stillLocked!.id)!;
+
+    expect(alreadyRow.status).toBe("resolved");
+    expect(alreadyRow.outcome).toBe("yes"); // untouched, not overwritten to void
+    expect(lockedRow.status).toBe("void");
+
+    expect(sent.length).toBe(1);
+    expect(sent[0]).toContain(lockedRow.text);
+    expect(sent[0]).not.toContain(alreadyRow.text);
+  });
+
+  it("sends no WARN when every targeted question is already resolved", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
+    const q = qs[0]!;
+    await resolveQuestion(db, q.id, "yes");
+
+    const { deps, sent } = fakeDeps(db, "2026-08-27T17:15:00Z");
+    await voidQuestions(db, deps.telegram, [q.id], "2026-08-27T17:15:00Z");
+
+    expect(sent.length).toBe(0);
   });
 });
 

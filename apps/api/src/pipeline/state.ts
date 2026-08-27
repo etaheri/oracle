@@ -24,7 +24,10 @@ export interface PipelineState {
 export async function loadPipelineState(db: Db, now: Date): Promise<PipelineState> {
   const [openRoundRow, lockedRoundRow, scheduledRounds] = await Promise.all([
     db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") }),
-    db.query.rounds.findFirst({ where: eq(schema.rounds.status, "locked") }),
+    db.query.rounds.findFirst({
+      where: eq(schema.rounds.status, "locked"),
+      orderBy: (rounds, { asc }) => [asc(rounds.date)],
+    }),
     db.query.rounds.findMany({ where: eq(schema.rounds.status, "scheduled") }),
   ]);
 

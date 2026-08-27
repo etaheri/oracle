@@ -167,6 +167,26 @@ describe("rerollSlot", () => {
     expect(sent[0]).not.toContain("%");
   });
 
+  it("f) refuses to reroll a slot whose round has already published, and leaves the question unchanged", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    // Simulate publish: the round and its questions moved past "scheduled".
+    await db.update(schema.rounds).set({ status: "open" }).where(eq(schema.rounds.date, "2026-08-27"));
+    await db.update(schema.questions).set({ status: "open" }).where(eq(schema.questions.roundDate, "2026-08-27"));
+
+    const { claude, calls } = fakeClaude([]);
+    const { deps, sent } = fakeDeps(db, claude);
+
+    await expect(rerollSlot(deps, "2026-08-27", 3, "guidance")).rejects.toThrow("draft already published");
+    expect(calls).toHaveLength(0); // never even asked Claude
+    expect(sent).toHaveLength(0);
+
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    const slot3 = qs.find((q) => q.slot === 3)!;
+    expect(slot3.text).toBe(validDraft.questions[2]!.text); // unchanged
+    expect(slot3.status).toBe("open"); // unchanged
+  });
+
   it("e) rejects a reroll response that flips is_big_one", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);

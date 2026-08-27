@@ -80,7 +80,7 @@ export const telegramRoutes = new Hono<AppContext>().post("/:secret", async (c) 
 
       case "reroll": {
         const state = await loadPipelineState(pipeline.db, pipeline.now());
-        const date = state.scheduledDates[0];
+        const date = [...state.scheduledDates].sort()[0];
         if (!date) {
           await send("no draft standing");
           break;

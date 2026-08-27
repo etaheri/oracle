@@ -139,6 +139,15 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
   const questions = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
   if (questions.length === 0) throw new Error(`no draft for ${date}`);
 
+  // A reroll that lands after publish must never mutate a live open round's
+  // question — re-check right before we touch anything (not just at the top
+  // of the handler) so this stays correct even though we do a slow Claude
+  // call in between.
+  const target = questions.find((q) => q.slot === slot);
+  if (!target || target.status !== "scheduled") {
+    throw new Error(`draft already published for ${date}`);
+  }
+
   const others = questions.filter((q) => q.slot !== slot).sort((a, b) => a.slot - b.slot);
   const othersTexts = others.map((q) => `[${q.category}] ${q.text}`).join("; ");
 
@@ -160,6 +169,16 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
     throw new Error(`reroll: is_big_one mismatch for slot ${slot}`);
   }
 
+  // The Claude call above takes real time; re-check right before writing so
+  // a publish that happened while we were waiting on Claude can't be
+  // clobbered by this reroll landing late.
+  const stillScheduled = await deps.db.query.questions.findFirst({
+    where: and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot)),
+  });
+  if (!stillScheduled || stillScheduled.status !== "scheduled") {
+    throw new Error(`draft already published for ${date}`);
+  }
+
   await deps.db
     .update(schema.questions)
     .set({
@@ -169,7 +188,7 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
       sourceUrl: q.source_url,
       category: q.category,
     })
-    .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot)));
+    .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
 
   const updated = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
   const sorted = [...updated].sort((a, b) => a.slot - b.slot);
