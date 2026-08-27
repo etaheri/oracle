@@ -5,11 +5,14 @@ import { roundRoutes } from "./routes/round";
 import { predictionRoutes } from "./routes/predictions";
 import { adminRoutes } from "./routes/admin";
 import { meRoutes } from "./routes/me";
+import { telegramRoutes } from "./routes/telegram";
 import type { PipelineDeps } from "./pipeline";
 export type { Db };
 export interface AppEnv {
   DEVICE_TOKEN_SECRET: string;
   ADMIN_SECRET: string;
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_CHAT_ID?: string;
 }
 export interface Deps { db: Db; env: AppEnv; pipeline?: PipelineDeps }
 export type AppContext = { Variables: { deps: Deps; userId: string } };
@@ -23,5 +26,6 @@ export function createApp(deps: Deps) {
   app.route("/v1/predictions", predictionRoutes);
   app.route("/v1/me", meRoutes);
   app.route("/admin", adminRoutes);
+  app.route("/v1/telegram", telegramRoutes);
   return app;
 }
