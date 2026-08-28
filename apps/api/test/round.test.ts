@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 
@@ -17,6 +17,8 @@ async function authedApp() {
     app.request(path, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${token}` } });
   return { app, db, authed };
 }
+
+afterEach(() => vi.useRealTimers());
 
 describe("GET /v1/round/today", () => {
   it("401s without a token", async () => {
@@ -40,5 +42,24 @@ describe("GET /v1/round/today", () => {
       expect(q).not.toHaveProperty("crowd_yes_pct");
       expect(q).not.toHaveProperty("outcome");
     }
+  });
+  it("counts distinct players who have sealed at least one answer", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { app, db, authed } = await authedApp();
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+
+    const res2 = await app.request("/v1/auth/device", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ platform: "ios" }) });
+    const { token: t2 } = (await res2.json()) as { token: string };
+    const authed2 = (path: string, init: RequestInit = {}) =>
+      app.request(path, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${t2}` } });
+
+    const submit = (p: typeof authed, qid: string) =>
+      p("/v1/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question_id: qid, answer: true, confidence: 75, idempotency_key: "k" }) });
+    await submit(authed, qs[0]!.id);
+    await submit(authed, qs[1]!.id); // same player twice — still one oracle
+    await submit(authed2, qs[0]!.id);
+
+    const body = (await (await authed("/v1/round/today")).json()) as { player_count: number };
+    expect(body.player_count).toBe(2);
   });
 });

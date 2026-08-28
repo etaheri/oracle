@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { asc, and, eq, inArray } from "drizzle-orm";
+import { asc, and, countDistinct, eq, inArray } from "drizzle-orm";
 import { dayPoints } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
@@ -22,10 +22,16 @@ export const roundRoutes = new Hono<AppContext>()
     const found = await openRound(db);
     if (!found) return c.json({ error: "no open round" }, 404);
     const { round, qs } = found;
+    // rounds.player_count is a dead column (never written); the live count is
+    // distinct predictors on this round, same source of truth as /today/crowd.
+    const qIds = qs.map((q) => q.id);
+    const [players] = qIds.length
+      ? await db.select({ n: countDistinct(schema.predictions.userId) }).from(schema.predictions).where(inArray(schema.predictions.questionId, qIds))
+      : [{ n: 0 }];
     return c.json({
       date: round.date,
       locks_at: qs[0]?.locksAt ?? null,
-      player_count: round.playerCount,
+      player_count: Number(players?.n ?? 0),
       questions: qs.map((q) => ({
         id: q.id,
         slot: q.slot,
