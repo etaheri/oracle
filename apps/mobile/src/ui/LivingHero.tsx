@@ -17,7 +17,7 @@ const ORB_CY = 0.47;
 export function LivingHero({ lean }: { lean: number | null }) {
   const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
-  const w = width - space(6);
+  const w = width;
   const h = w / ASPECT;
   const [r, g, b] = orbGlowRgb(lean);
 

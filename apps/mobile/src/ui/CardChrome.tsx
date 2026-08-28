@@ -7,6 +7,10 @@ export function numeral(slot: number): string {
   return NUMERALS[slot - 1] ?? String(slot);
 }
 
+// Tarot proportion (brief §3: "large areas of quiet negative space are
+// essential") — the card is an object you drew, not a form you fill.
+const DECK_RATIO = 0.7;
+
 const INSET = 9;
 const TICK = 14;
 const OVER = 5; // how far register marks overshoot the frame corner
@@ -31,20 +35,34 @@ function RegisterMarks() {
   );
 }
 
-export function CardChrome({ slot, title, caption, big = false, fill = false, children }: {
-  slot: number; title: string; caption?: string; big?: boolean; fill?: boolean; children: React.ReactNode;
+// coordinate: the card's one terminal detail (brief §8: "a feature card
+// reveals a static terminal coordinate or symbol cluster") — a quiet mono
+// line tucked into the bottom margin, discovered rather than announced.
+export function CardChrome({ slot, title, coordinate, big = false, fill = false, children }: {
+  slot: number; title: string; coordinate?: string; big?: boolean; fill?: boolean; children: React.ReactNode;
 }) {
   return (
-    <View style={{ borderWidth: 1, borderColor: big ? colors.agedGold : colors.line, backgroundColor: colors.frescoWhite, padding: space(6), paddingVertical: space(5), ...(fill ? { flex: 1 } : null) }}>
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: big ? colors.agedGold : colors.line,
+        backgroundColor: colors.frescoWhite,
+        paddingHorizontal: space(6),
+        paddingTop: space(6),
+        paddingBottom: space(9),
+        ...(fill ? { flex: 1 } : { aspectRatio: DECK_RATIO }),
+      }}
+    >
       <RegisterMarks />
-      <View style={{ alignItems: "center", gap: space(1) }}>
-        <Ritual bold size={13} color={colors.goldText} letterSpacing={4} style={{ marginRight: -4 }}>{numeral(slot)}</Ritual>
+      <View style={{ alignItems: "center", gap: space(2) }}>
+        <Ritual bold size={18} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(slot)}</Ritual>
         <Eyebrow>{title}</Eyebrow>
-        <View style={{ height: 1, alignSelf: "stretch", backgroundColor: colors.lineSoft, marginTop: space(1) }} />
       </View>
-      <View style={{ gap: space(3), paddingVertical: space(3), ...(fill ? { flex: 1 } : null) }}>{children}</View>
-      {caption ? (
-        <Mono size={9} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{caption}</Mono>
+      <View style={{ flex: 1, gap: space(3), paddingTop: space(3) }}>{children}</View>
+      {coordinate ? (
+        <Mono size={8.5} color={colors.mutedInk} letterSpacing={1.5} style={{ position: "absolute", left: INSET + 11, bottom: INSET + 8 }}>
+          {coordinate}
+        </Mono>
       ) : null}
     </View>
   );

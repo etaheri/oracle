@@ -53,16 +53,38 @@ export default function Round() {
       <TopBar label={`DAY ${today.data.date}`} />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         {current ? (
-          <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : DealIn}>
-            <OracleCard
-              q={current}
-              revealed={revealedQ?.id === current.id}
-              crowd={crowdById.get(current.id)}
-              isLast={allSealed}
-              onSealed={() => setRevealedId(current.id)}
-              onNext={() => setRevealedId(null)}
-            />
-          </Animated.View>
+          <View>
+            {/* The rest of the deck: undealt cards peek from beneath the live
+                one, slightly askew, so each deal visibly comes off a stack. */}
+            {qs.filter((q) => q.id !== current.id && !answers[q.id]?.sealed).slice(0, 2).map((q, i) => (
+              <View
+                key={q.id}
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: space(3) + i * space(3),
+                  right: space(3) + i * space(3),
+                  bottom: -7 - i * 6,
+                  height: 30,
+                  backgroundColor: colors.frescoWhite,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  transform: [{ rotate: i === 0 ? "-0.6deg" : "0.8deg" }],
+                }}
+              />
+            ))}
+            <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : DealIn}>
+              <OracleCard
+                q={current}
+                date={today.data.date}
+                revealed={revealedQ?.id === current.id}
+                crowd={crowdById.get(current.id)}
+                isLast={allSealed}
+                onSealed={() => setRevealedId(current.id)}
+                onNext={() => setRevealedId(null)}
+              />
+            </Animated.View>
+          </View>
         ) : (
           <CrowdReveal round={today.data} />
         )}

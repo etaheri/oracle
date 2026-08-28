@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { Screen } from "../ui/Screen";
-import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
+import { Mono, Eyebrow } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
+import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { Countdown } from "../ui/Countdown";
 import { useToday, useCrowdSoFar, useMeLedger } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
@@ -50,7 +51,9 @@ export default function Index() {
         {/* Temple moment: the near-touch, alive — transparent loop over the
             museum ground, glow tinted by the crowd's mood. */}
         <LivingHero lean={lean} />
-        <Ritual bold size={52} color={colors.ink} letterSpacing={14} style={{ marginRight: -14 }}>ORACLE</Ritual>
+        {/* The wordmark materializes out of ASCII (patina spec phase 2) and
+            settles into carved stillness with a faint edge residue. */}
+        <MaterializeTitle active={booted} />
         <View style={{ gap: space(2), alignItems: "center", paddingHorizontal: space(5) }}>
           <DecodeLine active={booted} text={`"${epigraph.text}"`} seed={epigraph.text} durationMs={700} size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }} />
           <DecodeLine active={booted} text={`— ${epigraph.source.toUpperCase()}`} seed={epigraph.source} delayMs={500} size={10} color={colors.goldText} letterSpacing={3} />
