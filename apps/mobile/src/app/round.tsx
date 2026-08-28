@@ -5,6 +5,7 @@ import { Screen } from "../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
 import { OracleCard } from "../ui/OracleCard";
+import { UndealtCard } from "../ui/UndealtCard";
 import { CrowdReveal } from "../ui/CrowdReveal";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
@@ -59,24 +60,11 @@ export default function Round() {
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         {current ? (
           <View>
-            {/* The rest of the deck: undealt cards peek from beneath the live
-                one, slightly askew, so each deal visibly comes off a stack. */}
-            {qs.filter((q) => q.id !== current.id && !answers[q.id]?.sealed).slice(0, 2).map((q, i) => (
-              <View
-                key={q.id}
-                pointerEvents="none"
-                style={{
-                  position: "absolute",
-                  left: space(3) + i * space(3),
-                  right: space(3) + i * space(3),
-                  bottom: -7 - i * 6,
-                  height: 30,
-                  backgroundColor: colors.frescoWhite,
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  transform: [{ rotate: i === 0 ? "-0.6deg" : "0.8deg" }],
-                }}
-              />
+            {/* The rest of the deck: full undealt cards beneath the live one,
+                their prophecies still static — so a mid-swipe glance shows a
+                real stack, not slivers, and nothing unspoiled is spoiled. */}
+            {qs.filter((q) => q.id !== current.id && !answers[q.id]?.sealed).slice(0, 2).reverse().map((q, i, arr) => (
+              <UndealtCard key={q.id} q={q} index={arr.length - 1 - i} />
             ))}
             <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : DealIn}>
               <OracleCard

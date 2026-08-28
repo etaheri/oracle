@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { leanProgress, leanRelease, LEAN_COMMIT, LEAN_DEAD_ZONE } from "../src/game/swipeLean";
+import { leanProgress, leanRelease, leanStep, holdConfidence, LEAN_COMMIT, LEAN_DEAD_ZONE, HOLD_STEP_MS } from "../src/game/swipeLean";
 
 const W = 320; // card width in px
 
@@ -45,5 +45,35 @@ describe("leanRelease", () => {
       const r = leanRelease(dx, W);
       if (r) expect((r.confidence - 55) % 5).toBe(0);
     }
+  });
+});
+
+describe("leanStep", () => {
+  it("is -1 below the commit threshold and 0..8 above it", () => {
+    expect(leanStep(0, W)).toBe(-1);
+    expect(leanStep(W * (LEAN_COMMIT - 0.01), W)).toBe(-1);
+    expect(leanStep(W * LEAN_COMMIT, W)).toBe(0);
+    expect(leanStep(W, W)).toBe(8);
+    expect(leanStep(-W, W)).toBe(8); // magnitude only — side is the sign of dx
+    expect(leanStep(100, 0)).toBe(-1);
+  });
+  it("agrees with leanRelease across the whole pull", () => {
+    for (let dx = -W; dx <= W; dx += 3) {
+      const step = leanStep(dx, W);
+      const r = leanRelease(dx, W);
+      if (step === -1) expect(r).toBeNull();
+      else expect(r!.confidence).toBe(55 + step * 5);
+    }
+  });
+});
+
+describe("holdConfidence", () => {
+  it("charges from 55 to 95 as the hold lengthens, on the grid, capped", () => {
+    expect(holdConfidence(0)).toBe(55);
+    expect(holdConfidence(HOLD_STEP_MS - 1)).toBe(55);
+    expect(holdConfidence(HOLD_STEP_MS)).toBe(60);
+    expect(holdConfidence(HOLD_STEP_MS * 8)).toBe(95);
+    expect(holdConfidence(HOLD_STEP_MS * 50)).toBe(95);
+    expect(holdConfidence(-100)).toBe(55);
   });
 });

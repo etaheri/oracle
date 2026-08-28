@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
-import { leanRelease, LEAN_COMMIT, LEAN_DEAD_ZONE } from "../game/swipeLean";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withSequence, withDelay, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
+import { leanRelease, leanStep, holdConfidence, LEAN_COMMIT, LEAN_DEAD_ZONE } from "../game/swipeLean";
+import { confidenceReading } from "../game/confidence";
+import { decodeFrame } from "../game/terminalPrint";
+import { useScreenReader } from "../hooks/useScreenReader";
+import { getSwipeHinted, markSwipeHinted } from "../api/flags";
 import { ApiError } from "../api/client";
 import { useSubmit } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
@@ -21,6 +25,32 @@ import type { RoundToday } from "@oracle/core";
 export interface CrowdEntry { crowd_yes_pct: number; player_count: number }
 
 const FLIP_MS = 650;
+
+// The dealt card's prophecy materializes: the mono static it wore in the
+// deck dissolves into the serif question. Reduced motion renders the serif
+// immediately.
+function QuestionFace({ text }: { text: string }) {
+  const reducedMotion = useReducedMotion();
+  const t = useSharedValue(reducedMotion ? 1 : 0);
+  useEffect(() => {
+    if (!reducedMotion) t.value = withDelay(320, withTiming(1, { duration: 480 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design
+  }, []);
+  const serifStyle = useAnimatedStyle(() => ({ opacity: t.value }));
+  const noiseStyle = useAnimatedStyle(() => ({ opacity: 1 - t.value }));
+  return (
+    <View>
+      <Animated.View style={serifStyle}>
+        <Serif size={22} style={{ lineHeight: 32, textAlign: "center" }}>{text}</Serif>
+      </Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFill, { justifyContent: "center", pointerEvents: "none" }, noiseStyle]}>
+        <Mono size={13} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: 24 }}>
+          {decodeFrame(text, 0, 1, text)}
+        </Mono>
+      </Animated.View>
+    </View>
+  );
+}
 
 export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext }: {
   q: RoundToday["questions"][number];
@@ -44,7 +74,14 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
   // UI thread; the release decision runs the node-tested game module on JS.
   const dragX = useSharedValue(0);
   const cardW = useSharedValue(0);
-  const crossed = useSharedValue(0);
+  const stepSV = useSharedValue(-1);
+  // The conviction the current pull (or button hold) implies — drives the
+  // live machine-voice readout and the ratchet haptics.
+  const [liveConf, setLiveConf] = useState<number | null>(null);
+  const screenReader = useScreenReader();
+  // The accessible twin: screen-reader and reduced-motion players get the
+  // hold-to-charge buttons instead of the drag.
+  const buttonsMode = screenReader || reducedMotion;
 
   useEffect(() => {
     if (reducedMotion) { flip.value = revealed ? 180 : 0; return; }
@@ -73,11 +110,19 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
 
   function commitLean(dx: number, width: number) {
     const r = leanRelease(dx, width);
+    setLiveConf(null);
     if (!r) return;
     setAnswer(q.id, r.answer);
     setConfidence(q.id, r.confidence);
   }
-  const crossHaptic = () => Haptics.selectionAsync();
+  // Ratchet haptics: crossing the commit threshold is a distinct thunk;
+  // every conviction step past it (in either direction) is a light tick.
+  function onStepChange(step: number, prev: number) {
+    if (step === -1) { setLiveConf(null); return; }
+    setLiveConf(55 + step * 5);
+    if (prev === -1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    else void Haptics.selectionAsync();
+  }
 
   const sealed = !!entry?.sealed;
   const pan = Gesture.Pan()
@@ -86,18 +131,68 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
     .failOffsetY([-16, 16])
     .onUpdate((e) => {
       dragX.value = e.translationX;
-      const over = Math.abs(e.translationX) / Math.max(1, cardW.value) >= LEAN_COMMIT ? 1 : 0;
-      if (over !== crossed.value) {
-        crossed.value = over;
-        if (over) runOnJS(crossHaptic)();
+      const step = leanStep(e.translationX, cardW.value);
+      if (step !== stepSV.value) {
+        const prev = stepSV.value;
+        stepSV.value = step;
+        runOnJS(onStepChange)(step, prev);
       }
     })
     .onEnd((e) => {
       runOnJS(commitLean)(e.translationX, cardW.value);
-      crossed.value = 0;
+      stepSV.value = -1;
       if (reducedMotion) dragX.value = 0;
       else dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
     });
+
+  // Hold-to-charge (buttonsMode): pressing a side charges conviction one
+  // grid step at a time, ticking as it climbs; release selects at that
+  // conviction. Same metaphor as the pull, no motion required.
+  const hold = useRef<{ start: number; timer: ReturnType<typeof setInterval>; last: number } | null>(null);
+  function beginHold() {
+    endHoldTimer();
+    const start = Date.now();
+    hold.current = {
+      start,
+      last: 55,
+      timer: setInterval(() => {
+        const c = holdConfidence(Date.now() - start);
+        if (hold.current && c !== hold.current.last) {
+          hold.current.last = c;
+          void Haptics.selectionAsync();
+          setLiveConf(c);
+        }
+      }, 50),
+    };
+    setLiveConf(55);
+  }
+  function endHoldTimer() {
+    if (hold.current) { clearInterval(hold.current.timer); hold.current = null; }
+  }
+  function endHold(answer: boolean) {
+    if (!hold.current) return;
+    const conf = holdConfidence(Date.now() - hold.current.start);
+    endHoldTimer();
+    setLiveConf(null);
+    setAnswer(q.id, answer);
+    setConfidence(q.id, conf);
+  }
+  useEffect(() => endHoldTimer, []);
+
+  // One-time teaching nudge: the very first undecided card ever drifts a
+  // few points toward YES and settles, so the hand learns the face is
+  // grabbable. Skipped in buttonsMode; never repeats (SecureStore flag).
+  useEffect(() => {
+    if (buttonsMode || entry) return;
+    let cancelled = false;
+    void getSwipeHinted().then((seen) => {
+      if (seen || cancelled) return;
+      void markSwipeHinted();
+      dragX.value = withDelay(900, withSequence(withTiming(18, { duration: 320 }), withTiming(0, { duration: 420, easing: Easing.out(Easing.poly(3)) })));
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design
+  }, []);
   const backStyle = useAnimatedStyle(() => ({
     transform: [{ perspective: 1200 }, { rotateY: `${flip.value + 180}deg` }],
     backfaceVisibility: "hidden" as const,
@@ -142,24 +237,40 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
               canonical path — the gesture only ever selects, never seals). */}
           <GestureDetector gesture={pan}>
             <View style={{ flex: 1, justifyContent: "center" }}>
-              <Serif size={22} style={{ lineHeight: 32, textAlign: "center" }}>{q.text}</Serif>
+              <QuestionFace text={q.text} />
             </View>
           </GestureDetector>
           <View style={{ gap: space(3) }}>
-            <View style={{ flexDirection: "row", gap: space(2) }}>
-              {([true, false] as const).map((v) => {
-                const sel = entry?.answer === v;
-                // Sleeve semantics from the art: YES wears the ultramarine sleeve, NO the vermilion.
-                const tone = v ? colors.ultramarine : colors.vermilion;
-                const wash = v ? colors.ultramarineWash : colors.vermilionWash;
-                return (
-                  <Pressable key={String(v)} accessibilityRole="button" accessibilityState={{ selected: sel }} onPress={() => setAnswer(q.id, v)}
-                    style={{ flex: 1, borderWidth: 1, borderColor: sel ? tone : colors.line, minHeight: 48, justifyContent: "center", alignItems: "center", backgroundColor: sel ? wash : "transparent" }}>
-                    <Mono size={12} color={sel ? tone : colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>{v ? "YES" : "NO"}</Mono>
-                  </Pressable>
-                );
-              })}
-            </View>
+            {liveConf !== null ? (
+              // Live conviction readout — the pull (or hold) speaking as it climbs.
+              <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>
+                {liveConf}% · {confidenceReading(liveConf)}
+              </Mono>
+            ) : !entry && !buttonsMode ? (
+              <DecodeLine text="‹ NO ─ · ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
+            ) : null}
+            {buttonsMode && (
+              <View style={{ flexDirection: "row", gap: space(2) }}>
+                {([true, false] as const).map((v) => {
+                  const sel = entry?.answer === v;
+                  // Sleeve semantics from the art: YES wears the ultramarine sleeve, NO the vermilion.
+                  const tone = v ? colors.ultramarine : colors.vermilion;
+                  const wash = v ? colors.ultramarineWash : colors.vermilionWash;
+                  return (
+                    <Pressable
+                      key={String(v)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: sel }}
+                      accessibilityHint="Hold to raise conviction before releasing; adjust it on the slider after."
+                      onPressIn={beginHold}
+                      onPressOut={() => endHold(v)}
+                      style={{ flex: 1, borderWidth: 1, borderColor: sel ? tone : colors.line, minHeight: 48, justifyContent: "center", alignItems: "center", backgroundColor: sel ? wash : "transparent" }}>
+                      <Mono size={12} color={sel ? tone : colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>{v ? "YES" : "NO"}</Mono>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
             {entry && <ConfidenceSlider value={entry.confidence} onChange={(c) => setConfidence(q.id, c)} />}
             {error && <Mono size={11} color={colors.vermilion} style={{ textAlign: "center" }}>{error}</Mono>}
             <GoldButton title={submit.isPending ? "SEALING…" : "SEAL THE PROPHECY"} onPress={seal} disabled={!entry || submit.isPending} />

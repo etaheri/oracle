@@ -22,6 +22,15 @@ export async function markRitesSeen(): Promise<void> {
   try { await (await store()).setItemAsync(RITES_SEEN_KEY, "1"); } catch {}
 }
 
+const SWIPE_HINTED_KEY = "oracle.swipe_hinted";
+
+export async function getSwipeHinted(): Promise<boolean> {
+  try { return (await (await store()).getItemAsync(SWIPE_HINTED_KEY)) === "1"; } catch { return true; } // storage failure → never replay the nudge
+}
+export async function markSwipeHinted(): Promise<void> {
+  try { await (await store()).setItemAsync(SWIPE_HINTED_KEY, "1"); } catch {}
+}
+
 const NOTIF_ASKED_KEY = "oracle.notif_asked";
 
 export async function getNotifAsked(): Promise<boolean> {
