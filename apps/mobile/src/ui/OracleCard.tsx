@@ -165,12 +165,21 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
             <GoldButton title={submit.isPending ? "SEALING…" : "SEAL THE PROPHECY"} onPress={seal} disabled={!entry || submit.isPending} />
           </View>
         </CardChrome>
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.ultramarineWash }, yesWashStyle]} />
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.vermilionWash }, noWashStyle]} />
+        {/* Plain-View wrapper carries pointerEvents="none": an opacity-0 view
+            still hit-tests, and reanimated does not reliably forward the
+            pointerEvents PROP — a none-wrapper makes the washes untouchable. */}
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.ultramarineWash }, yesWashStyle]} />
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.vermilionWash }, noWashStyle]} />
+        </View>
         {stamped && <AsciiActivation width={cardSize.w} height={cardSize.h} />}
         {stamped && <SealStamp numeral={numeral(q.slot)} />}
       </Animated.View>
-      <Animated.View style={[StyleSheet.absoluteFill, backStyle]}>
+      {/* The turned-away face must not hit-test: RN hit-testing ignores
+          backfaceVisibility, so the hidden back face — rendered above the
+          front — would swallow every touch on the card. style.pointerEvents
+          (not the prop) so reanimated can't drop it. */}
+      <Animated.View style={[StyleSheet.absoluteFill, backStyle, { pointerEvents: revealed ? "auto" : "none" }]}>
         <CardChrome slot={q.slot} title="The crowd speaks" big={q.is_big_one} fill coordinate=":: THE LEDGER IS READ TOMORROW NOON">
           <View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
             <Serif size={17} color={colors.mutedInk} numberOfLines={2}>{q.text}</Serif>
