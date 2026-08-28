@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   freeShieldUsedAt: date("free_shield_used_at"),
   oracleScore: integer("oracle_score"),
   callsResolved: integer("calls_resolved").notNull().default(0),
+  // Idempotency marker: the latest round date this user's streak has been
+  // settled through. Lets a crashed settleRound retry skip finished users
+  // (neon-http has no transactions to lean on).
+  streakSettledThrough: date("streak_settled_through"),
 });
 
 export const devices = pgTable("devices", {

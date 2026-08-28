@@ -15,6 +15,13 @@
       "when": 1787835323042,
       "tag": "0001_tired_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787928232593,
+      "tag": "0002_polite_zaran",
+      "breakpoints": true
     }
   ]
 }

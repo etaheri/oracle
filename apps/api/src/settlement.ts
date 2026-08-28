@@ -9,13 +9,11 @@ import { schema, type Db } from "./db/client";
 // PLAN-4 NOTE: the audience is users-with-streak ∪ users-who-played; both
 // queries are unbounded and per-user scoring is N queries — fine at current
 // scale, revisit with the DO alarm.
-// PLAN-4 PRECONDITION (final review 2026-08-27): settleRound is not atomic —
-// users settle one at a time and the round flips to "resolved" only at the
-// end. A mid-loop crash + retry would double-settle already-processed users
-// (streak +2, or a second shield burned). Safe while the trigger is one
-// manual admin call; BEFORE the DO alarm automates (and retries) this, make
-// it retry-safe per user — e.g. a users.streak_settled_through date checked
-// in the loop. Also note: neon-http has no interactive transactions.
+// RETRY SAFETY: users.streak_settled_through marks each user done as their
+// row is written, so a mid-loop crash + cron retry skips finished users.
+// Write order per user: users row (streak + marker, one statement) THEN the
+// entitlements decrement — a crash between the two leaves the player an
+// undecremented shield (player-favorable), never a double burn.
 export async function settleRound(db: Db, date: string): Promise<{ already: boolean; settled: number }> {
   const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (!round) throw new Error("unknown round");
@@ -31,7 +29,9 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
   const audience = new Map([...streakHolders, ...playedUsers].map((u) => [u.id, u]));
 
   const nonVoid = qs.filter((q) => q.outcome !== "void").length;
+  let settled = 0;
   for (const u of audience.values()) {
+    if (u.streakSettledThrough !== null && u.streakSettledThrough >= date) continue; // ISO dates compare lexicographically
     const played = (byUser.get(u.id) ?? 0) > 0;
     const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, u.id) });
     const result = settleStreak(
@@ -43,6 +43,7 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
       streakCurrent: result.streakCurrent,
       streakBest: result.streakBest,
       freeShieldUsedAt: result.freeShieldUsedAt,
+      streakSettledThrough: date,
     };
     // Complete-rounds rule: all 5 answered → the round rates.
     if (byUser.get(u.id) === qs.length) {
@@ -55,10 +56,11 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
         .set({ shieldsRemaining: result.paidShieldsRemaining, updatedAt: new Date() })
         .where(eq(schema.entitlements.userId, u.id));
     }
+    settled++;
   }
 
   await db.update(schema.rounds).set({ status: "resolved" }).where(eq(schema.rounds.date, date));
-  return { already: false, settled: audience.size };
+  return { already: false, settled };
 }
 
 // Brier scores over the user's complete rounds only (all 5 slots answered),

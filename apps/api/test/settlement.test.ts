@@ -116,6 +116,43 @@ describe("settleRound", () => {
     expect(await completeRoundBriers(db, uid, "2026-08-20")).toHaveLength(5); // B's 3 resolved briers do not leak in
     expect(await completeRoundBriers(db, uid, "2026-08-21")).toHaveLength(8); // A's 5 + B's 3, since B is the round being settled now
   });
+
+  it("a cron retry after a mid-loop crash does not double-settle a played user", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-20");
+    // Simulate the crash window: users were settled but the round never flipped.
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-20"));
+
+    const retry = await settleRound(db, "2026-08-20");
+    expect(retry.settled).toBe(0);
+    expect((await db.query.users.findMany())[0]!).toMatchObject({ streakCurrent: 1, streakBest: 1, streakSettledThrough: "2026-08-20" });
+  });
+
+  it("a cron retry does not burn a second shield", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-20");
+    const uid = (await db.query.users.findMany())[0]!.id;
+    // Free shield already spent this month; one paid shield in reserve.
+    await db.update(schema.users).set({ freeShieldUsedAt: "2026-08-20" }).where(eq(schema.users.id, uid));
+    await db.insert(schema.entitlements).values({ userId: uid, plusActive: true, shieldsRemaining: 1 });
+    // Day 2: a miss → the paid shield burns once.
+    await playedRound(db, app, "2026-08-21", []);
+    await settleRound(db, "2026-08-21");
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-21"));
+
+    await settleRound(db, "2026-08-21"); // the retry
+    const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
+    expect(ent!.shieldsRemaining).toBe(0); // burned once, not twice
+    expect((await db.query.users.findMany())[0]!.streakCurrent).toBe(1);
+  });
 });
 
 describe("POST /admin/rounds/:date/settle", () => {
