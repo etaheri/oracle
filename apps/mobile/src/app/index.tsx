@@ -7,13 +7,15 @@ import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
 import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { Countdown } from "../ui/Countdown";
-import { useToday, useCrowdSoFar, useMeLedger } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMeLedger, useReveal } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
 import { epigraphFor } from "../game/epigraph";
 import { onBootDone } from "../game/bootGate";
 import { shieldNotice } from "../game/shieldNotice";
+import { revealReady } from "../game/revealReady";
+import { getRevealSeen } from "../api/flags";
 import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
@@ -31,6 +33,10 @@ export default function Index() {
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
   const yesterday = yesterdayOf(round?.date);
+  const reveal = useReveal(yesterday);
+  const [revealSeen, setRevealSeen] = useState<string | null>(null);
+  useEffect(() => { void getRevealSeen().then(setRevealSeen); }, []);
+  const showLedgerCta = revealReady(reveal.data) && revealSeen !== yesterday;
   const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
   const lean = crowdLean(crowd.data?.questions ?? []);
@@ -62,6 +68,12 @@ export default function Index() {
         </View>
       </View>
       <View style={{ gap: space(3), paddingBottom: space(2) }}>
+        {showLedgerCta && (
+          <>
+            <DecodeLine active={booted} text="THE LEDGER IS READ" size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2} />
+            <GoldButton title="READ THE LEDGER" onPress={() => router.push(`/reveal/${yesterday}`)} />
+          </>
+        )}
         {round && !allSealed && (
           <>
             <DecodeLine
@@ -87,7 +99,7 @@ export default function Index() {
           <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{shield ?? vigil}</Mono>
         )}
         <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
-        <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />
+        {!showLedgerCta && <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />}
       </View>
     </Screen>
   );

@@ -16,6 +16,7 @@ import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCa
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
 import { useReveal } from "../../api/hooks";
+import { markRevealSeen } from "../../api/flags";
 import { colors, space } from "../../theme";
 
 const easeOut = Easing.out(Easing.poly(4));
@@ -34,6 +35,10 @@ const TideFlash = new Keyframe({
 export default function RevealScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const reveal = useReveal(date ?? null);
+  useEffect(() => {
+    const d = reveal.data;
+    if (d && !("pending" in d)) void markRevealSeen(d.date);
+  }, [reveal.data]);
   const reducedMotion = useReducedMotion();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
