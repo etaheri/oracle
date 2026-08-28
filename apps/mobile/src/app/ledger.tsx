@@ -12,6 +12,7 @@ import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
 import { colors, space } from "../theme";
 import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
+import { shieldStat } from "../game/shieldStat";
 
 // The Forecaster's Ledger (voice spec §6): a museum specimen plaque. Stats in
 // machine voice, one epithet with its receipt — identity only with evidence.
@@ -59,6 +60,7 @@ export default function Ledger() {
             <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
             <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
             <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
+            <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
             {calibrationVerdict(d.avg_confidence, d.accuracy_pct) && (
               <DecodeLine
                 text={calibrationVerdict(d.avg_confidence, d.accuracy_pct)!}

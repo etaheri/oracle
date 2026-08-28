@@ -13,6 +13,7 @@ import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
 import { epigraphFor } from "../game/epigraph";
 import { onBootDone } from "../game/bootGate";
+import { shieldNotice } from "../game/shieldNotice";
 import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
@@ -39,6 +40,7 @@ export default function Index() {
   const epigraph = epigraphFor(round?.date ?? new Date().toISOString().slice(0, 10));
   const ledger = useMeLedger();
   const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
+  const shield = shieldNotice(ledger.data?.shield_used_on ?? null, yesterday);
   // Hold the print-in until the boot rite lifts — the static resolves in
   // view as the overlay fades, instead of playing unseen behind it.
   const [booted, setBooted] = useState(false);
@@ -81,8 +83,8 @@ export default function Index() {
         {!round && !today.isLoading && (
           <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
         )}
-        {vigil && (
-          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{vigil}</Mono>
+        {(shield ?? vigil) && (
+          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{shield ?? vigil}</Mono>
         )}
         <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
         <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />
