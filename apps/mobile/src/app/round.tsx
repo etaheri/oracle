@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
@@ -6,6 +6,8 @@ import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
 import { OracleCard } from "../ui/OracleCard";
 import { UndealtCard } from "../ui/UndealtCard";
+import { ConvictionColumn } from "../ui/ConvictionColumn";
+import { confidenceReading } from "../game/confidence";
 import { CrowdReveal } from "../ui/CrowdReveal";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
@@ -28,6 +30,14 @@ export default function Round() {
   const reducedMotion = useReducedMotion();
   const answers = useRoundStore((s) => s.answers);
   const [revealedId, setRevealedId] = useState<string | null>(null);
+  // The card's live pull, lifted to the screen: the conviction column and
+  // the footer reading are stationary while the card moves.
+  const [lean, setLean] = useState<{ conf: number | null; side: boolean }>({ conf: null, side: true });
+  // Stable identity + no-op bailout: the card reports its lean on every
+  // change; an inline handler here would re-render forever.
+  const onLean = useCallback((conf: number | null, side: boolean) => {
+    setLean((prev) => (prev.conf === conf && prev.side === side ? prev : { conf, side }));
+  }, []);
 
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
@@ -75,6 +85,7 @@ export default function Round() {
                 isLast={allSealed}
                 onSealed={() => setRevealedId(current.id)}
                 onNext={() => setRevealedId(null)}
+                onLean={onLean}
               />
             </Animated.View>
           </View>
@@ -82,6 +93,7 @@ export default function Round() {
           <CrowdReveal round={today.data} />
         )}
       </View>
+      {lean.conf !== null && <ConvictionColumn conf={lean.conf} side={lean.side} />}
       <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
         {qs.map((q) => (
           <Ritual key={q.id} size={12} color={answers[q.id]?.sealed ? colors.goldText : "rgba(23,25,31,0.22)"} letterSpacing={1}>
@@ -89,9 +101,16 @@ export default function Round() {
           </Ritual>
         ))}
       </View>
-      <Mono size={9} color={colors.mutedInk} style={{ textAlign: "center", paddingTop: space(2) }}>
-        The crowd's leaning is hidden until you commit.
-      </Mono>
+      {lean.conf !== null ? (
+        // The oracle reads the pull aloud — stationary, in the footer's slot.
+        <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center", paddingTop: space(2) }}>
+          {confidenceReading(lean.conf)}
+        </Mono>
+      ) : (
+        <Mono size={9} color={colors.mutedInk} style={{ textAlign: "center", paddingTop: space(2) }}>
+          The crowd's leaning is hidden until you commit.
+        </Mono>
+      )}
     </Screen>
   );
 }

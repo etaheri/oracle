@@ -51,7 +51,7 @@ function QuestionFace({ text }: { text: string }) {
   );
 }
 
-export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext }: {
+export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext, onLean }: {
   q: RoundToday["questions"][number];
   date: string;
   revealed: boolean;
@@ -59,6 +59,9 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
   isLast: boolean;
   onSealed: () => void;
   onNext: () => void;
+  // The screen renders the stationary conviction column; the card reports
+  // its live lean upward (null conf = no pull in progress).
+  onLean?: (conf: number | null, side: boolean) => void;
 }) {
   const { answers, setAnswer, setConfidence, markSealed } = useRoundStore();
   const entry = answers[q.id];
@@ -79,6 +82,7 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
   // conviction meter and the ratchet haptics.
   const [liveConf, setLiveConf] = useState<number | null>(null);
   const [liveSide, setLiveSide] = useState(true);
+  useEffect(() => { onLean?.(liveConf, liveSide); }, [liveConf, liveSide, onLean]);
   const screenReader = useScreenReader();
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
