@@ -11,15 +11,25 @@ async function secureStore(): Promise<TokenStore> {
   return { get: (k) => SecureStore.getItemAsync(k), set: (k, v) => SecureStore.setItemAsync(k, v) };
 }
 
+// First launch fires several queries at once (today, ledger, reveal); each
+// calls getDeviceToken, and without a shared in-flight mint each would
+// create its own server user — a user per query. One mint, shared by all.
+let inflightMint: Promise<string> | null = null;
+
 export async function getDeviceToken(deps: { fetchFn?: typeof fetch; store?: TokenStore } = {}): Promise<string> {
   const store = deps.store ?? (await secureStore());
   const existing = await store.get(KEY);
   if (existing) return existing;
-  const { token } = await api("/v1/auth/device", MintSchema, {
-    method: "POST",
-    body: JSON.stringify({ platform: "ios" }),
-    fetchFn: deps.fetchFn,
-  });
-  await store.set(KEY, token);
-  return token;
+  if (!inflightMint) {
+    inflightMint = (async () => {
+      const { token } = await api("/v1/auth/device", MintSchema, {
+        method: "POST",
+        body: JSON.stringify({ platform: "ios" }),
+        fetchFn: deps.fetchFn,
+      });
+      await store.set(KEY, token);
+      return token;
+    })().finally(() => { inflightMint = null; });
+  }
+  return inflightMint;
 }

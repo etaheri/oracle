@@ -45,4 +45,22 @@ describe("getDeviceToken()", () => {
     expect(await getDeviceToken({ fetchFn, store })).toBe("minted.1.abc");
     expect(mints).toBe(1);
   });
+  it("concurrent callers share one mint — never a user per query", async () => {
+    let mints = 0;
+    const fetchFn = (async () => {
+      mints++;
+      await new Promise((r) => setTimeout(r, 20)); // hold the mint in flight
+      return new Response(JSON.stringify({ token: `minted.${mints}.abc`, user_id: "u" }), { status: 200 });
+    }) as typeof fetch;
+    const store = memStore();
+    const [a, b, c] = await Promise.all([
+      getDeviceToken({ fetchFn, store }),
+      getDeviceToken({ fetchFn, store }),
+      getDeviceToken({ fetchFn, store }),
+    ]);
+    expect(mints).toBe(1);
+    expect(a).toBe("minted.1.abc");
+    expect(b).toBe(a);
+    expect(c).toBe(a);
+  });
 });
