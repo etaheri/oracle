@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withSequence, withDelay, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
+import Animated, { useSharedValue, useAnimatedStyle, useDerivedValue, withTiming, withSpring, withSequence, withDelay, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
 import { leanRelease, leanStep, holdConfidence, LEAN_COMMIT, LEAN_DEAD_ZONE } from "../game/swipeLean";
-import { confidenceReading } from "../game/confidence";
 import { decodeFrame } from "../game/terminalPrint";
 import { useScreenReader } from "../hooks/useScreenReader";
 import { getSwipeHinted, markSwipeHinted } from "../api/flags";
@@ -14,7 +13,7 @@ import { useRoundStore } from "../game/roundStore";
 import { colors, space } from "../theme";
 import { Serif, Mono } from "./Text";
 import { GoldButton } from "./Button";
-import { ConfidenceSlider } from "./ConfidenceSlider";
+import { ConvictionMeter } from "./ConvictionMeter";
 import { CardChrome, numeral } from "./CardChrome";
 import { SealStamp, STAMP_MS } from "./SealStamp";
 import { CrowdBar } from "./CrowdReveal";
@@ -75,9 +74,11 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
   const dragX = useSharedValue(0);
   const cardW = useSharedValue(0);
   const stepSV = useSharedValue(-1);
+  const pullProgress = useDerivedValue(() => (cardW.value > 0 ? dragX.value / cardW.value : 0));
   // The conviction the current pull (or button hold) implies — drives the
-  // live machine-voice readout and the ratchet haptics.
+  // conviction meter and the ratchet haptics.
   const [liveConf, setLiveConf] = useState<number | null>(null);
+  const [liveSide, setLiveSide] = useState(true);
   const screenReader = useScreenReader();
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
@@ -107,18 +108,25 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
     const p = -dragX.value / Math.max(1, cardW.value);
     return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_COMMIT) : 0 };
   });
+  // The question recedes as conviction takes the stage — fully by the
+  // commit point during a pull, and while a hold-to-charge is live.
+  const holdDim = liveConf !== null;
+  const questionStyle = useAnimatedStyle(() => {
+    const p = Math.min(1, Math.abs(dragX.value) / Math.max(1, cardW.value * LEAN_COMMIT));
+    const drag = 1 - p * 0.9;
+    return { opacity: holdDim ? Math.min(drag, 0.08) : drag, transform: [{ scale: 1 - p * 0.05 }] };
+  }, [holdDim]);
 
   function commitLean(dx: number, width: number) {
     const r = leanRelease(dx, width);
-    setLiveConf(null);
-    if (!r) return;
-    setAnswer(q.id, r.answer);
-    setConfidence(q.id, r.confidence);
+    if (!r) { setLiveConf(null); return; }
+    void sealWith(r.answer, r.confidence);
   }
   // Ratchet haptics: crossing the commit threshold is a distinct thunk;
   // every conviction step past it (in either direction) is a light tick.
-  function onStepChange(step: number, prev: number) {
+  function onStepChange(step: number, prev: number, side: boolean) {
     if (step === -1) { setLiveConf(null); return; }
+    setLiveSide(side);
     setLiveConf(55 + step * 5);
     if (prev === -1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else void Haptics.selectionAsync();
@@ -135,7 +143,7 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
       if (step !== stepSV.value) {
         const prev = stepSV.value;
         stepSV.value = step;
-        runOnJS(onStepChange)(step, prev);
+        runOnJS(onStepChange)(step, prev, e.translationX > 0);
       }
     })
     .onEnd((e) => {
@@ -146,11 +154,12 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
     });
 
   // Hold-to-charge (buttonsMode): pressing a side charges conviction one
-  // grid step at a time, ticking as it climbs; release selects at that
+  // grid step at a time, ticking as it climbs; release seals at that
   // conviction. Same metaphor as the pull, no motion required.
   const hold = useRef<{ start: number; timer: ReturnType<typeof setInterval>; last: number } | null>(null);
-  function beginHold() {
+  function beginHold(answer: boolean) {
     endHoldTimer();
+    setLiveSide(answer);
     const start = Date.now();
     hold.current = {
       start,
@@ -173,9 +182,7 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
     if (!hold.current) return;
     const conf = holdConfidence(Date.now() - hold.current.start);
     endHoldTimer();
-    setLiveConf(null);
-    setAnswer(q.id, answer);
-    setConfidence(q.id, conf);
+    void sealWith(answer, conf);
   }
   useEffect(() => endHoldTimer, []);
 
@@ -198,12 +205,18 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
     backfaceVisibility: "hidden" as const,
   }));
 
-  async function seal() {
-    if (!entry) return;
+  // Release IS the seal: the pull (or hold) hands its side + conviction
+  // straight here. The meter stays lit while the seal is in flight; on
+  // failure the card returns unsealed with the error line, pullable again.
+  async function sealWith(answer: boolean, confidence: number) {
     setError(null);
+    setAnswer(q.id, answer);
+    setConfidence(q.id, confidence);
+    const key = useRoundStore.getState().answers[q.id]!.idempotencyKey;
     try {
-      await submit.mutateAsync({ question_id: q.id, answer: entry.answer, confidence: entry.confidence, idempotency_key: entry.idempotencyKey });
+      await submit.mutateAsync({ question_id: q.id, answer, confidence, idempotency_key: key });
       markSealed(q.id);
+      setLiveConf(null);
       if (reducedMotion) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onSealed();
@@ -214,6 +227,7 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
       setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), STAMP_MS);
       setTimeout(onSealed, STAMP_MS + 320);
     } catch (e) {
+      setLiveConf(null);
       setError(e instanceof ApiError && e.status === 409 ? "THE ORACLE HAS CLOSED" : "THE CONNECTION WAVERS — TRY AGAIN");
     }
   }
@@ -236,18 +250,13 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
               surface: swipe it to lean toward a side (buttons remain the
               canonical path — the gesture only ever selects, never seals). */}
           <GestureDetector gesture={pan}>
-            <View style={{ flex: 1, justifyContent: "center" }}>
+            <Animated.View style={[{ flex: 1, justifyContent: "center" }, questionStyle]}>
               <QuestionFace text={q.text} />
-            </View>
+            </Animated.View>
           </GestureDetector>
           <View style={{ gap: space(3) }}>
-            {liveConf !== null ? (
-              // Live conviction readout — the pull (or hold) speaking as it climbs.
-              <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>
-                {liveConf}% · {confidenceReading(liveConf)}
-              </Mono>
-            ) : !entry && !buttonsMode ? (
-              <DecodeLine text="‹ NO ─ · ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
+            {liveConf === null && !buttonsMode && !sealed ? (
+              <DecodeLine text="‹ NO ─ PULL · RELEASE ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
             ) : null}
             {buttonsMode && (
               <View style={{ flexDirection: "row", gap: space(2) }}>
@@ -261,8 +270,8 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
                       key={String(v)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: sel }}
-                      accessibilityHint="Hold to raise conviction before releasing; adjust it on the slider after."
-                      onPressIn={beginHold}
+                      accessibilityHint="Hold to raise conviction; releasing seals the prophecy."
+                      onPressIn={() => beginHold(v)}
                       onPressOut={() => endHold(v)}
                       style={{ flex: 1, borderWidth: 1, borderColor: sel ? tone : colors.line, minHeight: 48, justifyContent: "center", alignItems: "center", backgroundColor: sel ? wash : "transparent" }}>
                       <Mono size={12} color={sel ? tone : colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>{v ? "YES" : "NO"}</Mono>
@@ -271,9 +280,7 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
                 })}
               </View>
             )}
-            {entry && <ConfidenceSlider value={entry.confidence} onChange={(c) => setConfidence(q.id, c)} />}
             {error && <Mono size={11} color={colors.vermilion} style={{ textAlign: "center" }}>{error}</Mono>}
-            <GoldButton title={submit.isPending ? "SEALING…" : "SEAL THE PROPHECY"} onPress={seal} disabled={!entry || submit.isPending} />
           </View>
         </CardChrome>
         {/* Plain-View wrapper carries pointerEvents="none": an opacity-0 view
@@ -283,6 +290,7 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.ultramarineWash }, yesWashStyle]} />
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.vermilionWash }, noWashStyle]} />
         </View>
+        {liveConf !== null && <ConvictionMeter conf={liveConf} side={liveSide} pull={pullProgress} />}
         {stamped && <AsciiActivation width={cardSize.w} height={cardSize.h} />}
         {stamped && <SealStamp numeral={numeral(q.slot)} />}
       </Animated.View>
