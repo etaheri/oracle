@@ -13,6 +13,7 @@ export const meRoutes = new Hono<AppContext>()
     const { db } = c.get("deps");
     const userId = c.get("userId");
     const user = await db.query.users.findFirst({ where: eq(schema.users.id, userId) });
+    const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, userId) });
     const preds = await db.query.predictions.findMany({ where: eq(schema.predictions.userId, userId) });
     const qs = preds.length
       ? await db.query.questions.findMany({ where: inArray(schema.questions.id, preds.map((p) => p.questionId)) })
@@ -73,6 +74,14 @@ export const meRoutes = new Hono<AppContext>()
       avg_confidence: life.avgConfidence,
       tide_wins: life.tideWins,
       majority_rate: life.majorityRate,
+      // Shield state (streak.ts month rule). shield_used_on only dates the
+      // FREE shield — paid burns are undated, an accepted v1 limitation.
+      free_shield_available: (() => {
+        const usedAt = user?.freeShieldUsedAt ?? null;
+        return usedAt === null || usedAt.slice(0, 7) !== new Date().toISOString().slice(0, 7);
+      })(),
+      paid_shields: ent?.shieldsRemaining ?? 0,
+      shield_used_on: user?.freeShieldUsedAt ?? null,
       epithet,
       computed_through: new Date().toISOString().slice(0, 10),
     });

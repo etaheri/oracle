@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
+import * as schema from "../src/db/schema";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { resolveQuestion } from "../src/resolution";
@@ -63,5 +65,22 @@ describe("GET /v1/me/ledger", () => {
     const outF = (await (await fresh("/v1/me/ledger")).json()) as Record<string, unknown>;
     expect(outF).toMatchObject({ days_consulted: 0, accuracy_pct: null, streak: 0 });
     expect((outF.epithet as { id: string }).id).toBe("unread");
+  });
+
+  it("reports shield state: monthly free shield, paid reserve, last hold date", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+
+    const fresh = (await (await a("/v1/me/ledger")).json()) as Record<string, unknown>;
+    expect(fresh).toMatchObject({ free_shield_available: true, paid_shields: 0, shield_used_on: null });
+
+    const uid = (await db.query.users.findMany())[0]!.id;
+    await db.update(schema.users).set({ freeShieldUsedAt: "2026-08-19" }).where(eq(schema.users.id, uid));
+    await db.insert(schema.entitlements).values({ userId: uid, shieldsRemaining: 2 });
+
+    const spent = (await (await a("/v1/me/ledger")).json()) as Record<string, unknown>;
+    expect(spent).toMatchObject({ free_shield_available: false, paid_shields: 2, shield_used_on: "2026-08-19" });
   });
 });

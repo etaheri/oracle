@@ -94,6 +94,9 @@ export const MeLedgerSchema = z.object({
   avg_confidence: z.number().int().nullable(),
   tide_wins: z.number().int(),
   majority_rate: z.number().nullable(),
+  free_shield_available: z.boolean(),
+  paid_shields: z.number().int().min(0),
+  shield_used_on: z.string().nullable(),
   epithet: z.object({ id: z.string(), title: z.string(), receipt: z.string() }),
   computed_through: z.string(),
 });
