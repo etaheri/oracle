@@ -21,3 +21,12 @@ export async function getRitesSeen(): Promise<boolean> {
 export async function markRitesSeen(): Promise<void> {
   try { await (await store()).setItemAsync(RITES_SEEN_KEY, "1"); } catch {}
 }
+
+const NOTIF_ASKED_KEY = "oracle.notif_asked";
+
+export async function getNotifAsked(): Promise<boolean> {
+  try { return (await (await store()).getItemAsync(NOTIF_ASKED_KEY)) === "1"; } catch { return true; } // storage failure → never nag
+}
+export async function markNotifAsked(): Promise<void> {
+  try { await (await store()).setItemAsync(NOTIF_ASKED_KEY, "1"); } catch {}
+}

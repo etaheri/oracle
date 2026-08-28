@@ -16,6 +16,7 @@ import { onBootDone } from "../game/bootGate";
 import { shieldNotice } from "../game/shieldNotice";
 import { revealReady } from "../game/revealReady";
 import { getRevealSeen, getRitesSeen } from "../api/flags";
+import { resealReminders } from "../notifications/schedule";
 import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
@@ -32,6 +33,9 @@ export default function Index() {
 
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
+  useEffect(() => {
+    if (round?.locks_at) void resealReminders(round.locks_at, round.date, allSealed);
+  }, [round?.date, round?.locks_at, allSealed]);
   const yesterday = yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
   const [revealSeen, setRevealSeen] = useState<string | null>(null);

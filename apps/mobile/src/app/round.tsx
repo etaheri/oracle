@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
@@ -12,6 +12,7 @@ import { numeral } from "../ui/CardChrome";
 import { useToday, useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
+import { askNotifPermissionOnce } from "../notifications/schedule";
 import { colors, space } from "../theme";
 
 // Cards come off a deck: up from the bottom edge, slightly rotated, settling
@@ -29,6 +30,10 @@ export default function Round() {
 
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
+  // The one permission ask, the moment after the first seal ever lands.
+  useEffect(() => {
+    if (anySealed) void askNotifPermissionOnce();
+  }, [anySealed]);
   const crowd = useCrowdSoFar(anySealed);
   useHydratePlayedState(!!today.data);
 
