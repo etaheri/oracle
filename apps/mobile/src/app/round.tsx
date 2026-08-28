@@ -32,11 +32,11 @@ export default function Round() {
   const [revealedId, setRevealedId] = useState<string | null>(null);
   // The card's live pull, lifted to the screen: the conviction column and
   // the footer reading are stationary while the card moves.
-  const [lean, setLean] = useState<{ conf: number | null; side: boolean }>({ conf: null, side: true });
+  const [lean, setLean] = useState<{ conf: number | null; side: boolean; active: boolean }>({ conf: null, side: true, active: false });
   // Stable identity + no-op bailout: the card reports its lean on every
   // change; an inline handler here would re-render forever.
-  const onLean = useCallback((conf: number | null, side: boolean) => {
-    setLean((prev) => (prev.conf === conf && prev.side === side ? prev : { conf, side }));
+  const onLean = useCallback((conf: number | null, side: boolean, active: boolean) => {
+    setLean((prev) => (prev.conf === conf && prev.side === side && prev.active === active ? prev : { conf, side, active }));
   }, []);
 
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
@@ -93,7 +93,7 @@ export default function Round() {
           <CrowdReveal round={today.data} />
         )}
       </View>
-      {lean.conf !== null && <ConvictionColumn conf={lean.conf} side={lean.side} />}
+      {(lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
       <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
         {qs.map((q) => (
           <Ritual key={q.id} size={12} color={answers[q.id]?.sealed ? colors.goldText : "rgba(23,25,31,0.22)"} letterSpacing={1}>

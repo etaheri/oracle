@@ -60,8 +60,9 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
   onSealed: () => void;
   onNext: () => void;
   // The screen renders the stationary conviction column; the card reports
-  // its live lean upward (null conf = no pull in progress).
-  onLean?: (conf: number | null, side: boolean) => void;
+  // its live lean upward. active = a pull is in progress (from the first
+  // slid point, before any conviction resolves); conf = resolved conviction.
+  onLean?: (conf: number | null, side: boolean, active: boolean) => void;
 }) {
   const { answers, setAnswer, setConfidence, markSealed } = useRoundStore();
   const entry = answers[q.id];
@@ -82,7 +83,8 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
   // conviction meter and the ratchet haptics.
   const [liveConf, setLiveConf] = useState<number | null>(null);
   const [liveSide, setLiveSide] = useState(true);
-  useEffect(() => { onLean?.(liveConf, liveSide); }, [liveConf, liveSide, onLean]);
+  const [dragActive, setDragActive] = useState(false);
+  useEffect(() => { onLean?.(liveConf, liveSide, dragActive); }, [liveConf, liveSide, dragActive, onLean]);
   const screenReader = useScreenReader();
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
@@ -128,31 +130,45 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
   }
   // Ratchet haptics: crossing the commit threshold is a distinct thunk;
   // every conviction step past it (in either direction) is a light tick.
-  function onStepChange(step: number, prev: number, side: boolean) {
+  function onStepChange(step: number, prev: number) {
     if (step === -1) { setLiveConf(null); return; }
-    setLiveSide(side);
     setLiveConf(55 + step * 5);
     if (prev === -1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else void Haptics.selectionAsync();
   }
 
   const sealed = !!entry?.sealed;
+  const sideSV = useSharedValue(0); // 1 = leaning YES, -1 = NO, 0 = unknown
   const pan = Gesture.Pan()
     .enabled(!revealed && !stamped && !sealed && !submit.isPending)
     .activeOffsetX([-12, 12])
     .failOffsetY([-16, 16])
+    .onBegin(() => {
+      // The column stands (as static) from the first slid point.
+      runOnJS(setDragActive)(true);
+    })
     .onUpdate((e) => {
       dragX.value = e.translationX;
+      const s = e.translationX > 4 ? 1 : e.translationX < -4 ? -1 : sideSV.value;
+      if (s !== sideSV.value) {
+        sideSV.value = s;
+        runOnJS(setLiveSide)(s === 1);
+      }
       const step = leanStep(e.translationX, cardW.value);
       if (step !== stepSV.value) {
         const prev = stepSV.value;
         stepSV.value = step;
-        runOnJS(onStepChange)(step, prev, e.translationX > 0);
+        runOnJS(onStepChange)(step, prev);
       }
     })
     .onEnd((e) => {
       runOnJS(commitLean)(e.translationX, cardW.value);
+    })
+    .onFinalize(() => {
+      // Runs on release AND cancellation: stand down and spring home.
+      runOnJS(setDragActive)(false);
       stepSV.value = -1;
+      sideSV.value = 0;
       if (reducedMotion) dragX.value = 0;
       else dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
     });
