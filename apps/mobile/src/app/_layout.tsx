@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
@@ -34,9 +35,13 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.museumWhite } }} />
-      <BootRite />
-    </QueryClientProvider>
+    // GestureDetector (card swipe) requires a gesture-handler root; expo-router
+    // does not provide one.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.museumWhite } }} />
+        <BootRite />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

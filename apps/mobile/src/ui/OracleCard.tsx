@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import * as Haptics from "expo-haptics";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, useReducedMotion } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
+import { leanRelease, LEAN_COMMIT, LEAN_DEAD_ZONE } from "../game/swipeLean";
 import { ApiError } from "../api/client";
 import { useSubmit } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
@@ -37,6 +39,12 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
   const [cardSize, setCardSize] = useState({ w: 0, h: 0 });
   const reducedMotion = useReducedMotion();
   const flip = useSharedValue(revealed ? 180 : 0);
+  // Swipe-to-lean: dragging the card face tilts it toward a side; release
+  // past the commit threshold selects (never seals). dragX/cardW live on the
+  // UI thread; the release decision runs the node-tested game module on JS.
+  const dragX = useSharedValue(0);
+  const cardW = useSharedValue(0);
+  const crossed = useSharedValue(0);
 
   useEffect(() => {
     if (reducedMotion) { flip.value = revealed ? 180 : 0; return; }
@@ -44,9 +52,52 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
   }, [revealed, reducedMotion, flip]);
 
   const frontStyle = useAnimatedStyle(() => ({
-    transform: [{ perspective: 1200 }, { rotateY: `${flip.value}deg` }],
+    transform: [
+      { perspective: 1200 },
+      { rotateY: `${flip.value}deg` },
+      { translateX: reducedMotion ? 0 : dragX.value },
+      { rotate: `${reducedMotion ? 0 : (dragX.value / Math.max(1, cardW.value)) * 8}deg` },
+    ],
     backfaceVisibility: "hidden" as const,
   }));
+  // The side washes bleed in with the lean — same tokens as the selected
+  // button state, so the gesture and the buttons speak one color language.
+  const yesWashStyle = useAnimatedStyle(() => {
+    const p = dragX.value / Math.max(1, cardW.value);
+    return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_COMMIT) : 0 };
+  });
+  const noWashStyle = useAnimatedStyle(() => {
+    const p = -dragX.value / Math.max(1, cardW.value);
+    return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_COMMIT) : 0 };
+  });
+
+  function commitLean(dx: number, width: number) {
+    const r = leanRelease(dx, width);
+    if (!r) return;
+    setAnswer(q.id, r.answer);
+    setConfidence(q.id, r.confidence);
+  }
+  const crossHaptic = () => Haptics.selectionAsync();
+
+  const sealed = !!entry?.sealed;
+  const pan = Gesture.Pan()
+    .enabled(!revealed && !stamped && !sealed && !submit.isPending)
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-16, 16])
+    .onUpdate((e) => {
+      dragX.value = e.translationX;
+      const over = Math.abs(e.translationX) / Math.max(1, cardW.value) >= LEAN_COMMIT ? 1 : 0;
+      if (over !== crossed.value) {
+        crossed.value = over;
+        if (over) runOnJS(crossHaptic)();
+      }
+    })
+    .onEnd((e) => {
+      runOnJS(commitLean)(e.translationX, cardW.value);
+      crossed.value = 0;
+      if (reducedMotion) dragX.value = 0;
+      else dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
+    });
   const backStyle = useAnimatedStyle(() => ({
     transform: [{ perspective: 1200 }, { rotateY: `${flip.value + 180}deg` }],
     backfaceVisibility: "hidden" as const,
@@ -77,13 +128,23 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
 
   return (
     <View>
-      <Animated.View style={frontStyle} onLayout={(e) => setCardSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+      <Animated.View
+        style={frontStyle}
+        onLayout={(e) => {
+          setCardSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
+          cardW.value = e.nativeEvent.layout.width;
+        }}
+      >
         <CardChrome slot={q.slot} title={title} big={q.is_big_one} coordinate={`:: ${numeral(q.slot)} / ${date} / PER ${q.source_name.toUpperCase()}`}>
           {/* The question floats centered in the card's field, tarot-fashion;
-              the controls anchor at the foot. */}
-          <View style={{ flex: 1, justifyContent: "center" }}>
-            <Serif size={22} style={{ lineHeight: 32, textAlign: "center" }}>{q.text}</Serif>
-          </View>
+              the controls anchor at the foot. The face is also the grab
+              surface: swipe it to lean toward a side (buttons remain the
+              canonical path — the gesture only ever selects, never seals). */}
+          <GestureDetector gesture={pan}>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <Serif size={22} style={{ lineHeight: 32, textAlign: "center" }}>{q.text}</Serif>
+            </View>
+          </GestureDetector>
           <View style={{ gap: space(3) }}>
             <View style={{ flexDirection: "row", gap: space(2) }}>
               {([true, false] as const).map((v) => {
@@ -104,6 +165,8 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext 
             <GoldButton title={submit.isPending ? "SEALING…" : "SEAL THE PROPHECY"} onPress={seal} disabled={!entry || submit.isPending} />
           </View>
         </CardChrome>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.ultramarineWash }, yesWashStyle]} />
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.vermilionWash }, noWashStyle]} />
         {stamped && <AsciiActivation width={cardSize.w} height={cardSize.h} />}
         {stamped && <SealStamp numeral={numeral(q.slot)} />}
       </Animated.View>
