@@ -15,7 +15,7 @@ import { epigraphFor } from "../game/epigraph";
 import { onBootDone } from "../game/bootGate";
 import { shieldNotice } from "../game/shieldNotice";
 import { revealReady } from "../game/revealReady";
-import { getRevealSeen } from "../api/flags";
+import { getRevealSeen, getRitesSeen } from "../api/flags";
 import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useRouter } from "expo-router";
@@ -36,6 +36,8 @@ export default function Index() {
   const reveal = useReveal(yesterday);
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
   useEffect(() => { void getRevealSeen().then(setRevealSeen); }, []);
+  const [ritesSeen, setRitesSeen] = useState(true); // optimistic: never flash the gate at a veteran
+  useEffect(() => { void getRitesSeen().then(setRitesSeen); }, []);
   const showLedgerCta = revealReady(reveal.data) && revealSeen !== yesterday;
   const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
@@ -81,7 +83,7 @@ export default function Index() {
               text={round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
               size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}
             />
-            <GoldButton title="ENTER" onPress={() => router.push("/round")} />
+            <GoldButton title="ENTER" onPress={() => router.push(ritesSeen ? "/round" : "/rites")} />
             <Countdown until={round.locks_at} prefix="THE ORACLE CLOSES IN" />
           </>
         )}
@@ -100,6 +102,7 @@ export default function Index() {
         )}
         <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
         {!showLedgerCta && <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />}
+        <QuietLink title="The rites" onPress={() => router.push("/rites")} />
       </View>
     </Screen>
   );

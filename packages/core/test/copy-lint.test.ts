@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COPY_BANK, LITURGY, LITURGY_LINES, fillSlots, type CopyLine } from "../src/copy";
+import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, fillSlots, type CopyLine } from "../src/copy";
 
 const BANNED = ["CHECK", "TAP", "CLICK", "VISIT", "RESULTS", "DON'T MISS"];
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
@@ -57,5 +57,22 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
     expect(count("closing")).toBeGreaterThanOrEqual(20);
     expect(count("streak")).toBeGreaterThanOrEqual(10);
     expect(count("system")).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe("the rites", () => {
+  it("exist, and hold the register: caps, no emoji, no exclamation, no CTA verbs, push-length", () => {
+    expect(RITES_LINES.length).toBeGreaterThanOrEqual(8);
+    for (const l of RITES_LINES) {
+      expect(l, l).toBe(l.toUpperCase());
+      expect(l, l).not.toMatch(EMOJI);
+      expect(l, l).not.toContain("!");
+      for (const b of BANNED) expect(l, l).not.toContain(b);
+      expect(l.length, l).toBeLessThanOrEqual(140);
+    }
+  });
+  it("teach the load-bearing rules", () => {
+    const all = RITES_LINES.join(" ");
+    for (const word of ["SEALED", "CROWD", "BIG ONE", "TIDE", "FIRST HOUR", "SHIELD", "NOON"]) expect(all).toContain(word);
   });
 });

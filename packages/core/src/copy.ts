@@ -119,3 +119,19 @@ export function vigilLine(streak: number, seedKey: string): string | null {
   const line = selectLine(VIGIL_LINES, seedKey, ["streak"]);
   return line ? fillSlots(line.text, { streak }) : null;
 }
+
+// The Rites: the rules, spoken once before a first seal and kept on a quiet
+// link forever. Declaratives only — the machine explains itself the way it
+// does everything else. Hand-written, linted, versioned.
+export const RITES_LINES = [
+  "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON.",
+  "ANSWER YES OR NO. THEN STATE YOUR CONVICTION.",
+  "AN ANSWER SEALED CANNOT BE UNSEALED.",
+  "THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
+  "CONVICTION PAYS WHEN RIGHT. IT COSTS MORE WHEN WRONG.",
+  "THE BIG ONE COUNTS DOUBLE. IN BOTH DIRECTIONS.",
+  "STAND AGAINST THE TIDE AND PREVAIL: THE LEDGER PAYS TWICE.",
+  "SEAL WITHIN THE FIRST HOUR. THE DAY PAYS TEN PERCENT MORE.",
+  "MISS A NOON AND THE SHIELD MAY HOLD. ONE IS GRANTED EACH MONTH.",
+  "THE LEDGER IS READ AT NOON. NOTHING IS REVISED.",
+] as const;

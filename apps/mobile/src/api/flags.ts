@@ -12,3 +12,12 @@ export async function getRevealSeen(): Promise<string | null> {
 export async function markRevealSeen(date: string): Promise<void> {
   try { await (await store()).setItemAsync(REVEAL_SEEN_KEY, date); } catch {}
 }
+
+const RITES_SEEN_KEY = "oracle.rites_seen";
+
+export async function getRitesSeen(): Promise<boolean> {
+  try { return (await (await store()).getItemAsync(RITES_SEEN_KEY)) === "1"; } catch { return false; }
+}
+export async function markRitesSeen(): Promise<void> {
+  try { await (await store()).setItemAsync(RITES_SEEN_KEY, "1"); } catch {}
+}
