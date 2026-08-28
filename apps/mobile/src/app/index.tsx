@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, Eyebrow } from "../ui/Text";
@@ -19,7 +19,7 @@ import { getRevealSeen, getRitesSeen } from "../api/flags";
 import { resealReminders } from "../notifications/schedule";
 import { vigilLine } from "@oracle/core";
 import { colors, space } from "../theme";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 function yesterdayOf(date: string | undefined): string {
   const base = date ? new Date(`${date}T00:00:00Z`) : new Date();
@@ -39,9 +39,15 @@ export default function Index() {
   const yesterday = yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
-  useEffect(() => { void getRevealSeen().then(setRevealSeen); }, []);
   const [ritesSeen, setRitesSeen] = useState(true); // optimistic: never flash the gate at a veteran
-  useEffect(() => { void getRitesSeen().then(setRitesSeen); }, []);
+  // Home never remounts under the Stack (back-nav from /reveal or /rites just
+  // refocuses it), so re-read both flags on every focus, not just on mount.
+  useFocusEffect(
+    useCallback(() => {
+      void getRevealSeen().then(setRevealSeen);
+      void getRitesSeen().then(setRitesSeen);
+    }, [])
+  );
   const showLedgerCta = revealReady(reveal.data) && revealSeen !== yesterday;
   const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
