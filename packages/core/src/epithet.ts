@@ -3,6 +3,8 @@
 // asserts identity without evidence. Inputs are computed over a trailing
 // 28-day window by the ledger endpoint.
 
+import { CONSTANTS as C } from "./constants";
+
 export interface EpithetInput {
   completeRounds: number;
   tideWins: number;
@@ -10,6 +12,7 @@ export interface EpithetInput {
   accuracyPct: number | null;
   majorityRate: number | null;
   streakCurrent: number;
+  resolvedCalls: number; // resolved, non-void calls in the window — the receipt behind every gap claim
 }
 
 export interface Epithet {
@@ -20,16 +23,17 @@ export interface Epithet {
 
 export function assignEpithet(s: EpithetInput): Epithet {
   if (s.completeRounds < 5) {
-    return { id: "unread", title: "THE UNREAD", receipt: "THE LEDGER KNOWS TOO LITTLE OF YOU." };
+    return { id: "unread", title: "THE UNREAD", receipt: `${s.completeRounds} OF 5 COMPLETE DAYS WRITTEN.` };
   }
   if (s.tideWins >= 3) {
-    return { id: "tide-fighter", title: "TIDE-FIGHTER", receipt: `${s.tideWins} TIMES AGAINST THE CROWD. ${s.tideWins} TIMES RIGHT.` };
+    return { id: "tide-fighter", title: "TIDE-FIGHTER", receipt: `${s.tideWins} TIMES RIGHT AGAINST THE CROWD.` };
   }
-  const gap = s.avgConfidence !== null && s.accuracyPct !== null ? s.avgConfidence - s.accuracyPct : null;
+  const enough = s.resolvedCalls >= C.VERDICT_MIN_CALLS;
+  const gap = enough && s.avgConfidence !== null && s.accuracyPct !== null ? s.avgConfidence - s.accuracyPct : null;
   if (gap !== null && Math.abs(gap) <= 10 && s.avgConfidence! < 70) {
     return { id: "calibrated-skeptic", title: "CALIBRATED SKEPTIC", receipt: "YOU CLAIM LITTLE AND MISS LESS." };
   }
-  if (s.avgConfidence !== null && s.accuracyPct !== null && s.avgConfidence >= 85 && s.accuracyPct >= 60) {
+  if (gap !== null && Math.abs(gap) <= 10 && s.avgConfidence! >= 85 && s.accuracyPct! >= 60) {
     return { id: "high-priest", title: "HIGH PRIEST OF CONVICTION", receipt: "YOU SPEAK LOUDLY AND THE LEDGER AGREES." };
   }
   if (gap !== null && gap < -10) {
@@ -49,8 +53,8 @@ export function assignEpithet(s: EpithetInput): Epithet {
 
 // The plaque verdict line (spec §6): a second receipt, independent of the
 // epithet, that names the shape of the gap between claimed and earned.
-export function calibrationVerdict(avgConfidence: number | null, accuracyPct: number | null): string | null {
-  if (avgConfidence === null || accuracyPct === null) return null;
+export function calibrationVerdict(avgConfidence: number | null, accuracyPct: number | null, resolvedCalls: number): string | null {
+  if (avgConfidence === null || accuracyPct === null || resolvedCalls < C.VERDICT_MIN_CALLS) return null;
   const gap = avgConfidence - accuracyPct;
   if (gap > 10) return "YOUR CONFIDENCE OUTRUNS YOUR ACCURACY";
   if (gap < -10) return "YOU KNOW MORE THAN YOU CLAIM";

@@ -64,6 +64,7 @@ export const meRoutes = new Hono<AppContext>()
       accuracyPct: win.accuracyPct,
       majorityRate: win.majorityRate,
       streakCurrent: user?.streakCurrent ?? 0,
+      resolvedCalls: resolved.filter((r) => r.inWindow).length,
     });
 
     return c.json({
