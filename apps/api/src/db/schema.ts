@@ -7,7 +7,7 @@ export const category = pgEnum("category", ["markets", "sports", "weather", "cul
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  clerkId: text("clerk_id").unique(),
+  appleSub: text("apple_sub").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   streakCurrent: integer("streak_current").notNull().default(0),
   streakBest: integer("streak_best").notNull().default(0),
@@ -96,4 +96,11 @@ export const draftBank = pgTable("draft_bank", {
   draft: jsonb("draft").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   usedOn: date("used_on"),
+});
+
+// Processed RevenueCat webhook event ids — the webhook's idempotency marker
+// (neon-http has no transactions; insert-first, conflict = already handled).
+export const webhookEvents = pgTable("webhook_events", {
+  id: text("id").primaryKey(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });

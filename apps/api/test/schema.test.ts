@@ -24,4 +24,14 @@ describe("schema + harness", () => {
     const idx = (await pg.query<{ indexname: string }>(`select indexname from pg_indexes where schemaname = 'public'`)).rows.map((r) => r.indexname);
     expect(idx).toEqual(expect.arrayContaining(["predictions_user_idx", "questions_round_date_idx", "users_oracle_score_idx", "devices_ip_hash_idx"]));
   });
+
+  it("stores apple_sub uniquely and webhook event markers", async () => {
+    const { db } = await makeTestDb();
+    const [u1] = await db.insert(schema.users).values({ appleSub: "sub-1" }).returning();
+    await expect(db.insert(schema.users).values({ appleSub: "sub-1" })).rejects.toThrow();
+    expect(u1!.appleSub).toBe("sub-1");
+    await db.insert(schema.webhookEvents).values({ id: "evt-1" });
+    const dup = await db.insert(schema.webhookEvents).values({ id: "evt-1" }).onConflictDoNothing().returning();
+    expect(dup).toHaveLength(0);
+  });
 });
