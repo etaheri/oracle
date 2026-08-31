@@ -7,7 +7,7 @@ import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { colors, space } from "../theme";
-import { COPY_BANK, PAYWALL_CTA_LINES } from "@oracle/core";
+import { COPY_BANK, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES } from "@oracle/core";
 import { getOffering, purchasePackage, restore } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 
@@ -37,7 +37,7 @@ export default function Plus() {
           ))}
         </View>
         {plusActive ? (
-          <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>THE SHIELD IS RAISED. YOUR VIGIL IS PROTECTED.</Mono>
+          <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{PUSH_CAMPAIGN_LINES.plusWelcome}</Mono>
         ) : offering === "loading" ? (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>CONSULTING THE STORE…</Mono>
         ) : offering === null ? (
@@ -54,7 +54,7 @@ export default function Plus() {
         </Mono>
       </View>
       <View style={{ gap: space(2), paddingBottom: space(2) }}>
-        <QuietLink title="Recover purchases" onPress={() => restore()} />
+        <QuietLink title={PAYWALL_CTA_LINES.restore} onPress={() => restore()} />
         <View style={{ flexDirection: "row", justifyContent: "center", gap: space(4) }}>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Mono size={9} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
           <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}><Mono size={9} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
