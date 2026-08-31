@@ -1,11 +1,9 @@
 import { View } from "react-native";
 import { colors, space } from "../theme";
 import { Ritual, Mono, Eyebrow } from "./Text";
+import { NUMERALS, numeral } from "../game/numerals";
 
-export const NUMERALS = ["I", "II", "III", "IV", "V"] as const;
-export function numeral(slot: number): string {
-  return NUMERALS[slot - 1] ?? String(slot);
-}
+export { NUMERALS, numeral };
 
 // Tarot proportion (brief §3: "large areas of quiet negative space are
 // essential") — the card is an object you drew, not a form you fill.

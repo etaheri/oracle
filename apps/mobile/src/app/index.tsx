@@ -7,6 +7,7 @@ import { GoldButton, QuietLink } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
 import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { Countdown } from "../ui/Countdown";
+import { SleepsPanel } from "../ui/SleepsPanel";
 import { useToday, useCrowdSoFar, useMeLedger, useReveal } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
@@ -15,11 +16,15 @@ import { epigraphFor } from "../game/epigraph";
 import { onBootDone } from "../game/bootGate";
 import { shieldNotice } from "../game/shieldNotice";
 import { revealReady } from "../game/revealReady";
+import { partialLine, spokenLine, riskLine, lapseNotice } from "../game/homeLines";
+import { msUntil } from "../game/countdown";
 import { getRevealSeen, getRitesSeen } from "../api/flags";
 import { resealReminders } from "../notifications/schedule";
-import { vigilLine } from "@oracle/core";
+import { vigilLine, COPY_BANK } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useFocusEffect, useRouter } from "expo-router";
+
+const READING_LINE = COPY_BANK.find((l) => l.id === "system.reading-1")!.text;
 
 function yesterdayOf(date: string | undefined): string {
   const base = date ? new Date(`${date}T00:00:00Z`) : new Date();
@@ -33,11 +38,15 @@ export default function Index() {
 
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
+  const sealedCount = round ? round.questions.filter((q) => answers[q.id]?.sealed).length : 0;
+  const partial = round ? partialLine(sealedCount, round.questions.length) : null;
   useEffect(() => {
+    // TODO(task 5): resealReminders takes (locksAt, date, sealedCount) — signature changes.
     if (round?.locks_at) void resealReminders(round.locks_at, round.date, allSealed);
   }, [round?.date, round?.locks_at, allSealed]);
   const yesterday = yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
+  const playedYesterday = reveal.data && !("pending" in reveal.data) ? reveal.data.questions.some((q) => q.my !== null) : null;
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
   const [ritesSeen, setRitesSeen] = useState(true); // optimistic: never flash the gate at a veteran
   // Home never remounts under the Stack (back-nav from /reveal or /rites just
@@ -59,6 +68,16 @@ export default function Index() {
   const ledger = useMeLedger();
   const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
   const shield = shieldNotice(ledger.data?.shield_used_on ?? null, yesterday);
+  // Re-evaluated every 30s so the risk line can appear without a remount —
+  // Home never remounts under the Stack (see the focus effect above).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
+  const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${yesterday}`);
+  const notice = shield ?? risk ?? lapse ?? vigil;
   // Hold the print-in until the boot rite lifts — the static resolves in
   // view as the overlay fades, instead of playing unseen behind it.
   const [booted, setBooted] = useState(false);
@@ -90,10 +109,14 @@ export default function Index() {
           <>
             <DecodeLine
               active={booted}
-              text={round.player_count > 0 ? `${round.player_count} ORACLES ALREADY WAITING` : "THE ORACLE SPEAKS"}
+              text={partial ?? spokenLine(round.player_count)}
               size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}
             />
-            <GoldButton title="ENTER" onPress={() => router.push(ritesSeen ? "/round" : "/rites")} />
+            {showLedgerCta ? (
+              <QuietLink title="Enter today's round" onPress={() => router.push(ritesSeen ? "/round" : "/rites")} />
+            ) : (
+              <GoldButton title="ENTER" onPress={() => router.push(ritesSeen ? "/round" : "/rites")} />
+            )}
             <Countdown until={round.locks_at} prefix="THE ORACLE CLOSES IN" />
           </>
         )}
@@ -101,14 +124,12 @@ export default function Index() {
           <>
             <DecodeLine active={booted} text="THE PROPHECY IS SEALED" size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2} />
             <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
-            <Countdown until={round.locks_at} prefix="THE LEDGER IS READ IN" fallback="THE LEDGER IS READ AT NOON" />
+            <Countdown until={round.locks_at} prefix="THE LEDGER IS READ IN" fallback={READING_LINE} />
           </>
         )}
-        {!round && !today.isLoading && (
-          <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
-        )}
-        {(shield ?? vigil) && (
-          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{shield ?? vigil}</Mono>
+        {!round && !today.isLoading && <SleepsPanel active={booted} />}
+        {notice && (
+          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{notice}</Mono>
         )}
         <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
         {!showLedgerCta && <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />}
