@@ -1,17 +1,33 @@
+import { useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { SUMMONS_LINES } from "@oracle/core";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
-import { Eyebrow } from "../ui/Text";
+import { Eyebrow, Mono } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
+import { appleRestore } from "../api/identity";
 import { colors, space } from "../theme";
 
 export default function Summons() {
   const router = useRouter();
+  const qc = useQueryClient();
+  const [restoreState, setRestoreState] = useState<"idle" | "none">("idle");
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/"));
+  const handleRestore = () => {
+    void (async () => {
+      const r = await appleRestore();
+      if (r === "restored") {
+        qc.invalidateQueries();
+        router.replace("/");
+      } else if (r === "none") {
+        setRestoreState("none");
+      }
+    })();
+  };
   return (
     <Screen>
       <TopBar />
@@ -26,6 +42,12 @@ export default function Summons() {
       <View style={{ gap: space(2), paddingBottom: space(2) }}>
         <GoldButton title="LET IT SPEAK" onPress={async () => { try { await Notifications.requestPermissionsAsync(); } catch {} leave(); }} />
         <QuietLink title="Not now" onPress={leave} />
+        {restoreState === "none" && (
+          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
+            NO RECORD BEARS THIS NAME.
+          </Mono>
+        )}
+        <QuietLink title="Restore a claimed record" onPress={handleRestore} />
       </View>
     </Screen>
   );

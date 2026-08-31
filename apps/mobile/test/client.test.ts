@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { api, ApiError } from "../src/api/client";
-import { getDeviceToken, type TokenStore } from "../src/api/auth";
+import { getDeviceToken, clearDeviceToken, type TokenStore } from "../src/api/auth";
 import { z } from "zod";
 
 const memStore = (): TokenStore => {
   const m = new Map<string, string>();
-  return { get: async (k) => m.get(k) ?? null, set: async (k, v) => void m.set(k, v) };
+  return {
+    get: async (k) => m.get(k) ?? null,
+    set: async (k, v) => void m.set(k, v),
+    delete: async (k) => void m.delete(k),
+  };
 };
 
 describe("api()", () => {
@@ -62,5 +66,17 @@ describe("getDeviceToken()", () => {
     expect(a).toBe("minted.1.abc");
     expect(b).toBe(a);
     expect(c).toBe(a);
+  });
+});
+
+describe("clearDeviceToken()", () => {
+  it("removes the stored token so the next getDeviceToken mints fresh", async () => {
+    const store = memStore();
+    let mints = 0;
+    const fetchFn = (async () => { mints++; return new Response(JSON.stringify({ token: `minted.${mints}.abc`, user_id: "u" }), { status: 200 }); }) as typeof fetch;
+    await getDeviceToken({ fetchFn, store });
+    await clearDeviceToken({ store });
+    await getDeviceToken({ fetchFn, store });
+    expect(mints).toBe(2);
   });
 });

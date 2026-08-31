@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCanvasRef } from "@shopify/react-native-skia";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
 import { Eyebrow, Mono, Ritual } from "../ui/Text";
@@ -11,6 +13,7 @@ import { GoldButton, QuietLink } from "../ui/Button";
 import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
+import { appleClaim, appleRestore, strikeRecord } from "../api/identity";
 import { usePlusStore } from "../monetization/plusState";
 import { colors, space } from "../theme";
 import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
@@ -30,10 +33,65 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function Ledger() {
   const ledger = useMeLedger();
+  const qc = useQueryClient();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
   const router = useRouter();
   const plusActive = usePlusStore((s) => s.plusActive);
+
+  // AppleAuthenticationButton renders nothing (and warns in dev) if the
+  // platform can't support Sign in with Apple — non-iOS, or an iOS
+  // simulator without the capability. Gate the whole claim row on this so
+  // it degrades to simply not offering the row, rather than a dead button.
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    AppleAuthentication.isAvailableAsync()
+      .then((ok) => { if (alive) setAppleAvailable(ok); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const handleClaim = () => {
+    void (async () => {
+      const result = await appleClaim();
+      if (result === "claimed") {
+        qc.invalidateQueries({ queryKey: ["me", "ledger"] });
+      } else if (result === "collision") {
+        Alert.alert("THE RECORD ALREADY BEARS A NAME.", undefined, [
+          { text: "CANCEL", style: "cancel" },
+          {
+            text: "RESTORE",
+            onPress: () => {
+              void (async () => {
+                const r = await appleRestore();
+                if (r === "restored") {
+                  qc.invalidateQueries();
+                  router.replace("/");
+                }
+              })();
+            },
+          },
+        ]);
+      }
+    })();
+  };
+
+  const handleStrike = () => {
+    Alert.alert("THE RECORD WILL BE STRUCK", "THIS IS NOT UNDONE.", [
+      { text: "CANCEL", style: "cancel" },
+      {
+        text: "STRIKE",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            const ok = await strikeRecord();
+            if (ok) router.replace("/");
+          })();
+        },
+      },
+    ]);
+  };
 
   if (!ledger.data) return (
     <Screen>
@@ -75,6 +133,22 @@ export default function Ledger() {
               />
             )}
           </View>
+          {d.claimed ? (
+            <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}>
+              THE RECORD IS CLAIMED
+            </Mono>
+          ) : appleAvailable ? (
+            <View style={{ alignItems: "center", gap: space(2), marginTop: space(2) }}>
+              <Eyebrow>Claim your record</Eyebrow>
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={0}
+                style={{ width: 230, height: 44 }}
+                onPress={handleClaim}
+              />
+            </View>
+          ) : null}
         </View>
         {!plusActive && <QuietLink title="Oracle plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
@@ -89,6 +163,7 @@ export default function Ledger() {
             try { await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title); } catch {} finally { setSharing(false); }
           }}
         />
+        <QuietLink title="Strike the record" onPress={handleStrike} />
         <PlaqueShareCanvas canvasRef={canvasRef} data={d} />
       </View>
     </Screen>
