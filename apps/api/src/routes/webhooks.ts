@@ -16,7 +16,15 @@ const EventSchema = z.object({
 });
 const PLUS_PRODUCTS = ["plus_monthly", "plus_annual"];
 const ACTIVATING = ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE"];
+// Events that represent a new billing period — the only ones that earn a shield grant.
+// UNCANCELLATION and PRODUCT_CHANGE reactivate/modify an existing period, they don't start one.
+const SHIELD_GRANTING = ["INITIAL_PURCHASE", "RENEWAL"];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Design spec §5: "everyone gets one free auto-shield per month; Plus gets more."
+// Copy: "THE ORACLE FORGIVES ONCE A MONTH. PLUS FORGIVES MORE." (paywall.creed-3)
+export const PLUS_SHIELDS_PER_PERIOD = 3;
+export const PLUS_SHIELDS_CAP = 5;
 
 export const webhookRoutes = new Hono<AppContext>().post("/revenuecat", async (c) => {
   const { db, env } = c.get("deps");
@@ -49,9 +57,18 @@ export const webhookRoutes = new Hono<AppContext>().post("/revenuecat", async (c
   if (evt.product_id && PLUS_PRODUCTS.includes(evt.product_id)) {
     if (ACTIVATING.includes(evt.type)) {
       await ensure();
-      await db.update(schema.entitlements)
-        .set({ plusActive: true, expiresAt: evt.expiration_at_ms ? new Date(evt.expiration_at_ms) : null, updatedAt: new Date() })
-        .where(eq(schema.entitlements.userId, userId));
+      // Omit expiresAt entirely when the event doesn't carry one (some RENEWAL payloads don't) —
+      // writing null would wipe a known expiry instead of preserving it.
+      const set: { plusActive: true; updatedAt: Date; expiresAt?: Date; shieldsRemaining?: ReturnType<typeof sql> } = {
+        plusActive: true,
+        updatedAt: new Date(),
+      };
+      if (evt.expiration_at_ms) set.expiresAt = new Date(evt.expiration_at_ms);
+      if (SHIELD_GRANTING.includes(evt.type)) {
+        // +3 paid shields per billing period, capped at 5 total (design spec §5 / paywall.creed-3).
+        set.shieldsRemaining = sql`LEAST(${schema.entitlements.shieldsRemaining} + ${PLUS_SHIELDS_PER_PERIOD}, ${PLUS_SHIELDS_CAP})`;
+      }
+      await db.update(schema.entitlements).set(set).where(eq(schema.entitlements.userId, userId));
     } else if (evt.type === "EXPIRATION") {
       await ensure();
       await db.update(schema.entitlements)

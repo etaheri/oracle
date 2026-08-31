@@ -51,7 +51,29 @@ describe("POST /v1/webhooks/revenuecat", () => {
     await post({ id: "e7", type: "EXPIRATION", app_user_id: deviceId, product_id: "plus_annual" });
     const e = await ent(db, userId);
     expect(e?.plusActive).toBe(false);
-    expect(e?.shieldsRemaining).toBe(1); // spec §2: consumables survive lapse
+    // 1 (rescue) + 3 (plus INITIAL_PURCHASE grant) = 4; grants survive lapse (spec §2: consumables survive lapse)
+    expect(e?.shieldsRemaining).toBe(4);
+  });
+  it("grants +3 paid shields on INITIAL_PURCHASE of a plus product", async () => {
+    const { db, post, deviceId, userId } = await setup();
+    await post({ id: "e20", type: "INITIAL_PURCHASE", app_user_id: deviceId, product_id: "plus_monthly", expiration_at_ms: Date.UTC(2026, 9, 1) });
+    const e = await ent(db, userId);
+    expect(e?.plusActive).toBe(true);
+    expect(e?.shieldsRemaining).toBe(3);
+  });
+  it("grants +3 more shields on RENEWAL but caps the total at 5", async () => {
+    const { db, post, deviceId, userId } = await setup();
+    await post({ id: "e21", type: "INITIAL_PURCHASE", app_user_id: deviceId, product_id: "plus_monthly", expiration_at_ms: Date.UTC(2026, 9, 1) });
+    await post({ id: "e22", type: "RENEWAL", app_user_id: deviceId, product_id: "plus_monthly", expiration_at_ms: Date.UTC(2026, 10, 1) });
+    const e = await ent(db, userId);
+    expect(e?.shieldsRemaining).toBe(5); // 3 + 3 = 6, capped at 5
+  });
+  it("does not grant shields on UNCANCELLATION (no new billing period)", async () => {
+    const { db, post, deviceId, userId } = await setup();
+    await post({ id: "e23", type: "INITIAL_PURCHASE", app_user_id: deviceId, product_id: "plus_monthly", expiration_at_ms: Date.UTC(2026, 9, 1) });
+    await post({ id: "e24", type: "UNCANCELLATION", app_user_id: deviceId, product_id: "plus_monthly", expiration_at_ms: Date.UTC(2026, 9, 1) });
+    const e = await ent(db, userId);
+    expect(e?.shieldsRemaining).toBe(3); // unchanged from the initial grant
   });
   it("RENEWAL extends expiry; CANCELLATION and unknown types are 200 no-ops", async () => {
     const { db, post, deviceId, userId } = await setup();
@@ -62,6 +84,15 @@ describe("POST /v1/webhooks/revenuecat", () => {
     const e = await ent(db, userId);
     expect(e?.plusActive).toBe(true); // cancelled ≠ expired
     expect(e?.expiresAt?.getTime()).toBe(Date.UTC(2026, 10, 1));
+  });
+  it("preserves the prior expiresAt when a RENEWAL omits expiration_at_ms", async () => {
+    const { db, post, deviceId, userId } = await setup();
+    const exp = Date.UTC(2026, 9, 1);
+    await post({ id: "e25", type: "INITIAL_PURCHASE", app_user_id: deviceId, product_id: "plus_monthly", expiration_at_ms: exp });
+    await post({ id: "e26", type: "RENEWAL", app_user_id: deviceId, product_id: "plus_monthly" });
+    const e = await ent(db, userId);
+    expect(e?.plusActive).toBe(true);
+    expect(e?.expiresAt?.getTime()).toBe(exp);
   });
   it("200s (never 4xx) on an unknown app_user_id", async () => {
     const { post } = await setup();
