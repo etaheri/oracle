@@ -76,4 +76,17 @@ describe("upsertDraft", () => {
     await seedRound(db, { date: "2026-08-27", opensAt: new Date("2026-08-27T16:00:00Z"), locksAt: new Date("2026-08-28T16:00:00Z") });
     await expect(upsertDraft(db, "2026-08-27", validDraft)).rejects.toThrow("round not editable");
   });
+
+  it("an authored early locks_at is kept; null defaults to noon D+1; out of range throws", async () => {
+    const { db } = await makeTestDb();
+    const early = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-28T00:00:00Z" } : q)) };
+    await upsertDraft(db, "2026-08-27", DraftSchema.parse(early));
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27"), orderBy: (q, { asc }) => [asc(q.slot)] });
+    expect(qs[1]!.locksAt.toISOString()).toBe("2026-08-28T00:00:00.000Z");
+    expect(qs[0]!.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z");
+    const late = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-29T00:00:00Z" } : q)) };
+    await expect(upsertDraft(db, "2026-08-27", DraftSchema.parse(late))).rejects.toThrow("locks_at out of range");
+    const before = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-27T15:00:00Z" } : q)) };
+    await expect(upsertDraft(db, "2026-08-27", DraftSchema.parse(before))).rejects.toThrow("locks_at out of range");
+  });
 });

@@ -74,6 +74,7 @@ export const adminRoutes = new Hono<AppContext>()
     } catch (e) {
       const msg = e instanceof Error ? e.message : "upsert failed";
       if (msg === "round not editable") return c.json({ error: msg }, 409);
+      if (msg === "locks_at out of range") return c.json({ error: msg }, 400);
       return c.json({ error: "upsert failed" }, 500);
     }
   })

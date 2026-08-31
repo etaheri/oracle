@@ -21,6 +21,7 @@ const draftQuestionProperties = {
   author_probability: { type: "number", minimum: 0.3, maximum: 0.7 },
   is_big_one: { type: "boolean" },
   market_prob: { type: ["number", "null"], minimum: 0, maximum: 1 },
+  locks_at: { type: ["string", "null"] },
 };
 
 const draftQuestionRequired = [
@@ -33,6 +34,7 @@ const draftQuestionRequired = [
   "author_probability",
   "is_big_one",
   "market_prob",
+  "locks_at",
 ];
 
 const draftQuestionJsonSchema = {
@@ -75,6 +77,7 @@ function authorSystemPrompt(date: string, recentTexts: string, signals: MarketSi
 - Each question must be binary YES/NO in plain English, resolvable by 11:00 AM ET on ${addDays(date, 1)} from ONE named public source.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement, the exact source page, and the deadline. Zero ambiguity: a stranger must be able to resolve it identically.
+- locks_at: if the outcome begins to become knowable before 11:00 AM ET on ${addDays(date, 1)} (a game tips off, a market closes, a scheduled release lands), set locks_at to that moment as an ISO-8601 UTC timestamp so answers lock before the information leaks. Otherwise null.
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
 - Avoid repeating these recent questions: ${recentTexts}${marketSignalsBlock(signals)}
 Search the web for today's actual news before writing. When your draft is final, call the draft_round tool exactly once.`;
@@ -144,6 +147,7 @@ function rerollSystemPrompt(date: string, slot: number, othersTexts: string, gui
 - The question must be binary YES/NO in plain English, resolvable by 11:00 AM ET on ${addDays(date, 1)} from ONE named public source.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement, the exact source page, and the deadline. Zero ambiguity: a stranger must be able to resolve it identically.
+- locks_at: if the outcome begins to become knowable before 11:00 AM ET on ${addDays(date, 1)} (a game tips off, a market closes, a scheduled release lands), set locks_at to that moment as an ISO-8601 UTC timestamp so answers lock before the information leaks. Otherwise null.
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
 ${isBigOne ? "- This is THE BIG ONE: pick the day's most contested story from any category." : "- Pick a category different from the other four questions below."}
 Do not overlap these existing questions: ${othersTexts}
@@ -235,13 +239,15 @@ export function draftMessage(
     resolution_criteria: string;
     is_big_one: boolean;
     author_probability?: number;
+    locks_at?: string | null;
   }>,
 ): string {
   const sorted = [...questions].sort((a, b) => a.slot - b.slot);
   const lines = sorted.flatMap((q) => {
     const star = q.is_big_one ? "★ " : "";
     const pct = q.author_probability !== undefined ? ` (${Math.round(q.author_probability * 100)}%)` : "";
-    return [`${q.slot} [${q.category}] ${star}${q.text}${pct}`, `  ↳ ${q.resolution_criteria}`];
+    const locks = q.locks_at ? ` · locks ${q.locks_at}` : "";
+    return [`${q.slot} [${q.category}] ${star}${q.text}${pct}${locks}`, `  ↳ ${q.resolution_criteria}`];
   });
   return [`HERMES · DRAFT ${date}`, ...lines, `publishes at noon · /reroll <slot> [guidance] · /status`].join("\n");
 }

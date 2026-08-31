@@ -9,5 +9,6 @@ export const validDraft = {
     author_probability: 0.5,
     is_big_one: slot === 5,
     market_prob: null,
+    locks_at: null,
   })),
 };

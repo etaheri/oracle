@@ -45,6 +45,22 @@ describe("runTick", () => {
     expect(qs.every((q) => q.status === "open")).toBe(true);
   });
 
+  it("publish keeps an authored early locks_at and defaults everything else (incl. epoch-seeded rows) to noon D+1", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-08-27", status: "scheduled" });
+    await db.insert(schema.questions).values([1, 2, 3, 4, 5].map((slot) => ({
+      roundDate: "2026-08-27", slot, isBigOne: slot === 5, text: `Q${slot}?`, category: "news" as const,
+      resolutionCriteria: "c", sourceName: "s", opensAt: new Date(0),
+      locksAt: slot === 2 ? new Date("2026-08-28T00:00:00Z") : new Date(0),
+      resolveBy: new Date(0), status: "scheduled" as const,
+    })));
+    const { deps } = fakeDeps(db, "2026-08-27T16:01:00Z");
+    expect(await runTick(deps)).toContain("publish:2026-08-27");
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27"), orderBy: (q, { asc }) => [asc(q.slot)] });
+    expect(qs[1]!.locksAt.toISOString()).toBe("2026-08-28T00:00:00.000Z");
+    expect(qs[0]!.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z");
+  });
+
   it("refuses to publish while another round is open (WARN instead)", async () => {
     const { db } = await makeTestDb();
     // open round whose lock is NOT passed (hand-seeded anomaly)

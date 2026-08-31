@@ -32,11 +32,19 @@ export async function publish(db: Db, telegram: TelegramClient, date: string): P
   }
 
   const opensAt = noonET(date);
-  const locksAt = noonET(addDays(date, 1));
-  await db
-    .update(schema.questions)
-    .set({ opensAt, locksAt, status: "open" })
-    .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.status, "scheduled")));
+  const locksAtDefault = noonET(addDays(date, 1));
+  const scheduled = await db.query.questions.findMany({
+    where: and(eq(schema.questions.roundDate, date), eq(schema.questions.status, "scheduled")),
+  });
+  for (const q of scheduled) {
+    // Keep an authored early lock; anything else (incl. epoch-seeded test
+    // rows) gets the default noon D+1 lock.
+    const early = q.locksAt.getTime() > opensAt.getTime() && q.locksAt.getTime() < locksAtDefault.getTime();
+    await db
+      .update(schema.questions)
+      .set({ opensAt, locksAt: early ? q.locksAt : locksAtDefault, status: "open" })
+      .where(eq(schema.questions.id, q.id));
+  }
   await db.update(schema.rounds).set({ status: "open" }).where(eq(schema.rounds.date, date));
   return true;
 }

@@ -24,6 +24,9 @@ export const DraftQuestionSchema = z.object({
   // Set when the question was adapted from a live prediction market (feeds.ts);
   // stamped into questions.market_prob for later reveal display.
   market_prob: z.number().min(0).max(1).nullable().default(null),
+  // Leaky questions lock early (design spec §6): the instant the outcome
+  // starts to become knowable (tip-off, market close). null → noon D+1.
+  locks_at: z.iso.datetime({ offset: true }).nullable().default(null),
 });
 
 export const DraftSchema = z
@@ -61,12 +64,17 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
   }
 
   const opensAt = noonET(date);
-  const locksAt = noonET(addDays(date, 1));
-  const resolveBy = new Date(locksAt.getTime() + 3_600_000);
+  const locksAtDefault = noonET(addDays(date, 1));
+  const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
-  await db.insert(schema.rounds).values({ date, status: "scheduled" });
-  await db.insert(schema.questions).values(
-    draft.questions.map((q) => ({
+  // Validate ALL rows (including each question's locks_at) before any write —
+  // this map throws on the first out-of-range locks_at, before either insert.
+  const rows = draft.questions.map((q) => {
+    const locksAt = q.locks_at ? new Date(q.locks_at) : locksAtDefault;
+    if (locksAt.getTime() <= opensAt.getTime() || locksAt.getTime() > locksAtDefault.getTime()) {
+      throw new Error("locks_at out of range");
+    }
+    return {
       roundDate: date,
       slot: q.slot,
       isBigOne: q.is_big_one,
@@ -80,6 +88,9 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
       locksAt,
       resolveBy,
       status: "scheduled" as const,
-    })),
-  );
+    };
+  });
+
+  await db.insert(schema.rounds).values({ date, status: "scheduled" });
+  await db.insert(schema.questions).values(rows);
 }
