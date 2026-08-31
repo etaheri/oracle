@@ -33,3 +33,19 @@ export async function getDeviceToken(deps: { fetchFn?: typeof fetch; store?: Tok
   }
   return inflightMint;
 }
+
+// The device token is `deviceId.issuedAtMs.hmac` (see apps/api/src/auth/deviceToken.ts);
+// the RevenueCat app user ID is that same deviceId, so purchases survive a
+// reinstall the same way the rest of the account does. No token yet →
+// no id yet — never mint one just to identify a purchaser.
+export async function getDeviceId(deps: { store?: TokenStore } = {}): Promise<string | null> {
+  try {
+    const store = deps.store ?? (await secureStore());
+    const token = await store.get(KEY);
+    if (!token) return null;
+    const deviceId = token.split(".")[0];
+    return deviceId || null;
+  } catch {
+    return null;
+  }
+}

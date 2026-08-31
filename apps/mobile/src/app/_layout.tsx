@@ -9,6 +9,7 @@ import { BootRite } from "../ui/BootRite";
 import { CallingRite } from "../ui/CallingRite";
 import { getCallingSeen } from "../api/flags";
 import { chooseRite } from "../game/calling";
+import { initPurchases } from "../monetization/purchases";
 import { colors } from "../theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -34,6 +35,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  // Fire-and-forget: no key or no device id yet both degrade to plus-off,
+  // never block the boot rite on a store round-trip.
+  useEffect(() => {
+    if (fontsLoaded) void initPurchases();
   }, [fontsLoaded]);
 
   // React Query's refetch-on-focus assumes web visibility events; RN needs
