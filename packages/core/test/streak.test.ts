@@ -37,4 +37,17 @@ describe("settleStreak", () => {
     expect(r.streakCurrent).toBe(0);
     expect(r.streakBest).toBe(12);
   });
+  it("does not spend any shield on a vigil shorter than SHIELD_MIN_STREAK", () => {
+    const r = settleStreak({ ...base, streakCurrent: 2, paidShieldsRemaining: 3 }, false, "2026-08-20");
+    expect(r.streakCurrent).toBe(0);
+    expect(r.usedFreeShield).toBe(false);
+    expect(r.usedPaidShield).toBe(false);
+    expect(r.freeShieldUsedAt).toBeNull();
+    expect(r.paidShieldsRemaining).toBe(3);
+  });
+  it("spends the free shield exactly at SHIELD_MIN_STREAK", () => {
+    const r = settleStreak({ ...base, streakCurrent: 3 }, false, "2026-08-20");
+    expect(r.usedFreeShield).toBe(true);
+    expect(r.streakCurrent).toBe(3);
+  });
 });

@@ -1,3 +1,5 @@
+import { CONSTANTS as C } from "./constants";
+
 export interface StreakState {
   streakCurrent: number;
   streakBest: number;
@@ -21,6 +23,11 @@ export function settleStreak(state: StreakState, played: boolean, roundDate: str
       usedFreeShield: false,
       usedPaidShield: false,
     };
+  }
+  // A shield defends a vigil, not a first day: under the floor the streak
+  // simply resets and every shield stays in reserve for when it matters.
+  if (state.streakCurrent < C.SHIELD_MIN_STREAK) {
+    return { ...state, streakCurrent: 0, usedFreeShield: false, usedPaidShield: false };
   }
   const freeAvailable = state.freeShieldUsedAt === null || month(state.freeShieldUsedAt) !== month(roundDate);
   if (freeAvailable) {

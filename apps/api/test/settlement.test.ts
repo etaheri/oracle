@@ -53,26 +53,30 @@ describe("settleRound", () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const a = await player(app);
-    // day 1: played, streak 1
+    // days 1-3: played, streak reaches 3 (the shield floor)
     await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
     await settleRound(db, "2026-08-20");
-    const uid = (await db.query.users.findMany())[0]!.id;
-    // day 2: miss → free shield holds the streak
-    await playedRound(db, app, "2026-08-21", []);
+    await playedRound(db, app, "2026-08-21", [{ p: a, slots: [1] }]);
     await settleRound(db, "2026-08-21");
-    let u = (await db.query.users.findMany())[0]!;
-    expect(u).toMatchObject({ streakCurrent: 1, freeShieldUsedAt: "2026-08-21" });
-    // day 3: miss, free shield spent this month, one paid shield available
-    await db.insert(schema.entitlements).values({ userId: uid, plusActive: true, shieldsRemaining: 1 });
-    await playedRound(db, app, "2026-08-22", []);
+    await playedRound(db, app, "2026-08-22", [{ p: a, slots: [1] }]);
     await settleRound(db, "2026-08-22");
-    u = (await db.query.users.findMany())[0]!;
-    expect(u.streakCurrent).toBe(1);
-    const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
-    expect(ent!.shieldsRemaining).toBe(0);
-    // day 4: miss, no shields left → reset
+    const uid = (await db.query.users.findMany())[0]!.id;
+    // day 4: miss → free shield holds the streak
     await playedRound(db, app, "2026-08-23", []);
     await settleRound(db, "2026-08-23");
+    let u = (await db.query.users.findMany())[0]!;
+    expect(u).toMatchObject({ streakCurrent: 3, freeShieldUsedAt: "2026-08-23" });
+    // day 5: miss, free shield spent this month, one paid shield available
+    await db.insert(schema.entitlements).values({ userId: uid, plusActive: true, shieldsRemaining: 1 });
+    await playedRound(db, app, "2026-08-24", []);
+    await settleRound(db, "2026-08-24");
+    u = (await db.query.users.findMany())[0]!;
+    expect(u.streakCurrent).toBe(3);
+    const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
+    expect(ent!.shieldsRemaining).toBe(0);
+    // day 6: miss, no shields left → reset
+    await playedRound(db, app, "2026-08-25", []);
+    await settleRound(db, "2026-08-25");
     expect((await db.query.users.findMany())[0]!.streakCurrent).toBe(0);
   });
 
@@ -137,21 +141,26 @@ describe("settleRound", () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const a = await player(app);
+    // days 1-3: played, streak reaches 3 (the shield floor)
     await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
     await settleRound(db, "2026-08-20");
+    await playedRound(db, app, "2026-08-21", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-21");
+    await playedRound(db, app, "2026-08-22", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-22");
     const uid = (await db.query.users.findMany())[0]!.id;
     // Free shield already spent this month; one paid shield in reserve.
-    await db.update(schema.users).set({ freeShieldUsedAt: "2026-08-20" }).where(eq(schema.users.id, uid));
+    await db.update(schema.users).set({ freeShieldUsedAt: "2026-08-22" }).where(eq(schema.users.id, uid));
     await db.insert(schema.entitlements).values({ userId: uid, plusActive: true, shieldsRemaining: 1 });
-    // Day 2: a miss → the paid shield burns once.
-    await playedRound(db, app, "2026-08-21", []);
-    await settleRound(db, "2026-08-21");
-    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-21"));
+    // Day 4: a miss → the paid shield burns once.
+    await playedRound(db, app, "2026-08-23", []);
+    await settleRound(db, "2026-08-23");
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-23"));
 
-    await settleRound(db, "2026-08-21"); // the retry
+    await settleRound(db, "2026-08-23"); // the retry
     const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
     expect(ent!.shieldsRemaining).toBe(0); // burned once, not twice
-    expect((await db.query.users.findMany())[0]!.streakCurrent).toBe(1);
+    expect((await db.query.users.findMany())[0]!.streakCurrent).toBe(3);
   });
 });
 
