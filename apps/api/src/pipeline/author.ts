@@ -6,7 +6,7 @@ import { schema, type Db } from "../db/client";
 import type { PipelineDeps } from "./index";
 import { DraftSchema, DraftQuestionSchema, type Draft } from "./draft";
 import { upsertDraft } from "./draft";
-import { addDays } from "./clock";
+import { addDays, noonET } from "./clock";
 import { fetchMarketSignals, type MarketSignal } from "./feeds";
 
 const CATEGORIES = ["markets", "sports", "weather", "culture", "news"] as const;
@@ -192,6 +192,17 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
     throw new Error(`reroll: is_big_one mismatch for slot ${slot}`);
   }
 
+  // Same range rule as upsertDraft: an authored early lock survives the
+  // reroll, null defaults to noon D+1. rerollSlot has no retry-on-invalid
+  // path (unlike authorRound), so an out-of-range locks_at doesn't throw —
+  // it's clamped to the default and called out in the telegram message.
+  const opensAt = noonET(date);
+  const locksAtDefault = noonET(addDays(date, 1));
+  const requestedLocksAt = q.locks_at ? new Date(q.locks_at) : locksAtDefault;
+  const locksAtOutOfRange =
+    requestedLocksAt.getTime() <= opensAt.getTime() || requestedLocksAt.getTime() > locksAtDefault.getTime();
+  const locksAt = locksAtOutOfRange ? locksAtDefault : requestedLocksAt;
+
   // The Claude call above takes real time; re-check right before writing so
   // a publish that happened while we were waiting on Claude can't be
   // clobbered by this reroll landing late.
@@ -211,11 +222,15 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
       sourceUrl: q.source_url,
       category: q.category,
       marketProb: q.market_prob == null ? null : String(q.market_prob),
+      locksAt,
     })
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
 
   const updated = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
   const sorted = [...updated].sort((a, b) => a.slot - b.slot);
+  const outOfRangeNote = locksAtOutOfRange
+    ? `\n⚠ slot ${slot}'s locks_at was out of range; defaulted to noon ${addDays(date, 1)}`
+    : "";
   await deps.telegram.send(
     draftMessage(
       date,
@@ -225,8 +240,12 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
         text: row.text,
         resolution_criteria: row.resolutionCriteria,
         is_big_one: row.isBigOne,
+        // Pre-publish, an authored early lock is distinguishable from the
+        // default: it's strictly earlier than noon D+1 (same test publish
+        // itself uses to tell the two apart).
+        locks_at: row.locksAt.getTime() < locksAtDefault.getTime() ? row.locksAt.toISOString() : null,
       })),
-    ),
+    ) + outOfRangeNote,
   );
 }
 

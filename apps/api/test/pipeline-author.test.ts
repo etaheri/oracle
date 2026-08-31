@@ -190,6 +190,60 @@ describe("rerollSlot", () => {
     expect(slot3.status).toBe("open"); // unchanged
   });
 
+  it("g) an early locks_at in the reroll response is kept on the slot's row and shown in the telegram summary", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+
+    const replacement = {
+      slot: 3,
+      category: "sports" as const,
+      text: "Will the home team win tonight's game?",
+      resolution_criteria: "Official league boxscore final by 23:59 ET",
+      source_name: "ESPN",
+      source_url: "https://espn.com/game",
+      author_probability: 0.5,
+      is_big_one: false,
+      locks_at: "2026-08-27T23:00:00Z",
+    };
+    const { claude } = fakeClaude([replacement]);
+    const { deps, sent } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 3, "make it about sports");
+
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    const slot3 = qs.find((q) => q.slot === 3)!;
+    expect(slot3.locksAt.toISOString()).toBe("2026-08-27T23:00:00.000Z");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("· locks 2026-08-27T23:00:00.000Z");
+  });
+
+  it("h) an out-of-range locks_at in the reroll response is clamped to noon D+1 and noted in the telegram message", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+
+    const replacement = {
+      slot: 3,
+      category: "sports" as const,
+      text: "Will the home team win tonight's game?",
+      resolution_criteria: "Official league boxscore final by 23:59 ET",
+      source_name: "ESPN",
+      source_url: "https://espn.com/game",
+      author_probability: 0.5,
+      is_big_one: false,
+      locks_at: "2026-08-29T00:00:00Z", // past noon D+1 — out of range
+    };
+    const { claude } = fakeClaude([replacement]);
+    const { deps, sent } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 3, "make it about sports");
+
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    const slot3 = qs.find((q) => q.slot === 3)!;
+    expect(slot3.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z"); // clamped to default
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("out of range");
+  });
+
   it("e) rejects a reroll response that flips is_big_one", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);

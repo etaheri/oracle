@@ -89,4 +89,32 @@ describe("upsertDraft", () => {
     const before = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-27T15:00:00Z" } : q)) };
     await expect(upsertDraft(db, "2026-08-27", DraftSchema.parse(before))).rejects.toThrow("locks_at out of range");
   });
+
+  it("locks_at exactly at opensAt throws; locks_at exactly at noon D+1 is allowed", async () => {
+    const { db } = await makeTestDb();
+    const atOpen = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-27T16:00:00Z" } : q)) };
+    await expect(upsertDraft(db, "2026-08-27", DraftSchema.parse(atOpen))).rejects.toThrow("locks_at out of range");
+
+    const atDefault = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-28T16:00:00Z" } : q)) };
+    await upsertDraft(db, "2026-08-27", DraftSchema.parse(atDefault));
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    expect(qs.find((q) => q.slot === 2)!.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z");
+  });
+
+  it("a bad re-post's locks_at validation failure leaves a prior good scheduled round untouched", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+
+    const bad = { ...validDraft, questions: validDraft.questions.map((q) => (q.slot === 2 ? { ...q, locks_at: "2026-08-29T00:00:00Z" } : q)) };
+    await expect(upsertDraft(db, "2026-08-27", DraftSchema.parse(bad))).rejects.toThrow("locks_at out of range");
+
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-08-27") });
+    expect(round).toBeDefined();
+    expect(round!.status).toBe("scheduled");
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    expect(qs).toHaveLength(5);
+    expect(qs.every((q) => q.status === "scheduled")).toBe(true);
+    // Original text survived — the bad re-post never touched anything.
+    expect(qs.find((q) => q.slot === 1)!.text).toBe(validDraft.questions[0]!.text);
+  });
 });

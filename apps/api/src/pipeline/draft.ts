@@ -57,18 +57,15 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
   const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (existing && existing.status !== "scheduled") throw new Error("round not editable");
 
-  if (existing) {
-    // Questions carry an FK to rounds.date — delete children before the parent.
-    await db.delete(schema.questions).where(eq(schema.questions.roundDate, date));
-    await db.delete(schema.rounds).where(eq(schema.rounds.date, date));
-  }
-
   const opensAt = noonET(date);
   const locksAtDefault = noonET(addDays(date, 1));
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
   // Validate ALL rows (including each question's locks_at) before any write —
-  // this map throws on the first out-of-range locks_at, before either insert.
+  // this map throws on the first out-of-range locks_at, before we touch the
+  // DB at all. Critical: this must run before the delete-existing-draft
+  // block below, or a re-post with one bad locks_at would destroy a good
+  // scheduled round before the bad value is ever caught.
   const rows = draft.questions.map((q) => {
     const locksAt = q.locks_at ? new Date(q.locks_at) : locksAtDefault;
     if (locksAt.getTime() <= opensAt.getTime() || locksAt.getTime() > locksAtDefault.getTime()) {
@@ -90,6 +87,12 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
       status: "scheduled" as const,
     };
   });
+
+  if (existing) {
+    // Questions carry an FK to rounds.date — delete children before the parent.
+    await db.delete(schema.questions).where(eq(schema.questions.roundDate, date));
+    await db.delete(schema.rounds).where(eq(schema.rounds.date, date));
+  }
 
   await db.insert(schema.rounds).values({ date, status: "scheduled" });
   await db.insert(schema.questions).values(rows);
