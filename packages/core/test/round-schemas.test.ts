@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RoundTodaySchema, RevealSchema } from "../src/schemas";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema } from "../src/schemas";
 
 describe("round schemas", () => {
   it("parses a real /round/today payload", () => {
@@ -16,10 +16,15 @@ describe("round schemas", () => {
           category: "markets",
           source_name: "S&P",
           resolution_criteria: "close",
+          locks_at: "2026-08-21T16:00:00.000Z",
         },
       ],
     };
     expect(RoundTodaySchema.parse(payload)).toEqual(payload);
+  });
+  it("parses /round/next", () => {
+    const payload = { date: "2026-08-21", opens_at: "2026-08-21T16:00:00.000Z" };
+    expect(RoundNextSchema.parse(payload)).toEqual(payload);
   });
   it("parses a real reveal payload incl. void and null my", () => {
     const payload = {
@@ -35,8 +40,14 @@ describe("round schemas", () => {
           crowd_yes_pct: null,
           market_prob: null,
           my: null,
+          source_name: "NWS",
+          source_url: null,
+          evidence_quote: null,
+          void_reason: "unverifiable by deadline",
+          oracle_p_yes: null,
         },
       ],
+      ledger: { settled: true, streak: 4, calls_rated: 35, oracle_score: null },
     };
     expect(RevealSchema.parse(payload)).toEqual(payload);
   });

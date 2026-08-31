@@ -42,10 +42,14 @@ export const RoundTodaySchema = z.object({
       category: z.string(),
       source_name: z.string(),
       resolution_criteria: z.string(),
+      locks_at: z.string(),
     }),
   ),
 });
 export type RoundToday = z.infer<typeof RoundTodaySchema>;
+
+export const RoundNextSchema = z.object({ date: z.string(), opens_at: z.string() });
+export type RoundNext = z.infer<typeof RoundNextSchema>;
 
 export const MineTodaySchema = z.object({
   predictions: z.array(
@@ -78,8 +82,19 @@ export const RevealSchema = z.object({
           brier: z.number().nullable(),
         })
         .nullable(),
+      source_name: z.string(),
+      source_url: z.string().nullable(),
+      evidence_quote: z.string().nullable(),
+      void_reason: z.string().nullable(),
+      oracle_p_yes: z.number().nullable(),
     }),
   ),
+  ledger: z.object({
+    settled: z.boolean(),
+    streak: z.number().int(),
+    calls_rated: z.number().int(),
+    oracle_score: z.number().int().nullable(),
+  }),
 });
 export type Reveal = z.infer<typeof RevealSchema>;
 
@@ -88,6 +103,8 @@ export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
 export const MeLedgerSchema = z.object({
   oracle_score: z.number().int().nullable(),
+  calls_rated: z.number().int(),
+  calls_answered: z.number().int(),
   days_consulted: z.number().int(),
   streak: z.number().int(),
   accuracy_pct: z.number().int().nullable(),
