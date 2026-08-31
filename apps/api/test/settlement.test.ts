@@ -80,6 +80,54 @@ describe("settleRound", () => {
     expect((await db.query.users.findMany())[0]!.streakCurrent).toBe(0);
   });
 
+  it("decrements paid shields relatively, not absolutely — a rescue purchase landing mid-settle survives", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    // days 1-3: played, streak reaches 3 (the shield floor)
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-20");
+    await playedRound(db, app, "2026-08-21", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-21");
+    await playedRound(db, app, "2026-08-22", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-22");
+    const uid = (await db.query.users.findMany())[0]!.id;
+    // Free shield already spent this month; two paid shields in reserve —
+    // simulating a rescue purchase that landed after the free shield burned
+    // but before this settle runs. settleStreak reads shieldsRemaining=2 and
+    // computes paidShieldsRemaining=1 (absolute); the relative SQL write
+    // must independently land at 2-1=1, not clobber a higher concurrent value.
+    await db.update(schema.users).set({ freeShieldUsedAt: "2026-08-22" }).where(eq(schema.users.id, uid));
+    await db.insert(schema.entitlements).values({ userId: uid, plusActive: true, shieldsRemaining: 2 });
+    await playedRound(db, app, "2026-08-23", []);
+    await settleRound(db, "2026-08-23");
+    const u = (await db.query.users.findMany())[0]!;
+    expect(u.streakCurrent).toBe(3); // shield held the streak
+    const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
+    expect(ent!.shieldsRemaining).toBe(1); // 2 - 1, relative decrement
+  });
+
+  it("never decrements shieldsRemaining below zero", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-20");
+    await playedRound(db, app, "2026-08-21", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-21");
+    await playedRound(db, app, "2026-08-22", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-22");
+    const uid = (await db.query.users.findMany())[0]!.id;
+    await db.update(schema.users).set({ freeShieldUsedAt: "2026-08-22" }).where(eq(schema.users.id, uid));
+    await db.insert(schema.entitlements).values({ userId: uid, plusActive: true, shieldsRemaining: 1 });
+    await playedRound(db, app, "2026-08-23", []);
+    await settleRound(db, "2026-08-23");
+    const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
+    expect(ent!.shieldsRemaining).toBe(0); // 1 - 1, never negative
+  });
+
   it("a complete round feeds calls_resolved (non-void count); score stays null under the minimum; a void slot still credits the streak", async () => {
     vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
     const { db } = await makeTestDb();

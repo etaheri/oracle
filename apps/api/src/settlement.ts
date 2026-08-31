@@ -1,4 +1,4 @@
-import { count, eq, gt, inArray } from "drizzle-orm";
+import { count, eq, gt, inArray, sql } from "drizzle-orm";
 import { oracleScore, settleStreak } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
@@ -52,8 +52,13 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
     }
     await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
     if (result.usedPaidShield && ent) {
+      // Relative decrement, not settleStreak's absolute paidShieldsRemaining:
+      // a rescue purchase landing between our read above and this write must
+      // not be clobbered back down to the pre-purchase value. settleStreak
+      // consumes at most one paid shield per call (see streak.ts), so "-1,
+      // floored at 0" is always the correct delta here.
       await db.update(schema.entitlements)
-        .set({ shieldsRemaining: result.paidShieldsRemaining, updatedAt: new Date() })
+        .set({ shieldsRemaining: sql`GREATEST(${schema.entitlements.shieldsRemaining} - 1, 0)`, updatedAt: new Date() })
         .where(eq(schema.entitlements.userId, u.id));
     }
     settled++;
