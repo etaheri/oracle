@@ -11,16 +11,29 @@ let ready = false;
 // (if requestPushPermission only checked `ready`) silently no-op and burn
 // the once-ever ask on nothing. Every caller awaits the SAME init.
 let inflight: Promise<void> | null = null;
+// Tracks the native OneSignal.initialize() call specifically, separate from
+// `ready` (which also requires a successful login) — a retry after a
+// device-id miss must never call initialize() a second time.
+let initialized = false;
 
 export async function initOneSignal(): Promise<void> {
   if (ready || !KEYS.oneSignalAppId) return;
   const appId = KEYS.oneSignalAppId;
   if (!inflight) {
     inflight = (async () => {
-      OneSignal.Debug.setLogLevel(LogLevel.None);
-      OneSignal.initialize(appId);
+      if (!initialized) {
+        OneSignal.Debug.setLogLevel(LogLevel.None);
+        OneSignal.initialize(appId);
+        initialized = true; // native init must never run twice, even across retries
+      }
       const deviceId = await getDeviceId();
-      if (deviceId) OneSignal.login(deviceId); // external id = device id (spec §5)
+      if (!deviceId) {
+        // No device token yet (fresh-install race) — login was skipped for
+        // this attempt. Don't mark ready: a later call must retry the login
+        // rather than silently no-op forever (mirrors the thrown-error path).
+        return;
+      }
+      OneSignal.login(deviceId); // external id = device id (spec §5)
       ready = true;
     })().finally(() => { inflight = null; });
   }

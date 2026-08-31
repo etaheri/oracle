@@ -8,6 +8,7 @@ import { LivingHero } from "../ui/LivingHero";
 import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { Countdown } from "../ui/Countdown";
 import { SleepsPanel } from "../ui/SleepsPanel";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToday, useCrowdSoFar, useMeLedger, useReveal } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
@@ -109,10 +110,15 @@ export default function Index() {
   const noShieldsInReserve = !!ledger.data && !ledger.data.free_shield_available && ledger.data.paid_shields === 0;
   const showRescue = notice === risk && risk !== null && !plusActive && noShieldsInReserve;
   const [rescueResult, setRescueResult] = useState<"idle" | "success" | "error">("idle");
+  const qc = useQueryClient();
   const doRescue = useCallback(async () => {
     setRescueResult("idle");
-    setRescueResult((await purchaseRescue()) ? "success" : "error");
-  }, []);
+    const ok = await purchaseRescue();
+    setRescueResult(ok ? "success" : "error");
+    // The bought shield lands in the ledger server-side; without this the
+    // notice/rescue row above keeps reading the stale pre-purchase ledger.
+    if (ok) void qc.invalidateQueries({ queryKey: ["me", "ledger"] });
+  }, [qc]);
   // Hold the print-in until the boot rite lifts — the static resolves in
   // view as the overlay fades, instead of playing unseen behind it.
   const [booted, setBooted] = useState(false);
