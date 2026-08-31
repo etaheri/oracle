@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { DraftSchema, upsertDraft } from "../src/pipeline/draft";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import * as schema from "../src/db/schema";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function withQuestions(overrides: (qs: typeof validDraft.questions) => typeof validDraft.questions) {
   return { questions: overrides(validDraft.questions.map((q) => ({ ...q }))) };
@@ -39,6 +44,12 @@ describe("DraftSchema", () => {
   it("rejects fewer than 4 distinct categories", () => {
     const draft = withQuestions((qs) => qs.map((q) => ({ ...q, category: q.slot === 5 ? q.category : ("news" as const) })));
     expect(DraftSchema.safeParse(draft).success).toBe(false);
+  });
+
+  it("the bank-draft-example.json doc asset always parses as a valid draft", () => {
+    const path = join(__dirname, "../../../docs/superpowers/plans/assets/bank-draft-example.json");
+    const raw = JSON.parse(readFileSync(path, "utf8"));
+    expect(() => DraftSchema.parse(raw)).not.toThrow();
   });
 });
 

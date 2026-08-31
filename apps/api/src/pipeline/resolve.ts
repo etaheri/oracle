@@ -3,8 +3,9 @@
 // web_search tool it gets) and must answer strictly from that source, with
 // quoted evidence. No quotes → no resolution, even on a yes/no answer — a
 // ruling without receipts is treated the same as "unverifiable": left for
-// the next tick to retry, and eventually voided by the pipeline's 13:00 ET
-// deadline (actions.ts:voidQuestions) if it never produces one.
+// the next tick to retry hourly, and eventually voided by the pipeline
+// (actions.ts:voidQuestions) at noon ET two days after the round date — i.e.
+// unverifiable within 24 hours of lock — if it never produces one.
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { schema, type Db } from "../db/client";

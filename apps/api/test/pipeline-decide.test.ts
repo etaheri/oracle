@@ -72,6 +72,15 @@ describe("decideActions", () => {
     expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false } })).toEqual([]);
     expect(decideActions(at(11, 50), { ...empty, bankCount: 2 })).toEqual([]);
   });
+  it("never falls through to the bank when today already has a locked round (all-five-early-locks tail)", () => {
+    const acts = decideActions(at(12), {
+      ...empty,
+      lockedRound: { date: "2026-08-27", unresolvedIds: ["a"] },
+      bankCount: 2,
+    });
+    expect(acts.some((a) => a.kind === "publish-bank")).toBe(false);
+  });
+
   it("the 12:10 critical only fires with an empty bank; 23:00 downgrades to warn with a bank", () => {
     expect(decideActions(at(12, 10), { ...empty, bankCount: 1 }).some((a) => a.kind === "alert")).toBe(false);
     const warn = decideActions(at(23, 0), { ...empty, bankCount: 3 }).find((a) => a.kind === "alert");

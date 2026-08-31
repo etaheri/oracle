@@ -82,8 +82,9 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           // "resolve:<date>" means the tick ATTEMPTED resolution for every
           // still-locked question in this round — not that all of them
           // resolved. resolveWithClaude returns false (and unresolved
-          // questions stay locked for the next tick, then void at 13:00 ET)
-          // whenever Claude can't produce a sourced yes/no.
+          // questions stay locked, retried hourly) whenever Claude can't
+          // produce a sourced yes/no — they void at noon ET two days after
+          // the round date (unverifiable within 24 hours of lock).
           done.push(`resolve:${action.date}`);
           break;
 

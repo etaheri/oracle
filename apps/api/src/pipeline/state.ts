@@ -85,7 +85,14 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
 
   // PUBLISH FROM THE BANK — noon with nothing scheduled for today: the drop
   // must never depend on the author having been awake (design spec §6).
-  if (hour >= 12 && !state.scheduledDates.includes(today) && !openBlocksPublish && state.openRound?.date !== today && state.bankCount > 0) {
+  if (
+    hour >= 12 &&
+    !state.scheduledDates.includes(today) &&
+    !openBlocksPublish &&
+    state.openRound?.date !== today &&
+    state.lockedRound?.date !== today &&
+    state.bankCount > 0
+  ) {
     actions.push({ kind: "publish-bank", date: today });
   }
 

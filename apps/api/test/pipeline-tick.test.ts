@@ -174,6 +174,24 @@ describe("runTick", () => {
     expect(sent.some((t) => t.includes("published from the evergreen bank"))).toBe(false);
     expect(sent.some((t) => t.includes("publish skipped"))).toBe(true);
   });
+
+  it("publishFromBank returns false, sends nothing, and leaves the bank untouched when a round already exists for that date", async () => {
+    const { db } = await makeTestDb();
+    // Any status — including one decideActions' snapshot couldn't have seen
+    // coming (e.g. locked/resolved same-day) — must stop this before it
+    // burns a bank entry or fires telegram noise.
+    await db.insert(schema.rounds).values({ date: "2026-08-27", status: "resolved" });
+    const [entry] = await db
+      .insert(schema.draftBank)
+      .values({ draft: validDraft, createdAt: new Date("2026-08-20T00:00:00Z") })
+      .returning({ id: schema.draftBank.id });
+    const { deps, sent } = fakeDeps(db, "2026-08-27T16:00:00Z");
+    const published = await publishFromBank(db, deps.telegram, "2026-08-27");
+    expect(published).toBe(false);
+    expect(sent.length).toBe(0);
+    const row = await db.query.draftBank.findFirst({ where: eq(schema.draftBank.id, entry!.id) });
+    expect(row!.usedOn).toBeNull();
+  });
 });
 
 describe("voidQuestions", () => {

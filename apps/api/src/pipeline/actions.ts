@@ -80,6 +80,14 @@ export async function publish(db: Db, telegram: TelegramClient, date: string): P
 // this date without ever publishing — so the next tick tries the next one
 // instead of retrying the same bad row forever.
 export async function publishFromBank(db: Db, telegram: TelegramClient, date: string): Promise<boolean> {
+  // Belt-and-suspenders against decideActions' state snapshot going stale
+  // (spec §2): a round for this date — locked, resolved, whatever status —
+  // means someone already got here first. Bail before ever touching the
+  // bank, so no telegram noise and no evergreen entry gets burned on a date
+  // that doesn't need one.
+  const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+  if (existing) return false;
+
   const entry = await db.query.draftBank.findFirst({
     where: isNull(schema.draftBank.usedOn),
     orderBy: [asc(schema.draftBank.createdAt)],

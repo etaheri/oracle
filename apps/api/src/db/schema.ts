@@ -48,6 +48,10 @@ export const questions = pgTable("questions", {
   sourceUrl: text("source_url"),
   opensAt: timestamp("opens_at", { withTimezone: true }).notNull(),
   locksAt: timestamp("locks_at", { withTimezone: true }).notNull(),
+  // Written at draft time but currently read nowhere and predates the 24h
+  // grace period — this is NOT the void deadline. The actual void deadline
+  // is computed live as noon ET two days after the round date (see
+  // pipeline/state.ts decideActions); do not trust this column for that.
   resolveBy: timestamp("resolve_by", { withTimezone: true }).notNull(),
   status: questionStatus("status").notNull().default("scheduled"),
   outcome: outcome("outcome"),
