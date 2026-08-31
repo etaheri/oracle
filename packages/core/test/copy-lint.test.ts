@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, PARTIAL_LINE, SUMMONS_LINES, fillSlots, type CopyLine } from "../src/copy";
+import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, fillSlots, type CopyLine } from "../src/copy";
 
 const BANNED = ["CHECK", "TAP", "CLICK", "VISIT", "RESULTS", "DON'T MISS"];
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
@@ -57,6 +57,7 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
     expect(count("closing")).toBeGreaterThanOrEqual(20);
     expect(count("streak")).toBeGreaterThanOrEqual(10);
     expect(count("system")).toBeGreaterThanOrEqual(5);
+    expect(count("paywall")).toBeGreaterThanOrEqual(5);
   });
   it("carries the streak-at-risk and partial-closing lines", () => {
     expect(COPY_BANK.find((l) => l.id === "streak.risk-1")?.requires).toContain("streak");
@@ -123,5 +124,44 @@ describe("the calling", () => {
     const { CALLING_LINES } = await import("../src/copy");
     const all = CALLING_LINES.join(" ");
     for (const w of ["POINTS", "SHIELD", "NOON", "BIG ONE", "FIRST HOUR"]) expect(all).not.toContain(w);
+  });
+});
+
+describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, campaign copy)", () => {
+  it("every paywall-pool line in the bank holds the standard register", () => {
+    const paywall = COPY_BANK.filter((l) => l.pool === "paywall");
+    expect(paywall.length).toBeGreaterThanOrEqual(5);
+    for (const l of paywall) {
+      expect(l.text.replace(/\{[a-z]+\}/g, ""), l.id).toBe(l.text.replace(/\{[a-z]+\}/g, "").toUpperCase());
+      expect(l.text, l.id).not.toMatch(EMOJI);
+      expect(l.text, l.id).not.toContain("!");
+      for (const b of BANNED) expect(l.text, l.id).not.toContain(b);
+      expect(worst(l).length, l.id).toBeLessThanOrEqual(140);
+      if (l.text.includes("{streak}")) expect(l.requires ?? [], l.id).toContain("streak");
+      expect(worst(l), l.id).not.toMatch(/[{}]/);
+    }
+  });
+
+  it("CTA labels are quarantined: caps, no emoji, no exclamation, short enough for a button", () => {
+    const labels = Object.values(PAYWALL_CTA_LINES);
+    expect(labels.length).toBeGreaterThanOrEqual(3);
+    for (const l of labels) {
+      expect(l, l).toBe(l.toUpperCase());
+      expect(l, l).not.toMatch(EMOJI);
+      expect(l, l).not.toContain("!");
+      expect(l.length, l).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it("push-campaign copy holds the standard bank register at push length", () => {
+    const lines = Object.values(PUSH_CAMPAIGN_LINES);
+    expect(lines.length).toBeGreaterThanOrEqual(1);
+    for (const l of lines) {
+      expect(l, l).toBe(l.toUpperCase());
+      expect(l, l).not.toMatch(EMOJI);
+      expect(l, l).not.toContain("!");
+      for (const b of BANNED) expect(l, l).not.toContain(b);
+      expect(l.length, l).toBeLessThanOrEqual(140);
+    }
   });
 });

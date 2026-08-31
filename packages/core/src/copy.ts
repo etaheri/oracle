@@ -6,7 +6,7 @@ export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed
 
 export interface CopyLine {
   id: string;
-  pool: "noon" | "closing" | "streak" | "system";
+  pool: "noon" | "closing" | "streak" | "system" | "paywall";
   text: string;
   requires?: ReadonlyArray<Requirement>;
 }
@@ -91,7 +91,28 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.offline-1", pool: "system", text: "THE ORB IS BEYOND REACH. IT WILL RETURN." },
   { id: "system.creed-1", pool: "system", text: "NOTHING IS REVISED. NOTHING IS FORGOTTEN." },
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
+  // ── paywall: the shield offer. Protection, never pressure. No CTA verbs here —
+  // button labels live in PAYWALL_CTA_LINES by construction. ──
+  { id: "paywall.creed-1", pool: "paywall", text: "THE VIGIL IS FRAGILE. THE SHIELD IS NOT." },
+  { id: "paywall.creed-2", pool: "paywall", text: "A MISSED NOON NEED NOT END THE RECORD." },
+  { id: "paywall.creed-3", pool: "paywall", text: "THE ORACLE FORGIVES ONCE A MONTH. PLUS FORGIVES MORE." },
+  { id: "paywall.rescue-1", pool: "paywall", text: "YOUR VIGIL ENDS AT NOON. ONE SHIELD WOULD HOLD IT.", requires: ["streak"] },
+  { id: "paywall.terms-1", pool: "paywall", text: "PAYING NEVER IMPROVES A PROPHECY. ONLY PROTECTS ITS RECORD." },
 ] as const;
+
+// Purchase-button labels. Deliberately OUTSIDE the bank: the no-CTA-verb law
+// governs ambient copy; a button IS a CTA. Mini-lint: caps, no emoji/!, ≤32.
+export const PAYWALL_CTA_LINES = Object.freeze({
+  subscribe: "KEEP THE VIGIL",
+  rescue: "RAISE THE SHIELD",
+  restore: "RECOVER PURCHASES",
+} as const);
+
+// OneSignal dashboard campaign copy — the repo is the source of truth; the
+// dashboard is a paste target (spec §5). Standard bank rules apply.
+export const PUSH_CAMPAIGN_LINES = Object.freeze({
+  plusWelcome: "THE SHIELD IS RAISED. YOUR VIGIL IS PROTECTED.",
+} as const);
 
 // Char-walk hash (31-multiplier, 32-bit wrapped): deterministic, and the
 // oracle does not change its mind — one seed key, one line, all day.
