@@ -19,6 +19,7 @@ import { payoff } from "@oracle/core";
 import { useReveal } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, ledgerLines, pendingLine, lapsedLine } from "../../game/revealRows";
+import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
 const easeOut = Easing.out(Easing.poly(4));
@@ -54,6 +55,7 @@ export default function RevealScreen() {
     // pending ledger — the flag must survive so the gold CTA and the real
     // ceremony still happen once every row has resolved.
     if (d2.questions.some((q) => q.outcome === null)) return;
+    capture("reveal_viewed", { date: d2.date });
     const spectator = d2.questions.every((q) => q.my === null);
     const timers: ReturnType<typeof setTimeout>[] = [];
     // A spectator reveal has nothing to celebrate — mark it seen right away

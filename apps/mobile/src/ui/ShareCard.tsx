@@ -5,6 +5,7 @@ import * as Sharing from "expo-sharing";
 import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { shareMessage, type QuestionResult } from "../game/sharePattern";
+import { capture } from "../analytics/analytics";
 import { LITURGY_LINES } from "@oracle/core";
 
 // Offscreen Skia surface (design spec §7) shaped as a literal oracle card
@@ -37,6 +38,9 @@ export async function shareSnapshot(ref: RefObject<any>, filename: string, dialo
   if (file.exists) file.delete();
   file.write(bytes);
   await Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle });
+  // Shared home for both share surfaces (round spread + plaque) — one
+  // capture covers both call sites.
+  capture("card_shared", { filename });
 }
 
 export async function shareCard(ref: RefObject<any>, data: ShareCardData): Promise<void> {

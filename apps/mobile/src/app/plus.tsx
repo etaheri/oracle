@@ -10,6 +10,7 @@ import { colors, space } from "../theme";
 import { COPY_BANK, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES } from "@oracle/core";
 import { getOffering, purchasePackage, restore } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
+import { capture } from "../analytics/analytics";
 
 const CREED = COPY_BANK.filter((l) => l.pool === "paywall" && l.id.startsWith("paywall.creed"));
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
@@ -20,6 +21,7 @@ export default function Plus() {
   const [errorLine, setErrorLine] = useState<string | null>(null);
   const plusActive = usePlusStore((s) => s.plusActive);
   useEffect(() => { getOffering().then(setOffering); }, []);
+  useEffect(() => { capture("paywall_viewed"); }, []);
 
   const buy = async (pkg: PurchasesPackage) => {
     setErrorLine(null);

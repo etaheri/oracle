@@ -2,6 +2,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { z } from "zod";
 import { api, ApiError } from "./client";
 import { getDeviceToken, clearDeviceToken } from "./auth";
+import { capture } from "../analytics/analytics";
 
 // The claim/restore trigger only needs the identity token (which carries the
 // stable `sub`) to prove "this Apple ID exists" — no name/email scope, since
@@ -26,6 +27,7 @@ export async function appleClaim(): Promise<"claimed" | "collision" | "cancelled
       token: await getDeviceToken(),
       body: JSON.stringify({ identity_token: idt }),
     });
+    capture("record_claimed");
     return "claimed";
   } catch (e) {
     return e instanceof ApiError && e.status === 409 ? "collision" : "failed";

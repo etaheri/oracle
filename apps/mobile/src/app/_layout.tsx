@@ -4,19 +4,28 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import * as Sentry from "@sentry/react-native";
 import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
 import { BootRite } from "../ui/BootRite";
 import { CallingRite } from "../ui/CallingRite";
 import { getCallingSeen } from "../api/flags";
 import { chooseRite } from "../game/calling";
 import { initPurchases } from "../monetization/purchases";
+import { initAnalytics } from "../analytics/analytics";
+import { initOneSignal } from "../notifications/onesignal";
+import { KEYS } from "../config/keys";
 import { colors } from "../theme";
 
 SplashScreen.preventAutoHideAsync();
 
+// Missing DSN = dark, no crash (Global Constraint): init is guarded, but
+// wrap() itself is inert with no DSN, so it's always applied to the export
+// below rather than branched.
+if (KEYS.sentryDsn) Sentry.init({ dsn: KEYS.sentryDsn });
+
 const queryClient = new QueryClient();
 
-export default function RootLayout() {
+function RootLayout() {
   // Which rite opens the app: the one-time Calling on the very first open,
   // the plain boot rite ever after. null while the flag reads — a bare cover
   // holds the field so the wrong rite never flashes.
@@ -38,9 +47,14 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   // Fire-and-forget: no key or no device id yet both degrade to plus-off,
-  // never block the boot rite on a store round-trip.
+  // never block the boot rite on a store round-trip. Analytics and push
+  // init the same way — a missing key just leaves that sense dark.
   useEffect(() => {
-    if (fontsLoaded) void initPurchases();
+    if (fontsLoaded) {
+      void initPurchases();
+      initAnalytics();
+      void initOneSignal();
+    }
   }, [fontsLoaded]);
 
   // React Query's refetch-on-focus assumes web visibility events; RN needs
@@ -69,3 +83,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);

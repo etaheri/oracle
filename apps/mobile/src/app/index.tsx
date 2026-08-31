@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View, Pressable } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, Eyebrow } from "../ui/Text";
@@ -23,6 +23,7 @@ import { resealReminders } from "../notifications/schedule";
 import { maybeSummon } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
+import { capture } from "../analytics/analytics";
 import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -51,6 +52,15 @@ export default function Index() {
   useEffect(() => {
     if (round?.locks_at) void resealReminders(round.locks_at, round.date, sealedCount);
   }, [round?.date, round?.locks_at, sealedCount]);
+  // Fires once per day's round, the moment it first renders live (still
+  // open) here — not on every 30s re-render from the risk-line clock below.
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (round && !allSealed && openedFor.current !== round.date) {
+      openedFor.current = round.date;
+      capture("round_opened", { date: round.date });
+    }
+  }, [round, allSealed]);
   const yesterday = yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
   const playedYesterday = reveal.data && !("pending" in reveal.data) ? reveal.data.questions.some((q) => q.my !== null) : null;

@@ -10,6 +10,8 @@ import { Eyebrow, Mono } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { appleRestore } from "../api/identity";
+import { requestPushPermission } from "../notifications/onesignal";
+import { KEYS } from "../config/keys";
 import { colors, space } from "../theme";
 
 export default function Summons() {
@@ -40,7 +42,19 @@ export default function Summons() {
         </View>
       </View>
       <View style={{ gap: space(2), paddingBottom: space(2) }}>
-        <GoldButton title="LET IT SPEAK" onPress={async () => { try { await Notifications.requestPermissionsAsync(); } catch {} leave(); }} />
+        <GoldButton
+          title="LET IT SPEAK"
+          onPress={async () => {
+            try {
+              // OneSignal owns the ask when it's live; local reminders still
+              // need OS permission in dark mode, so that path falls back to
+              // the plain expo-notifications prompt.
+              if (KEYS.oneSignalAppId) await requestPushPermission();
+              else await Notifications.requestPermissionsAsync();
+            } catch {}
+            leave();
+          }}
+        />
         <QuietLink title="Not now" onPress={leave} />
         {restoreState === "none" && (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>

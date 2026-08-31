@@ -2,6 +2,7 @@ import Purchases, { type PurchasesOffering, type PurchasesPackage } from "react-
 import { KEYS } from "../config/keys";
 import { getDeviceId } from "../api/auth";
 import { plusFromCustomerInfo, usePlusStore } from "./plusState";
+import { capture } from "../analytics/analytics";
 
 // RN module — imports react-native-purchases, so this file is typecheck +
 // manual-pass only; the pure entitlement check lives in plusState.ts, which
@@ -42,6 +43,7 @@ export async function purchasePackage(pkg: PurchasesPackage): Promise<boolean> {
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
     usePlusStore.getState().set(plusFromCustomerInfo(customerInfo));
+    capture("purchase_completed", { product: "subscription", package_id: pkg.identifier });
     return true;
   } catch {
     return false; // user-cancelled and store errors land here; UI shows the quiet error line
@@ -54,6 +56,7 @@ export async function purchaseRescue(): Promise<boolean> {
     const products = await Purchases.getProducts(["shield_rescue"]);
     if (!products[0]) return false;
     await Purchases.purchaseStoreProduct(products[0]);
+    capture("purchase_completed", { product: "shield_rescue" });
     return true;
   } catch {
     return false;

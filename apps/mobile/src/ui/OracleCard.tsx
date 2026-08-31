@@ -10,6 +10,7 @@ import { getSwipeHinted, markSwipeHinted } from "../api/flags";
 import { ApiError } from "../api/client";
 import { useSubmit } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { capture } from "../analytics/analytics";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
 import { CardChrome, numeral } from "./CardChrome";
@@ -228,6 +229,7 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
   // thing that swaps `current`, so it must not flip mid-flight.
   function finishSeal() {
     markSealed(q.id);
+    capture("question_answered", { question_id: q.id, is_big_one: q.is_big_one });
     onSealed();
   }
 
