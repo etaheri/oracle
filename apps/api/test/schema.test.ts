@@ -13,4 +13,15 @@ describe("schema + harness", () => {
     await db.insert(schema.predictions).values(pred);
     await expect(db.insert(schema.predictions).values(pred)).rejects.toThrow(); // unique index
   });
+
+  it("0003: crowd_count, oracle_p_yes, device ip throttle columns, draft bank, indexes", async () => {
+    const { pg } = await makeTestDb();
+    const cols = async (table: string) =>
+      (await pg.query<{ column_name: string }>(`select column_name from information_schema.columns where table_name = $1`, [table])).rows.map((r) => r.column_name);
+    expect(await cols("questions")).toEqual(expect.arrayContaining(["crowd_count", "oracle_p_yes"]));
+    expect(await cols("devices")).toEqual(expect.arrayContaining(["ip_hash", "created_at"]));
+    expect(await cols("draft_bank")).toEqual(expect.arrayContaining(["id", "draft", "created_at", "used_on"]));
+    const idx = (await pg.query<{ indexname: string }>(`select indexname from pg_indexes where schemaname = 'public'`)).rows.map((r) => r.indexname);
+    expect(idx).toEqual(expect.arrayContaining(["predictions_user_idx", "questions_round_date_idx", "users_oracle_score_idx", "devices_ip_hash_idx"]));
+  });
 });

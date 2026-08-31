@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, timestamp, date, numeric, jsonb, uniqueIndex, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, boolean, timestamp, date, numeric, jsonb, uniqueIndex, index, pgEnum } from "drizzle-orm/pg-core";
 
 export const questionStatus = pgEnum("question_status", ["draft", "approved", "scheduled", "open", "locked", "resolved", "void"]);
 export const outcome = pgEnum("outcome", ["yes", "no", "void"]);
@@ -18,14 +18,17 @@ export const users = pgTable("users", {
   // settled through. Lets a crashed settleRound retry skip finished users
   // (neon-http has no transactions to lean on).
   streakSettledThrough: date("streak_settled_through"),
-});
+}, (t) => [index("users_oracle_score_idx").on(t.oracleScore)]);
 
 export const devices = pgTable("devices", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),
   installTokenHash: text("install_token_hash").notNull(),
   platform: text("platform").notNull(),
-});
+  // Salted hash of the minting IP — the device-mint throttle's only memory.
+  ipHash: text("ip_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("devices_ip_hash_idx").on(t.ipHash, t.createdAt)]);
 
 export const rounds = pgTable("rounds", {
   date: date("date").primaryKey(),
@@ -51,8 +54,13 @@ export const questions = pgTable("questions", {
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   resolutionEvidence: jsonb("resolution_evidence"),
   crowdYesPct: numeric("crowd_yes_pct"),
+  // Distinct predictors on this question at resolution — the contrarian
+  // floor (CONTRARIAN_MIN_CROWD) is judged against this, never re-derived.
+  crowdCount: integer("crowd_count"),
   marketProb: numeric("market_prob"),
-});
+  // The Oracle's own forecast (skill-weighted aggregate), stamped at lock.
+  oracleProbYes: numeric("oracle_p_yes"),
+}, (t) => [index("questions_round_date_idx").on(t.roundDate)]);
 
 export const predictions = pgTable("predictions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -64,7 +72,7 @@ export const predictions = pgTable("predictions", {
   firstHour: boolean("first_hour").notNull().default(false),
   brier: numeric("brier"),
   points: integer("points"),
-}, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId)]);
+}, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId), index("predictions_user_idx").on(t.userId)]);
 
 // Oracle Plus entitlements (backend spec L55). Written by the RevenueCat
 // webhook (Plan 3b); read by streak settlement for paid shields.
@@ -74,4 +82,14 @@ export const entitlements = pgTable("entitlements", {
   shieldsRemaining: integer("shields_remaining").notNull().default(0),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Evergreen draft bank: date-agnostic five-question drafts the noon publish
+// falls through to when no round is scheduled for today (design spec §6:
+// "the drop must never depend on the agent being alive").
+export const draftBank = pgTable("draft_bank", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  draft: jsonb("draft").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  usedOn: date("used_on"),
 });

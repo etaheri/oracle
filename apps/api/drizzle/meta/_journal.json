@@ -22,6 +22,13 @@
       "when": 1787928232593,
       "tag": "0002_polite_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788185092220,
+      "tag": "0003_gameplay_audit",
+      "breakpoints": true
     }
   ]
 }
