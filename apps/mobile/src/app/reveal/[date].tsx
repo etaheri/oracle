@@ -49,6 +49,11 @@ export default function RevealScreen() {
     if (!loaded) return;
     const d2 = reveal.data;
     if (!d2 || "pending" in d2) return;
+    // Some rows can still be outcome: null right at noon while resolution is
+    // in flight. Neither the ceremony nor the seen-mark fires on a still-
+    // pending ledger — the flag must survive so the gold CTA and the real
+    // ceremony still happen once every row has resolved.
+    if (d2.questions.some((q) => q.outcome === null)) return;
     const spectator = d2.questions.every((q) => q.my === null);
     const timers: ReturnType<typeof setTimeout>[] = [];
     // A spectator reveal has nothing to celebrate — mark it seen right away

@@ -60,7 +60,7 @@ describe("revealRows", () => {
     it("signs points for win/loss", () => {
       expect(rowRight(question({ my: { answer: true, confidence: 60, points: 12, brier: 0.1 } }))).toBe("+12");
       expect(rowRight(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.1 } }))).toBe("0");
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: -6, brier: 0.1 } }))).toBe("-6");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: -6, brier: 0.1 } }))).toBe("−6");
     });
     it("shows an em dash for void and pending", () => {
       expect(rowRight(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null } }))).toBe("—");

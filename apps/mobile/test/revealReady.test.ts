@@ -2,12 +2,18 @@ import { describe, it, expect } from "vitest";
 import { revealReady } from "../src/game/revealReady";
 import type { Reveal } from "@oracle/core";
 
-const q = (my: Reveal["questions"][number]["my"]): Reveal["questions"][number] => ({
-  id: "00000000-0000-0000-0000-000000000001", slot: 1, text: "Q?", outcome: "yes", crowd_yes_pct: 60, market_prob: null, my,
+const q = (
+  my: Reveal["questions"][number]["my"],
+  outcome: Reveal["questions"][number]["outcome"] = "yes"
+): Reveal["questions"][number] => ({
+  id: "00000000-0000-0000-0000-000000000001", slot: 1, text: "Q?", outcome, crowd_yes_pct: 60, market_prob: null, my,
   source_name: "S", source_url: null, evidence_quote: null, void_reason: null, oracle_p_yes: null,
 });
-const reveal = (my: Reveal["questions"][number]["my"]): Reveal => ({
-  date: "2026-08-27", day_points: 10, first_hour: false, questions: [q(my)],
+const reveal = (
+  my: Reveal["questions"][number]["my"],
+  outcome: Reveal["questions"][number]["outcome"] = "yes"
+): Reveal => ({
+  date: "2026-08-27", day_points: 10, first_hour: false, questions: [q(my, outcome)],
   ledger: { settled: true, streak: 1, calls_rated: 5, oracle_score: null },
 });
 
@@ -18,5 +24,8 @@ describe("revealReady", () => {
     expect(revealReady({ pending: true })).toBe(false);
     expect(revealReady(null)).toBe(false);
     expect(revealReady(undefined)).toBe(false);
+  });
+  it("stays false while an answered row is still unresolved (outcome: null)", () => {
+    expect(revealReady(reveal({ answer: true, confidence: 75, points: null, brier: null }, null))).toBe(false);
   });
 });

@@ -127,7 +127,11 @@ export default function Index() {
         {round && allSealed && (
           <>
             <DecodeLine active={booted} text="THE PROPHECY IS SEALED" size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2} />
-            <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
+            {showLedgerCta ? (
+              <QuietLink title="Behold the crowd" onPress={() => router.push("/round")} />
+            ) : (
+              <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
+            )}
             <Countdown until={round.locks_at} prefix="THE LEDGER IS READ IN" fallback={READING_LINE} />
           </>
         )}

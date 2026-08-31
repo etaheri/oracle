@@ -73,7 +73,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
         })}
       </View>
       <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
-        {playerCount} ORACLES HAVE SPOKEN
+        {playerCount === 1 ? "1 ORACLE HAS SPOKEN" : `${playerCount} ORACLES HAVE SPOKEN`}
       </Mono>
       <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>
         The ledger is read tomorrow at noon.

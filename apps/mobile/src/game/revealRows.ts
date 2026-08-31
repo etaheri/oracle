@@ -29,11 +29,14 @@ export function rowMark(state: RowState): string {
   }
 }
 
+// A true minus sign for a loss — matches payoffLine's receipt formatting,
+// never the ASCII hyphen.
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
+
 export function rowRight(q: Question): string {
   const state = rowState(q);
   if (state === "win" || state === "loss") {
-    const points = q.my!.points ?? 0;
-    return points > 0 ? `+${points}` : String(points);
+    return signed(q.my!.points ?? 0);
   }
   if (state === "spectator") {
     return q.outcome === "yes" ? "YES" : q.outcome === "no" ? "NO" : "VOID";

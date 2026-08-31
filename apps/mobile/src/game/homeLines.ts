@@ -18,19 +18,21 @@ export function partialLine(sealedCount: number, total: number): string | null {
 // "N ORACLES ALREADY WAITING" counts people who already sealed (audit #9) —
 // this counts who has spoken, and never claims a crowd that doesn't exist.
 export function spokenLine(playerCount: number): string {
-  return playerCount > 0 ? `${playerCount} ORACLES HAVE ALREADY SPOKEN` : "THE ORACLE SPEAKS";
+  if (playerCount <= 0) return "THE ORACLE SPEAKS";
+  return playerCount === 1 ? "1 ORACLE HAS ALREADY SPOKEN" : `${playerCount} ORACLES HAVE ALREADY SPOKEN`;
 }
 
 // The streak is invisible on the day it matters (audit §5.2): warn inside
 // the last three hours before lock, only while unsealed and only when there
-// is a vigil to lose.
+// is a vigil to lose. Matches vigilLine: the oracle starts counting at 2, so
+// a streak of 1 never speaks ("YOUR VIGIL OF 1 DAYS" would read as a bug).
 export function riskLine(
   streak: number,
   anySealed: boolean,
   msUntilLock: number | null,
   seedKey: string
 ): string | null {
-  if (streak < 1 || anySealed || msUntilLock === null || msUntilLock > RISK_MS) return null;
+  if (streak < 2 || anySealed || msUntilLock === null || msUntilLock > RISK_MS) return null;
   const line = selectLine(RISK, seedKey, ["streak"]);
   return line ? fillSlots(line.text, { streak }) : null;
 }
