@@ -67,4 +67,9 @@ describe("POST /v1/webhooks/revenuecat", () => {
     const { post } = await setup();
     expect((await post({ id: "e12", type: "INITIAL_PURCHASE", app_user_id: crypto.randomUUID(), product_id: "plus_monthly" })).status).toBe(200);
   });
+  it("200s (never 5xx) on a non-UUID app_user_id", async () => {
+    const { db, post, userId } = await setup();
+    expect((await post({ id: "e13", type: "INITIAL_PURCHASE", app_user_id: "$RCAnonymousID:0123456789abcdef0123456789abcdef", product_id: "plus_monthly" })).status).toBe(200);
+    expect(await ent(db, userId)).toBeUndefined(); // no entitlement written
+  });
 });

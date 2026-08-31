@@ -16,6 +16,7 @@ const EventSchema = z.object({
 });
 const PLUS_PRODUCTS = ["plus_monthly", "plus_annual"];
 const ACTIVATING = ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE"];
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const webhookRoutes = new Hono<AppContext>().post("/revenuecat", async (c) => {
   const { db, env } = c.get("deps");
@@ -31,6 +32,7 @@ export const webhookRoutes = new Hono<AppContext>().post("/revenuecat", async (c
   const marker = await db.insert(schema.webhookEvents).values({ id: evt.id }).onConflictDoNothing().returning();
   if (marker.length === 0) return c.json({ ok: true, ignored: "duplicate" });
 
+  if (!UUID_REGEX.test(evt.app_user_id)) return c.json({ ok: true, ignored: "non-uuid app_user_id" });
   const device = await db.query.devices.findFirst({ where: eq(schema.devices.id, evt.app_user_id) });
   if (!device) return c.json({ ok: true, ignored: "unknown app_user_id" });
   const userId = device.userId;
