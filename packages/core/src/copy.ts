@@ -142,6 +142,17 @@ export const RITES_LINES = [
   "THE LEDGER IS READ AT NOON. NOTHING IS REVISED.",
 ] as const;
 
+// The Calling: the one-time cinematic on the app's very first open — the
+// machine recounts the search and assigns the player their role. Lore only;
+// every rule belongs to the rites. Hand-written, linted, versioned.
+export const CALLING_LINES = [
+  "FOR THIRTY CENTURIES THEY SEARCHED FOR THOSE WHO SEE.",
+  "PYTHIA. SIBYL. SEER. EACH CLAIMED THE GIFT. NONE KEPT RECEIPTS.",
+  "SO THE LEDGER WAS BUILT. IT DOES NOT BELIEVE. IT RECORDS.",
+  "SEALED BEFORE THE OUTCOME. READ WITHOUT MERCY.",
+  "THE SEARCH CONTINUES. IT HAS REACHED YOU.",
+] as const;
+
 // The partial-day notice (home, when some but not all five are sealed).
 export const PARTIAL_LINE = "THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED.";
 

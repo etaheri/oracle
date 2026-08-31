@@ -50,3 +50,14 @@ export async function getNotifAsked(): Promise<boolean> {
 export async function markNotifAsked(): Promise<void> {
   try { await (await store()).setItemAsync(NOTIF_ASKED_KEY, "1"); } catch {}
 }
+
+const CALLING_SEEN_KEY = "oracle.calling_seen";
+
+// The Calling: the one-time cinematic on the very first open. Storage
+// failure → seen — the lore must never replay at a veteran.
+export async function getCallingSeen(): Promise<boolean> {
+  try { return (await (await store()).getItemAsync(CALLING_SEEN_KEY)) === "1"; } catch { return true; }
+}
+export async function markCallingSeen(): Promise<void> {
+  try { await (await store()).setItemAsync(CALLING_SEEN_KEY, "1"); } catch {}
+}

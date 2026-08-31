@@ -98,3 +98,30 @@ describe("the rites", () => {
     }
   });
 });
+
+describe("the calling", () => {
+  it("is five beats in the register: caps, no emoji, no exclamation, no CTA verbs, push-length", async () => {
+    const { CALLING_LINES } = await import("../src/copy");
+    expect(CALLING_LINES.length).toBe(5);
+    for (const l of CALLING_LINES) {
+      expect(l, l).toBe(l.toUpperCase());
+      expect(l, l).not.toMatch(EMOJI);
+      expect(l, l).not.toContain("!");
+      for (const b of BANNED) expect(l, l).not.toContain(b);
+      expect(l.length, l).toBeLessThanOrEqual(140);
+    }
+  });
+  it("tells the search, the receipts, the ledger, and ends on the player", async () => {
+    const { CALLING_LINES } = await import("../src/copy");
+    const all = CALLING_LINES.join(" ");
+    expect(all).toContain("SEARCH");
+    expect(all).toContain("RECEIPTS");
+    expect(all).toContain("LEDGER");
+    expect(CALLING_LINES[CALLING_LINES.length - 1]).toBe("THE SEARCH CONTINUES. IT HAS REACHED YOU.");
+  });
+  it("never states a rule the rites own — no scoring, no noon, no shield", async () => {
+    const { CALLING_LINES } = await import("../src/copy");
+    const all = CALLING_LINES.join(" ");
+    for (const w of ["POINTS", "SHIELD", "NOON", "BIG ONE", "FIRST HOUR"]) expect(all).not.toContain(w);
+  });
+});
