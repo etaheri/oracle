@@ -20,34 +20,41 @@ export async function verifyAppleIdentityToken(
   token: string,
   opts: { audience: string; fetchFn?: typeof fetch; nowMs?: number },
 ): Promise<{ sub: string } | null> {
-  const fetchFn = opts.fetchFn ?? fetch;
-  const nowMs = opts.nowMs ?? Date.now();
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [h, p, s] = parts as [string, string, string];
-  const header = decodeJson(h);
-  const claims = decodeJson(p);
-  if (!header || !claims || header.alg !== "RS256" || typeof header.kid !== "string") return null;
-  if (claims.iss !== APPLE_ISS || claims.aud !== opts.audience) return null;
-  if (typeof claims.exp !== "number" || claims.exp * 1000 < nowMs) return null;
-  if (typeof claims.sub !== "string" || !claims.sub) return null;
-
-  if (!jwksCache || nowMs - jwksCache.fetchedAt > JWKS_TTL_MS) {
-    const res = await fetchFn(APPLE_JWKS_URL);
-    if (!res.ok) return null;
-    jwksCache = { keys: ((await res.json()) as { keys: Jwk[] }).keys, fetchedAt: nowMs };
-  }
-  const jwk = jwksCache.keys.find((k) => k.kid === header.kid);
-  if (!jwk) { jwksCache = null; return null; } // unknown kid: bust cache so a rotated key retries next call
-
-  let key: CryptoKey;
   try {
-    key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
-  } catch { return null; }
-  const sig = b64urlToBytes(s);
-  const data = new TextEncoder().encode(`${h}.${p}`);
-  const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, sig as BufferSource, data);
-  return ok ? { sub: claims.sub } : null;
+    const fetchFn = opts.fetchFn ?? fetch;
+    const nowMs = opts.nowMs ?? Date.now();
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [h, p, s] = parts as [string, string, string];
+    const header = decodeJson(h);
+    const claims = decodeJson(p);
+    if (!header || !claims || header.alg !== "RS256" || typeof header.kid !== "string") return null;
+    if (claims.iss !== APPLE_ISS || claims.aud !== opts.audience) return null;
+    if (typeof claims.exp !== "number" || claims.exp * 1000 < nowMs) return null;
+    if (typeof claims.sub !== "string" || !claims.sub) return null;
+
+    if (!jwksCache || nowMs - jwksCache.fetchedAt > JWKS_TTL_MS) {
+      const res = await fetchFn(APPLE_JWKS_URL);
+      if (!res.ok) return null;
+      const body = (await res.json()) as { keys?: unknown };
+      const keys = body.keys;
+      if (!Array.isArray(keys)) return null;
+      jwksCache = { keys: keys as Jwk[], fetchedAt: nowMs };
+    }
+    const jwk = jwksCache.keys.find((k) => k.kid === header.kid);
+    if (!jwk) { jwksCache = null; return null; } // unknown kid: bust cache so a rotated key retries next call
+
+    let key: CryptoKey;
+    try {
+      key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, n: jwk.n, e: jwk.e }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    } catch { return null; }
+    const sig = b64urlToBytes(s);
+    const data = new TextEncoder().encode(`${h}.${p}`);
+    const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, sig as BufferSource, data);
+    return ok ? { sub: claims.sub } : null;
+  } catch {
+    return null; // fail-closed: null on any unguarded error
+  }
 }
 
 /** Test hook: reset the module JWKS cache. */
