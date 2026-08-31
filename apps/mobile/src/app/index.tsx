@@ -20,6 +20,7 @@ import { partialLine, spokenLine, riskLine, lapseNotice } from "../game/homeLine
 import { msUntil } from "../game/countdown";
 import { getRevealSeen, getRitesSeen } from "../api/flags";
 import { resealReminders } from "../notifications/schedule";
+import { maybeSummon } from "../notifications/summons";
 import { vigilLine, COPY_BANK } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -41,24 +42,27 @@ export default function Index() {
   const sealedCount = round ? round.questions.filter((q) => answers[q.id]?.sealed).length : 0;
   const partial = round ? partialLine(sealedCount, round.questions.length) : null;
   useEffect(() => {
-    // TODO(task 5): resealReminders takes (locksAt, date, sealedCount) — signature changes.
-    if (round?.locks_at) void resealReminders(round.locks_at, round.date, allSealed);
-  }, [round?.date, round?.locks_at, allSealed]);
+    if (round?.locks_at) void resealReminders(round.locks_at, round.date, sealedCount);
+  }, [round?.date, round?.locks_at, sealedCount]);
   const yesterday = yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
   const playedYesterday = reveal.data && !("pending" in reveal.data) ? reveal.data.questions.some((q) => q.my !== null) : null;
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
   const [ritesSeen, setRitesSeen] = useState(true); // optimistic: never flash the gate at a veteran
+  const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   // Home never remounts under the Stack (back-nav from /reveal or /rites just
   // refocuses it), so re-read both flags on every focus, not just on mount.
   useFocusEffect(
     useCallback(() => {
       void getRevealSeen().then(setRevealSeen);
       void getRitesSeen().then(setRitesSeen);
-    }, [])
+      // Covers the partial player: round.tsx only fires the summons on the
+      // full seal, so someone who never returns to a finished spread is
+      // still asked here, once, on any focus after their first seal.
+      if (anySealed) void maybeSummon((href) => router.push(href));
+    }, [anySealed, router])
   );
   const showLedgerCta = revealReady(reveal.data) && revealSeen !== yesterday;
-  const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   const crowd = useCrowdSoFar(anySealed);
   const lean = crowdLean(crowd.data?.questions ?? []);
   useHydratePlayedState(!!round);

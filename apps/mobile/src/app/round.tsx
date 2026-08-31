@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { Screen } from "../ui/Screen";
 import { Mono, Ritual } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
@@ -20,7 +21,7 @@ import { useToday, useCrowdSoFar } from "../api/hooks";
 import { getFloorNoticed, markFloorNoticed } from "../api/flags";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
-import { askNotifPermissionOnce } from "../notifications/schedule";
+import { maybeSummon } from "../notifications/summons";
 import { colors, space } from "../theme";
 
 // The throw UNCOVERS the stack — the next card was already on the table as
@@ -34,6 +35,7 @@ const Uncover = new Keyframe({
 
 export default function Round() {
   const today = useToday();
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const answers = useRoundStore((s) => s.answers);
   // The last thrown card's id: its crowd verdict prints in the stationary
@@ -74,10 +76,13 @@ export default function Round() {
 
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
-  // The one permission ask, the moment after the first seal ever lands.
+  const allSealed = qs.length > 0 && qs.every((q) => answers[q.id]?.sealed);
+  // The summons, the moment the spread is fully sealed for the first time
+  // this mount — once, ever, across the whole app (voice spec §4).
+  const summoned = useRef(false);
   useEffect(() => {
-    if (anySealed) void askNotifPermissionOnce();
-  }, [anySealed]);
+    if (allSealed && !summoned.current) { summoned.current = true; void maybeSummon((href) => router.push(href)); }
+  }, [allSealed]);
   const crowd = useCrowdSoFar(anySealed);
   useHydratePlayedState(!!today.data);
   // The payout reaches screen-reader players too: speak each card's verdict
@@ -149,6 +154,7 @@ export default function Round() {
               color={struck ? colors.mutedInk : sealed ? colors.goldText : "rgba(23,25,31,0.22)"}
               letterSpacing={1}
               style={struck ? { textDecorationLine: "line-through" } : undefined}
+              accessibilityLabel={`question ${q.slot}: ${struck ? "closed" : answers[q.id]?.sealed ? "sealed" : "open"}`}
             >
               {numeral(q.slot)}
             </Ritual>

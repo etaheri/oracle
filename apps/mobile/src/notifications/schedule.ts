@@ -1,7 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { planReminders } from "../game/reminders";
-import { getNotifAsked, markNotifAsked } from "../api/flags";
 
 // Local closing reminders — no push service. Reseal = cancel everything and
 // schedule the next 7 days fresh; runs on every home mount, so drift and
@@ -21,14 +20,14 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
-export async function resealReminders(locksAt: string, roundDate: string, todaySealed: boolean): Promise<void> {
+export async function resealReminders(locksAt: string, roundDate: string, sealedCount: number): Promise<void> {
   try {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) return;
     await ensureAndroidChannel();
     await Notifications.cancelAllScheduledNotificationsAsync();
     const now = Date.now();
-    for (const r of planReminders(locksAt, roundDate, todaySealed)) {
+    for (const r of planReminders(locksAt, roundDate, sealedCount)) {
       if (r.at.getTime() <= now) continue; // inside the 3h window already — no late nag
       await Notifications.scheduleNotificationAsync({
         content: { title: "ORACLE", body: r.body },
@@ -39,15 +38,5 @@ export async function resealReminders(locksAt: string, roundDate: string, todayS
         },
       });
     }
-  } catch {}
-}
-
-// Voice spec §4: the permission ask comes immediately after the FIRST seal —
-// never at first launch. One ask, ever; the OS remembers the answer.
-export async function askNotifPermissionOnce(): Promise<void> {
-  try {
-    if (await getNotifAsked()) return;
-    await markNotifAsked();
-    await Notifications.requestPermissionsAsync();
   } catch {}
 }
