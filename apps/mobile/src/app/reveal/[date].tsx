@@ -15,6 +15,7 @@ import { DecodeLine } from "../../ui/DecodeText";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
+import { payoff } from "@oracle/core";
 import { useReveal } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { colors, space } from "../../theme";
@@ -51,8 +52,7 @@ export default function RevealScreen() {
     if (!loaded) return;
     const d2 = reveal.data;
     const big2 = d2 && !("pending" in d2) ? d2.questions.find((q) => q.slot === 5) : undefined;
-    const side = big2?.my && big2.crowd_yes_pct !== null ? (big2.my.answer ? big2.crowd_yes_pct : 100 - big2.crowd_yes_pct) : null;
-    const tide = side !== null && side < 40 && (big2?.my?.points ?? 0) > 0;
+    const tide = !!big2?.my && (big2.my.points ?? 0) > payoff(big2.my.confidence, true).win;
     const timers: ReturnType<typeof setTimeout>[] = [];
     timers.push(setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
     if (tide && !reducedMotion) {
@@ -87,8 +87,7 @@ export default function RevealScreen() {
 
   const d = reveal.data;
   const big = d.questions.find((q) => q.slot === 5);
-  const bigSide = big?.my && big.crowd_yes_pct !== null ? (big.my.answer ? big.crowd_yes_pct : 100 - big.crowd_yes_pct) : null;
-  const contrarianWin = bigSide !== null && bigSide < 40 && (big?.my?.points ?? 0) > 0;
+  const contrarianWin = !!big?.my && (big.my.points ?? 0) > payoff(big.my.confidence, true).win;
   const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult =>
     !q.my ? "none" : q.outcome === "void" ? "void" : (q.my.points ?? 0) > 0 ? "win" : "loss");
   const cardData: ShareCardData = {
@@ -167,7 +166,7 @@ export default function RevealScreen() {
                   {contrarianWin && (
                     <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
                       <Ritual bold size={14} letterSpacing={3}>AGAINST THE TIDE</Ritual>
-                      <Ritual bold size={22} color={colors.agedGold} letterSpacing={1}>×2</Ritual>
+                      <Ritual bold size={22} color={colors.agedGold} letterSpacing={1}>+40</Ritual>
                     </Animated.View>
                   )}
                 </View>

@@ -78,7 +78,7 @@ export default function Round() {
     const c = (crowd.data?.questions ?? []).find((q) => q.id === lastSealedId);
     if (!entry || !c) return;
     announcedFor.current = lastSealedId;
-    AccessibilityInfo.announceForAccessibility(`The crowd: ${crowdVerdict(entry.answer, c.crowd_yes_pct).line}`);
+    AccessibilityInfo.announceForAccessibility(`The crowd: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count).line}`);
   }, [lastSealedId, answers, crowd.data]);
 
   if (today.isLoading) return (
@@ -96,7 +96,7 @@ export default function Round() {
   const current = qs.find((q) => !answers[q.id]?.sealed);
   const lastEntry = lastSealedId ? answers[lastSealedId] : undefined;
   const lastCrowd = lastSealedId ? crowdById.get(lastSealedId) : undefined;
-  const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct) : null;
+  const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct, lastCrowd.player_count) : null;
 
   return (
     <Screen>

@@ -6,7 +6,7 @@ import { Serif, Mono, Eyebrow } from "./Text";
 import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { asciiGauge } from "../game/terminalPrint";
-import type { RoundToday } from "@oracle/core";
+import { contrarianApplies, type RoundToday } from "@oracle/core";
 
 // The crowd bar in the machine's own alphabet: [#######·····], the fill
 // printing cell by cell. Stepped at 50ms — a gauge prints, it doesn't slide.
@@ -54,14 +54,15 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           const c = byId.get(q.id)!;
           const mine = answers[q.id]!;
           const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
+          const against = contrarianApplies(mySidePct, c.player_count);
           return (
             <View key={q.id} style={{ gap: space(1.5) }}>
               <Serif size={15} color={colors.mutedInk} numberOfLines={2}>{q.text}</Serif>
               <CrowdBar pct={c.crowd_yes_pct} />
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>
-                <Mono size={10} color={mySidePct < 40 ? colors.goldText : colors.mutedInk}>
-                  {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{mySidePct < 40 ? " · AGAINST THE TIDE" : ""}
+                <Mono size={10} color={against ? colors.goldText : colors.mutedInk}>
+                  {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
                 </Mono>
               </View>
             </View>
