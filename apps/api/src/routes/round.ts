@@ -4,6 +4,7 @@ import { dayPoints } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
+import { evidenceSummary } from "../resolution";
 
 async function openRound(db: Db) {
   const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
@@ -40,6 +41,7 @@ export const roundRoutes = new Hono<AppContext>()
         category: q.category,
         source_name: q.sourceName,
         resolution_criteria: q.resolutionCriteria,
+        locks_at: q.locksAt.toISOString(),
       })),
     });
   })
@@ -87,12 +89,16 @@ export const roundRoutes = new Hono<AppContext>()
     if (qs.length === 0) return c.json({ error: "unknown round" }, 404);
     if (!qs.every((q) => q.status === "locked" || q.status === "resolved" || q.status === "void")) return c.json({ error: "not locked" }, 409);
 
+    const [round, user] = await Promise.all([
+      db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) }),
+      db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
+    ]);
     const mine = await db.query.predictions.findMany({
       where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),
     });
     const byQ = new Map(mine.map((p) => [p.questionId, p]));
     const perQuestionPoints = mine.map((p) => p.points ?? 0);
-    const allFirstHour = mine.length > 0 && mine.every((p) => p.firstHour);
+    const allFirstHour = mine.length === qs.length && mine.every((p) => p.firstHour);
 
     return c.json({
       date,
@@ -100,6 +106,7 @@ export const roundRoutes = new Hono<AppContext>()
       first_hour: allFirstHour,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);
+        const ev = evidenceSummary(q.resolutionEvidence);
         return {
           id: q.id,
           slot: q.slot,
@@ -108,7 +115,18 @@ export const roundRoutes = new Hono<AppContext>()
           crowd_yes_pct: q.crowdYesPct === null ? null : Number(q.crowdYesPct),
           market_prob: q.marketProb === null ? null : Number(q.marketProb),
           my: p ? { answer: p.answer, confidence: p.confidence, points: p.points, brier: p.brier === null ? null : Number(p.brier) } : null,
+          source_name: q.sourceName,
+          source_url: q.sourceUrl,
+          evidence_quote: ev.quote,
+          void_reason: q.outcome === "void" ? (ev.reason ?? "UNVERIFIABLE") : null,
+          oracle_p_yes: q.oracleProbYes === null ? null : Number(q.oracleProbYes),
         };
       }),
+      ledger: {
+        settled: round?.status === "resolved",
+        streak: user?.streakCurrent ?? 0,
+        calls_rated: user?.callsResolved ?? 0,
+        oracle_score: user?.oracleScore ?? null,
+      },
     });
   });

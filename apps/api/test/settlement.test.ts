@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { resolveQuestion } from "../src/resolution";
-import { settleRound, completeRoundBriers } from "../src/settlement";
+import { settleRound, completeRoundBriers, resettleRound } from "../src/settlement";
 import * as schema from "../src/db/schema";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
@@ -161,6 +161,36 @@ describe("settleRound", () => {
     const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, uid) });
     expect(ent!.shieldsRemaining).toBe(0); // burned once, not twice
     expect((await db.query.users.findMany())[0]!.streakCurrent).toBe(3);
+  });
+
+  it("a round with four questions still rates when all four are answered", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const qs = await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1, 2, 3, 4] }]);
+    await db.delete(schema.predictions).where(eq(schema.predictions.questionId, qs[4]!.id));
+    await db.delete(schema.questions).where(eq(schema.questions.id, qs[4]!.id));
+    await settleRound(db, "2026-08-20");
+    expect((await db.query.users.findMany())[0]!.callsResolved).toBe(4);
+  });
+
+  it("recomputeTruth rebuilds calls_resolved and oracle_score after a forced re-resolve", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const qs = await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1, 2, 3, 4, 5] }]);
+    await settleRound(db, "2026-08-20");
+    const before = (await db.query.users.findMany())[0]!;
+    expect(before.callsResolved).toBe(5);
+    // flip slot 1 to void → 4 rated calls
+    await resolveQuestion(db, qs[0]!.id, "void", null, { force: true });
+    const out = await resettleRound(db, "2026-08-20");
+    expect(out.users).toBe(1);
+    const after = (await db.query.users.findMany())[0]!;
+    expect(after.callsResolved).toBe(4);
+    expect(after.streakCurrent).toBe(before.streakCurrent);
   });
 });
 

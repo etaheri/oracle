@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNotNull } from "drizzle-orm";
+import { count, eq, gt, inArray } from "drizzle-orm";
 import { oracleScore, settleStreak } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
@@ -28,7 +28,6 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
   const playedUsers = byUser.size ? await db.query.users.findMany({ where: inArray(schema.users.id, [...byUser.keys()]) }) : [];
   const audience = new Map([...streakHolders, ...playedUsers].map((u) => [u.id, u]));
 
-  const nonVoid = qs.filter((q) => q.outcome !== "void").length;
   let settled = 0;
   for (const u of audience.values()) {
     if (u.streakSettledThrough !== null && u.streakSettledThrough >= date) continue; // ISO dates compare lexicographically
@@ -45,10 +44,11 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
       freeShieldUsedAt: result.freeShieldUsedAt,
       streakSettledThrough: date,
     };
-    // Complete-rounds rule: all 5 answered → the round rates.
+    // Complete-rounds rule: every question of the round answered → the round rates.
     if (byUser.get(u.id) === qs.length) {
-      patch.callsResolved = u.callsResolved + nonVoid;
-      patch.oracleScore = oracleScore(await completeRoundBriers(db, u.id, date));
+      const briers = await completeRoundBriers(db, u.id, date);
+      patch.callsResolved = briers.length;
+      patch.oracleScore = oracleScore(briers);
     }
     await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
     if (result.usedPaidShield && ent) {
@@ -63,30 +63,56 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
   return { already: false, settled };
 }
 
-// Brier scores over the user's complete rounds only (all 5 slots answered),
-// in round/slot order — feeds oracleScore(). A round only counts once it is
-// fully resolved ("resolved" status) or is the round being settled right now
-// (its status flips to "resolved" only after this settlement pass finishes,
-// so `settlingDate` covers that gap without letting a still-in-progress round
-// leak partial briers into some OTHER user's score recompute).
-export async function completeRoundBriers(db: Db, userId: string, settlingDate: string): Promise<number[]> {
+// Brier scores over the user's complete rounds only (every question of that
+// round answered — void/yes/no all count), in round/slot order — feeds
+// oracleScore(). A round only counts once it is fully resolved ("resolved"
+// status) or is the round being settled right now (its status flips to
+// "resolved" only after this settlement pass finishes, so `settlingDate`
+// covers that gap without letting a still-in-progress round leak partial
+// briers into some OTHER user's score recompute). `settlingDate: null` means
+// resolved rounds only — used by recomputeTruth's from-scratch rebuild.
+export async function completeRoundBriers(db: Db, userId: string, settlingDate: string | null): Promise<number[]> {
   const resolvedRounds = await db.query.rounds.findMany({ where: eq(schema.rounds.status, "resolved") });
-  const eligibleDates = new Set([...resolvedRounds.map((r) => r.date), settlingDate]);
+  const eligibleDates = new Set(resolvedRounds.map((r) => r.date));
+  if (settlingDate) eligibleDates.add(settlingDate);
 
-  const rows = await db
+  const mine = await db
     .select({ brier: schema.predictions.brier, roundDate: schema.questions.roundDate, locksAt: schema.questions.locksAt, slot: schema.questions.slot })
     .from(schema.predictions)
     .innerJoin(schema.questions, eq(schema.predictions.questionId, schema.questions.id))
-    .where(and(eq(schema.predictions.userId, userId), isNotNull(schema.predictions.brier)));
-  const perRound = new Map<string, number>();
-  const all = await db
-    .select({ roundDate: schema.questions.roundDate })
-    .from(schema.predictions)
-    .innerJoin(schema.questions, eq(schema.predictions.questionId, schema.questions.id))
     .where(eq(schema.predictions.userId, userId));
-  for (const r of all) perRound.set(r.roundDate, (perRound.get(r.roundDate) ?? 0) + 1);
-  return rows
-    .filter((r) => perRound.get(r.roundDate) === 5 && eligibleDates.has(r.roundDate))
+  const answeredPerRound = new Map<string, number>();
+  for (const r of mine) answeredPerRound.set(r.roundDate, (answeredPerRound.get(r.roundDate) ?? 0) + 1);
+
+  // One definition of "complete": answered every question that round asked.
+  const dates = [...answeredPerRound.keys()];
+  const sizes = dates.length
+    ? await db.select({ roundDate: schema.questions.roundDate, n: count() }).from(schema.questions).where(inArray(schema.questions.roundDate, dates)).groupBy(schema.questions.roundDate)
+    : [];
+  const questionsPerRound = new Map(sizes.map((s) => [s.roundDate, Number(s.n)]));
+
+  return mine
+    .filter((r) => r.brier !== null && eligibleDates.has(r.roundDate) && answeredPerRound.get(r.roundDate) === questionsPerRound.get(r.roundDate))
     .sort((x, y) => x.locksAt.getTime() - y.locksAt.getTime() || x.slot - y.slot)
     .map((r) => Number(r.brier));
+}
+
+// Rebuild one user's truth economy from the ledger itself (resolved rounds
+// only). Used after a forced re-resolve; never touches streaks.
+export async function recomputeTruth(db: Db, userId: string): Promise<{ callsRated: number; oracleScore: number | null }> {
+  const briers = await completeRoundBriers(db, userId, null);
+  const out = { callsRated: briers.length, oracleScore: oracleScore(briers) };
+  await db.update(schema.users).set({ callsResolved: out.callsRated, oracleScore: out.oracleScore }).where(eq(schema.users.id, userId));
+  return out;
+}
+
+export async function resettleRound(db: Db, date: string): Promise<{ users: number }> {
+  const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+  if (!round) throw new Error("unknown round");
+  if (round.status !== "resolved") return { users: 0 }; // an unsettled round will settle normally
+  const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
+  const preds = qs.length ? await db.query.predictions.findMany({ where: inArray(schema.predictions.questionId, qs.map((q) => q.id)) }) : [];
+  const userIds = [...new Set(preds.map((p) => p.userId))];
+  for (const id of userIds) await recomputeTruth(db, id);
+  return { users: userIds.length };
 }

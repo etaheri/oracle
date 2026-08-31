@@ -41,6 +41,7 @@ describe("GET /v1/round/today", () => {
     for (const q of body.questions) {
       expect(q).not.toHaveProperty("crowd_yes_pct");
       expect(q).not.toHaveProperty("outcome");
+      expect(q.locks_at).toBe("2026-08-21T16:00:00.000Z");
     }
   });
   it("counts distinct players who have sealed at least one answer", async () => {

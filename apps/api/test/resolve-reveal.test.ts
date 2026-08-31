@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
+import { resolveQuestion } from "../src/resolution";
+import { settleRound } from "../src/settlement";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin-secret" };
 
@@ -55,11 +57,11 @@ describe("resolve + reveal cycle", () => {
     // A: correct @75 → base round(37.5)=38. Crowd is 33% YES (< 40%, so A is
     // contrarian) but crowdCount is only 3 — under the 20-player floor — so
     // the additive contrarian bonus does NOT apply; asserting the plain
-    // Brier points here is what proves that floor. All three predictions
-    // land in the first hour, so day_points adds the +10% first-hour bonus:
-    // 38 + round(0.1 * 38) = 42.
+    // Brier points here is what proves that floor. A only answered q1 of the
+    // round's 5 questions, so the first-hour bonus (which now requires all
+    // five sealed within the hour) does not apply: day_points is the plain sum.
     expect(rq.my!.points).toBe(38);
-    expect(bodyJson.day_points).toBe(42);
+    expect(bodyJson.day_points).toBe(38);
   });
 
   it("rejects reveal while any question is still open, and admin without secret", async () => {
@@ -127,5 +129,44 @@ describe("market_prob in reveal", () => {
     const body = (await res.json()) as { questions: Array<{ slot: number; market_prob: number | null }> };
     expect(body.questions.find((q) => q.slot === 5)!.market_prob).toBeCloseTo(0.42);
     expect(body.questions.find((q) => q.slot === 1)!.market_prob).toBeNull();
+  });
+});
+
+describe("reveal ledger and evidence", () => {
+  it("serves per-question evidence and the oracle's forecast, then flips ledger.settled after settleRound", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const a = await playerOn(app);
+    await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "a" }) });
+
+    vi.setSystemTime(new Date("2026-08-20T17:05:00Z"));
+    await resolveQuestion(db, qs[0]!.id, "yes", { quotes: [{ url: "u", quote: "Final 3-1" }] });
+    await resolveQuestion(db, qs[1]!.id, "void", { reason: "postponed" });
+    for (const q of qs.slice(2)) await resolveQuestion(db, q.id, "yes");
+    await db.update(schema.questions).set({ oracleProbYes: "0.61" }).where(eq(schema.questions.id, qs[0]!.id));
+
+    type RevealBody = {
+      ledger: { settled: boolean; streak: number; calls_rated: number; oracle_score: number | null };
+      questions: Array<{ slot: number; source_name: string; source_url: string | null; evidence_quote: string | null; void_reason: string | null; oracle_p_yes: number | null }>;
+    };
+    const before = (await (await a("/v1/round/2026-08-20/reveal")).json()) as RevealBody;
+    const slot1 = before.questions.find((q) => q.slot === 1)!;
+    expect(slot1.source_name).toBe("test");
+    expect(slot1.evidence_quote).toBe("Final 3-1");
+    expect(slot1.void_reason).toBeNull();
+    expect(slot1.oracle_p_yes).toBeCloseTo(0.61);
+    const slot2 = before.questions.find((q) => q.slot === 2)!;
+    expect(slot2.void_reason).toBe("postponed");
+    expect(slot2.evidence_quote).toBeNull();
+    expect(before.ledger.settled).toBe(false);
+
+    await settleRound(db, "2026-08-20");
+    const after = (await (await a("/v1/round/2026-08-20/reveal")).json()) as RevealBody;
+    expect(after.ledger.settled).toBe(true);
+    expect(after.ledger.streak).toBe(1);
+    expect(after.ledger.calls_rated).toBe(0); // only 1 of 5 answered — incomplete round doesn't rate
+    expect(after.ledger.oracle_score).toBeNull();
   });
 });
