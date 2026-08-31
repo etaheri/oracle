@@ -64,7 +64,21 @@ export const authRoutes = new Hono<AppContext>().post("/device", async (c) => {
   const bound = await db.query.users.findFirst({ where: eq(schema.users.appleSub, idt.sub) });
   const userId = c.get("userId");
   if (bound && bound.id !== userId) return c.json({ error: "already_claimed" }, 409);
-  if (!bound) await db.update(schema.users).set({ appleSub: idt.sub }).where(eq(schema.users.id, userId));
+  if (!bound) {
+    try {
+      await db.update(schema.users).set({ appleSub: idt.sub }).where(eq(schema.users.id, userId));
+    } catch (e) {
+      // Race: two unbound users both read bound === null for the same sub
+      // (users.apple_sub is DB-unique, and this read-then-write isn't
+      // transactional), then both UPDATE — the loser hits the unique
+      // constraint. Re-check who actually won: if it's someone else, that's
+      // a legitimate already_claimed, not a real failure. Anything else
+      // rethrows rather than swallowing an unrelated DB error.
+      const now = await db.query.users.findFirst({ where: eq(schema.users.appleSub, idt.sub) });
+      if (now && now.id !== userId) return c.json({ error: "already_claimed" }, 409);
+      throw e;
+    }
+  }
   return c.json({ claimed: true });
 })
 .post("/apple/restore", deviceAuth, async (c) => {
