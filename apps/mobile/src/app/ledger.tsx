@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { View } from "react-native";
+import { useRouter } from "expo-router";
 import { useCanvasRef } from "@shopify/react-native-skia";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
 import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
-import { GoldButton } from "../ui/Button";
+import { GoldButton, QuietLink } from "../ui/Button";
 import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
+import { usePlusStore } from "../monetization/plusState";
 import { colors, space } from "../theme";
 import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
@@ -30,6 +32,8 @@ export default function Ledger() {
   const ledger = useMeLedger();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
+  const router = useRouter();
+  const plusActive = usePlusStore((s) => s.plusActive);
 
   if (!ledger.data) return (
     <Screen>
@@ -72,6 +76,7 @@ export default function Ledger() {
             )}
           </View>
         </View>
+        {!plusActive && <QuietLink title="Oracle plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
           {LITURGY_LINES.map((line) => (
             <Mono key={line} size={9} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>

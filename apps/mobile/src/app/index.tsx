@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
+import { View, Pressable } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, Eyebrow } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
@@ -21,11 +21,18 @@ import { msUntil } from "../game/countdown";
 import { getRevealSeen, getRitesSeen } from "../api/flags";
 import { resealReminders } from "../notifications/schedule";
 import { maybeSummon } from "../notifications/summons";
-import { vigilLine, COPY_BANK } from "@oracle/core";
+import { purchaseRescue } from "../monetization/purchases";
+import { usePlusStore } from "../monetization/plusState";
+import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES } from "@oracle/core";
 import { colors, space } from "../theme";
 import { useFocusEffect, useRouter } from "expo-router";
 
 const READING_LINE = COPY_BANK.find((l) => l.id === "system.reading-1")!.text;
+// The rescue offer at the breaking point (revenue-rites spec): the line has
+// no {streak} token (verbatim per copy bank), so no fillSlots is needed here.
+const RESCUE_LINE = COPY_BANK.find((l) => l.id === "paywall.rescue-1")!.text;
+const RESCUE_CONFIRM_LINE = COPY_BANK.find((l) => l.id === "streak.shield-1")!.text;
+const STORE_SILENT_LINE = "THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.";
 
 function yesterdayOf(date: string | undefined): string {
   const base = date ? new Date(`${date}T00:00:00Z`) : new Date();
@@ -82,6 +89,20 @@ export default function Index() {
   const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
   const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${yesterday}`);
   const notice = shield ?? risk ?? lapse ?? vigil;
+  // Risk/lapse notices are the paywall's entry point — a missed vigil is the
+  // one moment protection actually matters. Shield/vigil lines stay plain.
+  const noticeLinksToPlus = notice !== null && (notice === risk || notice === lapse);
+  // The one-row rescue offer: only below an ACTUAL risk notice (not when a
+  // shield notice from yesterday is taking priority), only when there is no
+  // subscription and no shield already in reserve to cover the miss.
+  const plusActive = usePlusStore((s) => s.plusActive);
+  const noShieldsInReserve = !!ledger.data && !ledger.data.free_shield_available && ledger.data.paid_shields === 0;
+  const showRescue = notice === risk && risk !== null && !plusActive && noShieldsInReserve;
+  const [rescueResult, setRescueResult] = useState<"idle" | "success" | "error">("idle");
+  const doRescue = useCallback(async () => {
+    setRescueResult("idle");
+    setRescueResult((await purchaseRescue()) ? "success" : "error");
+  }, []);
   // Hold the print-in until the boot rite lifts — the static resolves in
   // view as the overlay fades, instead of playing unseen behind it.
   const [booted, setBooted] = useState(false);
@@ -137,7 +158,21 @@ export default function Index() {
         )}
         {!round && !today.isLoading && <SleepsPanel active={booted} />}
         {notice && (
-          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{notice}</Mono>
+          noticeLinksToPlus ? (
+            <Pressable accessibilityRole="button" onPress={() => router.push("/plus")}>
+              <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{notice}</Mono>
+            </Pressable>
+          ) : (
+            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>{notice}</Mono>
+          )
+        )}
+        {showRescue && (
+          <View style={{ gap: space(2), alignItems: "center" }}>
+            <Mono size={10} color={rescueResult === "success" ? colors.goldText : colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>
+              {rescueResult === "success" ? RESCUE_CONFIRM_LINE : rescueResult === "error" ? STORE_SILENT_LINE : RESCUE_LINE}
+            </Mono>
+            {rescueResult !== "success" && <GoldButton title={PAYWALL_CTA_LINES.rescue} onPress={doRescue} />}
+          </View>
         )}
         <QuietLink title="The forecaster's ledger" onPress={() => router.push("/ledger")} />
         {!showLedgerCta && <QuietLink title="Yesterday's ledger" onPress={() => router.push(`/reveal/${yesterday}`)} />}
