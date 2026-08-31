@@ -15,7 +15,7 @@ export async function resolveQuestion(db: Db, questionId: string, outcome: "yes"
     .where(eq(schema.questions.id, questionId));
 
   for (const p of preds) {
-    const points = questionPoints({ answer: p.answer, confidence: p.confidence, outcome, isBigOne: q.isBigOne, crowdYesPct });
+    const points = questionPoints({ answer: p.answer, confidence: p.confidence, outcome, isBigOne: q.isBigOne, crowdYesPct, crowdCount: preds.length });
     const b = outcome === "void" ? null : String(brier({ answer: p.answer, confidence: p.confidence, outcome }));
     await db.update(schema.predictions).set({ points, brier: b }).where(eq(schema.predictions.id, p.id));
   }
