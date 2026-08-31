@@ -4,14 +4,37 @@
 // labels. neon-http has no transactions — every write here is a standalone
 // statement, safe to retry on the next tick if a later step in the same
 // action fails.
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull } from "drizzle-orm";
+import { oracleForecast } from "@oracle/core";
 import { schema, type Db } from "../db/client";
 import { addDays, noonET } from "./clock";
 import { resolveQuestion } from "../resolution";
 import { settleRound } from "../settlement";
 import type { TelegramClient } from "./telegram";
 
+// The Oracle takes its position (design §2a) the instant the crowd is final.
+// Raw mean at cold start, skill-weighted + extremized once FORECAST_MIN_RATED
+// players carry a score — all of that lives in core; this just feeds it.
+export async function stampForecasts(db: Db, date: string): Promise<void> {
+  const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
+  const [rated] = await db.select({ n: count() }).from(schema.users).where(isNotNull(schema.users.oracleScore));
+  const ratedCount = Number(rated?.n ?? 0);
+  for (const q of qs) {
+    const rows = await db
+      .select({ answer: schema.predictions.answer, confidence: schema.predictions.confidence, oracleScore: schema.users.oracleScore })
+      .from(schema.predictions)
+      .innerJoin(schema.users, eq(schema.predictions.userId, schema.users.id))
+      .where(eq(schema.predictions.questionId, q.id));
+    const p = oracleForecast(
+      rows.map((r) => ({ pYes: r.answer ? r.confidence / 100 : 1 - r.confidence / 100, oracleScore: r.oracleScore })),
+      ratedCount,
+    );
+    await db.update(schema.questions).set({ oracleProbYes: p === null ? null : String(p) }).where(eq(schema.questions.id, q.id));
+  }
+}
+
 export async function lock(db: Db, date: string): Promise<void> {
+  await stampForecasts(db, date);
   await db
     .update(schema.questions)
     .set({ status: "locked" })

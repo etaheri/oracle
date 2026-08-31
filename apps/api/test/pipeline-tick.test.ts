@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { runTick, type PipelineDeps } from "../src/pipeline";
@@ -6,6 +6,19 @@ import { voidQuestions } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
 import * as schema from "../src/db/schema";
 import { buildPipelineDeps, type WorkerEnv } from "../src/worker";
+import { createApp } from "../src/app";
+
+const authEnv = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
+
+async function player(app: ReturnType<typeof createApp>) {
+  const res = await app.request("/v1/auth/device", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ platform: "ios" }) });
+  const { token } = (await res.json()) as { token: string };
+  return (path: string, init: RequestInit = {}) =>
+    app.request(path, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${token}`, "content-type": "application/json" } });
+}
+const body = (q: string, answer: boolean, confidence: number) => JSON.stringify({ question_id: q, answer, confidence, idempotency_key: "k" });
+
+afterEach(() => vi.useRealTimers());
 
 function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
   const sent: string[] = [];
@@ -28,6 +41,28 @@ describe("runTick", () => {
     expect(round!.status).toBe("locked");
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
     expect(qs.every((q) => q.status === "locked")).toBe(true);
+  });
+
+  it("lock stamps the oracle's forecast: the plain mean of p_yes under the rated-player floor", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env: authEnv });
+    const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    const [a, b, c] = [await player(app), await player(app), await player(app)];
+    // slot 1: YES@75, YES@55, NO@65 → pYes mean(0.75, 0.55, 0.35) = 0.55
+    vi.useFakeTimers({ now: new Date("2026-08-26T16:30:00Z"), toFake: ["Date"] });
+    await a("/v1/predictions", { method: "POST", body: body(qs[0]!.id, true, 75) });
+    await b("/v1/predictions", { method: "POST", body: body(qs[0]!.id, true, 55) });
+    await c("/v1/predictions", { method: "POST", body: body(qs[0]!.id, false, 65) });
+    vi.useRealTimers();
+    const { deps } = fakeDeps(db, "2026-08-27T16:00:00Z");
+    const done = await runTick(deps);
+    expect(done).toContain("lock:2026-08-26");
+    const questions = await db.query.questions.findMany({
+      where: eq(schema.questions.roundDate, "2026-08-26"),
+      orderBy: (q, { asc }) => [asc(q.slot)],
+    });
+    expect(Number(questions[0]!.oracleProbYes)).toBeCloseTo(0.55, 6);
+    expect(questions[1]!.oracleProbYes).toBeNull();
   });
 
   it("publishes a scheduled draft at noon and stamps noon open/lock times", async () => {
