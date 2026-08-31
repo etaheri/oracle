@@ -2,7 +2,7 @@
 // Hand-written, linted, versioned. No generated copy — the meme value of a
 // voice comes from one unmistakable register sustained for years.
 
-export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed" | "wrong";
+export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed" | "wrong" | "partial";
 
 export interface CopyLine {
   id: string;
@@ -42,7 +42,7 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.read-10", pool: "noon", text: "THE INK IS DRY. THE LEDGER HOLDS YOUR RECKONING.", requires: ["results"] },
   { id: "noon.tide-1", pool: "noon", text: "YOU STOOD AGAINST THE TIDE. THE TIDE BROKE.", requires: ["tideWin"] },
   { id: "noon.tide-2", pool: "noon", text: "THE CROWD WENT ONE WAY. YOU WENT THE OTHER. THE LEDGER BOWED TO YOU.", requires: ["tideWin"] },
-  { id: "noon.tide-3", pool: "noon", text: "FEW STOOD WHERE YOU STOOD. THE LEDGER PAID TWICE.", requires: ["tideWin"] },
+  { id: "noon.tide-3", pool: "noon", text: "FEW STOOD WHERE YOU STOOD. THE LEDGER PAID A BOUNTY.", requires: ["tideWin"] },
   { id: "noon.lapsed-1", pool: "noon", text: "THE LEDGER WAS READ WITHOUT YOU. TOMORROW IT NEED NOT BE.", requires: ["lapsed"] },
   { id: "noon.lapsed-2", pool: "noon", text: "THE CROWD SPOKE. YOUR LINE IS BLANK.", requires: ["lapsed"] },
   { id: "noon.lapsed-3", pool: "noon", text: "NOON CAME AND WENT. THE ORB DID NOT HEAR FROM YOU.", requires: ["lapsed"] },
@@ -71,6 +71,8 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "closing.call-18", pool: "closing", text: "THE ORB HOLDS FIVE QUESTIONS AND NO GRUDGES. NOON CHANGES THAT." },
   { id: "closing.call-19", pool: "closing", text: "SPEAK BEFORE NOON OR HOLD YOUR PEACE UNTIL TOMORROW." },
   { id: "closing.call-20", pool: "closing", text: "THE LEDGER TAKES NO LATE ENTRIES." },
+  { id: "closing.partial-1", pool: "closing", text: "THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED. NOON IS COMING.", requires: ["partial"] },
+  { id: "closing.partial-2", pool: "closing", text: "YOUR PROPHECY IS UNFINISHED. THE LEDGER COUNTS ONLY WHOLE DAYS.", requires: ["partial"] },
   // ── streak: vigil lines for in-app surfaces. ──
   { id: "streak.vigil-1", pool: "streak", text: "{streak} DAYS WITHOUT SILENCE.", requires: ["streak"] },
   { id: "streak.vigil-2", pool: "streak", text: "YOUR VIGIL HOLDS. {streak} DAYS AND COUNTING.", requires: ["streak"] },
@@ -82,6 +84,7 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "streak.lapse-3", pool: "streak", text: "STREAKS END. RECORDS REMAIN." },
   { id: "streak.shield-1", pool: "streak", text: "THE SHIELD HELD. YOUR VIGIL SURVIVES THE MISSED NOON." },
   { id: "streak.begin-1", pool: "streak", text: "BEGIN AGAIN. THE ORB DOES NOT DWELL." },
+  { id: "streak.risk-1", pool: "streak", text: "YOUR VIGIL OF {streak} DAYS ENDS AT NOON.", requires: ["streak"] },
   // ── system: states of the machine. ──
   { id: "system.sleep-1", pool: "system", text: "THE ORACLE SLEEPS. NO ROUND IS OPEN." },
   { id: "system.reading-1", pool: "system", text: "THE LEDGER IS BEING READ. PATIENCE." },
@@ -112,7 +115,9 @@ export function selectLine(
 // The home vigil: one quiet line while a streak holds. Only streak-pool lines
 // that REQUIRE a streak are eligible — the lapse/shield lines are for other
 // moments. Streak 1 is every first day; the oracle starts counting at 2.
-const VIGIL_LINES = COPY_BANK.filter((l) => l.pool === "streak" && (l.requires ?? []).includes("streak"));
+const VIGIL_LINES = COPY_BANK.filter(
+  (l) => l.pool === "streak" && (l.requires ?? []).includes("streak") && !l.id.startsWith("streak.risk"),
+);
 
 export function vigilLine(streak: number, seedKey: string): string | null {
   if (streak < 2) return null;
@@ -124,14 +129,26 @@ export function vigilLine(streak: number, seedKey: string): string | null {
 // link forever. Declaratives only — the machine explains itself the way it
 // does everything else. Hand-written, linted, versioned.
 export const RITES_LINES = [
-  "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON.",
+  "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON, NEW YORK TIME.",
   "PULL TOWARD YES OR NO. THE LONGER THE PULL, THE GREATER THE CONVICTION. TO RELEASE IS TO SEAL.",
   "AN ANSWER SEALED CANNOT BE UNSEALED.",
   "THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
   "CONVICTION PAYS WHEN RIGHT. IT COSTS MORE WHEN WRONG.",
   "THE BIG ONE COUNTS DOUBLE. IN BOTH DIRECTIONS.",
-  "STAND AGAINST THE TIDE AND PREVAIL: THE LEDGER PAYS TWICE.",
-  "SEAL WITHIN THE FIRST HOUR. THE DAY PAYS TEN PERCENT MORE.",
+  "STAND AGAINST THE TIDE AND PREVAIL: THE LEDGER ADDS A BOUNTY.",
+  "SEAL ALL FIVE WITHIN THE FIRST HOUR. THE DAY PAYS TEN PERCENT MORE.",
+  "SEAL ALL FIVE OR THE DAY DOES NOT RATE. POINTS AND VIGIL STILL COUNT.",
   "MISS A NOON AND THE SHIELD MAY HOLD. ONE IS GRANTED EACH MONTH.",
   "THE LEDGER IS READ AT NOON. NOTHING IS REVISED.",
+] as const;
+
+// The partial-day notice (home, when some but not all five are sealed).
+export const PARTIAL_LINE = "THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED.";
+
+// The summons: the interstitial before the OS notification prompt (voice
+// spec §4). Three declaratives, then the machine asks once.
+export const SUMMONS_LINES = [
+  "THE ORACLE SPEAKS TWICE A DAY.",
+  "ONCE TO ASK. ONCE TO ANSWER.",
+  "IT WILL NOT SPEAK MORE THAN THAT.",
 ] as const;
