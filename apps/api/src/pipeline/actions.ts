@@ -96,8 +96,10 @@ export async function publishFromBank(db: Db, telegram: TelegramClient, date: st
   await upsertDraft(db, date, parsed.data);
   await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
   const ok = await publish(db, telegram, date);
-  const [left] = await db.select({ n: count() }).from(schema.draftBank).where(isNull(schema.draftBank.usedOn));
-  await telegram.send(`⚠ round ${date} published from the evergreen bank (${Number(left?.n ?? 0)} left)`);
+  if (ok) {
+    const [left] = await db.select({ n: count() }).from(schema.draftBank).where(isNull(schema.draftBank.usedOn));
+    await telegram.send(`⚠ round ${date} published from the evergreen bank (${Number(left?.n ?? 0)} left)`);
+  }
   return ok;
 }
 
@@ -122,11 +124,11 @@ export async function voidQuestions(
     await resolveQuestion(db, row.id, "void", {
       unverifiable: true,
       checked_at: nowIso,
-      reason: "unverifiable by 13:00 ET",
+      reason: "unverifiable within 24 hours of lock",
     });
   }
 
-  await telegram.send(`⚠ voided unresolved questions (unverifiable by 13:00 ET):\n${texts.map((t) => `- ${t}`).join("\n")}`);
+  await telegram.send(`⚠ voided unresolved questions (unverifiable within 24 hours of lock):\n${texts.map((t) => `- ${t}`).join("\n")}`);
 }
 
 export async function settle(deps: { db: Db; telegram: TelegramClient }, date: string): Promise<void> {

@@ -26,10 +26,19 @@ describe("decideActions", () => {
   it("does not publish before noon", () => {
     expect(decideActions(at(11, 50), { ...empty, scheduledDates: ["2026-08-27"] })).toEqual([]);
   });
-  it("resolves unresolved questions before 13:00 and voids after", () => {
+  it("retries resolution every tick in the noon hour, hourly after, and voids at noon the next day", () => {
     const st: PipelineState = { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["a", "b"] } };
-    expect(decideActions(at(12, 20), st)).toEqual([{ kind: "resolve", date: "2026-08-26", questionIds: ["a", "b"] }]);
-    expect(decideActions(at(13, 0), st)).toEqual([{ kind: "void", date: "2026-08-26", questionIds: ["a", "b"] }]);
+    const resolve = { kind: "resolve", date: "2026-08-26", questionIds: ["a", "b"] };
+    expect(decideActions(at(12, 20), st)).toEqual([resolve]);          // noon hour: every tick
+    expect(decideActions(at(13, 0), st)).toEqual([resolve]);           // hourly at :00
+    expect(decideActions(at(13, 20), st)).toEqual([]);                 // throttled
+    expect(decideActions(at(15, 5), st)).toEqual([resolve]);
+    expect(decideActions({ date: "2026-08-28", hour: 11, minute: 50 }, st)).toEqual([]);
+    expect(decideActions({ date: "2026-08-28", hour: 12, minute: 0 }, st)).toEqual([{ kind: "void", date: "2026-08-26", questionIds: ["a", "b"] }]);
+  });
+  it("warns (not criticals) hourly while a round is unresolved past the noon hour", () => {
+    const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["a"] } });
+    expect(acts.filter((a) => a.kind === "alert")).toEqual([expect.objectContaining({ level: "warn" })]);
   });
   it("settles once nothing is unresolved", () => {
     expect(decideActions(at(12, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [] } }))
@@ -52,9 +61,10 @@ describe("decideActions", () => {
     expect(acts.some((a) => a.kind === "alert" && a.level === "critical")).toBe(true);
     expect(decideActions(at(12, 10), { ...empty, openRound: { date: "2026-08-27", lockPassed: false } })).toEqual([]);
   });
-  it("criticals at 13:30 with a still-unsettled round", () => {
+  it("no alert at 13:30 once a locked round has nothing left unresolved (settles instead)", () => {
     const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [] } });
-    expect(acts.filter((a) => a.kind === "alert").length).toBe(1);
+    expect(acts.filter((a) => a.kind === "alert")).toEqual([]);
+    expect(acts).toContainEqual({ kind: "settle", date: "2026-08-26" });
   });
   it("falls through to the bank at noon when nothing is scheduled for today", () => {
     expect(decideActions(at(12), { ...empty, bankCount: 2 })).toEqual([{ kind: "publish-bank", date: "2026-08-27" }]);

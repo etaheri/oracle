@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import { runTick, type PipelineDeps } from "../src/pipeline";
-import { voidQuestions } from "../src/pipeline/actions";
+import { voidQuestions, publishFromBank } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
 import * as schema from "../src/db/schema";
 import { buildPipelineDeps, type WorkerEnv } from "../src/worker";
@@ -108,23 +108,26 @@ describe("runTick", () => {
     expect(sent.length).toBe(0); // decide layer already skips publish; no warn needed here
   });
 
-  it("voids unresolved questions after 13:00 ET and then settles on the next tick", async () => {
+  it("voids unresolved questions at noon 24 hours after lock and then settles on the next tick", async () => {
     const { db } = await makeTestDb();
     const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
     for (const q of qs.slice(0, 3)) await resolveQuestion(db, q.id, "yes");
     const { deps: d1 } = fakeDeps(db, "2026-08-27T17:05:00Z"); // 13:05 ET
     let done = await runTick(d1); // lock happens this tick
     expect(done).toContain("lock:2026-08-26");
-    const { deps: d2, sent } = fakeDeps(db, "2026-08-27T17:15:00Z");
+    const { deps: d2, sent } = fakeDeps(db, "2026-08-28T16:05:00Z"); // noon ET, D+2 from lock date
     done = await runTick(d2); // void the 2 stragglers
     expect(done).toContain("void:2026-08-26");
     expect(sent.some((t) => t.includes("⚠"))).toBe(true);
-    const { deps: d3, sent: sent3 } = fakeDeps(db, "2026-08-27T17:25:00Z");
+    const { deps: d3, sent: sent3 } = fakeDeps(db, "2026-08-28T16:15:00Z");
     done = await runTick(d3);
     expect(done).toContain("settle:2026-08-26");
     expect(sent3.some((t) => t.includes("reply if any outcome looks wrong"))).toBe(true);
     const voided = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
     expect(voided.filter((q) => q.status === "void").length).toBe(2);
+    for (const q of voided.filter((q) => q.status === "void")) {
+      expect((q.resolutionEvidence as { reason: string }).reason).toBe("unverifiable within 24 hours of lock");
+    }
   });
 
   it("author failure becomes a WARN, not a crash", async () => {
@@ -159,6 +162,17 @@ describe("runTick", () => {
     expect(newerRow!.usedOn).toBeNull();
 
     expect(sent.some((t) => /published from the evergreen bank \(1 left\)/.test(t))).toBe(true);
+  });
+
+  it("publishFromBank sends no 'published from the evergreen bank' message when another round is still open", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-29T16:00:00Z") }); // still open, lock not passed
+    await db.insert(schema.draftBank).values({ draft: validDraft, createdAt: new Date("2026-08-20T00:00:00Z") });
+    const { deps, sent } = fakeDeps(db, "2026-08-27T16:00:00Z");
+    const published = await publishFromBank(db, deps.telegram, "2026-08-27");
+    expect(published).toBe(false);
+    expect(sent.some((t) => t.includes("published from the evergreen bank"))).toBe(false);
+    expect(sent.some((t) => t.includes("publish skipped"))).toBe(true);
   });
 });
 

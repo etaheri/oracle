@@ -89,16 +89,20 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     actions.push({ kind: "publish-bank", date: today });
   }
 
-  // RESOLVE / VOID / SETTLE on the locked round
+  // RESOLVE / VOID / SETTLE on the locked round. Late, never wrong (design
+  // §8): a question gets a full day of hourly retries before it voids.
   if (state.lockedRound) {
-    if (state.lockedRound.unresolvedIds.length > 0) {
-      if (hour >= 13) {
-        actions.push({ kind: "void", date: state.lockedRound.date, questionIds: state.lockedRound.unresolvedIds });
-      } else {
-        actions.push({ kind: "resolve", date: state.lockedRound.date, questionIds: state.lockedRound.unresolvedIds });
+    const { date: lockedDate, unresolvedIds } = state.lockedRound;
+    if (unresolvedIds.length > 0) {
+      const voidDay = addDays(lockedDate, 2); // locked at noon D+1 → voids at noon D+2
+      const pastGrace = today > voidDay || (today === voidDay && hour >= 12);
+      if (pastGrace) {
+        actions.push({ kind: "void", date: lockedDate, questionIds: unresolvedIds });
+      } else if (hour === 12 || minute < 10) {
+        actions.push({ kind: "resolve", date: lockedDate, questionIds: unresolvedIds });
       }
     } else {
-      actions.push({ kind: "settle", date: state.lockedRound.date });
+      actions.push({ kind: "settle", date: lockedDate });
     }
   }
 
@@ -141,14 +145,15 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
 
   if (
     state.lockedRound &&
-    (hour > 13 || (hour === 13 && minute >= 30)) &&
+    state.lockedRound.unresolvedIds.length > 0 &&
+    hour >= 13 &&
     minute >= 30 &&
     minute < 40
   ) {
     actions.push({
       kind: "alert",
-      level: "critical",
-      message: `round ${state.lockedRound.date} locked but unsettled`,
+      level: "warn",
+      message: `round ${state.lockedRound.date} still has unresolved questions — retrying hourly, voids at noon ${addDays(state.lockedRound.date, 2)}`,
     });
   }
 
