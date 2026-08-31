@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -10,6 +10,23 @@ export function useToday() {
       const token = await getDeviceToken();
       try {
         return await api("/v1/round/today", RoundTodaySchema, { token });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
+}
+
+export function useNextRound(enabled: boolean) {
+  return useQuery({
+    queryKey: ["round", "next"],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      try {
+        return await api("/v1/round/next", RoundNextSchema, { token });
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) return null;
         throw e;

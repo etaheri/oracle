@@ -2,14 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
-import { Serif, Mono, Ritual, Eyebrow } from "../ui/Text";
+import { Mono, Ritual } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
 import { OracleCard } from "../ui/OracleCard";
 import { UndealtCard, STACK_TOP_Y, STACK_TOP_ROTATE } from "../ui/UndealtCard";
 import { ConvictionColumn } from "../ui/ConvictionColumn";
 import { confidenceReading } from "../game/confidence";
 import { crowdVerdict } from "../game/crowdVerdict";
+import { payoffLine } from "../game/payoffLine";
+import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
+import { SleepsPanel } from "../ui/SleepsPanel";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { numeral } from "../ui/CardChrome";
@@ -52,6 +55,14 @@ export default function Round() {
   // flag loads.
   const [floorSeen, setFloorSeen] = useState(true);
   const floorShown = useRef(false);
+  // Per-question early locks mean "closed" is time-dependent — recomputed
+  // every 30s, not just at fetch time, so a card that locks mid-session
+  // is skipped without a refetch.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => { void getFloorNoticed().then(setFloorSeen); }, []);
   useEffect(() => {
     if (lean.conf !== null && !floorSeen) floorShown.current = true;
@@ -90,10 +101,10 @@ export default function Round() {
       </View>
     </Screen>
   );
-  if (!today.data) return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}><Eyebrow>The oracle sleeps</Eyebrow><Serif size={20}>No round is open.</Serif></View></Screen>;
+  if (!today.data) return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center" }}><SleepsPanel /></View></Screen>;
 
   const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
-  const current = qs.find((q) => !answers[q.id]?.sealed);
+  const current = nextOpenQuestion(qs, (id) => !!answers[id]?.sealed, now);
   const lastEntry = lastSealedId ? answers[lastSealedId] : undefined;
   const lastCrowd = lastSealedId ? crowdById.get(lastSealedId) : undefined;
   const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct, lastCrowd.player_count) : null;
@@ -114,6 +125,7 @@ export default function Round() {
               <OracleCard
                 q={current}
                 date={today.data.date}
+                roundLocksAt={today.data.locks_at}
                 onSealed={() => setLastSealedId(current.id)}
                 onLean={onLean}
               />
@@ -125,20 +137,39 @@ export default function Round() {
       </View>
       {(lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
       <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
-        {qs.map((q) => (
-          <Ritual key={q.id} size={12} color={answers[q.id]?.sealed ? colors.goldText : "rgba(23,25,31,0.22)"} letterSpacing={1}>
-            {numeral(q.slot)}
-          </Ritual>
-        ))}
+        {qs.map((q) => {
+          const sealed = !!answers[q.id]?.sealed;
+          // A closed-but-never-sealed slot was missed, not answered — struck
+          // through so the numeral tells the truth about it.
+          const struck = !sealed && isClosed(q, now);
+          return (
+            <Ritual
+              key={q.id}
+              size={12}
+              color={struck ? colors.mutedInk : sealed ? colors.goldText : "rgba(23,25,31,0.22)"}
+              letterSpacing={1}
+              style={struck ? { textDecorationLine: "line-through" } : undefined}
+            >
+              {numeral(q.slot)}
+            </Ritual>
+          );
+        })}
       </View>
       {/* One fixed-height footer slot: reading, verdict, and hint trade
           places without nudging the layout above them. */}
       <View style={{ height: 40, justifyContent: "center" }}>
         {lean.conf !== null ? (
-          // The oracle reads the pull aloud — stationary, in the footer's slot.
-          <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>
-            {floorSeen ? confidenceReading(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
-          </Mono>
+          // The oracle reads the pull aloud — stationary, in the footer's
+          // slot — with the honest stake printed underneath: what this
+          // conviction pays if right, costs if wrong.
+          <View style={{ alignItems: "center", gap: 2 }}>
+            <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>
+              {floorSeen ? confidenceReading(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
+            </Mono>
+            <Mono size={9} color={colors.mutedInk} letterSpacing={1}>
+              {payoffLine(lean.conf, current?.is_big_one ?? false)}
+            </Mono>
+          </View>
         ) : current && lastSealedId && lastEntry ? (
           // The seal's payout: the thrown card's crowd verdict, printing while
           // the next card deals. Gold only when the contrarian multiplier is

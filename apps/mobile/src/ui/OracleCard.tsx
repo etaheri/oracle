@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { View, Pressable, StyleSheet, Dimensions } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useQueryClient } from "@tanstack/react-query";
 import Animated, { useSharedValue, useAnimatedStyle, useDerivedValue, withTiming, withSpring, withSequence, withDelay, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
 import { leanRelease, leanStep, holdConfidence, LEAN_DEAD_ZONE, LEAN_FULL } from "../game/swipeLean";
 import { useScreenReader } from "../hooks/useScreenReader";
@@ -50,9 +51,12 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
   );
 }
 
-export function OracleCard({ q, date, onSealed, onLean }: {
+export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
   q: RoundToday["questions"][number];
   date: string;
+  // The round's overall lock (if any): a question whose own lock differs
+  // from it closes ahead of the round, and the title says so.
+  roundLocksAt: string | null;
   // Fires when the seal ceremony completes and the card has left the stage
   // (or immediately under reduced motion). The store's sealed flag flips
   // here too, so the round advances only after the throw.
@@ -65,6 +69,7 @@ export function OracleCard({ q, date, onSealed, onLean }: {
   const { answers, setAnswer, setConfidence, markSealed } = useRoundStore();
   const entry = answers[q.id];
   const submit = useSubmit();
+  const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [thrown, setThrown] = useState(false);
   const [cardSize, setCardSize] = useState({ w: 0, h: 0 });
@@ -261,10 +266,18 @@ export function OracleCard({ q, date, onSealed, onLean }: {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       if (!reducedMotion) dragX.value = withSpring(0, { damping: 16, stiffness: 160 });
       setError(e instanceof ApiError && e.status === 409 ? "THE ORACLE HAS CLOSED" : "THE CONNECTION WAVERS — TRY AGAIN");
+      // A 409 means this question closed under us — a stale `today` would
+      // keep dealing it. Refetch so the round advances past the dead card.
+      if (e instanceof ApiError && e.status === 409) void qc.invalidateQueries({ queryKey: ["round", "today"] });
     }
   }
 
-  const title = q.is_big_one ? "✶ The Big One · worth double" : q.category;
+  const closesEarly = roundLocksAt !== null && q.locks_at !== roundLocksAt;
+  const title = q.is_big_one
+    ? `✶ The Big One · pays double · costs double${closesEarly ? " · closes early" : ""}`
+    : closesEarly
+      ? `${q.category} · closes early`
+      : q.category;
 
   return (
     <View>
@@ -286,8 +299,12 @@ export function OracleCard({ q, date, onSealed, onLean }: {
             </Animated.View>
           </GestureDetector>
           <View style={{ gap: space(3) }}>
-            {liveConf === null && !buttonsMode && !sealed && !thrown ? (
-              <DecodeLine text="‹ NO ─ PULL · RELEASE ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
+            {liveConf === null && !sealed && !thrown ? (
+              buttonsMode ? (
+                <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>HOLD TO RAISE CONVICTION · RELEASE TO SEAL</Mono>
+              ) : (
+                <DecodeLine text="‹ NO ─ PULL · RELEASE ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
+              )
             ) : null}
             {buttonsMode && (
               <View style={{ flexDirection: "row", gap: space(2) }}>
