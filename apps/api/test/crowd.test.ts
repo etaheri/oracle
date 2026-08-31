@@ -33,6 +33,7 @@ describe("GET /v1/round/today/crowd", () => {
     expect(out.questions[0]).toEqual({ id: qs[0]!.id, crowd_yes_pct: 33, player_count: 3 });
   });
   it("empty list when the caller sealed nothing; 404 with no open round", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const a = await player(app);

@@ -31,6 +31,7 @@ describe("GET /v1/round/today/mine", () => {
   });
 
   it("empty when the caller sealed nothing; 404 with no open round", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const a = await player(app);

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
+import * as schema from "../src/db/schema";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -30,6 +31,7 @@ describe("GET /v1/round/today", () => {
     expect((await authed("/v1/round/today")).status).toBe(404);
   });
   it("returns the open round's questions, slot-ordered, without spoilers", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
     const { db, authed } = await authedApp();
     await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
     const res = await authed("/v1/round/today");
@@ -62,5 +64,34 @@ describe("GET /v1/round/today", () => {
 
     const body = (await (await authed("/v1/round/today")).json()) as { player_count: number };
     expect(body.player_count).toBe(2);
+  });
+  it("does not serve a round whose lock time has passed, even if the cron has not flipped it", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-21T16:05:00Z"), toFake: ["Date"] });
+    const { db, authed } = await authedApp();
+    await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    expect((await authed("/v1/round/today")).status).toBe(404);
+    expect((await authed("/v1/round/today/crowd")).status).toBe(404);
+  });
+  it("serves the earliest live round when two are open, and carries per-question locks_at", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-21T12:00:00Z"), toFake: ["Date"] });
+    const { db, authed } = await authedApp();
+    await seedRound(db, { date: "2026-08-21", opensAt: new Date("2026-08-21T16:00:00Z"), locksAt: new Date("2026-08-22T16:00:00Z") });
+    await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const body = (await (await authed("/v1/round/today")).json()) as { date: string; locks_at: string; questions: Array<{ locks_at: string }> };
+    expect(body.date).toBe("2026-08-20");
+    expect(body.locks_at).toBe("2026-08-21T16:00:00.000Z");
+    expect(body.questions.every((q) => q.locks_at === "2026-08-21T16:00:00.000Z")).toBe(true);
+  });
+});
+
+describe("GET /v1/round/next", () => {
+  it("404s with nothing scheduled", async () => {
+    const { authed } = await authedApp();
+    expect((await authed("/v1/round/next")).status).toBe(404);
+  });
+  it("returns the earliest scheduled round's noon ET", async () => {
+    const { db, authed } = await authedApp();
+    await db.insert(schema.rounds).values([{ date: "2026-08-23", status: "scheduled" }, { date: "2026-08-22", status: "scheduled" }]);
+    expect(await (await authed("/v1/round/next")).json()).toEqual({ date: "2026-08-22", opens_at: "2026-08-22T16:00:00.000Z" });
   });
 });

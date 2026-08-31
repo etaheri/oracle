@@ -5,24 +5,28 @@ import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
 import { evidenceSummary } from "../resolution";
+import { noonET } from "../pipeline/clock";
 
-async function openRound(db: Db) {
-  const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") });
-  if (!round) return null;
-  const qs = await db.query.questions.findMany({
-    where: eq(schema.questions.roundDate, round.date),
-    orderBy: [asc(schema.questions.slot)],
-  });
-  return { round, qs };
+// The live round: earliest open round whose latest question lock is still
+// ahead of the server clock. The cron flips statuses on a 10-minute tick;
+// the clock is authoritative in between (predictions.ts already enforces it).
+async function openRound(db: Db, now: Date) {
+  const rounds = await db.query.rounds.findMany({ where: eq(schema.rounds.status, "open"), orderBy: [asc(schema.rounds.date)] });
+  for (const round of rounds) {
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, round.date), orderBy: [asc(schema.questions.slot)] });
+    const lastLock = qs.reduce((m, q) => Math.max(m, q.locksAt.getTime()), 0);
+    if (qs.length > 0 && now.getTime() < lastLock) return { round, qs, lastLock: new Date(lastLock) };
+  }
+  return null;
 }
 
 export const roundRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
   .get("/today", async (c) => {
     const { db } = c.get("deps");
-    const found = await openRound(db);
+    const found = await openRound(db, new Date());
     if (!found) return c.json({ error: "no open round" }, 404);
-    const { round, qs } = found;
+    const { round, qs, lastLock } = found;
     // rounds.player_count is a dead column (never written); the live count is
     // distinct predictors on this round, same source of truth as /today/crowd.
     const qIds = qs.map((q) => q.id);
@@ -31,7 +35,7 @@ export const roundRoutes = new Hono<AppContext>()
       : [{ n: 0 }];
     return c.json({
       date: round.date,
-      locks_at: qs[0]?.locksAt ?? null,
+      locks_at: lastLock.toISOString(),
       player_count: Number(players?.n ?? 0),
       questions: qs.map((q) => ({
         id: q.id,
@@ -48,7 +52,7 @@ export const roundRoutes = new Hono<AppContext>()
   .get("/today/crowd", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");
-    const found = await openRound(db);
+    const found = await openRound(db, new Date());
     if (!found) return c.json({ error: "no open round" }, 404);
     const { qs } = found;
     const qIds = qs.map((q) => q.id);
@@ -66,7 +70,7 @@ export const roundRoutes = new Hono<AppContext>()
   .get("/today/mine", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");
-    const found = await openRound(db);
+    const found = await openRound(db, new Date());
     if (!found) return c.json({ error: "no open round" }, 404);
     const { qs } = found;
     const mine = qs.length
@@ -78,6 +82,12 @@ export const roundRoutes = new Hono<AppContext>()
       predictions: mine.map((p) => ({ question_id: p.questionId, answer: p.answer, confidence: p.confidence })),
     });
   })
+  .get("/next", async (c) => {
+    const { db } = c.get("deps");
+    const next = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "scheduled"), orderBy: [asc(schema.rounds.date)] });
+    if (!next) return c.json({ error: "no round scheduled" }, 404);
+    return c.json({ date: next.date, opens_at: noonET(next.date).toISOString() });
+  })
   .get("/:date/reveal", async (c) => {
     const { db } = c.get("deps");
     const userId = c.get("userId");
@@ -87,7 +97,9 @@ export const roundRoutes = new Hono<AppContext>()
       orderBy: [asc(schema.questions.slot)],
     });
     if (qs.length === 0) return c.json({ error: "unknown round" }, 404);
-    if (!qs.every((q) => q.status === "locked" || q.status === "resolved" || q.status === "void")) return c.json({ error: "not locked" }, 409);
+    const now = Date.now();
+    const settledEnough = qs.every((q) => q.status === "locked" || q.status === "resolved" || q.status === "void" || now >= q.locksAt.getTime());
+    if (!settledEnough) return c.json({ error: "not locked" }, 409);
 
     const [round, user] = await Promise.all([
       db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) }),
