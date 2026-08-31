@@ -42,3 +42,28 @@ describe("POST /v1/auth/device", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("mint throttle", () => {
+  const mint = (app: ReturnType<typeof createApp>, ip?: string) =>
+    app.request("/v1/auth/device", { method: "POST", headers: { "content-type": "application/json", ...(ip ? { "cf-connecting-ip": ip } : {}) }, body: JSON.stringify({ platform: "ios" }) });
+  it("allows five devices per IP per hour, then 429s; other IPs unaffected", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    for (let i = 0; i < 5; i++) expect((await mint(app, "1.2.3.4")).status).toBe(200);
+    expect((await mint(app, "1.2.3.4")).status).toBe(429);
+    expect((await mint(app, "5.6.7.8")).status).toBe(200);
+  });
+  it("does not throttle when no client IP header is present", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    for (let i = 0; i < 7; i++) expect((await mint(app)).status).toBe(200);
+  });
+  it("stores only a salted hash, never the IP", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    await mint(app, "1.2.3.4");
+    const d = (await db.query.devices.findMany())[0]!;
+    expect(d.ipHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(d.ipHash).not.toContain("1.2.3.4");
+  });
+});
