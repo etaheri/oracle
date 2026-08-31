@@ -5,11 +5,26 @@ import { and, count, eq, gt } from "drizzle-orm";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { mintDeviceToken, verifyDeviceToken, sha256Hex } from "../auth/deviceToken";
+import { verifyAppleIdentityToken } from "../auth/apple";
 
 const BodySchema = z.object({ platform: z.enum(["ios", "android"]) });
 
 export const MINT_LIMIT = 5;
 export const MINT_WINDOW_MS = 3_600_000;
+
+/** Middleware: sets userId from a valid bearer device token. */
+export const deviceAuth = createMiddleware<AppContext>(async (c, next) => {
+  const header = c.req.header("authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const { db, env } = c.get("deps");
+  const deviceId = token ? await verifyDeviceToken(env.DEVICE_TOKEN_SECRET, token) : null;
+  if (!deviceId) return c.json({ error: "unauthorized" }, 401);
+  const device = await db.query.devices.findFirst({ where: eq(schema.devices.id, deviceId) });
+  if (!device) return c.json({ error: "unauthorized" }, 401);
+  c.set("userId", device.userId);
+  c.set("deviceId", device.id);
+  await next();
+});
 
 export const authRoutes = new Hono<AppContext>().post("/device", async (c) => {
   const parsed = BodySchema.safeParse(await c.req.json().catch(() => null));
@@ -38,17 +53,40 @@ export const authRoutes = new Hono<AppContext>().post("/device", async (c) => {
     ipHash,
   });
   return c.json({ token, user_id: user!.id });
-});
-
-/** Middleware: sets userId from a valid bearer device token. */
-export const deviceAuth = createMiddleware<AppContext>(async (c, next) => {
-  const header = c.req.header("authorization") ?? "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  const { db, env } = c.get("deps");
-  const deviceId = token ? await verifyDeviceToken(env.DEVICE_TOKEN_SECRET, token) : null;
-  if (!deviceId) return c.json({ error: "unauthorized" }, 401);
-  const device = await db.query.devices.findFirst({ where: eq(schema.devices.id, deviceId) });
-  if (!device) return c.json({ error: "unauthorized" }, 401);
-  c.set("userId", device.userId);
-  await next();
+})
+.post("/apple/claim", deviceAuth, async (c) => {
+  const { db, env, verifyApple } = c.get("deps");
+  const body = z.object({ identity_token: z.string() }).safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid body" }, 400);
+  const verify = verifyApple ?? ((t: string, o: { audience: string }) => verifyAppleIdentityToken(t, o));
+  const idt = await verify(body.data.identity_token, { audience: env.APPLE_BUNDLE_ID ?? "com.eriktaheri.oracle" });
+  if (!idt) return c.json({ error: "unauthorized" }, 401);
+  const bound = await db.query.users.findFirst({ where: eq(schema.users.appleSub, idt.sub) });
+  const userId = c.get("userId");
+  if (bound && bound.id !== userId) return c.json({ error: "already_claimed" }, 409);
+  if (!bound) await db.update(schema.users).set({ appleSub: idt.sub }).where(eq(schema.users.id, userId));
+  return c.json({ claimed: true });
+})
+.post("/apple/restore", deviceAuth, async (c) => {
+  const { db, env, verifyApple } = c.get("deps");
+  const body = z.object({ identity_token: z.string() }).safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: "invalid body" }, 400);
+  const verify = verifyApple ?? ((t: string, o: { audience: string }) => verifyAppleIdentityToken(t, o));
+  const idt = await verify(body.data.identity_token, { audience: env.APPLE_BUNDLE_ID ?? "com.eriktaheri.oracle" });
+  if (!idt) return c.json({ error: "unauthorized" }, 401);
+  const bound = await db.query.users.findFirst({ where: eq(schema.users.appleSub, idt.sub) });
+  if (!bound) return c.json({ error: "no record" }, 404);
+  // The claimed record wins; the fresh row is abandoned, never merged (spec §4).
+  await db.update(schema.devices).set({ userId: bound.id }).where(eq(schema.devices.id, c.get("deviceId")));
+  return c.json({ restored: true, user_id: bound.id });
+})
+.post("/apple/strike", deviceAuth, async (c) => {
+  const { db } = c.get("deps");
+  const userId = c.get("userId");
+  // Child rows first; neon-http has no transactions — worst crash leaves an orphaned empty user, re-strikeable.
+  await db.delete(schema.predictions).where(eq(schema.predictions.userId, userId));
+  await db.delete(schema.entitlements).where(eq(schema.entitlements.userId, userId));
+  await db.delete(schema.devices).where(eq(schema.devices.userId, userId));
+  await db.delete(schema.users).where(eq(schema.users.id, userId));
+  return c.json({ struck: true });
 });

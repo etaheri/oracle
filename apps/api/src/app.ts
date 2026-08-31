@@ -15,9 +15,15 @@ export interface AppEnv {
   TELEGRAM_WEBHOOK_SECRET?: string;
   TELEGRAM_CHAT_ID?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
+  APPLE_BUNDLE_ID?: string;
 }
-export interface Deps { db: Db; env: AppEnv; pipeline?: PipelineDeps }
-export type AppContext = { Variables: { deps: Deps; userId: string } };
+export interface Deps {
+  db: Db;
+  env: AppEnv;
+  pipeline?: PipelineDeps;
+  verifyApple?: (token: string, opts: { audience: string }) => Promise<{ sub: string } | null>;
+}
+export type AppContext = { Variables: { deps: Deps; userId: string; deviceId: string } };
 
 export function createApp(deps: Deps) {
   const app = new Hono<AppContext>();
