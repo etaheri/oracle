@@ -1,64 +1,62 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, Dimensions } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useSharedValue, useAnimatedStyle, useDerivedValue, withTiming, withSpring, withSequence, withDelay, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
-import { leanRelease, leanStep, holdConfidence, LEAN_COMMIT, LEAN_DEAD_ZONE } from "../game/swipeLean";
-import { decodeFrame } from "../game/terminalPrint";
+import { leanRelease, leanStep, holdConfidence, LEAN_DEAD_ZONE, LEAN_FULL } from "../game/swipeLean";
 import { useScreenReader } from "../hooks/useScreenReader";
 import { getSwipeHinted, markSwipeHinted } from "../api/flags";
 import { ApiError } from "../api/client";
 import { useSubmit } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { colors, space } from "../theme";
-import { Serif, Mono } from "./Text";
-import { GoldButton } from "./Button";
-import { ConvictionMeter } from "./ConvictionMeter";
+import { Mono } from "./Text";
 import { CardChrome, numeral } from "./CardChrome";
-import { SealStamp, STAMP_MS } from "./SealStamp";
-import { CrowdBar } from "./CrowdReveal";
-import { AsciiActivation } from "./TerminalPatina";
+import { AsciiCharge } from "./TerminalPatina";
 import { DecodeLine } from "./DecodeText";
 import type { RoundToday } from "@oracle/core";
 
-export interface CrowdEntry { crowd_yes_pct: number; player_count: number }
+// The throw IS the seal: release your pull and the card leaves your hand —
+// off the screen edge it was pulled toward, accelerating from wherever the
+// fingers let go, one heavy thunk at dispatch. No stamp, no pause. The next
+// card deals in under it; the crowd's verdict prints in the stationary
+// footer. If the oracle refuses the prophecy, the card flies back in.
+const THROW_MS = 320;
+const SCREEN_W = Dimensions.get("window").width;
 
-const FLIP_MS = 650;
+// The uncovered card's prophecy materializes IN PLACE and in ONE face: the
+// exact static it wore in the stack (same seed, same serif, muted ink)
+// prints left-to-right into the question's words in ink. No typeface flip,
+// no reflow — the card is an artifact whose inscription resolves, and the
+// terminal lives in the symbol set and the print cadence, not the font.
+// Reduced motion renders the words immediately.
+export const QUESTION_FACE = { size: 22, lineHeight: 32 } as const;
+const DECODE_DELAY_MS = 250;
+const DECODE_MS = 600;
 
-// The dealt card's prophecy materializes: the mono static it wore in the
-// deck dissolves into the serif question. Reduced motion renders the serif
-// immediately.
-function QuestionFace({ text }: { text: string }) {
-  const reducedMotion = useReducedMotion();
-  const t = useSharedValue(reducedMotion ? 1 : 0);
-  useEffect(() => {
-    if (!reducedMotion) t.value = withDelay(320, withTiming(1, { duration: 480 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design
-  }, []);
-  const serifStyle = useAnimatedStyle(() => ({ opacity: t.value }));
-  const noiseStyle = useAnimatedStyle(() => ({ opacity: 1 - t.value }));
+function QuestionFace({ text, seed }: { text: string; seed: string }) {
   return (
-    <View>
-      <Animated.View style={serifStyle}>
-        <Serif size={22} style={{ lineHeight: 32, textAlign: "center" }}>{text}</Serif>
-      </Animated.View>
-      <Animated.View style={[StyleSheet.absoluteFill, { justifyContent: "center", pointerEvents: "none" }, noiseStyle]}>
-        <Mono size={13} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: 24 }}>
-          {decodeFrame(text, 0, 1, text)}
-        </Mono>
-      </Animated.View>
-    </View>
+    <DecodeLine
+      serif
+      text={text}
+      seed={seed}
+      delayMs={DECODE_DELAY_MS}
+      durationMs={DECODE_MS}
+      size={QUESTION_FACE.size}
+      color={colors.ink}
+      dimColor={colors.mutedInk}
+      style={{ lineHeight: QUESTION_FACE.lineHeight, textAlign: "center" }}
+    />
   );
 }
 
-export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext, onLean }: {
+export function OracleCard({ q, date, onSealed, onLean }: {
   q: RoundToday["questions"][number];
   date: string;
-  revealed: boolean;
-  crowd: CrowdEntry | undefined;
-  isLast: boolean;
+  // Fires when the seal ceremony completes and the card has left the stage
+  // (or immediately under reduced motion). The store's sealed flag flips
+  // here too, so the round advances only after the throw.
   onSealed: () => void;
-  onNext: () => void;
   // The screen renders the stationary conviction column; the card reports
   // its live lean upward. active = a pull is in progress (from the first
   // slid point, before any conviction resolves); conf = resolved conviction.
@@ -68,19 +66,19 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
   const entry = answers[q.id];
   const submit = useSubmit();
   const [error, setError] = useState<string | null>(null);
-  const [stamped, setStamped] = useState(false);
+  const [thrown, setThrown] = useState(false);
   const [cardSize, setCardSize] = useState({ w: 0, h: 0 });
   const reducedMotion = useReducedMotion();
-  const flip = useSharedValue(revealed ? 180 : 0);
   // Swipe-to-lean: dragging the card face tilts it toward a side; release
-  // past the commit threshold selects (never seals). dragX/cardW live on the
-  // UI thread; the release decision runs the node-tested game module on JS.
+  // past the commit threshold SEALS at the pulled conviction. dragX/cardW
+  // live on the UI thread; the release decision runs the node-tested game
+  // module on JS.
   const dragX = useSharedValue(0);
   const cardW = useSharedValue(0);
   const stepSV = useSharedValue(-1);
   const pullProgress = useDerivedValue(() => (cardW.value > 0 ? dragX.value / cardW.value : 0));
   // The conviction the current pull (or button hold) implies — drives the
-  // conviction meter and the ratchet haptics.
+  // conviction column and the ratchet haptics.
   const [liveConf, setLiveConf] = useState<number | null>(null);
   const [liveSide, setLiveSide] = useState(true);
   const [dragActive, setDragActive] = useState(false);
@@ -90,35 +88,28 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
   // hold-to-charge buttons instead of the drag.
   const buttonsMode = screenReader || reducedMotion;
 
-  useEffect(() => {
-    if (reducedMotion) { flip.value = revealed ? 180 : 0; return; }
-    flip.value = withTiming(revealed ? 180 : 0, { duration: FLIP_MS, easing: Easing.out(Easing.poly(4)) });
-  }, [revealed, reducedMotion, flip]);
-
   const frontStyle = useAnimatedStyle(() => ({
     transform: [
-      { perspective: 1200 },
-      { rotateY: `${flip.value}deg` },
       { translateX: reducedMotion ? 0 : dragX.value },
       { rotate: `${reducedMotion ? 0 : (dragX.value / Math.max(1, cardW.value)) * 8}deg` },
     ],
-    backfaceVisibility: "hidden" as const,
   }));
-  // The side washes bleed in with the lean — same tokens as the selected
-  // button state, so the gesture and the buttons speak one color language.
+  // The side washes bleed in from the first slid point and saturate at the
+  // full pull — same tokens as the selected button state, so the gesture and
+  // the buttons speak one color language.
   const yesWashStyle = useAnimatedStyle(() => {
     const p = dragX.value / Math.max(1, cardW.value);
-    return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_COMMIT) : 0 };
+    return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_FULL) : 0 };
   });
   const noWashStyle = useAnimatedStyle(() => {
     const p = -dragX.value / Math.max(1, cardW.value);
-    return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_COMMIT) : 0 };
+    return { opacity: p > LEAN_DEAD_ZONE ? Math.min(1, p / LEAN_FULL) : 0 };
   });
-  // The question recedes as conviction takes the stage — fully by the
-  // commit point during a pull, and while a hold-to-charge is live.
+  // The question recedes as conviction takes the stage — fully by the top of
+  // the scale during a pull, and while a hold-to-charge is live.
   const holdDim = liveConf !== null;
   const questionStyle = useAnimatedStyle(() => {
-    const p = Math.min(1, Math.abs(dragX.value) / Math.max(1, cardW.value * LEAN_COMMIT));
+    const p = Math.min(1, Math.abs(dragX.value) / Math.max(1, cardW.value * LEAN_FULL));
     const drag = 1 - p * 0.9;
     return { opacity: holdDim ? Math.min(drag, 0.08) : drag, transform: [{ scale: 1 - p * 0.05 }] };
   }, [holdDim]);
@@ -139,8 +130,13 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
 
   const sealed = !!entry?.sealed;
   const sideSV = useSharedValue(0); // 1 = leaning YES, -1 = NO, 0 = unknown
+  // 1 while a sealing release is in flight: tells onFinalize NOT to spring
+  // the card home — the throw owns dragX from the moment the fingers let go.
+  const sealingSV = useSharedValue(0);
   const pan = Gesture.Pan()
-    .enabled(!revealed && !stamped && !sealed && !submit.isPending)
+    // buttonsMode players seal ONLY through the hold buttons — a stray brush
+    // across the face must never commit a prophecy they can't see moving.
+    .enabled(!buttonsMode && !thrown && !sealed && !submit.isPending)
     .activeOffsetX([-12, 12])
     .failOffsetY([-16, 16])
     .onBegin(() => {
@@ -162,15 +158,17 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
       }
     })
     .onEnd((e) => {
+      sealingSV.value = leanStep(e.translationX, cardW.value) !== -1 ? 1 : 0;
       runOnJS(commitLean)(e.translationX, cardW.value);
     })
     .onFinalize(() => {
-      // Runs on release AND cancellation: stand down and spring home.
+      // Runs on release AND cancellation: stand down, and spring home ONLY
+      // when the release didn't seal — a sealing release throws instead.
       runOnJS(setDragActive)(false);
       stepSV.value = -1;
       sideSV.value = 0;
       if (reducedMotion) dragX.value = 0;
-      else dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
+      else if (sealingSV.value === 0) dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
     });
 
   // Hold-to-charge (buttonsMode): pressing a side charges conviction one
@@ -220,40 +218,53 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once by design
   }, []);
-  const backStyle = useAnimatedStyle(() => ({
-    transform: [{ perspective: 1200 }, { rotateY: `${flip.value + 180}deg` }],
-    backfaceVisibility: "hidden" as const,
-  }));
 
-  // Release IS the seal: the pull (or hold) hands its side + conviction
-  // straight here. The meter stays lit while the seal is in flight; on
-  // failure the card returns unsealed with the error line, pullable again.
+  // The round advances only after the throw: the store's sealed flag is the
+  // thing that swaps `current`, so it must not flip mid-flight.
+  function finishSeal() {
+    markSealed(q.id);
+    onSealed();
+  }
+
+  // Release IS the seal, and the throw IS the ceremony: the moment the pull
+  // (or hold) commits, the card is dispatched — one heavy thunk, off the
+  // pulled edge, from wherever the fingers let go — while the server call
+  // flies with it. On refusal the card flies back in, unsealed, with the
+  // error line, pullable again.
   async function sealWith(answer: boolean, confidence: number) {
     setError(null);
     setAnswer(q.id, answer);
     setConfidence(q.id, confidence);
+    setLiveConf(null);
     const key = useRoundStore.getState().answers[q.id]!.idempotencyKey;
+    let flight: Promise<void> = Promise.resolve();
+    if (!reducedMotion) {
+      setThrown(true);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      flight = new Promise<void>((resolve) => {
+        dragX.value = withTiming((answer ? 1 : -1) * SCREEN_W * 1.2, { duration: THROW_MS, easing: Easing.in(Easing.poly(3)) }, () => {
+          runOnJS(resolve)();
+        });
+      });
+    }
     try {
       await submit.mutateAsync({ question_id: q.id, answer, confidence, idempotency_key: key });
-      markSealed(q.id);
-      setLiveConf(null);
-      if (reducedMotion) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onSealed();
-        return;
-      }
-      // Stamp lands, heavy haptic at its settle, then the flip.
-      setStamped(true);
-      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), STAMP_MS);
-      setTimeout(onSealed, STAMP_MS + 320);
+      await flight;
+      if (reducedMotion) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      finishSeal();
     } catch (e) {
-      setLiveConf(null);
+      // Let the throw land before the card returns — a mid-air reversal
+      // reads as a glitch, a full return reads as the oracle's refusal.
+      await flight;
+      sealingSV.value = 0;
+      setThrown(false);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (!reducedMotion) dragX.value = withSpring(0, { damping: 16, stiffness: 160 });
       setError(e instanceof ApiError && e.status === 409 ? "THE ORACLE HAS CLOSED" : "THE CONNECTION WAVERS — TRY AGAIN");
     }
   }
 
   const title = q.is_big_one ? "✶ The Big One · worth double" : q.category;
-  const mySidePct = crowd && entry ? (entry.answer ? crowd.crowd_yes_pct : 100 - crowd.crowd_yes_pct) : null;
 
   return (
     <View>
@@ -267,15 +278,15 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
         <CardChrome slot={q.slot} title={title} big={q.is_big_one} coordinate={`:: ${numeral(q.slot)} / ${date} / PER ${q.source_name.toUpperCase()}`}>
           {/* The question floats centered in the card's field, tarot-fashion;
               the controls anchor at the foot. The face is also the grab
-              surface: swipe it to lean toward a side (buttons remain the
-              canonical path — the gesture only ever selects, never seals). */}
+              surface: pull it toward a side and release to seal (buttonsMode
+              players hold-to-charge instead). */}
           <GestureDetector gesture={pan}>
             <Animated.View style={[{ flex: 1, justifyContent: "center" }, questionStyle]}>
-              <QuestionFace text={q.text} />
+              <QuestionFace text={q.text} seed={q.id} />
             </Animated.View>
           </GestureDetector>
           <View style={{ gap: space(3) }}>
-            {liveConf === null && !buttonsMode && !sealed ? (
+            {liveConf === null && !buttonsMode && !sealed && !thrown ? (
               <DecodeLine text="‹ NO ─ PULL · RELEASE ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
             ) : null}
             {buttonsMode && (
@@ -310,37 +321,9 @@ export function OracleCard({ q, date, revealed, crowd, isLast, onSealed, onNext,
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.ultramarineWash }, yesWashStyle]} />
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.vermilionWash }, noWashStyle]} />
         </View>
-        {liveConf !== null && <ConvictionMeter conf={liveConf} side={liveSide} pull={pullProgress} />}
-        {stamped && <AsciiActivation width={cardSize.w} height={cardSize.h} />}
-        {stamped && <SealStamp numeral={numeral(q.slot)} />}
-      </Animated.View>
-      {/* The turned-away face must not hit-test: RN hit-testing ignores
-          backfaceVisibility, so the hidden back face — rendered above the
-          front — would swallow every touch on the card. style.pointerEvents
-          (not the prop) so reanimated can't drop it. */}
-      <Animated.View style={[StyleSheet.absoluteFill, backStyle, { pointerEvents: revealed ? "auto" : "none" }]}>
-        <CardChrome slot={q.slot} title="The crowd speaks" big={q.is_big_one} fill coordinate=":: THE LEDGER IS READ TOMORROW NOON">
-          <View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
-            <Serif size={17} color={colors.mutedInk} numberOfLines={2}>{q.text}</Serif>
-            {crowd && entry ? (
-              <>
-                <CrowdBar pct={crowd.crowd_yes_pct} />
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Mono size={10} color={colors.goldText}>{crowd.crowd_yes_pct}% SAY YES</Mono>
-                  <Mono size={10} color={mySidePct !== null && mySidePct < 40 ? colors.goldText : colors.mutedInk}>
-                    {entry.answer ? "YOU: YES" : "YOU: NO"} @ {entry.confidence}%{mySidePct !== null && mySidePct < 40 ? " · AGAINST THE TIDE" : ""}
-                  </Mono>
-                </View>
-                <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2}>
-                  {crowd.player_count} ORACLES CONSULTED
-                </Mono>
-              </>
-            ) : (
-              <DecodeLine text="CONSULTING THE CROWD…" cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
-            )}
-          </View>
-          <GoldButton title={isLast ? "BEHOLD THE SPREAD" : "DRAW THE NEXT CARD"} onPress={onNext} />
-        </CardChrome>
+        {(dragActive || liveConf !== null) && !thrown && (
+          <AsciiCharge width={cardSize.w} height={cardSize.h} side={liveSide} charge={liveConf !== null ? (liveConf - 55) / 40 : 0} pull={pullProgress} />
+        )}
       </Animated.View>
     </View>
   );

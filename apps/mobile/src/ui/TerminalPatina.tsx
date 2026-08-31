@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Canvas, Fill, ImageShader, Rect, Shader, Skia, useClock, useImage } from "@shopify/react-native-skia";
-import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
+import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
+import { LEAN_FULL } from "../game/swipeLean";
 
 // Terminal Patina (brand brief §4-5, spec 2026-08-26-terminal-patina-shader.md):
 // sparse hash-selected monospace glyphs inside an annulus mask. Phase 1 has no
@@ -64,6 +65,8 @@ if (!effect) console.error("Terminal Patina SkSL unavailable — ASCII effects d
 const LAVENDER = [183, 169, 228] as const;
 const GOLD = [126, 101, 56] as const; // goldText
 const GLASS_BLUE = [156, 181, 209] as const; // glassBlue
+const ULTRAMARINE = [36, 61, 120] as const; // YES sleeve
+const VERMILION = [168, 75, 53] as const; // NO sleeve
 
 // Marked 'worklet' (spec deviation from brief's literal listing): this runs
 // inside useDerivedValue on the UI thread, and Reanimated 4.5.1 does not
@@ -179,6 +182,54 @@ export function PatinaHalo({
         <ImageShader image={atlas} rect={{ x: 0, y: 0, width: ATLAS_W, height: ATLAS_H }} />
       </Shader>
     </Rect>
+  );
+}
+
+// Charge (the swipe's instrument): a glyph annulus over the card face in the
+// side's sleeve tone, reading the pull live off the UI thread. The ring
+// widens and densifies as conviction climbs — the machine's own alphabet
+// where a soft glow would break the material system. `charge` is the
+// resolved conviction (0..1) so hold-to-charge reads too; `pull` is the raw
+// drag fraction so the field answers the very first slid point. Clock is
+// quantized to 6 steps/s and the canvas only mounts while a pull or charge
+// is live, so nothing repaints at rest.
+export function AsciiCharge({ width, height, side, charge, pull }: {
+  width: number;
+  height: number;
+  side: boolean; // true = YES (ultramarine), false = NO (vermilion)
+  charge: number; // 0..1 resolved conviction
+  pull: SharedValue<number>; // raw drag fraction −1..1; 0 under hold-to-charge
+}) {
+  const atlas = useImage(ATLAS);
+  const clock = useClock();
+  const reducedMotion = useReducedMotion();
+
+  const uniforms = useDerivedValue(() => {
+    const a = Math.max(Math.min(1, Math.abs(pull.value) / LEAN_FULL), charge);
+    const base = Math.min(width, height) / 2;
+    return {
+      atlasSize: [ATLAS_W, ATLAS_H],
+      glyphCount: GLYPH_COUNT,
+      cell: [CELL_W, CELL_H],
+      intensity: 0.15 + 0.55 * a,
+      t: Math.floor(clock.value / 166),
+      tint: tintOf(side ? ULTRAMARINE : VERMILION),
+      center: [width / 2, height / 2],
+      innerR: base * (0.42 + 0.3 * a),
+      outerR: base * (0.85 + 0.5 * a),
+      gate: 0.16 + 0.3 * a,
+    };
+  }, [width, height, side, charge]);
+
+  if (reducedMotion || !effect || !atlas || width === 0 || height === 0) return null;
+  return (
+    <Canvas style={{ position: "absolute", left: 0, top: 0, width, height }} pointerEvents="none">
+      <Fill>
+        <Shader source={effect} uniforms={uniforms}>
+          <ImageShader image={atlas} rect={{ x: 0, y: 0, width: ATLAS_W, height: ATLAS_H }} />
+        </Shader>
+      </Fill>
+    </Canvas>
   );
 }
 

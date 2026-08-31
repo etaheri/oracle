@@ -1,10 +1,12 @@
 // Swipe-to-lean: dragging the card face tilts it toward a side; releasing
-// past the commit threshold SELECTS that side (never seals — the seal stays
-// an explicit button). Drag distance suggests conviction: a nudge past the
-// threshold is 55, a full-width pull is 95, always snapped to the grid and
-// always still adjustable on the slider. Pure — node-tested.
-export const LEAN_COMMIT = 0.35; // fraction of card width that selects
+// past the commit threshold SEALS that side at the conviction the pull
+// implies. The scale is tuned for instant feedback: conviction resolves at
+// LEAN_COMMIT (one small nudge — 55%), climbs the 5-point grid, and tops out
+// at LEAN_FULL, well within a single thumb stroke. Below LEAN_COMMIT a
+// release cancels and the card springs home. Pure — node-tested.
 export const LEAN_DEAD_ZONE = 0.05; // no visual lean under this fraction
+export const LEAN_COMMIT = 0.12; // fraction of card width where 55% resolves
+export const LEAN_FULL = 0.62; // fraction of card width where 95% lands
 
 export function leanProgress(dx: number, cardWidth: number): number {
   if (cardWidth <= 0) return 0;
@@ -26,7 +28,7 @@ export function leanStep(dx: number, cardWidth: number): number {
   if (cardWidth <= 0) return -1;
   const p = Math.min(1, Math.abs(dx) / cardWidth);
   if (p < LEAN_COMMIT) return -1;
-  return Math.round(((p - LEAN_COMMIT) / (1 - LEAN_COMMIT)) * 8);
+  return Math.round(((Math.min(p, LEAN_FULL) - LEAN_COMMIT) / (LEAN_FULL - LEAN_COMMIT)) * 8);
 }
 
 // The accessible twin of the pull: press-and-hold charges conviction at one

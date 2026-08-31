@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asciiGauge, decodeFrame, GAUGE_CELLS } from "../src/game/terminalPrint";
+import { asciiGauge, decodeFrame, GAUGE_CELLS, blinkFrame } from "../src/game/terminalPrint";
 
 describe("decodeFrame", () => {
   const text = "THE ORACLE SPEAKS";
@@ -72,5 +72,30 @@ describe("asciiGauge", () => {
     const mid = (asciiGauge(80, 0.5).match(/#/g) ?? []).length;
     expect(mid).toBeLessThan(full);
     expect((asciiGauge(80, 0).match(/#/g) ?? []).length).toBe(0);
+  });
+});
+
+describe("blinkFrame", () => {
+  it("holds characters that did not change and noises only the ones that did", () => {
+    const f = blinkFrame("70%", "75%", "col");
+    expect(f[0]).toBe("7");
+    expect(f[1]).not.toBe("5");
+    expect(f[1]).not.toMatch(/[0-9]/); // symbols only — never a wrong digit
+    expect(f[2]).toBe("%");
+  });
+  it("noises every changed character when both digits roll (55 → 60)", () => {
+    const f = blinkFrame("55%", "60%", "col");
+    expect(f[0]).not.toMatch(/[0-9]/);
+    expect(f[1]).not.toMatch(/[0-9]/);
+    expect(f[2]).toBe("%");
+  });
+  it("is a no-op when nothing changed", () => {
+    expect(blinkFrame("80%", "80%", "col")).toBe("80%");
+  });
+  it("treats positions beyond the previous text as changed", () => {
+    const f = blinkFrame("9%", "95%", "col");
+    expect(f).toHaveLength(3);
+    expect(f[0]).toBe("9");
+    expect(f[1]).not.toMatch(/[0-9]/); // '%' is a legal noise symbol, so only digits are ruled out
   });
 });

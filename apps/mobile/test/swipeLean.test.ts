@@ -1,7 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { leanProgress, leanRelease, leanStep, holdConfidence, LEAN_COMMIT, LEAN_DEAD_ZONE, HOLD_STEP_MS } from "../src/game/swipeLean";
+import { leanProgress, leanRelease, leanStep, holdConfidence, LEAN_COMMIT, LEAN_DEAD_ZONE, LEAN_FULL, HOLD_STEP_MS } from "../src/game/swipeLean";
 
 const W = 320; // card width in px
+
+describe("the scale itself", () => {
+  it("commits within one small nudge — conviction must feel instant", () => {
+    expect(LEAN_COMMIT).toBeLessThanOrEqual(0.15);
+    expect(LEAN_COMMIT).toBeGreaterThan(LEAN_DEAD_ZONE);
+  });
+  it("tops out well within a single thumb stroke", () => {
+    expect(LEAN_FULL).toBeLessThanOrEqual(0.7);
+    expect(LEAN_FULL).toBeGreaterThan(LEAN_COMMIT);
+  });
+});
 
 describe("leanProgress", () => {
   it("is zero inside the dead zone", () => {
@@ -31,12 +42,13 @@ describe("leanRelease", () => {
     expect(leanRelease(W * LEAN_COMMIT, W)).toEqual({ answer: true, confidence: 55 });
     expect(leanRelease(-W * LEAN_COMMIT, W)).toEqual({ answer: false, confidence: 55 });
   });
-  it("a full pull lands maximum conviction", () => {
+  it("a pull to LEAN_FULL lands maximum conviction, and further pulls clamp there", () => {
+    expect(leanRelease(W * LEAN_FULL, W)).toEqual({ answer: true, confidence: 95 });
     expect(leanRelease(W, W)).toEqual({ answer: true, confidence: 95 });
     expect(leanRelease(-W * 3, W)).toEqual({ answer: false, confidence: 95 });
   });
   it("mid-pull maps onto the 55-95 grid symmetrically", () => {
-    const mid = W * (LEAN_COMMIT + (1 - LEAN_COMMIT) / 2);
+    const mid = W * (LEAN_COMMIT + (LEAN_FULL - LEAN_COMMIT) / 2);
     expect(leanRelease(mid, W)).toEqual({ answer: true, confidence: 75 });
     expect(leanRelease(-mid, W)).toEqual({ answer: false, confidence: 75 });
   });
@@ -53,7 +65,8 @@ describe("leanStep", () => {
     expect(leanStep(0, W)).toBe(-1);
     expect(leanStep(W * (LEAN_COMMIT - 0.01), W)).toBe(-1);
     expect(leanStep(W * LEAN_COMMIT, W)).toBe(0);
-    expect(leanStep(W, W)).toBe(8);
+    expect(leanStep(W * LEAN_FULL, W)).toBe(8);
+    expect(leanStep(W, W)).toBe(8); // clamps past LEAN_FULL
     expect(leanStep(-W, W)).toBe(8); // magnitude only — side is the sign of dx
     expect(leanStep(100, 0)).toBe(-1);
   });

@@ -31,6 +31,17 @@ export async function markSwipeHinted(): Promise<void> {
   try { await (await store()).setItemAsync(SWIPE_HINTED_KEY, "1"); } catch {}
 }
 
+const FLOOR_NOTICED_KEY = "oracle.floor_noticed";
+
+// The one-time floor rite: the first committed pull ever shows "NO COIN
+// FLIPS · 55 IS THE LEAST BELIEF" in place of the conviction reading.
+export async function getFloorNoticed(): Promise<boolean> {
+  try { return (await (await store()).getItemAsync(FLOOR_NOTICED_KEY)) === "1"; } catch { return true; } // storage failure → never replay the rite
+}
+export async function markFloorNoticed(): Promise<void> {
+  try { await (await store()).setItemAsync(FLOOR_NOTICED_KEY, "1"); } catch {}
+}
+
 const NOTIF_ASKED_KEY = "oracle.notif_asked";
 
 export async function getNotifAsked(): Promise<boolean> {

@@ -36,3 +36,15 @@ export function asciiGauge(pct: number, progress = 1): string {
   const filled = Math.round(target * Math.min(1, Math.max(0, progress)));
   return `[${"#".repeat(filled)}${"·".repeat(GAUGE_CELLS - filled)}]`;
 }
+
+// One blink frame for a readout that just changed: characters that differ
+// from the previous reading pass through noise for a tick; characters that
+// held (the "7" in 70→75, the "%") stay put. A gauge counts up — it does not
+// re-scramble what the eye already resolved.
+export function blinkFrame(prev: string, next: string, seedKey: string): string {
+  if (prev === next) return next;
+  const noise = decodeFrame(next, 0, 1, `${seedKey}:${next}`);
+  let out = "";
+  for (let i = 0; i < next.length; i++) out += prev[i] === next[i] ? next[i] : noise[i];
+  return out;
+}

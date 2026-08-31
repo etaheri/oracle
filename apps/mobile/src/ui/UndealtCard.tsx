@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import { CardChrome } from "./CardChrome";
-import { Mono } from "./Text";
+import { Serif } from "./Text";
+import { QUESTION_FACE } from "./OracleCard";
 import { decodeFrame } from "../game/terminalPrint";
 import { colors } from "../theme";
 import type { RoundToday } from "@oracle/core";
@@ -9,6 +10,13 @@ import type { RoundToday } from "@oracle/core";
 // and question print as pure static (decodeFrame step 0 — symbols only, word
 // shape preserved), so the stack shows true depth without spoiling a card
 // that has not been dealt. Never interactive.
+//
+// The top of the stack's resting pose is exported so the live card can take
+// over from EXACTLY here when the thrown card uncovers it — the stack card
+// and the live card must read as the same object.
+export const STACK_TOP_Y = 9;
+export const STACK_TOP_ROTATE = "-0.7deg";
+
 export function UndealtCard({ q, index }: { q: RoundToday["questions"][number]; index: number }) {
   return (
     <View
@@ -17,15 +25,17 @@ export function UndealtCard({ q, index }: { q: RoundToday["questions"][number]; 
         position: "absolute",
         left: 0,
         right: 0,
-        top: 9 + index * 9,
-        transform: [{ rotate: index === 0 ? "-0.7deg" : "0.9deg" }],
+        top: STACK_TOP_Y + index * 9,
+        transform: [{ rotate: index === 0 ? STACK_TOP_ROTATE : "0.9deg" }],
       }}
     >
       <CardChrome slot={q.slot} title={decodeFrame(q.category, 0, 1, q.id)} big={q.is_big_one}>
         <View style={{ flex: 1, justifyContent: "center" }}>
-          <Mono size={13} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: 24 }}>
+          {/* Same face, size, seed and tone as the live card's unresolved
+              inscription — so uncovering it changes nothing but time. */}
+          <Serif size={QUESTION_FACE.size} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: QUESTION_FACE.lineHeight }}>
             {decodeFrame(q.text, 0, 1, q.id)}
-          </Mono>
+          </Serif>
         </View>
       </CardChrome>
     </View>

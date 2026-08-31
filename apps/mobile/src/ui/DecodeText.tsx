@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Text, type TextProps } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { colors } from "../theme";
-import { Mono } from "./Text";
+import { Mono, Serif } from "./Text";
 import { decodeFrame } from "../game/terminalPrint";
 
 // The machine prints its lines: characters resolve left-to-right out of ASCII
@@ -18,6 +18,8 @@ export function DecodeLine({
   delayMs = 0,
   cursor = false,
   active = true,
+  serif = false,
+  dimColor,
   size,
   color,
   letterSpacing,
@@ -32,6 +34,12 @@ export function DecodeLine({
   // While false the line holds as static (full noise) and the print does not
   // start — home uses this to wait out the boot-rite overlay.
   active?: boolean;
+  // Print in the card's serif instead of the machine's mono — the artifact's
+  // own text resolving in its own face, no typeface flip at the end.
+  serif?: boolean;
+  // Two-tone print: the unresolved static wears this color, the resolved
+  // characters wear `color`. Omit for a single-tone line.
+  dimColor?: string;
   size?: number;
   color?: string;
   letterSpacing?: number;
@@ -64,12 +72,17 @@ export function DecodeLine({
   }, [cursor, reducedMotion]);
 
   const shown = decodeFrame(text, step, totalSteps, seed ?? text);
+  // Same split decodeFrame uses, so the tone boundary sits exactly on the
+  // resolved/unresolved seam.
+  const revealed = step >= totalSteps ? text.length : Math.floor((text.length * Math.max(0, step)) / totalSteps);
+  const Face = serif ? Serif : Mono;
   return (
-    <Mono size={size} color={color} letterSpacing={letterSpacing} style={style} {...rest}>
-      {shown}
+    <Face size={size} color={color} {...(serif ? {} : { letterSpacing })} style={style} {...rest}>
+      {dimColor ? shown.slice(0, revealed) : shown}
+      {dimColor && <Text style={{ color: dimColor }}>{shown.slice(revealed)}</Text>}
       {cursor && (
         <Text style={{ color: blinkOn || reducedMotion ? (color ?? colors.mutedInk) : "transparent" }}>_</Text>
       )}
-    </Mono>
+    </Face>
   );
 }
