@@ -261,5 +261,6 @@ describe("POST /v1/telegram/:secret", () => {
 
     const updated = await db.query.questions.findFirst({ where: eq(schema.questions.id, qs[0]!.id) });
     expect(updated!.outcome).toBe("no");
+    expect((updated!.resolutionEvidence as { reason?: string })?.reason).toBe("overturned by the operator");
   });
 });

@@ -17,7 +17,7 @@ describe("crowdVerdict", () => {
     expect(crowdVerdict(true, 59, 50)).toEqual({ line: "59% SAY YES · THE CROWD SPLITS", against: false });
   });
   it("agrees with the scoring engine's contrarian rule exactly at the boundary", () => {
-    // sidePct < 40 is the CONTRARIAN_MULT condition — 40 itself is not contrarian.
+    // sidePct < 40 is the contrarianApplies condition — 40 itself is not contrarian.
     expect(crowdVerdict(true, 40, 50).against).toBe(false);
     expect(crowdVerdict(false, 60, 50).against).toBe(false);
     expect(crowdVerdict(false, 61, 50).against).toBe(true);
