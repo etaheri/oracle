@@ -1,0 +1,62 @@
+import { Hono } from "hono";
+import { z } from "zod";
+import { eq, sql } from "drizzle-orm";
+import type { AppContext } from "../app";
+import { schema } from "../db/client";
+
+// RevenueCat webhook (spec §2). Idempotent via webhook_events insert-first.
+// Ruling: always 200 for payloads we can't act on — RevenueCat retries 4xx/5xx
+// and a permanently-bad event would retry forever. 401 only for a bad secret.
+const EventSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  app_user_id: z.string(),
+  product_id: z.string().optional(),
+  expiration_at_ms: z.number().optional(),
+});
+const PLUS_PRODUCTS = ["plus_monthly", "plus_annual"];
+const ACTIVATING = ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE"];
+
+export const webhookRoutes = new Hono<AppContext>().post("/revenuecat", async (c) => {
+  const { db, env } = c.get("deps");
+  const secret = env.REVENUECAT_WEBHOOK_SECRET;
+  const auth = c.req.header("authorization") ?? "";
+  if (!secret || auth !== `Bearer ${secret}`) return c.json({ error: "unauthorized" }, 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = EventSchema.safeParse((body as { event?: unknown } | null)?.event);
+  if (!parsed.success) return c.json({ ok: true, ignored: "malformed" });
+  const evt = parsed.data;
+
+  const marker = await db.insert(schema.webhookEvents).values({ id: evt.id }).onConflictDoNothing().returning();
+  if (marker.length === 0) return c.json({ ok: true, ignored: "duplicate" });
+
+  const device = await db.query.devices.findFirst({ where: eq(schema.devices.id, evt.app_user_id) });
+  if (!device) return c.json({ ok: true, ignored: "unknown app_user_id" });
+  const userId = device.userId;
+
+  const ensure = () => db.insert(schema.entitlements).values({ userId }).onConflictDoNothing();
+
+  if (evt.type === "NON_RENEWING_PURCHASE" && evt.product_id === "shield_rescue") {
+    await ensure();
+    await db.update(schema.entitlements)
+      .set({ shieldsRemaining: sql`${schema.entitlements.shieldsRemaining} + 1`, updatedAt: new Date() })
+      .where(eq(schema.entitlements.userId, userId));
+    return c.json({ ok: true });
+  }
+  if (evt.product_id && PLUS_PRODUCTS.includes(evt.product_id)) {
+    if (ACTIVATING.includes(evt.type)) {
+      await ensure();
+      await db.update(schema.entitlements)
+        .set({ plusActive: true, expiresAt: evt.expiration_at_ms ? new Date(evt.expiration_at_ms) : null, updatedAt: new Date() })
+        .where(eq(schema.entitlements.userId, userId));
+    } else if (evt.type === "EXPIRATION") {
+      await ensure();
+      await db.update(schema.entitlements)
+        .set({ plusActive: false, updatedAt: new Date() })
+        .where(eq(schema.entitlements.userId, userId));
+    }
+    // CANCELLATION = auto-renew off, entitlement holds until EXPIRATION. BILLING_ISSUE: grace handled by eventual EXPIRATION.
+  }
+  return c.json({ ok: true });
+});
