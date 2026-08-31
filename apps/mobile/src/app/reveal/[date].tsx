@@ -18,6 +18,7 @@ import type { QuestionResult } from "../../game/sharePattern";
 import { payoff } from "@oracle/core";
 import { useReveal } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
+import { rowState, rowMark, rowRight, receiptLine, ledgerLines, pendingLine, lapsedLine } from "../../game/revealRows";
 import { colors, space } from "../../theme";
 
 const easeOut = Easing.out(Easing.poly(4));
@@ -36,10 +37,6 @@ const TideFlash = new Keyframe({
 export default function RevealScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const reveal = useReveal(date ?? null);
-  useEffect(() => {
-    const d = reveal.data;
-    if (d && !("pending" in d)) void markRevealSeen(d.date);
-  }, [reveal.data]);
   const reducedMotion = useReducedMotion();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
@@ -51,13 +48,22 @@ export default function RevealScreen() {
   useEffect(() => {
     if (!loaded) return;
     const d2 = reveal.data;
-    const big2 = d2 && !("pending" in d2) ? d2.questions.find((q) => q.slot === 5) : undefined;
-    const tide = !!big2?.my && (big2.my.points ?? 0) > payoff(big2.my.confidence, true).win;
+    if (!d2 || "pending" in d2) return;
+    const spectator = d2.questions.every((q) => q.my === null);
     const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
-    if (tide && !reducedMotion) {
-      timers.push(setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), BIG_ONE_DELAY + 650));
-      timers.push(setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), BIG_ONE_DELAY + 800));
+    // A spectator reveal has nothing to celebrate — mark it seen right away
+    // instead of waiting on a ceremony that never plays.
+    if (spectator) {
+      void markRevealSeen(d2.date);
+    } else {
+      const big2 = d2.questions.find((q) => q.slot === 5);
+      const tide = !!big2?.my && (big2.my.points ?? 0) > payoff(big2.my.confidence, true).win;
+      timers.push(setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
+      timers.push(setTimeout(() => markRevealSeen(d2.date), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
+      if (tide && !reducedMotion) {
+        timers.push(setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), BIG_ONE_DELAY + 650));
+        timers.push(setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), BIG_ONE_DELAY + 800));
+      }
     }
     return () => timers.forEach(clearTimeout);
   }, [loaded, reducedMotion, reveal.data]);
@@ -81,15 +87,20 @@ export default function RevealScreen() {
       <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
       <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
-      <DecodeLine text="RETURN AT NOON." cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
+      <DecodeLine text={pendingLine(date ?? "", new Date().toISOString().slice(0, 10))} cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
     </View></Screen>;
   }
 
   const d = reveal.data;
   const big = d.questions.find((q) => q.slot === 5);
+  const bigState = big ? rowState(big) : null;
   const contrarianWin = !!big?.my && (big.my.points ?? 0) > payoff(big.my.confidence, true).win;
-  const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult =>
-    !q.my ? "none" : q.outcome === "void" ? "void" : (q.my.points ?? 0) > 0 ? "win" : "loss");
+  const anyPending = d.questions.some((q) => rowState(q) === "pending");
+  const allSpectator = d.questions.every((q) => q.my === null);
+  const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult => {
+    const st = rowState(q);
+    return st === "win" ? "win" : st === "loss" ? "loss" : st === "void" ? "void" : "none"; // pending, spectator → none
+  });
   const cardData: ShareCardData = {
     date: d.date,
     dayPoints: d.day_points,
@@ -108,25 +119,43 @@ export default function RevealScreen() {
     <Screen>
       <TopBar />
       <ScrollView contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}>
-        <Eyebrow>{`Day ${d.date} · the ledger is read`}</Eyebrow>
+        <Eyebrow>
+          {anyPending
+            ? `Day ${d.date} · the ledger is still being read`
+            : allSpectator
+              ? `Day ${d.date} · the ledger was read without you`
+              : `Day ${d.date} · the ledger is read`}
+        </Eyebrow>
+        {allSpectator && !anyPending && (
+          <DecodeLine text={lapsedLine(d.date)} size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
+        )}
         <Animated.View entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)} style={{ alignItems: "center", gap: space(1) }}>
-          <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
-          <Mono size={9} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
-          {d.first_hour && d.day_points > 0 && (
-            <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
+          {!allSpectator && (
+            <>
+              <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
+              <Mono size={9} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
+              {d.first_hour && d.day_points > 0 && (
+                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
+              )}
+            </>
           )}
+          {ledgerLines(d.ledger).map((line, i) => (
+            <Mono key={i} size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
+          ))}
         </Animated.View>
         <View>
           {d.questions.filter((q) => q.slot !== 5).map((q, i) => {
-            const won = q.my && q.outcome !== "void" && q.my.points !== null && q.my.points > 0;
-            const mark = q.outcome === "void" ? "∅" : won ? "✓" : q.my ? "✗" : "·";
-            const color = q.outcome === "void" ? colors.mutedInk : won ? colors.goldText : q.my ? colors.vermilion : colors.mutedInk;
+            const st = rowState(q);
+            const color = st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
             return (
               <Animated.View key={q.id} entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
                 style={{ flexDirection: "row", gap: space(2), paddingVertical: space(2), borderBottomWidth: 1, borderBottomColor: colors.lineSoft, alignItems: "baseline" }}>
-                <Mono size={12} color={color}>{mark}</Mono>
-                <Mono size={11} color={colors.mutedInk} style={{ flex: 1 }} numberOfLines={2}>{q.text}</Mono>
-                <Mono size={12} color={color}>{q.my?.points != null ? (q.my.points > 0 ? `+${q.my.points}` : String(q.my.points)) : "—"}</Mono>
+                <Mono size={12} color={color}>{rowMark(st)}</Mono>
+                <View style={{ flex: 1 }}>
+                  <Mono size={11} color={colors.mutedInk} numberOfLines={2}>{q.text}</Mono>
+                  <Mono size={9} color={colors.mutedInk} numberOfLines={2}>{receiptLine(q)}</Mono>
+                </View>
+                <Mono size={12} color={color}>{rowRight(q)}</Mono>
               </Animated.View>
             );
           })}
@@ -151,18 +180,30 @@ export default function RevealScreen() {
             <View style={{ padding: space(3), gap: space(2) }}>
               <Ritual bold size={11} letterSpacing={4}>✶ THE BIG ONE</Ritual>
               <Serif size={17}>{big.text}</Serif>
-              {big.my && big.crowd_yes_pct !== null && (
+              {bigState === "pending" && (
+                <Mono size={11} color={colors.mutedInk}>{receiptLine(big)}</Mono>
+              )}
+              {bigState === "void" && (
+                <Mono size={11} color={colors.mutedInk}>{receiptLine(big)}</Mono>
+              )}
+              {bigState !== "pending" && bigState !== "void" && big.crowd_yes_pct !== null && (
                 <View style={{ gap: space(1) }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Mono size={11}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
-                    <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
-                      {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
-                    </Mono>
-                  </View>
+                  {big.my && (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Mono size={11}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
+                      <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
+                        {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
+                      </Mono>
+                    </View>
+                  )}
                   <Mono size={10} color={colors.mutedInk}>CROWD SAID {big.crowd_yes_pct}% YES</Mono>
                   {big.market_prob != null && (
                     <Mono size={10} color={colors.mutedInk}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
                   )}
+                  {big.oracle_p_yes != null && (
+                    <Mono size={10} color={colors.mutedInk}>THE ORACLE FORESAW {Math.round(big.oracle_p_yes * 100)}% YES</Mono>
+                  )}
+                  <Mono size={10} color={colors.mutedInk} numberOfLines={2}>{receiptLine(big)}</Mono>
                   {contrarianWin && (
                     <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
                       <Ritual bold size={14} letterSpacing={3}>AGAINST THE TIDE</Ritual>
