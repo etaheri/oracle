@@ -100,6 +100,7 @@ export const meRoutes = new Hono<AppContext>()
       })(),
       paid_shields: ent?.shieldsRemaining ?? 0,
       shield_used_on: user?.freeShieldUsedAt ?? null,
+      claimed: Boolean(user?.appleSub),
       epithet,
       computed_through: new Date().toISOString().slice(0, 10),
     });

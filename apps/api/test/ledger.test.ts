@@ -104,7 +104,7 @@ describe("GET /v1/me/ledger", () => {
 
     const fresh = await player(app);
     const outF = (await (await fresh("/v1/me/ledger")).json()) as Record<string, unknown>;
-    expect(outF).toMatchObject({ days_consulted: 0, accuracy_pct: null, streak: 0 });
+    expect(outF).toMatchObject({ days_consulted: 0, accuracy_pct: null, streak: 0, claimed: false });
     expect((outF.epithet as { id: string }).id).toBe("unread");
   });
 

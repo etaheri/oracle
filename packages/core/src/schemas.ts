@@ -114,6 +114,7 @@ export const MeLedgerSchema = z.object({
   free_shield_available: z.boolean(),
   paid_shields: z.number().int().min(0),
   shield_used_on: z.string().nullable(),
+  claimed: z.boolean(),
   epithet: z.object({ id: z.string(), title: z.string(), receipt: z.string() }),
   computed_through: z.string(),
 });
