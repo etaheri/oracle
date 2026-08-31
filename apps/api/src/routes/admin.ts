@@ -120,4 +120,18 @@ export const adminRoutes = new Hono<AppContext>()
     if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
     const executed = await runTick(pipeline);
     return c.json({ ok: true, executed });
+  })
+  .post("/bank", async (c) => {
+    const parsed = DraftSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    if (parsed.data.questions.some((q) => q.locks_at !== null)) return c.json({ error: "bank drafts must not set locks_at" }, 400);
+    const [row] = await c.get("deps").db.insert(schema.draftBank).values({ draft: parsed.data }).returning({ id: schema.draftBank.id });
+    return c.json({ id: row!.id }, 201);
+  })
+  .get("/bank", async (c) => {
+    const rows = await c.get("deps").db.query.draftBank.findMany({ orderBy: (b, { asc }) => [asc(b.createdAt)] });
+    return c.json({
+      available: rows.filter((r) => r.usedOn === null).length,
+      drafts: rows.map((r) => ({ id: r.id, created_at: r.createdAt.toISOString(), used_on: r.usedOn })),
+    });
   });

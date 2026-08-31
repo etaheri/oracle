@@ -2,13 +2,14 @@
 // into a plain snapshot; decideActions is a pure function of ET wall-clock +
 // that snapshot — no Date.now, no I/O, so the cron's every-tick decisions are
 // fully testable and replayable.
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import { addDays, type ETNow } from "./clock";
 
 export type Action =
   | { kind: "lock"; date: string }
   | { kind: "publish"; date: string }
+  | { kind: "publish-bank"; date: string }
   | { kind: "resolve"; date: string; questionIds: string[] }
   | { kind: "void"; date: string; questionIds: string[] }
   | { kind: "settle"; date: string }
@@ -19,16 +20,18 @@ export interface PipelineState {
   openRound: { date: string; lockPassed: boolean } | null; // status='open'; lockPassed = now >= questions' locksAt
   lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
   scheduledDates: string[]; // rounds with status='scheduled'
+  bankCount: number; // unused evergreen drafts (draft_bank.used_on IS NULL)
 }
 
 export async function loadPipelineState(db: Db, now: Date): Promise<PipelineState> {
-  const [openRoundRow, lockedRoundRow, scheduledRounds] = await Promise.all([
+  const [openRoundRow, lockedRoundRow, scheduledRounds, bankRow] = await Promise.all([
     db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") }),
     db.query.rounds.findFirst({
       where: eq(schema.rounds.status, "locked"),
       orderBy: (rounds, { asc }) => [asc(rounds.date)],
     }),
     db.query.rounds.findMany({ where: eq(schema.rounds.status, "scheduled") }),
+    db.select({ n: count() }).from(schema.draftBank).where(isNull(schema.draftBank.usedOn)),
   ]);
 
   let openRound: PipelineState["openRound"] = null;
@@ -59,6 +62,7 @@ export async function loadPipelineState(db: Db, now: Date): Promise<PipelineStat
     openRound,
     lockedRound,
     scheduledDates: scheduledRounds.map((r) => r.date),
+    bankCount: Number(bankRow[0]?.n ?? 0),
   };
 }
 
@@ -77,6 +81,12 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
   const openBlocksPublish = state.openRound !== null && !state.openRound.lockPassed;
   if (hour >= 12 && state.scheduledDates.includes(today) && !openBlocksPublish) {
     actions.push({ kind: "publish", date: today });
+  }
+
+  // PUBLISH FROM THE BANK — noon with nothing scheduled for today: the drop
+  // must never depend on the author having been awake (design spec §6).
+  if (hour >= 12 && !state.scheduledDates.includes(today) && !openBlocksPublish && state.openRound?.date !== today && state.bankCount > 0) {
+    actions.push({ kind: "publish-bank", date: today });
   }
 
   // RESOLVE / VOID / SETTLE on the locked round
@@ -99,11 +109,19 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
 
   // ALERTS — each throttled to one tick per hour by minute window
   if (hour >= 23 && minute < 10 && !state.scheduledDates.includes(tomorrow)) {
-    actions.push({
-      kind: "alert",
-      level: "critical",
-      message: `no draft for tomorrow — seed manually: POST /admin/rounds/${tomorrow}`,
-    });
+    actions.push(
+      state.bankCount > 0
+        ? {
+            kind: "alert",
+            level: "warn",
+            message: `no draft for tomorrow — the bank covers noon (${state.bankCount} left)`,
+          }
+        : {
+            kind: "alert",
+            level: "critical",
+            message: `no draft for tomorrow — seed manually: POST /admin/rounds/${tomorrow}`,
+          },
+    );
   }
 
   if (
@@ -111,7 +129,8 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     minute >= 10 &&
     minute < 20 &&
     !state.scheduledDates.includes(today) &&
-    state.openRound?.date !== today
+    state.openRound?.date !== today &&
+    state.bankCount === 0
   ) {
     actions.push({
       kind: "alert",

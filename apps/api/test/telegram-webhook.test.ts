@@ -151,6 +151,7 @@ describe("POST /v1/telegram/:secret", () => {
     expect(sent[0]).toContain("open: none");
     expect(sent[0]).toContain("locked-unsettled: none");
     expect(sent[0]).toContain("tomorrow draft: yes");
+    expect(sent[0]).toContain("bank: 0");
   });
 
   it("/reroll with a standing draft: 'rerolling slot N…' sent and the slot's question changes", async () => {

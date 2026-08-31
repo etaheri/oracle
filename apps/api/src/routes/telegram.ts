@@ -86,6 +86,7 @@ export const telegramRoutes = new Hono<AppContext>().post("/:secret", async (c) 
             ? `locked-unsettled: ${state.lockedRound.date} (${state.lockedRound.unresolvedIds.length} unresolved)`
             : "locked-unsettled: none",
           `tomorrow draft: ${state.scheduledDates.length > 0 ? "yes" : "no"}`,
+          `bank: ${state.bankCount}`,
         ];
         await send(lines.join("\n"));
         break;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
+import { validDraft } from "./helpers/draft";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import { voidQuestions } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
@@ -132,6 +133,32 @@ describe("runTick", () => {
     const done = await runTick(deps); // stub authorRound throws "authoring not wired"
     expect(done.some((d) => d.startsWith("author"))).toBe(false);
     expect(sent.some((t) => t.includes("author failed"))).toBe(true);
+  });
+
+  it("noon with no draft publishes the oldest bank entry and marks it used", async () => {
+    const { db } = await makeTestDb();
+    const [older, newer] = await db
+      .insert(schema.draftBank)
+      .values([
+        { draft: validDraft, createdAt: new Date("2026-08-20T00:00:00Z") },
+        { draft: validDraft, createdAt: new Date("2026-08-21T00:00:00Z") },
+      ])
+      .returning({ id: schema.draftBank.id });
+    const { deps, sent } = fakeDeps(db, "2026-08-27T16:00:00Z"); // noon ET, nothing scheduled
+    const done = await runTick(deps);
+    expect(done).toContain("publish-bank:2026-08-27");
+
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-08-27") });
+    expect(round!.status).toBe("open");
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    expect(qs.filter((q) => q.status === "open")).toHaveLength(5);
+
+    const olderRow = await db.query.draftBank.findFirst({ where: eq(schema.draftBank.id, older!.id) });
+    const newerRow = await db.query.draftBank.findFirst({ where: eq(schema.draftBank.id, newer!.id) });
+    expect(olderRow!.usedOn).toBe("2026-08-27");
+    expect(newerRow!.usedOn).toBeNull();
+
+    expect(sent.some((t) => /published from the evergreen bank \(1 left\)/.test(t))).toBe(true);
   });
 });
 

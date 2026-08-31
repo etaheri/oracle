@@ -1,0 +1,64 @@
+{
+  "questions": [
+    {
+      "slot": 1,
+      "category": "markets",
+      "text": "Will the S&P 500 close higher tomorrow than it closed today?",
+      "resolution_criteria": "Per the S&P 500 (SPX) official closing value reported by WSJ Markets, tomorrow's close > today's close.",
+      "source_name": "WSJ",
+      "source_url": "https://www.wsj.com/market-data/quotes/index/SPX",
+      "author_probability": 0.52,
+      "is_big_one": false,
+      "market_prob": null,
+      "locks_at": null
+    },
+    {
+      "slot": 2,
+      "category": "weather",
+      "text": "Will Central Park's high temperature tomorrow exceed the NWS forecast high issued today?",
+      "resolution_criteria": "Per the National Weather Service Central Park (KNYC) observed daily high vs. the NWS forecast high for that date issued the prior day, observed > forecast.",
+      "source_name": "NWS",
+      "source_url": "https://forecast.weather.gov/MapClick.php?lat=40.7829&lon=-73.9654",
+      "author_probability": 0.45,
+      "is_big_one": false,
+      "market_prob": null,
+      "locks_at": null
+    },
+    {
+      "slot": 3,
+      "category": "culture",
+      "text": "Will the #1 movie at the U.S. box office tomorrow be the same title that was #1 today?",
+      "resolution_criteria": "Per Box Office Mojo's daily domestic chart, tomorrow's #1 title matches today's #1 title.",
+      "source_name": "Box Office Mojo",
+      "source_url": "https://www.boxofficemojo.com/daily/",
+      "author_probability": 0.6,
+      "is_big_one": false,
+      "market_prob": null,
+      "locks_at": null
+    },
+    {
+      "slot": 4,
+      "category": "news",
+      "text": "Will the top story on the NYTimes.com homepage tomorrow morning be a different story than today's top story?",
+      "resolution_criteria": "Per a same-time (9:00 AM ET) comparison of the lead headline on nytimes.com, tomorrow's top story differs from today's.",
+      "source_name": "The New York Times",
+      "source_url": "https://www.nytimes.com",
+      "author_probability": 0.55,
+      "is_big_one": false,
+      "market_prob": null,
+      "locks_at": null
+    },
+    {
+      "slot": 5,
+      "category": "sports",
+      "text": "Will any MLB game scheduled for tomorrow go into extra innings?",
+      "resolution_criteria": "Per MLB.com's official scoreboard, at least one scheduled game tomorrow reaches the 10th inning or later.",
+      "source_name": "MLB.com",
+      "source_url": "https://www.mlb.com/scores",
+      "author_probability": 0.5,
+      "is_big_one": true,
+      "market_prob": null,
+      "locks_at": null
+    }
+  ]
+}

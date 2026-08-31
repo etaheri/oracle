@@ -7,7 +7,7 @@
 import type { Db } from "../db/client";
 import { etNow } from "./clock";
 import { decideActions, loadPipelineState } from "./state";
-import { lock, publish, settle, voidQuestions } from "./actions";
+import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
 import { authorRound } from "./author";
 import { resolveWithClaude } from "./resolve";
 import type { TelegramClient } from "./telegram";
@@ -45,6 +45,12 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
         case "publish": {
           const published = await publish(deps.db, deps.telegram, action.date);
           if (published) done.push(`publish:${action.date}`);
+          break;
+        }
+
+        case "publish-bank": {
+          const published = await publishFromBank(deps.db, deps.telegram, action.date);
+          if (published) done.push(`publish-bank:${action.date}`);
           break;
         }
 

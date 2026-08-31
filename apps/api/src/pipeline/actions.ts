@@ -4,12 +4,13 @@
 // labels. neon-http has no transactions — every write here is a standalone
 // statement, safe to retry on the next tick if a later step in the same
 // action fails.
-import { and, count, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { oracleForecast } from "@oracle/core";
 import { schema, type Db } from "../db/client";
 import { addDays, noonET } from "./clock";
 import { resolveQuestion } from "../resolution";
 import { settleRound } from "../settlement";
+import { DraftSchema, upsertDraft } from "./draft";
 import type { TelegramClient } from "./telegram";
 
 // The Oracle takes its position (design §2a) the instant the crowd is final.
@@ -70,6 +71,34 @@ export async function publish(db: Db, telegram: TelegramClient, date: string): P
   }
   await db.update(schema.rounds).set({ status: "open" }).where(eq(schema.rounds.date, date));
   return true;
+}
+
+// The evergreen drop (spec §6): noon with nothing authored falls through to
+// the oldest unused bank entry, so the round never depends on the agent
+// being alive. An entry that fails DraftSchema (bank contents predate a
+// schema change, or were hand-inserted wrong) is poisoned — marked used on
+// this date without ever publishing — so the next tick tries the next one
+// instead of retrying the same bad row forever.
+export async function publishFromBank(db: Db, telegram: TelegramClient, date: string): Promise<boolean> {
+  const entry = await db.query.draftBank.findFirst({
+    where: isNull(schema.draftBank.usedOn),
+    orderBy: [asc(schema.draftBank.createdAt)],
+  });
+  if (!entry) return false;
+
+  const parsed = DraftSchema.safeParse(entry.draft);
+  if (!parsed.success) {
+    await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
+    await telegram.send(`⚠ bank draft ${entry.id} failed validation and was skipped`);
+    return false;
+  }
+
+  await upsertDraft(db, date, parsed.data);
+  await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
+  const ok = await publish(db, telegram, date);
+  const [left] = await db.select({ n: count() }).from(schema.draftBank).where(isNull(schema.draftBank.usedOn));
+  await telegram.send(`⚠ round ${date} published from the evergreen bank (${Number(left?.n ?? 0)} left)`);
+  return ok;
 }
 
 export async function voidQuestions(

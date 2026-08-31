@@ -187,3 +187,39 @@ describe("POST /admin/questions/:id/resolve", () => {
     expect(await forced.json()).toEqual({ ok: true, rescored: 0 }); // round not settled yet
   });
 });
+
+describe("POST /admin/bank", () => {
+  it("accepts a valid bank draft (no locks_at) and returns an id", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/bank", { method: "POST", body: JSON.stringify(validDraft) });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string };
+    expect(typeof body.id).toBe("string");
+  });
+
+  it("rejects a draft with a non-null locks_at", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const draftWithLock = {
+      questions: validDraft.questions.map((q, i) => (i === 0 ? { ...q, locks_at: "2026-08-27T18:00:00Z" } : q)),
+    };
+    const res = await admin(app)("/admin/bank", { method: "POST", body: JSON.stringify(draftWithLock) });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bank drafts must not set locks_at" });
+  });
+});
+
+describe("GET /admin/bank", () => {
+  it("lists bank drafts and the available count", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    await admin(app)("/admin/bank", { method: "POST", body: JSON.stringify(validDraft) });
+    const res = await admin(app)("/admin/bank");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { available: number; drafts: Array<{ id: string; created_at: string; used_on: string | null }> };
+    expect(body.available).toBe(1);
+    expect(body.drafts).toHaveLength(1);
+    expect(body.drafts[0]!.used_on).toBeNull();
+  });
+});
