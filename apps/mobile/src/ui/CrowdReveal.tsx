@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { colors, space } from "../theme";
 import { Serif, Mono, Eyebrow } from "./Text";
+import { GoldButton } from "./Button";
 import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { asciiGauge } from "../game/terminalPrint";
@@ -40,6 +42,7 @@ export function CrowdBar({ pct }: { pct: number }) {
 }
 
 export function CrowdReveal({ round }: { round: RoundToday }) {
+  const router = useRouter();
   const crowd = useCrowdSoFar(true);
   const answers = useRoundStore((s) => s.answers);
   const byId = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
@@ -70,11 +73,14 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
         })}
       </View>
       <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
-        {playerCount} ORACLES CONSULTED
+        {playerCount} ORACLES HAVE SPOKEN
       </Mono>
       <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>
         The ledger is read tomorrow at noon.
       </Mono>
+      <View style={{ paddingBottom: space(2) }}>
+        <GoldButton title="RETURN AT NOON" onPress={() => router.replace("/")} />
+      </View>
     </View>
   );
 }
