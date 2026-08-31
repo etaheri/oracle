@@ -1,11 +1,16 @@
 import { Hono } from "hono";
-import { eq, inArray } from "drizzle-orm";
-import { assignEpithet, CONSTANTS } from "@oracle/core";
+import { count, eq, inArray } from "drizzle-orm";
+import { assignEpithet, contrarianApplies } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
 
 const WINDOW_MS = 28 * 86_400_000;
+
+// The free shield resets on the calendar month as seen from America/New_York
+// (Shipaton judges + most of our players are ET), not UTC.
+const etMonth = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit" }).format(d); // "2026-08"
 
 export const meRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
@@ -21,7 +26,7 @@ export const meRoutes = new Hono<AppContext>()
     const qById = new Map(qs.map((q) => [q.id, q]));
     const windowStart = Date.now() - WINDOW_MS;
 
-    interface Row { correct: boolean; confidence: number; sidePct: number | null; inWindow: boolean }
+    interface Row { correct: boolean; confidence: number; sidePct: number | null; crowdCount: number; inWindow: boolean }
     const resolved: Row[] = [];
     for (const p of preds) {
       const q = qById.get(p.questionId);
@@ -31,6 +36,7 @@ export const meRoutes = new Hono<AppContext>()
         correct: p.answer === (q.outcome === "yes"),
         confidence: p.confidence,
         sidePct: crowd === null ? null : p.answer ? crowd : 100 - crowd,
+        crowdCount: q.crowdCount ?? 0,
         inWindow: q.locksAt.getTime() >= windowStart,
       });
     }
@@ -40,7 +46,7 @@ export const meRoutes = new Hono<AppContext>()
       return {
         accuracyPct: rows.length ? Math.round((100 * rows.filter((r) => r.correct).length) / rows.length) : null,
         avgConfidence: rows.length ? Math.round(rows.reduce((s, r) => s + r.confidence, 0) / rows.length) : null,
-        tideWins: rows.filter((r) => r.correct && r.sidePct !== null && r.sidePct < CONSTANTS.CONTRARIAN_CROWD_PCT).length,
+        tideWins: rows.filter((r) => r.correct && r.sidePct !== null && contrarianApplies(r.sidePct, r.crowdCount)).length,
         majorityRate: withCrowd.length ? withCrowd.filter((r) => r.sidePct! > 50).length / withCrowd.length : null,
       };
     };
@@ -52,9 +58,17 @@ export const meRoutes = new Hono<AppContext>()
       const q = qById.get(p.questionId);
       if (q) byDate.set(q.roundDate, (byDate.get(q.roundDate) ?? 0) + 1);
     }
+    // Complete rounds: the user's answer count for a round must equal that
+    // round's TRUE question count (not just the questions they happened to
+    // answer), fetched fresh so a partial round never rates as complete.
+    const roundDates = [...byDate.keys()];
+    const sizes = roundDates.length
+      ? await db.select({ roundDate: schema.questions.roundDate, n: count() }).from(schema.questions).where(inArray(schema.questions.roundDate, roundDates)).groupBy(schema.questions.roundDate)
+      : [];
+    const sizeOf = new Map(sizes.map((s) => [s.roundDate, Number(s.n)]));
     const completeRounds = [...byDate.entries()].filter(([date, n]) => {
       const anyQ = qs.find((q) => q.roundDate === date);
-      return n >= 5 && anyQ !== undefined && anyQ.locksAt.getTime() >= windowStart;
+      return n === sizeOf.get(date) && anyQ !== undefined && anyQ.locksAt.getTime() >= windowStart;
     }).length;
 
     const epithet = assignEpithet({
@@ -69,6 +83,8 @@ export const meRoutes = new Hono<AppContext>()
 
     return c.json({
       oracle_score: user?.oracleScore ?? null,
+      calls_rated: user?.callsResolved ?? 0,
+      calls_answered: resolved.length,
       days_consulted: byDate.size,
       streak: user?.streakCurrent ?? 0,
       accuracy_pct: life.accuracyPct,
@@ -77,9 +93,10 @@ export const meRoutes = new Hono<AppContext>()
       majority_rate: life.majorityRate,
       // Shield state (streak.ts month rule). shield_used_on only dates the
       // FREE shield — paid burns are undated, an accepted v1 limitation.
+      // Month is keyed on America/New_York, not UTC.
       free_shield_available: (() => {
         const usedAt = user?.freeShieldUsedAt ?? null;
-        return usedAt === null || usedAt.slice(0, 7) !== new Date().toISOString().slice(0, 7);
+        return usedAt === null || usedAt.slice(0, 7) !== etMonth(new Date());
       })(),
       paid_shields: ent?.shieldsRemaining ?? 0,
       shield_used_on: user?.freeShieldUsedAt ?? null,
