@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
-import { makeTestDb } from "./helpers/db";
+import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import { upsertDraft } from "../src/pipeline/draft";
 import { parseCommand } from "../src/routes/telegram";
+import { resolveQuestion } from "../src/resolution";
+import { settleRound } from "../src/settlement";
 import type { PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
@@ -15,6 +17,8 @@ const env = {
   TELEGRAM_WEBHOOK_SECRET: "hook",
   TELEGRAM_CHAT_ID: "42",
 };
+
+afterEach(() => vi.useRealTimers());
 
 function fakeClaude(responses: unknown[]) {
   const calls: StructuredCall[] = [];
@@ -77,6 +81,14 @@ describe("parseCommand", () => {
 
   it("parses /status", () => {
     expect(parseCommand("/status")).toEqual({ cmd: "status" });
+  });
+
+  it("parses /flip <slot> <outcome>", () => {
+    expect(parseCommand("/flip 3 no")).toEqual({ cmd: "flip", slot: 3, outcome: "no" });
+    expect(parseCommand("/flip 5 VOID")).toEqual({ cmd: "flip", slot: 5, outcome: "void" });
+    expect(parseCommand("/flip 3")).toEqual({ cmd: "help" });
+    expect(parseCommand("/flip 9 yes")).toEqual({ cmd: "help" });
+    expect(parseCommand("/flip 3 maybe")).toEqual({ cmd: "help" });
   });
 
   it("falls back to help for anything else", () => {
@@ -213,7 +225,7 @@ describe("POST /v1/telegram/:secret", () => {
     const app = createApp({ db, env, pipeline: deps });
     const res = await post(app, "hook", msg("hello there"));
     expect(res.status).toBe(200);
-    expect(sent).toEqual(["/reroll <slot> [guidance] · /status"]);
+    expect(sent).toEqual(["/reroll <slot> [guidance] · /flip <slot> <yes|no|void> · /status"]);
   });
 
   it("an internal throw during reroll still returns 200 and sends the error text", async () => {
@@ -231,5 +243,23 @@ describe("POST /v1/telegram/:secret", () => {
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-28") });
     const slot3 = qs.find((q) => q.slot === 3)!;
     expect(slot3.text).toBe(validDraft.questions[2]!.text); // unchanged
+  });
+
+  it("/flip re-judges a slot of the latest round and reports the rescore", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-27T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-08-27", opensAt: new Date("2026-08-27T16:00:00Z"), locksAt: new Date("2026-08-28T16:00:00Z") });
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+    await settleRound(db, "2026-08-27");
+
+    const { deps, sent } = fakePipeline(db, null, "2026-08-27T16:30:00Z");
+    const app = createApp({ db, env, pipeline: deps });
+
+    const res = await post(app, "hook", msg("/flip 1 no"));
+    expect(res.status).toBe(200);
+    expect(sent[sent.length - 1]).toMatch(/flipped slot 1 of 2026-08-2\d → NO · rescored \d+ users/);
+
+    const updated = await db.query.questions.findFirst({ where: eq(schema.questions.id, qs[0]!.id) });
+    expect(updated!.outcome).toBe("no");
   });
 });

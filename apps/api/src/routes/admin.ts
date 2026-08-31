@@ -3,14 +3,14 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import type { AppContext } from "../app";
 import { resolveQuestion } from "../resolution";
-import { settleRound } from "../settlement";
+import { settleRound, resettleRound } from "../settlement";
 import { schema } from "../db/client";
 import { DraftSchema, upsertDraft } from "../pipeline/draft";
 import { publish } from "../pipeline/actions";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
 
-const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional() });
+const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
 
 const PatchQuestionSchema = z.object({
   text: z.string().min(10).optional(),
@@ -32,8 +32,21 @@ export const adminRoutes = new Hono<AppContext>()
   .post("/questions/:id/resolve", async (c) => {
     const parsed = ResolveSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    await resolveQuestion(c.get("deps").db, c.req.param("id"), parsed.data.outcome, parsed.data.evidence ?? null);
-    return c.json({ ok: true });
+    const db = c.get("deps").db;
+    try {
+      await resolveQuestion(db, c.req.param("id"), parsed.data.outcome, parsed.data.evidence ?? null, { force: parsed.data.force === true });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "resolve failed";
+      if (msg === "not resolvable") return c.json({ error: msg }, 409);
+      if (msg === "question not found") return c.json({ error: msg }, 404);
+      return c.json({ error: "resolve failed" }, 500);
+    }
+    let rescored = 0;
+    if (parsed.data.force) {
+      const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, c.req.param("id")) });
+      if (q) rescored = (await resettleRound(db, q.roundDate)).users;
+    }
+    return c.json({ ok: true, rescored });
   })
   .patch("/questions/:id", async (c) => {
     const parsed = PatchQuestionSchema.safeParse(await c.req.json().catch(() => null));

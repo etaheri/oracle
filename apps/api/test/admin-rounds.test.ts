@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
@@ -8,6 +8,8 @@ import type { PipelineDeps } from "../src/pipeline";
 import * as schema from "../src/db/schema";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
+
+afterEach(() => vi.useRealTimers());
 
 function admin(app: ReturnType<typeof createApp>) {
   return (path: string, init: RequestInit = {}) =>
@@ -168,5 +170,20 @@ describe("POST /admin/pipeline/tick", () => {
     const body = (await res.json()) as { ok: boolean; executed: string[] };
     expect(body.ok).toBe(true);
     expect(body.executed).toContain("lock:2026-08-26");
+  });
+});
+
+describe("POST /admin/questions/:id/resolve", () => {
+  it("resolve refuses a judged question without force, re-judges with it, and rescores a settled round", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-27T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-27", opensAt: new Date("2026-08-27T16:00:00Z"), locksAt: new Date("2026-08-28T16:00:00Z") });
+    const admin = (path: string, body: unknown) => app.request(path, { method: "POST", headers: { "content-type": "application/json", "x-admin-secret": "admin" }, body: JSON.stringify(body) });
+    expect((await admin(`/admin/questions/${qs[0]!.id}/resolve`, { outcome: "yes" })).status).toBe(200);
+    expect((await admin(`/admin/questions/${qs[0]!.id}/resolve`, { outcome: "no" })).status).toBe(409);
+    const forced = await admin(`/admin/questions/${qs[0]!.id}/resolve`, { outcome: "no", force: true });
+    expect(forced.status).toBe(200);
+    expect(await forced.json()).toEqual({ ok: true, rescored: 0 }); // round not settled yet
   });
 });
