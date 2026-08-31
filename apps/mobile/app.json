@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "oracle",
     "userInterfaceStyle": "light",
+    "ios": {
+      "usesAppleSignIn": true
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#F7F6F2",
@@ -32,7 +35,13 @@
       ],
       "expo-secure-store",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-apple-authentication",
+      ["onesignal-expo-plugin", { "mode": "production" }],
+      [
+        "@sentry/react-native/expo",
+        { "organization": "SENTRY_ORG_TBD_BY_ERIK", "project": "oracle-mobile" }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
