@@ -52,9 +52,14 @@ describe("resolve + reveal cycle", () => {
     const rq = bodyJson.questions.find((x) => x.id === q1)!;
     expect(rq.outcome).toBe("yes");
     expect(rq.crowd_yes_pct).toBe(33);
-    // A: correct @75 → base 37.5, contrarian ×2 (33% < 40) → round(75) = 75; first hour: +round(7.5)=8 → day 83
-    expect(rq.my!.points).toBe(75);
-    expect(bodyJson.day_points).toBe(83);
+    // A: correct @75 → base round(37.5)=38. Crowd is 33% YES (< 40%, so A is
+    // contrarian) but crowdCount is only 3 — under the 20-player floor — so
+    // the additive contrarian bonus does NOT apply; asserting the plain
+    // Brier points here is what proves that floor. All three predictions
+    // land in the first hour, so day_points adds the +10% first-hour bonus:
+    // 38 + round(0.1 * 38) = 42.
+    expect(rq.my!.points).toBe(38);
+    expect(bodyJson.day_points).toBe(42);
   });
 
   it("rejects reveal while any question is still open, and admin without secret", async () => {
