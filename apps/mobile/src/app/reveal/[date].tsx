@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -42,6 +42,10 @@ export default function RevealScreen() {
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
   const loaded = !!reveal.data && !("pending" in reveal.data);
+  // reveal.data's reference changes on every refetch (staleTime 0 + AppState
+  // focus refetches), so the resolved-outcomes effect below can re-run for
+  // the same date many times — the guard fires the capture once per date.
+  const viewedFor = useRef<string | null>(null);
 
   // The day-points landing is the ceremony's beat — the number finishes its
   // roll, THEN the haptic lands. A contrarian big-one win gets a double
@@ -55,7 +59,10 @@ export default function RevealScreen() {
     // pending ledger — the flag must survive so the gold CTA and the real
     // ceremony still happen once every row has resolved.
     if (d2.questions.some((q) => q.outcome === null)) return;
-    capture("reveal_viewed", { date: d2.date });
+    if (viewedFor.current !== d2.date) {
+      viewedFor.current = d2.date;
+      capture("reveal_viewed", { date: d2.date });
+    }
     const spectator = d2.questions.every((q) => q.my === null);
     const timers: ReturnType<typeof setTimeout>[] = [];
     // A spectator reveal has nothing to celebrate — mark it seen right away
