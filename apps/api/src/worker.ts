@@ -15,6 +15,8 @@ export interface WorkerEnv {
   PIPELINE_ENABLED?: string;
   PIPELINE_AUTHOR_MODEL?: string;
   PIPELINE_RESOLVE_MODEL?: string;
+  REVENUECAT_WEBHOOK_SECRET?: string;
+  APPLE_BUNDLE_ID?: string;
 }
 
 // Enablement gate (spec §11): the pipeline is fully wired but stays inert
@@ -43,6 +45,8 @@ export default {
         ADMIN_SECRET: env.ADMIN_SECRET,
         TELEGRAM_WEBHOOK_SECRET: env.TELEGRAM_WEBHOOK_SECRET,
         TELEGRAM_CHAT_ID: env.TELEGRAM_CHAT_ID,
+        REVENUECAT_WEBHOOK_SECRET: env.REVENUECAT_WEBHOOK_SECRET,
+        APPLE_BUNDLE_ID: env.APPLE_BUNDLE_ID,
       },
       pipeline: buildPipelineDeps(env),
     });
