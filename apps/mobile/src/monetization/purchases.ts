@@ -38,6 +38,7 @@ export async function getOffering(): Promise<PurchasesOffering | null> {
 }
 
 export async function purchasePackage(pkg: PurchasesPackage): Promise<boolean> {
+  if (!configured) return false;
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
     usePlusStore.getState().set(plusFromCustomerInfo(customerInfo));
