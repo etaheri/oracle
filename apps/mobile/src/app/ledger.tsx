@@ -13,6 +13,7 @@ import { useMeLedger } from "../api/hooks";
 import { colors, space } from "../theme";
 import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
+import { scoreValue } from "../game/scoreProgress";
 
 // The Forecaster's Ledger (voice spec §6): a museum specimen plaque. Stats in
 // machine voice, one epithet with its receipt — identity only with evidence.
@@ -48,22 +49,23 @@ export default function Ledger() {
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
         <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4) }}>
+          <Eyebrow>Epithet of the last 28 days</Eyebrow>
           <View style={{ alignItems: "center", gap: space(2) }}>
             <Ritual bold size={24} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
             <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{d.epithet.receipt}</Mono>
           </View>
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(2) }}>
-            <Stat label="ORACLE SCORE" value={d.oracle_score === null ? "UNWRITTEN" : String(d.oracle_score)} />
+            <Stat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
             <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
             <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />
             <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
             <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
             <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
             <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
-            {calibrationVerdict(d.avg_confidence, d.accuracy_pct, 0) && (
+            {calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered) && (
               <DecodeLine
-                text={calibrationVerdict(d.avg_confidence, d.accuracy_pct, 0)!}
+                text={calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered)!}
                 delayMs={300} durationMs={600}
                 size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}
               />
