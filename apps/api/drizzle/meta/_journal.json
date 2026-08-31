@@ -29,6 +29,13 @@
       "when": 1788185092220,
       "tag": "0003_gameplay_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788274761000,
+      "tag": "0004_revenue_rites",
+      "breakpoints": true
     }
   ]
 }

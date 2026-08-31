@@ -1,6 +1,6 @@
 {
-  "id": "57590563-4b28-4df7-a973-8f90fb106f33",
-  "prevId": "8618c036-8b63-40db-84bf-d5cd5c87c26d",
+  "id": "9e29d2ed-0d44-4e0e-b37f-6875c43e9e70",
+  "prevId": "57590563-4b28-4df7-a973-8f90fb106f33",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -538,12 +538,6 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "clerk_id": {
-          "name": "clerk_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -589,6 +583,12 @@
           "type": "date",
           "primaryKey": false,
           "notNull": false
+        },
+        "apple_sub": {
+          "name": "apple_sub",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -611,11 +611,11 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_clerk_id_unique": {
-          "name": "users_clerk_id_unique",
+        "users_apple_sub_unique": {
+          "name": "users_apple_sub_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "clerk_id"
+            "apple_sub"
           ]
         }
       },
@@ -623,7 +623,7 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "webhook_events": {
+    "public.webhook_events": {
       "name": "webhook_events",
       "schema": "",
       "columns": {
@@ -644,7 +644,10 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
