@@ -34,3 +34,26 @@ export const fonts = {
 };
 
 export const space = (n: number) => n * 4;
+
+// The machine voice runs on five roles. Size, tracking, and line box live here
+// — not at the call site — so "10 or 11, tracking 2 or 3" stops being a
+// decision each screen makes for itself. Colour, not metrics, carries meaning:
+// `line` in gold is the oracle's state, `line` in muted ink is navigation.
+export const typeScale = {
+  eyebrow: { size: 10, letterSpacing: 4 }, // the screen's stamp
+  meta: { size: 10, letterSpacing: 2 }, // passive chrome: countdowns, notices
+  line: { size: 11, letterSpacing: 2 }, // one row of machine speech
+  action: { size: 12, letterSpacing: 3 }, // framed buttons
+  body: { size: 12, letterSpacing: 0.5 }, // long-form text
+  clock: { size: 16, letterSpacing: 4 }, // the live time under the wordmark
+} as const;
+
+// Explicit line boxes, so a row's height is a constant we can reserve space
+// for rather than a font-metric surprise. Lines that arrive late (the notice,
+// the countdown) hold their slot from the first frame and never shove the
+// composition when they land.
+export const ROW_H = { meta: 14, line: 16, body: 20, clock: 22 } as const;
+
+// A tracked run of text carries its tracking after the last glyph too, which
+// pushes centred text left by one step. Cancel it at the tail.
+export const trackTail = (letterSpacing: number) => ({ marginRight: -letterSpacing });
