@@ -68,7 +68,7 @@ ORACLE ships to the App Store during the Shipaton window with a purchase powered
 ## 7. Build, release, review
 
 - **This plan ends Expo Go.** RC/OneSignal/SIWA are native modules → EAS **dev client** is Task 1; every later task is verified inside it. Build profiles: `development` (dev client), `preview` (internal), `production`. `app.json` → `app.config.ts` if needed for plugin config; iOS privacy manifest declarations for the new SDKs.
-- **App Store Connect:** app record, bundle ID `com.erikcitrine.oracle` (Erik confirms/overrides at enrollment), IAP products (§2), offer codes, screenshots 1179×2556 frameless, App Privacy questionnaire (device identifiers, purchases, diagnostics; no tracking → no ATT).
+- **App Store Connect:** app record, bundle ID `com.erikt.oracle` (Erik confirms/overrides at enrollment), IAP products (§2), offer codes, screenshots 1179×2556 frameless, App Privacy questionnaire (device identifiers, purchases, diagnostics; no tracking → no ATT).
 - **Review-proofing rulings:** (1) the prod pipeline is armed (secrets + `PIPELINE_ENABLED`) **before** submission — a reviewer must never see THE ORACLE SLEEPS with no countdown to a real round; (2) review notes include a walkthrough, the offer code, and the explanation that content rotates daily at noon ET; (3) no betting vocabulary anywhere in listing or app (design spec §5a.4).
 - **Branch reality:** 3b work builds on top of `gameplay-audit-fixes` (27 commits, unmerged pending Erik's hand-check playthrough). Merging that branch to main first is strongly preferred — flagged as a §9 Erik item; if not merged, 3b branches from it, not from main.
 

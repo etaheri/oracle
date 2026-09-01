@@ -21,7 +21,7 @@ created in earlier ones.
    decided in the plan spec §0: RevenueCat's Stripe-Projects path provisions
    a different account shape than what this integration expects. Sign up at
    revenuecat.com directly, then create the iOS app inside it with bundle id
-   `com.erikcitrine.oracle`.
+   `com.erikt.oracle`.
 3. **OneSignal account via the Shipaton perk link** (gets the free Growth
    plan tier — do not sign up through the normal onsignal.com flow, use the
    Shipaton-provided link so the perk applies). Create the iOS app inside it.
@@ -35,7 +35,7 @@ created in earlier ones.
 
 ## 2. App Store Connect
 
-- Create the app record (bundle id `com.erikcitrine.oracle`).
+- Create the app record (bundle id `com.erikt.oracle`).
 - Subscription group `oracle_plus`, containing:
   - `plus_monthly` — $2.99
   - `plus_annual` — $19.99
@@ -67,7 +67,7 @@ created in earlier ones.
   ```
   Paste the same secret value used in the webhook Authorization header above.
 - Optional — only needed if the real bundle id ever differs from the
-  default baked into `apps/api/src/routes/auth.ts` (`com.erikcitrine.oracle`):
+  default baked into `apps/api/src/routes/auth.ts` (`com.erikt.oracle`):
   ```
   wrangler secret put APPLE_BUNDLE_ID
   ```
