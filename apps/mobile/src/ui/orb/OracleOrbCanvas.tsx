@@ -4,10 +4,24 @@ import { ORB_D, ORB_DY } from "./orbTouch";
 import { INTERIOR_SIZE, ORB_EFFECT } from "./orbShader";
 import { dispersionEnabled, interiorSamples, type OrbTier } from "./orbQuality";
 
-// How far past the silhouette the halo reaches. The tile clears the orb by
-// about 5% a side, so this stays inside it and the canvas never has to grow
-// (growing it would move the hero's layout, which heroStage forbids).
-const HALO_R = 1.1;
+// How far past the silhouette the halo reaches, as a multiple of the
+// silhouette radius r. The canvas must never grow -- that would move the
+// hero's layout, which heroStage forbids -- so this is capped by whichever
+// tile edge the halo circle would hit first. ORB_DY moves the orb's centre
+// up, so the top is the tight edge: it clears the centre by (0.5 + ORB_DY)
+// tile-units, against a silhouette radius of ORB_D/2. HALO_SAFETY keeps a
+// visible margin so the glow fades to nothing before the canvas bound,
+// rather than being clipped by a hard edge mid-gradient.
+const CENTER_TO_TOP = 0.5 + ORB_DY;
+const SILHOUETTE_R = ORB_D / 2;
+const HALO_SAFETY = 0.02;
+const HALO_R = (CENTER_TO_TOP - HALO_SAFETY) / SILHOUETTE_R;
+// Where the silhouette's own edge falls within the halo circle's [0, 1]
+// gradient radius. The gradient must stay fully transparent out to this
+// point -- the halo is drawn over the opaque shell, so any alpha at or
+// inside the silhouette washes the raster rather than glowing past it.
+const HALO_RIM = 1 / HALO_R;
+const HALO_PEAK = HALO_RIM + (1 - HALO_RIM) * 0.5;
 
 export type OrbUniforms = {
   t: number;
@@ -93,8 +107,13 @@ export function OracleOrbCanvas({
         <RadialGradient
           c={vec(cx, cy)}
           r={r * HALO_R}
-          colors={["rgba(156,181,209,0)", "rgba(156,181,209,0.22)", "rgba(156,181,209,0)"]}
-          positions={[0, 1 / HALO_R - 0.02, 1]}
+          colors={[
+            "rgba(156,181,209,0)",
+            "rgba(156,181,209,0)",
+            "rgba(156,181,209,0.22)",
+            "rgba(156,181,209,0)",
+          ]}
+          positions={[0, HALO_RIM, HALO_PEAK, 1]}
         />
       </Circle>
     </Canvas>

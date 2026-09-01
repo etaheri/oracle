@@ -3,7 +3,7 @@ import { AppState, Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
-import { useClock, useImage } from "@shopify/react-native-skia";
+import { useClock, useImage, type DataSourceParam, type SkImage } from "@shopify/react-native-skia";
 import { locate, type OrbPoint } from "./orbTouch";
 import { assign, EMPTY_SLOTS, type RippleSlots } from "./orbRipples";
 import { nextState, settleTo, isTransient, targetsFor, transitionMs, type OrbState } from "./orbState";
@@ -14,6 +14,28 @@ import { OracleOrbCanvas, type OrbUniforms } from "./OracleOrbCanvas";
 const FALLBACK = require("../../../assets/art/orb-fallback.png");
 const SHELL = require("../../../assets/art/orb-shell.png");
 const INTERIOR = require("../../../assets/art/orb-interior.png");
+
+// `useImage`'s own state (@shopify/react-native-skia's `useLoading`) is a
+// fresh `useState(null)` per mount, so a mount can never see a cache hit
+// synchronously *through the hook itself* -- there is no way to seed a
+// library-owned useState from outside it. This module-scope map is the
+// closest substitute: once any instance finishes decoding a source, every
+// later mount reads the resolved image straight off this map on its first
+// render, instead of re-fetching and re-decoding the same PNG. The boot rite
+// mounts the first instance; by the time it hands off to Home's, the decode
+// is long done, so that second mount is genuinely synchronous.
+const imageCache = new Map<DataSourceParam, SkImage>();
+
+function useCachedImage(source: DataSourceParam, onError: (e: Error) => void): SkImage | null {
+  const cached = imageCache.get(source) ?? null;
+  // Once cached, there is nothing left to load -- pass `null` so the
+  // underlying hook's loader resolves immediately instead of re-decoding.
+  const loaded = useImage(cached ? null : source, onError);
+  useEffect(() => {
+    if (loaded && !imageCache.has(source)) imageCache.set(source, loaded);
+  }, [loaded, source]);
+  return cached ?? loaded;
+}
 
 export type OracleOrbHandle = {
   ripple(local?: OrbPoint): void;
@@ -40,8 +62,9 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   // distinct signal from the *fallback* image failing (below): static is
   // already the floor, so that failure has nowhere lower to report to.
   const [canvasImagesFailed, setCanvasImagesFailed] = useState(false);
-  const shell = useImage(SHELL, () => setCanvasImagesFailed(true));
-  const interior = useImage(INTERIOR, () => setCanvasImagesFailed(true));
+  const onImageError = useCallback(() => setCanvasImagesFailed(true), []);
+  const shell = useCachedImage(SHELL, onImageError);
+  const interior = useCachedImage(INTERIOR, onImageError);
   const tier = resolve({ prop: quality, reducedMotion, compiled: orbCompiled(), imagesReady: !canvasImagesFailed });
 
   const [current, setCurrent] = useState<OrbState>(state);
@@ -164,8 +187,13 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
     [tile, fire, onPress],
   );
 
+  // A live tier still renders the fallback until both rasters are actually
+  // in hand -- while they're loading, and forever if a load rejects (which
+  // never reaches canvasImagesFailed; see useCachedImage/onError above). A
+  // live tier with nothing to sample must never be the frame that draws.
+  const ready = !!shell && !!interior;
   const body =
-    tier === "static" ? (
+    tier === "static" || !ready ? (
       <Image source={FALLBACK} contentFit="contain" style={{ width: tile, height: tile }} accessible={false} />
     ) : (
       <OracleOrbCanvas tile={tile} live={live} tier={tier} shell={shell} interior={interior} />
@@ -191,6 +219,7 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
     <Pressable
       onPress={handlePress}
       accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
       testID={testID}
       style={{ width: tile, height: tile }}
     >

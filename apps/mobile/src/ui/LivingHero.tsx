@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { Canvas, Circle, RadialGradient, vec } from "@shopify/react-native-skia";
@@ -6,10 +6,11 @@ import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, w
 import { orbGlowRgb } from "../game/orbMood";
 import { haloDwell, haloGate } from "../game/haloMood";
 import { ORB_CX, ORB_CY, dustRect, handSlot, orbRect, stageSize } from "../game/heroStage";
-import { setHeroAnchor } from "../game/bootGate";
+import { isOrbLanded, onOrbLanded, setHeroAnchor } from "../game/bootGate";
 import { AsciiDust } from "./TerminalPatina";
 import { GlassRefraction } from "./GlassRefraction";
 import { OracleOrb } from "./orb/OracleOrb";
+import { type OrbState } from "./orb/orbState";
 import { HandLayer } from "./HandLayer";
 
 // The living hero as a stage of layers (spec 2026-09-01-boot-orb-handoff):
@@ -36,6 +37,19 @@ export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: nu
   const gate = haloGate(playerCount);
   const hold = haloDwell(lean);
   const dustOrigin: readonly [number, number] = [orb.x - dust.x, orb.y - dust.y];
+
+  // The orb's own state, decoupled from `phase`. It must NOT track `phase`
+  // directly ("waking" -> "attending") -- that seeds a brand-new OracleOrb
+  // instance already fully lit while the boot rite's dormant orb is still
+  // sliding on top of it, and OracleOrb's own "waking" rise never plays
+  // because it would already be sitting at its destination. Instead: mount
+  // dormant (identical to the rite's still, so the two orbs match for the
+  // whole slide), then flip to waking exactly when the rite's orb lands --
+  // OracleOrb settles waking into attending on its own after the rise.
+  // A warm remount that observes the orb already landed (isOrbLanded() true
+  // at mount) skips the rise entirely -- there is no rite orb to sync with.
+  const [orbState, setOrbState] = useState<OrbState>(() => (isOrbLanded() ? "attending" : "dormant"));
+  useEffect(() => onOrbLanded(() => setOrbState((s) => (s === "dormant" ? "waking" : s))), []);
 
   // Anchor: the orb slot's rect in window coordinates, republished on every
   // layout so the rite reads a settled value at `done`.
@@ -94,8 +108,9 @@ export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: nu
       <HandLayer rect={handSlot(width, "left")} side="left" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       <HandLayer rect={handSlot(width, "right")} side="right" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       {/* The orb slot always exists — it's what gets measured for the boot
-          rite's anchor. The orb renders from waking onward, arriving in its
-          waking state and settling to attending. */}
+          rite's anchor. The orb renders from waking onward, mounted dormant
+          to match the rite's still and rising to attending once it lands
+          (see orbState above). */}
       <View
         ref={slotRef}
         onLayout={publishAnchor}
@@ -104,7 +119,7 @@ export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: nu
         {phase !== "cold" && (
           <OracleOrb
             tile={orb.w}
-            state={phase === "waking" ? "waking" : "attending"}
+            state={orbState}
             interactive
             accessibilityLabel="Oracle"
           />
