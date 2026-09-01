@@ -2,6 +2,15 @@
 // without it: these three numbers are how we find out whether a question
 // stayed answerable after its answer existed. predictions.created_at has been
 // stored since the beginning; nothing ever read it.
+//
+// These metrics measure drift, not leakage — read them as a tripwire, not
+// proof. Honest information arrival (the crowd correctly updating on real
+// news) converges the crowd too, so a nonzero drift alone doesn't mean a
+// question stayed answerable after its answer existed. And the first-hour
+// bonus selects engaged players into the early half of sealers, which biases
+// lateEdge negative — the leak's own scoreboard signature can hide behind
+// that selection effect. A quiet LEAK WATCH is not vindication; it's the
+// absence of a symptom that a real leak isn't guaranteed to produce.
 import { eq } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import { etNow } from "./clock";
