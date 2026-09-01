@@ -137,6 +137,43 @@ describe("authorRound", () => {
   });
 });
 
+describe("recent-question digest", () => {
+  it("carries each question's outcome, crowd split, and void reason to the author", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-08-26", status: "resolved" });
+    await db.insert(schema.questions).values([
+      {
+        roundDate: "2026-08-26", slot: 1, isBigOne: false, text: "Will the index close higher?",
+        category: "markets", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "resolved",
+        outcome: "yes", crowdYesPct: "91", crowdCount: 40,
+      },
+      {
+        roundDate: "2026-08-26", slot: 2, isBigOne: false, text: "Will the thing be verifiable?",
+        category: "news", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "void", outcome: "void",
+      },
+    ]);
+
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    await authorRound(deps, "2026-08-27");
+
+    expect(calls[0]!.system).toContain("Will the index close higher? → YES, crowd 91% yes");
+    expect(calls[0]!.system).toContain("Will the thing be verifiable? → VOID");
+  });
+
+  it("says so plainly when there is no history", async () => {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    await authorRound(deps, "2026-08-27");
+    expect(calls[0]!.system).toContain("(no history yet)");
+  });
+});
+
 describe("rerollSlot", () => {
   it("throws when there is no scheduled draft for the date", async () => {
     const { db } = await makeTestDb();

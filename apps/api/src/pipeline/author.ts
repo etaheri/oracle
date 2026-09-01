@@ -76,7 +76,7 @@ ${lines.join("\n")}
 - A question adapted from a listed market MUST set resolves_at to that market's own close: the price is public and converges on the answer, so answers have to close with it.`;
 }
 
-function authorSystemPrompt(date: string, recentTexts: string, signals: MarketSignal[]): string {
+function authorSystemPrompt(date: string, recent: string, signals: MarketSignal[]): string {
   const lockDay = addDays(date, 1);
   return `You author the daily round for ORACLE, a prediction game. Produce exactly 5 yes/no questions for the round dated ${date} (ET). The round opens at noon ET on ${date} and closes at noon ET on ${lockDay}. Rules:
 - Slots 1-4: four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the day's most contested story from any category.
@@ -87,7 +87,7 @@ function authorSystemPrompt(date: string, recentTexts: string, signals: MarketSi
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
 - WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
-- Here is how your last seven days landed. Do not repeat them, and read the outcomes and crowd splits as feedback on your own question-writing: ${recentTexts}${marketSignalsBlock(signals)}
+- Here is how your last seven days landed. Do not repeat them, and read the outcomes and crowd splits as feedback on your own question-writing: ${recent}${marketSignalsBlock(signals)}
 Search the web for today's actual news before writing. When your draft is final, call the draft_round tool exactly once.`;
 }
 
@@ -97,24 +97,37 @@ function formatIssues(issues: { path: PropertyKey[]; message: string }[]): strin
     .join("; ");
 }
 
-async function recentQuestionTexts(db: Db, date: string): Promise<string> {
+// The last seven days, WITH how they landed. This used to return bare texts
+// as a "don't repeat these" list; carrying the outcome and the crowd split
+// turns it into the only feedback the author ever gets — a question the crowd
+// agreed on at 91% was not contested, whatever probability the model claimed
+// for it (audit 2026-09-01 §2.4).
+async function recentQuestionDigest(db: Db, date: string): Promise<string> {
   const since = addDays(date, -7);
   const rows = await db.query.questions.findMany({
     where: and(gte(schema.questions.roundDate, since), lt(schema.questions.roundDate, date)),
+    orderBy: (q, { asc }) => [asc(q.roundDate), asc(q.slot)],
   });
-  const texts = rows.map((r) => r.text);
-  return texts.length ? texts.join("; ") : "(none)";
+  if (rows.length === 0) return "(no history yet)";
+  return rows
+    .map((r) => {
+      if (r.outcome === "void") return `${r.text} → VOID (unresolvable — do not write questions shaped like this)`;
+      if (r.outcome === null) return `${r.text} → not yet resolved`;
+      const crowd = r.crowdYesPct === null ? "crowd unknown" : `crowd ${Math.round(Number(r.crowdYesPct))}% yes`;
+      return `${r.text} → ${r.outcome.toUpperCase()}, ${crowd}`;
+    })
+    .join("; ");
 }
 
 export async function authorRound(deps: PipelineDeps, date: string): Promise<void> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
   const claude = deps.claude;
 
-  const recentTexts = await recentQuestionTexts(deps.db, date);
+  const recent = await recentQuestionDigest(deps.db, date);
   // Market feeds are advisory: any failure logs inside fetchMarketSignals and
   // authoring proceeds market-blind on an empty list.
   const { signals } = await fetchMarketSignals(deps.marketFetch ?? fetch, deps.now());
-  const system = authorSystemPrompt(date, recentTexts, signals);
+  const system = authorSystemPrompt(date, recent, signals);
   const baseUser = `Produce today's ORACLE round for ${date}.`;
 
   const first = await claude.structured({
