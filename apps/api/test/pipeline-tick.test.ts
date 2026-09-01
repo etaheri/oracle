@@ -123,6 +123,12 @@ describe("runTick", () => {
     done = await runTick(d3);
     expect(done).toContain("settle:2026-08-26");
     expect(sent3.some((t) => t.includes("reply if any outcome looks wrong"))).toBe(true);
+    const report = sent3.find((t) => t.includes("reply if any outcome looks wrong"))!;
+    expect(report).toContain("LEAK WATCH");
+    // No predictions on this round, so every slot reports honestly rather
+    // than inventing a drift from a sample of zero.
+    expect(report).toContain("too few seals");
+    expect(report).toContain("early-lock rate 0/5");
     const voided = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
     expect(voided.filter((q) => q.status === "void").length).toBe(2);
     for (const q of voided.filter((q) => q.status === "void")) {

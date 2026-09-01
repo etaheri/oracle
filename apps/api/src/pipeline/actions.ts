@@ -11,6 +11,7 @@ import { addDays, noonET } from "./clock";
 import { resolveQuestion } from "../resolution";
 import { settleRound } from "../settlement";
 import { DraftSchema, upsertDraft } from "./draft";
+import { crowdDrift, lateEdge, leakReport, loadLeakRows } from "./leak";
 import type { TelegramClient } from "./telegram";
 
 // The Oracle takes its position (design §2a) the instant the crowd is final.
@@ -146,11 +147,22 @@ export async function settle(deps: { db: Db; telegram: TelegramClient }, date: s
     orderBy: (questions, { asc }) => [asc(questions.slot)],
   });
 
+  const defaultLocksAt = noonET(addDays(date, 1));
+  const leakLines = await Promise.all(
+    qs.map(async (q) => {
+      const rows = await loadLeakRows(deps.db, q.id);
+      return { slot: q.slot, drift: crowdDrift(rows), edge: lateEdge(rows), locksAt: q.locksAt };
+    }),
+  );
+
   const lines = qs.map((q) => `${q.slot}. ${q.text} → ${q.outcome ? q.outcome.toUpperCase() : "?"}`);
   const report = [
     `Round ${date} settled`,
     ...lines,
     `settled: ${result.settled}`,
+    "",
+    ...leakReport(leakLines, defaultLocksAt),
+    "",
     "reply if any outcome looks wrong",
   ].join("\n");
 
