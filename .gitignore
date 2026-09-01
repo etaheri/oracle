@@ -7,3 +7,6 @@ dist/
 .wrangler/
 *.tsbuildinfo
 .dev.vars
+
+# Local venv for design/scripts (Pillow asset generation)
+design/.venv/

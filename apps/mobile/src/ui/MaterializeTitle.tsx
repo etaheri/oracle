@@ -10,7 +10,7 @@ import {
   useImage,
 } from "@shopify/react-native-skia";
 import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
-import { colors } from "../theme";
+import { colors, trackTail } from "../theme";
 import { Ritual } from "./Text";
 
 // Materialization (brand brief §4, patina spec phase 2): the wordmark is
@@ -25,8 +25,17 @@ const ATLAS_H = 128;
 const GLYPH_COUNT = 8;
 
 const WORD = "ORACLE";
-const SIZE = 40;
-const TRACKING = 11;
+// 34/8 rather than 40/11: at the old setting the wordmark was spaced like a
+// luxury logotype rather than an inscription, and it was the only serif on a
+// screen of eight mono rows. Tighter and smaller, it sits closer to the
+// machine voice's optical weight while staying the temple's one carved word.
+const SIZE = 34;
+const TRACKING = 8;
+// A fixed line box, generous enough to clear Cinzel's ascender and descender
+// at SIZE. Both the shader canvas and the plain fallback centre inside it, so
+// the wordmark occupies the same rows whether or not the Skia font and atlas
+// have loaded — the epigraph below never shifts when they arrive.
+const BOX_H = Math.round(SIZE * 1.5);
 const CELL_W = 3.75; // ~10 rows of glyph cells across the cap height, so the pure-ASCII
 const CELL_H = 5; // phase reads as letterforms; 11.25x15 physical @3x, above the 6px floor
 const RASTER_SCALE = 2;
@@ -68,7 +77,10 @@ half4 main(float2 xy) {
   float live = reached * (1.0 - gone) * (0.40 + 0.60 * lum);
   // Edge residue: high-hash cells on the letterform boundary (partial area
   // coverage) survive as a faint static patina.
-  float residue = smoothstep(0.86, 1.0, p) * step(0.90, h) * (1.0 - step(0.72, lum)) * 0.30;
+  // Residue was 10% of edge cells at 0.30 alpha — invisible at this size, which
+  // is why the settled wordmark read as clean type rather than a patinated one.
+  // 22% at 0.55: a permanent ASCII crust on the letterform boundary.
+  float residue = smoothstep(0.86, 1.0, p) * step(0.78, h) * (1.0 - step(0.72, lum)) * 0.55;
   // Periodic breath: inside a narrow sweeping band, half the letterform cells
   // knock their portion of the carved text out and wear a glyph instead — the
   // brief's "edge shimmer" (ASCII replaces small portions of the silhouette).
@@ -76,15 +88,21 @@ half4 main(float2 xy) {
   float band = 1.0 - smoothstep(0.0, 100.0, abs(cc.x - gx));
   float h2 = hash21(cellID * 2.3 + floor(t) * 0.11);
   float knock = step(0.35, band) * step(h2, 0.85);
-  float flicker = knock * (0.5 + 0.5 * lum);
+  float flicker = knock * (0.65 + 0.35 * lum);
   float glow = 1.0 - smoothstep(0.0, 110.0, abs(cc.x - front));
   float idx = 1.0 + floor(hash21(cellID * 1.7 + t * 0.37) * (glyphCount - 1.0));
   idx = min(idx, glyphCount - 1.0);
   float gw = atlasSize.x / glyphCount;
   float2 ap = float2(idx * gw + localUV.x * gw, localUV.y * atlasSize.y);
   half4 g = glyphAtlas.eval(ap);
-  half a = half(g.a * max(max(live, residue), flicker));
-  half3 col = mix(half3(ink.rgb), half3(gold.rgb), half(glow * 0.85));
+  float lit = max(live, flicker);
+  half a = half(g.a * max(lit, residue));
+  // The wave front is gold as it passes. What it leaves behind — the residue
+  // cells that outlive the reveal — stays gold: patina is aged, not inked. The
+  // breath keeps a trace of the same warmth so the glitch belongs to the crust
+  // rather than reading as a separate black artifact.
+  float aged = step(lit, residue) * step(0.001, residue) * 0.70;
+  half3 col = mix(half3(ink.rgb), half3(gold.rgb), half(max(glow * 0.85, max(aged, knock * 0.25))));
   half4 gl = half4(col * a, a);
   half4 tx = txtImg.eval(xy) * half(ta * (1.0 - knock));
   return gl + tx * (1.0 - gl.a);
@@ -105,9 +123,20 @@ const GOLD = [0x7e / 255, 0x65 / 255, 0x38 / 255, 1] as const;
 const CHURN_STEP_MS = 166; // ~6 steps/s while materializing, then frozen
 const REVEAL_MS = 2100;
 
+// The stable box. Overflow stays visible, so a font whose metrics exceed BOX_H
+// draws past it rather than being clipped — it just never changes the row the
+// epigraph starts on.
+function Box({ children }: { children: React.ReactNode }) {
+  return (
+    <View accessible accessibilityRole="header" accessibilityLabel={WORD} style={{ height: BOX_H, alignItems: "center", justifyContent: "center" }}>
+      {children}
+    </View>
+  );
+}
+
 function FallbackWordmark() {
   return (
-    <Ritual bold size={SIZE} color={colors.ink} letterSpacing={TRACKING} style={{ marginRight: -TRACKING }}>
+    <Ritual bold size={SIZE} color={colors.ink} letterSpacing={TRACKING} style={{ ...trackTail(TRACKING) }}>
       {WORD}
     </Ritual>
   );
@@ -174,8 +203,8 @@ export function MaterializeTitle({ active }: { active: boolean }) {
     return () => { clearInterval(churn); clearTimeout(stop); };
   }, [active, reducedMotion, p, tick]);
 
-  // The breath: every 9-15s a narrow band sweeps the settled wordmark for
-  // ~620ms while the residue re-rolls its glyphs, then stillness again. Sparse
+  // The breath: every 6-11s a narrow band sweeps the settled wordmark for
+  // ~700ms while the residue re-rolls its glyphs, then stillness again. Sparse
   // and quantized (brief §4: no rapid flickering; discovered as a detail).
   useEffect(() => {
     if (!active || reducedMotion) return;
@@ -186,12 +215,12 @@ export function MaterializeTitle({ active }: { active: boolean }) {
       ids.push(setTimeout(() => {
         if (!alive) return;
         gp.value = 0;
-        gp.value = withTiming(1, { duration: 620, easing: Easing.inOut(Easing.quad) });
+        gp.value = withTiming(1, { duration: 700, easing: Easing.inOut(Easing.quad) });
         const churn = setInterval(() => { tick.value = tick.value + 1; }, 180);
         intervals.push(churn);
-        ids.push(setTimeout(() => { clearInterval(churn); gp.value = -1; }, 700));
+        ids.push(setTimeout(() => { clearInterval(churn); gp.value = -1; }, 780));
         schedule();
-      }, 9000 + Math.random() * 6000));
+      }, 6000 + Math.random() * 5000));
     };
     schedule();
     return () => { alive = false; ids.forEach(clearTimeout); intervals.forEach(clearInterval); };
@@ -212,10 +241,10 @@ export function MaterializeTitle({ active }: { active: boolean }) {
     gold: GOLD,
   }), [layout]);
 
-  if (reducedMotion || !effect || !layout || !atlas) return <FallbackWordmark />;
+  if (reducedMotion || !effect || !layout || !atlas) return <Box><FallbackWordmark /></Box>;
 
   return (
-    <View accessible accessibilityRole="header" accessibilityLabel={WORD}>
+    <Box>
       <Canvas style={{ width: layout.w, height: layout.h }}>
         <Fill>
           <Shader source={effect} uniforms={uniforms}>
@@ -225,6 +254,6 @@ export function MaterializeTitle({ active }: { active: boolean }) {
           </Shader>
         </Fill>
       </Canvas>
-    </View>
+    </Box>
   );
 }

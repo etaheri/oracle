@@ -27,6 +27,12 @@ uniform float2 center;
 uniform float innerR;
 uniform float outerR;
 uniform float gate;
+// Per-cell clock (Atmospheric Dust): hold = [minSeconds, maxSeconds]. When
+// hold.y > 0, t is continuous seconds and each cell derives its own tick from
+// its own dwell time and phase, so re-rolls never land on a shared frame. When
+// hold.y == 0, t is already an integer step shared by every cell (halo,
+// activation) — legacy lockstep behavior.
+uniform float2 hold;
 
 float hash21(float2 p) {
   p = fract(p * float2(123.34, 456.21));
@@ -41,8 +47,14 @@ half4 main(float2 xy) {
   float d = distance(cellCenter, center);
   float band = smoothstep(innerR - cell.y, innerR + cell.y, d)
              * (1.0 - smoothstep(outerR - cell.y, outerR + cell.y, d));
-  float show = step(1.0 - gate, hash21(cellID + t));
-  float idx = 1.0 + floor(hash21(cellID * 1.7 + t * 0.37) * (glyphCount - 1.0));
+  float tick = t;
+  if (hold.y > 0.0) {
+    float seed = hash21(cellID * 3.1);
+    float myHold = mix(hold.x, hold.y, seed);
+    tick = floor(t / myHold + seed);
+  }
+  float show = step(1.0 - gate, hash21(cellID + tick));
+  float idx = 1.0 + floor(hash21(cellID * 1.7 + tick * 0.37) * (glyphCount - 1.0));
   idx = min(idx, glyphCount - 1.0);
   float glyphW = atlasSize.x / glyphCount;
   float2 atlasPos = float2(idx * glyphW + localUV.x * glyphW, localUV.y * atlasSize.y);
@@ -63,7 +75,7 @@ try {
 if (!effect) console.error("Terminal Patina SkSL unavailable — ASCII effects disabled");
 
 const LAVENDER = [183, 169, 228] as const;
-const GOLD = [126, 101, 56] as const; // goldText
+export const GOLD = [126, 101, 56] as const; // goldText
 const GLASS_BLUE = [156, 181, 209] as const; // glassBlue
 const ULTRAMARINE = [36, 61, 120] as const; // YES sleeve
 const VERMILION = [168, 75, 53] as const; // NO sleeve
@@ -79,8 +91,14 @@ function tintOf(c: readonly [number, number, number]): [number, number, number, 
   return [c[0] / 255, c[1] / 255, c[2] / 255, 1];
 }
 
-// Atmospheric Dust (spec mode 3): a slow-stepping glyph halo. The clock is
-// quantized to 3 steps/s — the pattern must never re-randomize per frame.
+// Atmospheric Dust (spec mode 3): a glyph halo where each cell ticks on its
+// own clock. A cell dwells DUST_HOLD[0]–DUST_HOLD[1] seconds (per-cell, hashed)
+// before it re-rolls — blinks out, appears, or swaps glyph — so at any instant
+// most of the field is still and a few glyphs tick over at unshared moments:
+// hidden system activity, not a strobe. (V1 stepped every cell in lockstep at
+// 3 Hz, which read as flashing and violated the brief's no-rapid-flicker rule.)
+const DUST_HOLD: readonly [number, number] = [2, 6];
+
 export function AsciiDust({
   size = 180,
   color = LAVENDER,
@@ -88,6 +106,7 @@ export function AsciiDust({
   gate = 0.22,
   innerRatio = 0.24,
   outerRatio = 0.46,
+  hold = DUST_HOLD,
 }: {
   size?: number;
   color?: readonly [number, number, number];
@@ -95,6 +114,9 @@ export function AsciiDust({
   gate?: number;
   innerRatio?: number;
   outerRatio?: number;
+  // Per-cell dwell range. Home drives it from the crowd (see haloMood); the
+  // default is the calm, unknown-crowd cadence.
+  hold?: readonly [number, number];
 }) {
   const atlas = useImage(ATLAS);
   const clock = useClock();
@@ -105,13 +127,14 @@ export function AsciiDust({
     glyphCount: GLYPH_COUNT,
     cell: [CELL_W, CELL_H],
     intensity,
-    t: reducedMotion ? 1 : Math.floor(clock.value / 333),
+    t: reducedMotion ? 1 : clock.value / 1000,
     tint: tintOf(color),
     center: [size / 2, size / 2],
     innerR: size * innerRatio,
     outerR: size * outerRatio,
     gate,
-  }), [size, color, intensity, gate, innerRatio, outerRatio, reducedMotion]);
+    hold: [hold[0], hold[1]],
+  }), [size, color, intensity, gate, innerRatio, outerRatio, hold, reducedMotion]);
 
   if (!effect || !atlas) return null;
   return (
@@ -177,6 +200,7 @@ export function PatinaHalo({
           innerR,
           outerR,
           gate,
+          hold: [0, 0],
         }}
       >
         <ImageShader image={atlas} rect={{ x: 0, y: 0, width: ATLAS_W, height: ATLAS_H }} />
@@ -218,6 +242,7 @@ export function AsciiCharge({ width, height, side, charge, pull }: {
       innerR: base * (0.42 + 0.3 * a),
       outerR: base * (0.85 + 0.5 * a),
       gate: 0.16 + 0.3 * a,
+      hold: [0, 0],
     };
   }, [width, height, side, charge]);
 
@@ -271,6 +296,7 @@ export function AsciiActivation({
       innerR: Math.max(0, outerR - width * 0.45),
       outerR,
       gate: 0.35,
+      hold: [0, 0],
     };
   }, [width, height, maxR]);
 

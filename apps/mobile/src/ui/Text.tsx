@@ -1,5 +1,5 @@
 import { Text, type TextProps } from "react-native";
-import { colors, fonts } from "../theme";
+import { colors, fonts, typeScale, ROW_H, trackTail } from "../theme";
 
 export function Serif({ size = 18, color = colors.ink, style, ...rest }: TextProps & { size?: number; color?: string }) {
   return <Text {...rest} style={[{ fontFamily: fonts.display, fontSize: size, color }, style]} />;
@@ -15,6 +15,18 @@ export function Mono({ size = 13, color = colors.mutedInk, letterSpacing = 0.5, 
   return <Text {...rest} style={[{ fontFamily: fonts.mono, fontSize: size, color, letterSpacing }, style]} />;
 }
 
+// The machine-voice roles as ready-made props, spreadable onto <Mono> or
+// <DecodeLine>. Each carries its own line box, so a row of chrome is exactly
+// ROW_H tall whatever the font metrics do — which is what lets Home reserve
+// space for lines that have not arrived yet. Spread these instead of typing a
+// size/letterSpacing/lineHeight triplet at the call site; pass `color` to say
+// which voice it is.
+export const role = {
+  eyebrow: { ...typeScale.eyebrow, style: { lineHeight: ROW_H.meta, textAlign: "center" as const, ...trackTail(typeScale.eyebrow.letterSpacing) } },
+  meta: { ...typeScale.meta, style: { lineHeight: ROW_H.meta, textAlign: "center" as const, ...trackTail(typeScale.meta.letterSpacing) } },
+  line: { ...typeScale.line, style: { lineHeight: ROW_H.line, textAlign: "center" as const, ...trackTail(typeScale.line.letterSpacing) } },
+} as const;
+
 export function Eyebrow({ children }: { children: string }) {
-  return <Mono size={10} color={colors.goldText} letterSpacing={4} style={{ textTransform: "uppercase", textAlign: "center" }}>{children}</Mono>;
+  return <Mono {...role.eyebrow} color={colors.goldText} style={[role.eyebrow.style, { textTransform: "uppercase" }]}>{children}</Mono>;
 }

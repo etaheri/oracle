@@ -270,7 +270,12 @@ Characters move from a hand toward the orb when the user interacts.
 
 Only a few cells appear and change slowly around the halo.
 
-- `cellSize: 6`, `intensity: 0.25`, time update: 2–4 changes per second
+- `cellSize: 6`, `intensity: 0.25`
+- Time: per-cell, not global. Each cell dwells 2–6 s (hashed per cell) before it
+  re-rolls — blinks out, appears, or swaps glyph — so at any instant most of the
+  field is still and a few glyphs tick over at unshared moments. Never step every
+  cell on a shared clock: a whole-field re-roll, even at 3 Hz, reads as flashing
+  (brief §4 "Rapid flickering" restriction), not as hidden system activity.
 - Avoid updating the pattern every frame. A slower rhythm feels intentional and
   prevents nervous visual noise.
 

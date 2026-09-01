@@ -4,11 +4,11 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from "react-native-reanim
 import * as Haptics from "expo-haptics";
 import { CALLING_LINES } from "@oracle/core";
 import { colors, space } from "../theme";
-import { markBootDone } from "../game/bootGate";
+import { markBootDone, markOrbLanded } from "../game/bootGate";
 import { markCallingSeen } from "../api/flags";
 import { callingHaptic } from "../game/calling";
 import { DecodeLine } from "./DecodeText";
-import { AsciiDust } from "./TerminalPatina";
+import { AsciiDust, GOLD } from "./TerminalPatina";
 
 // The Calling: the app's very first breath — the machine recounts the search
 // and assigns the player their role. Cinema, not a gate: no button, each beat
@@ -55,6 +55,7 @@ export function CallingRite() {
     if (done) {
       void markCallingSeen();
       markBootDone();
+      markOrbLanded();
     }
   }, [done]);
 
@@ -87,7 +88,7 @@ export function CallingRite() {
         onPress={() => setDone(true)}
         style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}
       >
-        <AsciiDust size={160} />
+        <AsciiDust size={160} color={GOLD} intensity={0.7} gate={0.28} />
         <View style={styles.column}>
           {CALLING_LINES.slice(0, shown).map((line, i) => (
             <Animated.View key={line} entering={FadeIn.duration(200)}>
