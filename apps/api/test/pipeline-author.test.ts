@@ -112,6 +112,26 @@ describe("authorRound", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("renders resolves_at through the derived lock, not the raw field", async () => {
+    const { db } = await makeTestDb();
+    const early = "2026-08-27T22:00:00Z";
+    const draft = {
+      questions: validDraft.questions.map((q) => (q.slot === 1 ? { ...q, resolves_at: early } : q)),
+    };
+    const { claude } = fakeClaude([draft]);
+    const { deps, sent } = fakeDeps(db, claude);
+
+    await authorRound(deps, "2026-08-27");
+
+    // Slot 1 authored an early resolves_at: shown as the derived instant.
+    expect(sent[0]).toContain(`· locks ${new Date(early).toISOString()}`);
+    // Every other slot is "after-lock" (the default noon lock): rendering the
+    // raw literal is meaningless to an operator — it must show as noon, the
+    // same branch a clamped-down late instant already uses.
+    expect(sent[0]).not.toContain("locks after-lock");
+    expect(sent[0]).toContain("locks at noon");
+  });
+
   it("includes the last 7 days of question texts as dedup context", async () => {
     const { db } = await makeTestDb();
     await db.insert(schema.rounds).values({ date: "2026-08-21", status: "resolved" });

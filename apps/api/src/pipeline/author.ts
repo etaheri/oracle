@@ -163,7 +163,22 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
 
   const draft: Draft = parsed.data;
   await upsertDraft(deps.db, date, draft);
-  await deps.telegram.send(draftMessage(date, draft.questions));
+
+  const opensAt = noonET(date);
+  const locksAtDefault = noonET(addDays(date, 1));
+  // draftMessage wants the derived lock, not the raw resolves_at — an
+  // "after-lock" question and a post-noon ISO both clamp to the same
+  // instant, and only that instant is worth showing an operator. Mirrors
+  // the mapping rerollSlot already does before its own draftMessage call.
+  await deps.telegram.send(
+    draftMessage(
+      date,
+      draft.questions.map((q) => {
+        const locksAt = lockFromResolvesAt(q.resolves_at, opensAt, locksAtDefault);
+        return { ...q, resolves_at: locksAt.getTime() < locksAtDefault.getTime() ? locksAt.toISOString() : null };
+      }),
+    ),
+  );
 }
 
 function rerollSystemPrompt(date: string, slot: number, othersTexts: string, guidance: string): string {
