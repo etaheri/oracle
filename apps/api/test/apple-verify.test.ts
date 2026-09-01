@@ -23,19 +23,19 @@ async function makeApple() {
   return { fetchFn, sign };
 }
 const NOW = Date.UTC(2026, 8, 1);
-const good = { iss: "https://appleid.apple.com", aud: "com.eriktaheri.oracle", exp: NOW / 1000 + 600, sub: "apple-sub-1" };
+const good = { iss: "https://appleid.apple.com", aud: "com.erikcitrine.oracle", exp: NOW / 1000 + 600, sub: "apple-sub-1" };
 
 describe("verifyAppleIdentityToken", () => {
   beforeEach(() => __resetJwksCache());
 
   it("accepts a valid token and returns sub", async () => {
     const { fetchFn, sign } = await makeApple();
-    const out = await verifyAppleIdentityToken(await sign(good), { audience: "com.eriktaheri.oracle", fetchFn, nowMs: NOW });
+    const out = await verifyAppleIdentityToken(await sign(good), { audience: "com.erikcitrine.oracle", fetchFn, nowMs: NOW });
     expect(out).toEqual({ sub: "apple-sub-1" });
   });
   it("rejects wrong audience, wrong issuer, expiry, unknown kid, bad signature, garbage", async () => {
     const { fetchFn, sign } = await makeApple();
-    const opts = { audience: "com.eriktaheri.oracle", fetchFn, nowMs: NOW };
+    const opts = { audience: "com.erikcitrine.oracle", fetchFn, nowMs: NOW };
     expect(await verifyAppleIdentityToken(await sign({ ...good, aud: "other.app" }), opts)).toBeNull();
     expect(await verifyAppleIdentityToken(await sign({ ...good, iss: "https://evil.example" }), opts)).toBeNull();
     expect(await verifyAppleIdentityToken(await sign({ ...good, exp: NOW / 1000 - 10 }), opts)).toBeNull();
@@ -47,19 +47,19 @@ describe("verifyAppleIdentityToken", () => {
   it("returns null when fetchFn rejects (network error)", async () => {
     const { sign } = await makeApple();
     const failFetch = (() => Promise.reject(new Error("Network error"))) as unknown as typeof fetch;
-    const opts = { audience: "com.eriktaheri.oracle", fetchFn: failFetch, nowMs: NOW };
+    const opts = { audience: "com.erikcitrine.oracle", fetchFn: failFetch, nowMs: NOW };
     expect(await verifyAppleIdentityToken(await sign(good), opts)).toBeNull();
   });
   it("returns null when fetchFn returns invalid JSON", async () => {
     const { sign } = await makeApple();
     const badJsonFetch = (async () => new Response("not json")) as unknown as typeof fetch;
-    const opts = { audience: "com.eriktaheri.oracle", fetchFn: badJsonFetch, nowMs: NOW };
+    const opts = { audience: "com.erikcitrine.oracle", fetchFn: badJsonFetch, nowMs: NOW };
     expect(await verifyAppleIdentityToken(await sign(good), opts)).toBeNull();
   });
   it("returns null when JWKS response has no keys array", async () => {
     const { sign } = await makeApple();
     const noKeysFetch = (async () => new Response(JSON.stringify({}))) as unknown as typeof fetch;
-    const opts = { audience: "com.eriktaheri.oracle", fetchFn: noKeysFetch, nowMs: NOW };
+    const opts = { audience: "com.erikcitrine.oracle", fetchFn: noKeysFetch, nowMs: NOW };
     expect(await verifyAppleIdentityToken(await sign(good), opts)).toBeNull();
   });
   it("returns null when signature segment is not valid base64url", async () => {
@@ -67,7 +67,7 @@ describe("verifyAppleIdentityToken", () => {
     const validToken = await sign(good);
     const parts = validToken.split(".");
     const badToken = `${parts[0]}.${parts[1]}.!!!not-base64url!!!`;
-    const opts = { audience: "com.eriktaheri.oracle", fetchFn, nowMs: NOW };
+    const opts = { audience: "com.erikcitrine.oracle", fetchFn, nowMs: NOW };
     expect(await verifyAppleIdentityToken(badToken, opts)).toBeNull();
   });
 });

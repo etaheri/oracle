@@ -4,7 +4,7 @@ import { makeTestDb } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { eq } from "drizzle-orm";
 
-const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin", APPLE_BUNDLE_ID: "com.eriktaheri.oracle" };
+const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin", APPLE_BUNDLE_ID: "com.erikcitrine.oracle" };
 // Injected verifier: token string IS the sub, "bad" fails — endpoint logic under test, not JWT crypto (Task 4 owns that).
 const verifyApple = async (token: string) => (token === "bad" ? null : { sub: token });
 

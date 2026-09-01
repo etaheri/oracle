@@ -8,7 +8,8 @@
     "scheme": "oracle",
     "userInterfaceStyle": "light",
     "ios": {
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.erikcitrine.oracle"
     },
     "android": {
       "adaptiveIcon": {
@@ -37,10 +38,18 @@
       "expo-sharing",
       "expo-notifications",
       "expo-apple-authentication",
-      ["onesignal-expo-plugin", { "mode": "production" }],
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ],
       [
         "@sentry/react-native/expo",
-        { "organization": "SENTRY_ORG_TBD_BY_ERIK", "project": "oracle-mobile" }
+        {
+          "organization": "SENTRY_ORG_TBD_BY_ERIK",
+          "project": "oracle-mobile"
+        }
       ]
     ],
     "experiments": {

@@ -59,7 +59,7 @@ export const authRoutes = new Hono<AppContext>().post("/device", async (c) => {
   const body = z.object({ identity_token: z.string() }).safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: "invalid body" }, 400);
   const verify = verifyApple ?? ((t: string, o: { audience: string }) => verifyAppleIdentityToken(t, o));
-  const idt = await verify(body.data.identity_token, { audience: env.APPLE_BUNDLE_ID ?? "com.eriktaheri.oracle" });
+  const idt = await verify(body.data.identity_token, { audience: env.APPLE_BUNDLE_ID ?? "com.erikcitrine.oracle" });
   if (!idt) return c.json({ error: "unauthorized" }, 401);
   const bound = await db.query.users.findFirst({ where: eq(schema.users.appleSub, idt.sub) });
   const userId = c.get("userId");
@@ -86,7 +86,7 @@ export const authRoutes = new Hono<AppContext>().post("/device", async (c) => {
   const body = z.object({ identity_token: z.string() }).safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: "invalid body" }, 400);
   const verify = verifyApple ?? ((t: string, o: { audience: string }) => verifyAppleIdentityToken(t, o));
-  const idt = await verify(body.data.identity_token, { audience: env.APPLE_BUNDLE_ID ?? "com.eriktaheri.oracle" });
+  const idt = await verify(body.data.identity_token, { audience: env.APPLE_BUNDLE_ID ?? "com.erikcitrine.oracle" });
   if (!idt) return c.json({ error: "unauthorized" }, 401);
   const bound = await db.query.users.findFirst({ where: eq(schema.users.appleSub, idt.sub) });
   if (!bound) return c.json({ error: "no record" }, 404);
