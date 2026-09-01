@@ -18,7 +18,7 @@
 - **Zod 4** — `z.iso.datetime({ offset: true })`, `z.literal()`, `z.union()`. Not Zod 3 idioms.
 - **`packages/core/src/copy.ts` is governed by `packages/core/test/copy-lint.test.ts`.** Any copy change must keep the lint green: mono caps, no emoji, no `!`, no CTA verbs (`CHECK TAP CLICK VISIT RESULTS DON'T MISS`), ≤140 chars.
 - **Never put non-ASCII in Skia text** — `useFont` has no fallback and renders tofu.
-- **Baselines to beat:** core 76, api 196, mobile 113 tests green; `pnpm typecheck` clean in all three packages. Every task ends green.
+- **Baselines to beat:** core 82, api 221, mobile 120 tests green (verified in this worktree at `30bc753`); `pnpm typecheck` clean in all three packages. Every task ends green and ADDS tests — never fewer than these counts.
 - **Commit per task**, conventional-commit style matching the repo (`feat(api):`, `fix(mobile):`, `refactor(core):`).
 
 ## Vocabulary
@@ -1107,7 +1107,7 @@ git commit -m "feat(mobile): the share carries a link when one is configured, an
 
 ## Final verification
 
-- [ ] `pnpm test` at the repo root — core ≥77, api ≥202, mobile ≥115, all green.
+- [ ] `pnpm test` at the repo root — core ≥83, api ≥232, mobile ≥122, all green.
 - [ ] `pnpm typecheck` at the repo root — clean in all three packages.
 - [ ] `grep -rn "locks_at" apps/api/src packages/core/src` — the only hits should be the derived `locks_at` fields in `routes/round.ts`'s JSON responses. Any hit in `pipeline/` is a miss.
 - [ ] `grep -rn "11:00 AM ET" apps/api/src` — no hits.
