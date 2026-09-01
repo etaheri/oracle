@@ -2,63 +2,63 @@
   "questions": [
     {
       "slot": 1,
+      "category": "culture",
+      "text": "Will the #1 song on the Billboard Hot 100 next week be the same title that is #1 this week, per Billboard's chart?",
+      "resolution_criteria": "Per Billboard's Hot 100 chart, next week's #1 title matches this week's #1 title. Billboard's chart update depends on a future tracking week and is never determinable before this round's own lock.",
+      "source_name": "Billboard",
+      "source_url": "https://www.billboard.com/charts/hot-100/",
+      "author_probability": 0.6,
+      "is_big_one": false,
+      "market_prob": null,
+      "resolves_at": "after-lock"
+    },
+    {
+      "slot": 2,
       "category": "markets",
-      "text": "Will the S&P 500 close higher today than its previous close, per WSJ market data?",
-      "resolution_criteria": "Per the S&P 500 (SPX) official closing value on the WSJ Markets quote page, today's close > the prior session's close. Resolves at today's 4:00 PM ET market close — well before the 11:00 AM ET D+1 grace window.",
+      "text": "Will the S&P 500 close higher next Friday than it closed the Friday before, per WSJ market data?",
+      "resolution_criteria": "Per the S&P 500 (SPX) official closing value on the WSJ Markets quote page, next Friday's close > the prior Friday's close. A future week-over-week comparison, never determinable before this round's own lock.",
       "source_name": "WSJ",
       "source_url": "https://www.wsj.com/market-data/quotes/index/SPX",
       "author_probability": 0.52,
       "is_big_one": false,
       "market_prob": null,
-      "locks_at": null
-    },
-    {
-      "slot": 2,
-      "category": "weather",
-      "text": "Will tonight's overnight low temperature in Central Park undercut the NWS forecast overnight low issued this morning, per NWS observations?",
-      "resolution_criteria": "Per the National Weather Service Central Park (KNYC) observed overnight low vs. the NWS forecast low issued this morning for tonight, observed < forecast. NWS posts the overnight low observation by early morning D+1, resolvable well before 11:00 AM ET.",
-      "source_name": "NWS",
-      "source_url": "https://forecast.weather.gov/MapClick.php?lat=40.7829&lon=-73.9654",
-      "author_probability": 0.45,
-      "is_big_one": false,
-      "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     },
     {
       "slot": 3,
-      "category": "culture",
-      "text": "Will the #1 movie at the U.S. box office today be the same title that was #1 yesterday, per Box Office Mojo's daily chart?",
-      "resolution_criteria": "Per Box Office Mojo's daily domestic chart, today's #1 title matches yesterday's #1 title. Box Office Mojo posts today's daily estimates the same evening, well ahead of the 11:00 AM ET D+1 grace window.",
-      "source_name": "Box Office Mojo",
-      "source_url": "https://www.boxofficemojo.com/daily/",
-      "author_probability": 0.6,
-      "is_big_one": false,
-      "market_prob": null,
-      "locks_at": null
-    },
-    {
-      "slot": 4,
       "category": "news",
-      "text": "Will the lead headline on the NYTimes.com homepage tomorrow morning be a different story than today's lead headline, per nytimes.com?",
-      "resolution_criteria": "Per a same-time (7:00 AM ET) comparison of the lead headline on nytimes.com, tomorrow morning's top story differs from today's. Resolvable at 7:00 AM ET D+1, ahead of the 11:00 AM ET grace window.",
+      "text": "Will the lead headline on the NYTimes.com homepage one week from now be a different story than today's lead headline, per nytimes.com?",
+      "resolution_criteria": "Per a same-time comparison of the lead headline on nytimes.com, the headline one week from now differs from today's. A future comparison, never determinable before this round's own lock.",
       "source_name": "The New York Times",
       "source_url": "https://www.nytimes.com",
       "author_probability": 0.55,
       "is_big_one": false,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
+    },
+    {
+      "slot": 4,
+      "category": "sports",
+      "text": "Will next Sunday's NFL early slate include at least one game decided by 14 or more points, per official NFL.com box scores?",
+      "resolution_criteria": "Per NFL.com's official box scores, at least one game in next Sunday's early slate ends with a final margin of 14 or more points. Depends on games not yet played, never determinable before this round's own lock.",
+      "source_name": "NFL.com",
+      "source_url": "https://www.nfl.com/scores/",
+      "author_probability": 0.5,
+      "is_big_one": false,
+      "market_prob": null,
+      "resolves_at": "after-lock"
     },
     {
       "slot": 5,
-      "category": "sports",
-      "text": "Will any MLB game scheduled for today be decided by 6 or more runs, per official MLB.com box scores?",
-      "resolution_criteria": "Per MLB.com's official box scores, at least one game scheduled for today ends with a final run differential of 6 or more. All scheduled games conclude by late evening ET, well ahead of the 11:00 AM ET D+1 grace window.",
-      "source_name": "MLB.com",
-      "source_url": "https://www.mlb.com/scores",
-      "author_probability": 0.5,
+      "category": "culture",
+      "text": "Will the #1 movie at the U.S. box office next weekend be a title not currently in the top 5, per Box Office Mojo's weekend chart?",
+      "resolution_criteria": "Per Box Office Mojo's weekend domestic chart, next weekend's #1 title is not among this week's top 5. Depends on a future weekend's results, never determinable before this round's own lock.",
+      "source_name": "Box Office Mojo",
+      "source_url": "https://www.boxofficemojo.com/weekend/",
+      "author_probability": 0.45,
       "is_big_one": true,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     }
   ]
 }
