@@ -108,6 +108,7 @@ applicable):
 - `EXPO_PUBLIC_POSTHOG_KEY`
 - `EXPO_PUBLIC_SENTRY_DSN`
 - `EXPO_PUBLIC_API_URL=<prod worker URL>`
+- `EXPO_PUBLIC_SHARE_URL=https://apps.apple.com/app/id<APP_STORE_ID>` — the link appended to every shared prophecy. Leave unset until the App Store Connect record exists; unset means the share ships with no link rather than a dead one.
 
 Then fill in the two remaining placeholders in the mobile app source:
 
