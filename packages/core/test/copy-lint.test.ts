@@ -82,12 +82,15 @@ describe("the rites", () => {
     const all = RITES_LINES.join(" ");
     for (const word of ["SEALED", "CROWD", "BIG ONE", "TIDE", "FIRST HOUR", "SHIELD", "NOON"]) expect(all).toContain(word);
   });
-  it("state the current rules: bounty not double, all five for the first hour, the city of noon, partial days", () => {
+  it("state the current rules: bounty not double, all five for the first hour, the city of noon, partial days, staggered locks", () => {
     const all = RITES_LINES.join(" ");
     expect(all).not.toContain("PAYS TWICE");
     expect(all).toContain("NEW YORK");
     expect(all).toContain("ALL FIVE");
-    expect(RITES_LINES.length).toBe(11);
+    // Early locks are the norm now: a player who finds a card already closed
+    // must have been told this could happen.
+    expect(all).toContain("BEFORE NOON");
+    expect(RITES_LINES.length).toBe(12);
   });
   it("partial and summons lines hold the register", () => {
     for (const l of [PARTIAL_LINE, ...SUMMONS_LINES]) {

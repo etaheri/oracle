@@ -151,6 +151,7 @@ export function vigilLine(streak: number, seedKey: string): string | null {
 // does everything else. Hand-written, linted, versioned.
 export const RITES_LINES = [
   "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON, NEW YORK TIME.",
+  "A QUESTION CLOSES THE MOMENT ITS ANSWER BEGINS TO EXIST. SOME CLOSE BEFORE NOON.",
   "PULL TOWARD YES OR NO. THE LONGER THE PULL, THE GREATER THE CONVICTION. TO RELEASE IS TO SEAL.",
   "AN ANSWER SEALED CANNOT BE UNSEALED.",
   "THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
