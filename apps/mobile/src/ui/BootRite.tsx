@@ -125,7 +125,7 @@ export function BootRite() {
         accessibilityRole="button"
         accessibilityLabel="Skip introduction"
         onPress={() => setDone(true)}
-        style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(4) }}
+        style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
       >
         <Animated.View ref={groupRef} style={[{ width: dustBox.w, height: dustBox.h }, groupStyle]}>
           <Animated.View style={[StyleSheet.absoluteFill, dustStyle]} pointerEvents="none">
@@ -133,7 +133,25 @@ export function BootRite() {
           </Animated.View>
           <OrbLayer rect={{ x: (dustBox.w - orb.w) / 2, y: (dustBox.h - orb.h) / 2, w: orb.w, h: orb.h }} playing={false} />
         </Animated.View>
-        <Animated.View style={[{ gap: space(2), alignItems: "center" }, textStyle]}>
+        {/* Out of flow, hung from the screen's midline: each printed line grows
+            this column, and in flow that growth re-centered the pair and walked
+            the orb upward line by line. The orb must hold still — it is about to
+            be measured against Home's slot. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              top: "50%",
+              left: 0,
+              right: 0,
+              marginTop: dustBox.h / 2 + space(4),
+              gap: space(2),
+              alignItems: "center",
+            },
+            textStyle,
+          ]}
+        >
           {LINES.slice(0, shown).map((line, i) => (
             <DecodeLine
               key={line}
