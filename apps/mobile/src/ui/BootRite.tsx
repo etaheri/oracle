@@ -16,9 +16,11 @@ import { OrbLayer } from "./OrbLayer";
 // minimum hold so it reads as intentional rather than as a flash.
 // V3 (spec 2026-09-01-boot-orb-handoff): the orb is here from the first frame
 // as a still, with its dust ring, at exactly the size it has on Home. When the
-// hold elapses the field fades and the orb rises to Home's measured slot; on
-// landing Home's own orb takes over on frame 0 — THE ORB WAKES. With no
-// anchor (deep link, unmeasured) the rite simply fades as before.
+// hold elapses the field fades and the orb rises to Home's measured slot, its
+// own dust ring dissolving in flight so it never overlaps Home's dimmer one;
+// on landing Home's own orb takes over on frame 0 — THE ORB WAKES. With no
+// anchor (deep link, unmeasured) the whole orb+dust group fades out together
+// with the field instead of sliding.
 const LINES = ["ORACLE OS V1.0", "THE ORB WAKES", "THE LEDGER OPENS"] as const;
 const LINE_MS = 420;
 const READY_MS = LINES.length * LINE_MS + 320;
@@ -38,26 +40,38 @@ export function BootRite() {
   // Geometry shared with Home: identical rects from the same window width, so
   // the slide is pure translation.
   const orb = orbRect(width);
-  const dust = dustRect(width);
+  const dustBox = dustRect(width);
   const groupRef = useRef<View>(null);
+  // The print-sequence timers (line reveals, READY, done). Held in a ref so
+  // the `done` effect can cancel them the instant it fires — a skip tap
+  // otherwise leaves them running, and a later setShown/setReady still
+  // landing mid-slide grows the (opacity-only, still-in-layout) text column
+  // and shoves the centered group off the position dx/dy were measured from.
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const field = useSharedValue(1);
   const text = useSharedValue(1);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
+  const groupOpacity = useSharedValue(1);
+  const dust = useSharedValue(1);
 
   useEffect(() => {
     if (reducedMotion) { markBootDone(); markOrbLanded(); return; }
-    const timers = LINES.slice(1).map((_, i) =>
+    timers.current = LINES.slice(1).map((_, i) =>
       setTimeout(() => setShown(i + 2), (i + 1) * LINE_MS),
     );
-    timers.push(setTimeout(() => setReady(true), READY_MS));
-    timers.push(setTimeout(() => setDone(true), HOLD_MS));
-    return () => timers.forEach(clearTimeout);
+    timers.current.push(setTimeout(() => setReady(true), READY_MS));
+    timers.current.push(setTimeout(() => setDone(true), HOLD_MS));
+    return () => timers.current.forEach(clearTimeout);
   }, [reducedMotion]);
 
   useEffect(() => {
     if (!done || gone) return;
+    // Freeze the print sequence the instant done fires — no further
+    // setShown/setReady may land and reflow the text column mid-slide.
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
     markBootDone();
     const finish = () => { markOrbLanded(); setGone(true); };
     field.value = withTiming(0, { duration: FADE_MS, easing: Easing.out(Easing.quad) });
@@ -66,12 +80,22 @@ export function BootRite() {
     const anchor = getHeroAnchor();
     const group = groupRef.current;
     if (!anchor || !group) {
-      // No slide possible: fade as V2 did, then hand off.
+      // No slide possible: fade the orb+dust group out together with the
+      // field, then hand off — otherwise an opaque orb and gold dust ring
+      // would sit exposed once the field dissolves to reveal what's beneath.
+      groupOpacity.value = withTiming(0, { duration: FADE_MS });
       const id = setTimeout(finish, FADE_MS);
       return () => clearTimeout(id);
     }
     // The group is the dust canvas with the orb centered inside it, so the
     // group's center IS the orb's center; the anchor is the orb tile's rect.
+    // The boot dust dissolves over the slide so it doesn't sit on top of
+    // Home's own (dimmer, lavender) dust ring once the field turns
+    // transparent; the orb itself stays fully opaque throughout. A watchdog
+    // stands in for `finish` if the native measure/animation callback never
+    // arrives — finish is idempotent and setGone after unmount is a no-op.
+    dust.value = withTiming(0, { duration: SLIDE_MS });
+    const id = setTimeout(finish, SLIDE_MS + 150);
     group.measureInWindow((gx, gy, gw, gh) => {
       const dx = anchor.x + anchor.w / 2 - (gx + gw / 2);
       const dy = anchor.y + anchor.h / 2 - (gy + gh / 2);
@@ -82,11 +106,16 @@ export function BootRite() {
         if (finished) runOnJS(finish)();
       });
     });
-  }, [done, gone, field, text, tx, ty]);
+    return () => clearTimeout(id);
+  }, [done, gone, field, text, tx, ty, groupOpacity, dust]);
 
   const fieldStyle = useAnimatedStyle(() => ({ opacity: field.value }));
   const textStyle = useAnimatedStyle(() => ({ opacity: text.value }));
-  const groupStyle = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }, { translateY: ty.value }] }));
+  const groupStyle = useAnimatedStyle(() => ({
+    opacity: groupOpacity.value,
+    transform: [{ translateX: tx.value }, { translateY: ty.value }],
+  }));
+  const dustStyle = useAnimatedStyle(() => ({ opacity: dust.value }));
 
   if (reducedMotion || gone) return null;
   return (
@@ -98,9 +127,11 @@ export function BootRite() {
         onPress={() => setDone(true)}
         style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(4) }}
       >
-        <Animated.View ref={groupRef} style={[{ width: dust.w, height: dust.h }, groupStyle]}>
-          <AsciiDust size={dust.w} color={GOLD} intensity={0.7} gate={0.28} />
-          <OrbLayer rect={{ x: (dust.w - orb.w) / 2, y: (dust.h - orb.h) / 2, w: orb.w, h: orb.h }} playing={false} />
+        <Animated.View ref={groupRef} style={[{ width: dustBox.w, height: dustBox.h }, groupStyle]}>
+          <Animated.View style={[StyleSheet.absoluteFill, dustStyle]} pointerEvents="none">
+            <AsciiDust size={dustBox.w} color={GOLD} intensity={0.7} gate={0.28} />
+          </Animated.View>
+          <OrbLayer rect={{ x: (dustBox.w - orb.w) / 2, y: (dustBox.h - orb.h) / 2, w: orb.w, h: orb.h }} playing={false} />
         </Animated.View>
         <Animated.View style={[{ gap: space(2), alignItems: "center" }, textStyle]}>
           {LINES.slice(0, shown).map((line, i) => (
