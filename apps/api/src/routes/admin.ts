@@ -5,7 +5,7 @@ import type { AppContext } from "../app";
 import { resolveQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";
 import { schema } from "../db/client";
-import { DraftSchema, upsertDraft } from "../pipeline/draft";
+import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft } from "../pipeline/draft";
 import { publish } from "../pipeline/actions";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
@@ -74,7 +74,8 @@ export const adminRoutes = new Hono<AppContext>()
     } catch (e) {
       const msg = e instanceof Error ? e.message : "upsert failed";
       if (msg === "round not editable") return c.json({ error: msg }, 409);
-      if (msg === "locks_at out of range") return c.json({ error: msg }, 400);
+      const BAD_DRAFT = new Set(["resolves_at out of range", "weather must lock before noon"]);
+      if (BAD_DRAFT.has(msg)) return c.json({ error: msg }, 400);
       return c.json({ error: "upsert failed" }, 500);
     }
   })
@@ -124,7 +125,12 @@ export const adminRoutes = new Hono<AppContext>()
   .post("/bank", async (c) => {
     const parsed = DraftSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    if (parsed.data.questions.some((q) => q.locks_at !== null)) return c.json({ error: "bank drafts must not set locks_at" }, 400);
+    // Bank drafts publish on an unknown future date, so an absolute instant
+    // would be stale. Every question must be "after-lock" — which also means
+    // no weather in the bank (the schema forbids weather from after-lock).
+    if (parsed.data.questions.some((q) => q.resolves_at !== RESOLVES_AFTER_LOCK)) {
+      return c.json({ error: "bank drafts must resolve after the lock" }, 400);
+    }
     const [row] = await c.get("deps").db.insert(schema.draftBank).values({ draft: parsed.data }).returning({ id: schema.draftBank.id });
     return c.json({ id: row!.id }, 201);
   })

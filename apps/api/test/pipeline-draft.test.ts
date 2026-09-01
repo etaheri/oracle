@@ -3,14 +3,17 @@ import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, upsertDraft } from "../src/pipeline/draft";
+import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, upsertDraft, type Draft } from "../src/pipeline/draft";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import * as schema from "../src/db/schema";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function withQuestions(overrides: (qs: typeof validDraft.questions) => typeof validDraft.questions) {
+// `validDraft`'s own inferred type pins `category` to the 4 categories the
+// fixture actually uses; overrides need the full schema union (e.g. to build
+// a weather question inline), so annotate against `Draft["questions"]`.
+function withQuestions(overrides: (qs: Draft["questions"]) => Draft["questions"]) {
   return { questions: overrides(validDraft.questions.map((q) => ({ ...q }))) };
 }
 

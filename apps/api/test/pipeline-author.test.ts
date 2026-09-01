@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { makeTestDb } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import { authorRound, rerollSlot, draftMessage } from "../src/pipeline/author";
@@ -36,6 +36,19 @@ function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null) {
 }
 
 const invalidDraft = { questions: [...validDraft.questions, { ...validDraft.questions[0]!, slot: 6 }] };
+
+const replacement = (resolvesAt: string) => ({
+  slot: 1,
+  category: "markets" as const,
+  text: "Will the replacement thing happen before the close?",
+  resolution_criteria: "Per the source page, at the stated deadline",
+  source_name: "SRC",
+  source_url: "https://example.com/y",
+  author_probability: 0.5,
+  is_big_one: false,
+  market_prob: null,
+  resolves_at: resolvesAt,
+});
 
 describe("authorRound", () => {
   it("throws when there is no claude client", async () => {
@@ -145,6 +158,7 @@ describe("rerollSlot", () => {
       source_url: "https://weather.gov/nyc",
       author_probability: 0.45,
       is_big_one: false,
+      resolves_at: "2026-08-27T21:00:00Z",
     };
     const { claude, calls } = fakeClaude([replacement]);
     const { deps, sent } = fakeDeps(db, claude);
@@ -190,7 +204,7 @@ describe("rerollSlot", () => {
     expect(slot3.status).toBe("open"); // unchanged
   });
 
-  it("g) an early locks_at in the reroll response is kept on the slot's row and shown in the telegram summary", async () => {
+  it("g) an early resolves_at in the reroll response is kept on the slot's row and shown in the telegram summary", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);
 
@@ -203,7 +217,7 @@ describe("rerollSlot", () => {
       source_url: "https://espn.com/game",
       author_probability: 0.5,
       is_big_one: false,
-      locks_at: "2026-08-27T23:00:00Z",
+      resolves_at: "2026-08-27T23:00:00Z",
     };
     const { claude } = fakeClaude([replacement]);
     const { deps, sent } = fakeDeps(db, claude);
@@ -217,7 +231,7 @@ describe("rerollSlot", () => {
     expect(sent[0]).toContain("· locks 2026-08-27T23:00:00.000Z");
   });
 
-  it("h) an out-of-range locks_at in the reroll response is clamped to noon D+1 and noted in the telegram message", async () => {
+  it("a resolves_at later than noon D+1 in the reroll response is silently clamped to the default lock", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);
 
@@ -230,7 +244,7 @@ describe("rerollSlot", () => {
       source_url: "https://espn.com/game",
       author_probability: 0.5,
       is_big_one: false,
-      locks_at: "2026-08-29T00:00:00Z", // past noon D+1 — out of range
+      resolves_at: "2026-08-29T00:00:00Z", // past noon D+1
     };
     const { claude } = fakeClaude([replacement]);
     const { deps, sent } = fakeDeps(db, claude);
@@ -241,7 +255,37 @@ describe("rerollSlot", () => {
     const slot3 = qs.find((q) => q.slot === 3)!;
     expect(slot3.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z"); // clamped to default
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toContain("out of range");
+    expect(sent[0]).not.toContain("out of range");
+    expect(sent[0]).toContain("locks at noon");
+  });
+
+  it("reroll derives the slot's lock from resolves_at", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 1, "make it sharper");
+
+    const q = await db.query.questions.findFirst({
+      where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 1)),
+    });
+    expect(q!.locksAt.toISOString()).toBe("2026-08-27T22:00:00.000Z");
+  });
+
+  it("reroll refuses a resolves_at already past at open instead of silently defaulting", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude } = fakeClaude([replacement("2026-08-27T15:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await expect(rerollSlot(deps, "2026-08-27", 1, "guidance")).rejects.toThrow("resolves_at out of range");
+
+    // And the live draft is untouched — a refused reroll must never half-write.
+    const q = await db.query.questions.findFirst({
+      where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 1)),
+    });
+    expect(q!.text).toBe(validDraft.questions[0]!.text);
   });
 
   it("e) rejects a reroll response that flips is_big_one", async () => {
