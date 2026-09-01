@@ -4,7 +4,7 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from "react-native-reanim
 import * as Haptics from "expo-haptics";
 import { CALLING_LINES } from "@oracle/core";
 import { colors, space } from "../theme";
-import { markBootDone } from "../game/bootGate";
+import { markBootDone, markOrbLanded } from "../game/bootGate";
 import { markCallingSeen } from "../api/flags";
 import { callingHaptic } from "../game/calling";
 import { DecodeLine } from "./DecodeText";
@@ -55,6 +55,7 @@ export function CallingRite() {
     if (done) {
       void markCallingSeen();
       markBootDone();
+      markOrbLanded();
     }
   }, [done]);
 
