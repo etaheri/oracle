@@ -38,8 +38,9 @@ export function LivingHero({ lean, phase = "live" }: { lean: number | null; phas
     });
   };
 
-  // Glow: 0 while cold; fades up 300ms after the rite's `done` (waking); 1 when live.
-  const glow = useSharedValue(phase === "cold" ? 0 : 1);
+  // Glow: 0 while cold or waking (fades up 300ms after the rite's `done`,
+  // driven by the effect below); 1 when mounted straight into live.
+  const glow = useSharedValue(phase === "live" ? 1 : 0);
   useEffect(() => {
     if (phase === "waking") glow.value = withDelay(GLOW_DELAY_MS, withTiming(1, { duration: GLOW_MS, easing: Easing.out(Easing.quad) }));
     else if (phase === "live") glow.value = withTiming(1, { duration: GLOW_MS });
@@ -59,7 +60,6 @@ export function LivingHero({ lean, phase = "live" }: { lean: number | null; phas
   }
 
   const handsEnter = phase !== "cold";
-  const handsDelay = phase === "waking" ? HANDS_DELAY_MS : 0;
 
   return (
     <View style={{ width: w, height: h }}>
@@ -80,8 +80,8 @@ export function LivingHero({ lean, phase = "live" }: { lean: number | null; phas
       <View pointerEvents="none" style={{ position: "absolute", left: dust.x, top: dust.y }}>
         <AsciiDust size={dust.w} intensity={0.22} gate={0.18} />
       </View>
-      <HandLayer rect={handSlot(width, "left")} side="left" enter={handsEnter} stageWidth={width} delayMs={handsDelay} />
-      <HandLayer rect={handSlot(width, "right")} side="right" enter={handsEnter} stageWidth={width} delayMs={handsDelay} />
+      <HandLayer rect={handSlot(width, "left")} side="left" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
+      <HandLayer rect={handSlot(width, "right")} side="right" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       {/* The orb slot always exists (it is what gets measured); the orb itself
           mounts only once landed, so its loop starts on frame 0 — the frame the
           rite's still was showing. */}
