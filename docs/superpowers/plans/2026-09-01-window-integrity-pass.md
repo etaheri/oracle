@@ -18,7 +18,7 @@
 - **Zod 4** — `z.iso.datetime({ offset: true })`, `z.literal()`, `z.union()`. Not Zod 3 idioms.
 - **`packages/core/src/copy.ts` is governed by `packages/core/test/copy-lint.test.ts`.** Any copy change must keep the lint green: mono caps, no emoji, no `!`, no CTA verbs (`CHECK TAP CLICK VISIT RESULTS DON'T MISS`), ≤140 chars.
 - **Never put non-ASCII in Skia text** — `useFont` has no fallback and renders tofu.
-- **Baselines to beat:** core 76, api 196, mobile 113 tests green; `pnpm typecheck` clean in all three packages. Every task ends green.
+- **Baselines to beat:** core 82, api 221, mobile 120 tests green (verified in this worktree at `30bc753`); `pnpm typecheck` clean in all three packages. Every task ends green and ADDS tests — never fewer than these counts.
 - **Commit per task**, conventional-commit style matching the repo (`feat(api):`, `fix(mobile):`, `refactor(core):`).
 
 ## Vocabulary
@@ -134,8 +134,9 @@ describe("upsertDraft derives the lock", () => {
 
   it("refuses a weather question that would still lock at noon D+1", async () => {
     const { db } = await makeTestDb();
+    // validDraft has no weather (see helpers/draft.ts) — build one here.
     const draft = withQuestions((qs) =>
-      qs.map((q) => (q.category === "weather" ? { ...q, resolves_at: "2026-08-29T09:00:00Z" } : q)),
+      qs.map((q) => (q.slot === 3 ? { ...q, category: "weather" as const, resolves_at: "2026-08-29T09:00:00Z" } : q)),
     );
     await expect(upsertDraft(db, "2026-08-27", draft)).rejects.toThrow("weather must lock before noon");
   });
@@ -166,7 +167,13 @@ import { RESOLVES_AFTER_LOCK } from "../../src/pipeline/draft";
 export const validDraft = {
   questions: [1, 2, 3, 4, 5].map((slot) => ({
     slot,
-    category: (["markets", "sports", "weather", "culture", "news"] as const)[slot - 1]!,
+    // Slot 3 was weather. It cannot be any more: weather is forbidden from
+    // "after-lock", and an absolute instant would pin this fixture to one
+    // date — but 30+ existing tests upsert it at 2026-08-27/28/29 and
+    // pipeline-tick puts it in the draft bank. Date-independence is the
+    // fixture's job; weather gets built inline by the tests that need it.
+    // Still 4 distinct categories: markets, sports, news, culture.
+    category: (["markets", "sports", "news", "culture", "news"] as const)[slot - 1]!,
     text: `Will thing ${slot} happen tomorrow?`,
     resolution_criteria: `Official number per source, page X`,
     source_name: "SRC",
@@ -174,9 +181,7 @@ export const validDraft = {
     author_probability: 0.5,
     is_big_one: slot === 5,
     market_prob: null,
-    // Weather must lock at the end of its measurement window; everything
-    // else in the fixture is deliberately the full-window case.
-    resolves_at: slot === 3 ? "2026-08-28T11:00:00Z" : RESOLVES_AFTER_LOCK,
+    resolves_at: RESOLVES_AFTER_LOCK,
   })),
 };
 ```
@@ -345,20 +350,19 @@ it("reroll refuses a resolves_at already past at open instead of silently defaul
 });
 ```
 
-Add to `apps/api/test/admin-rounds.test.ts`:
+`apps/api/test/admin-rounds.test.ts` already has this test at ~line 205 — it currently builds a rejected bank draft with `locks_at: "2026-08-27T18:00:00Z"` on question 0. **Amend that existing test; do not add a second one.** Change the field and the expected error:
 
 ```ts
-it("rejects a bank draft whose questions name an absolute resolves_at", async () => {
-  // Bank drafts are used on an unknown future date; an absolute instant
-  // would be stale by the time it publishes.
-  const draft = { questions: validDraft.questions.map((q) => ({ ...q, category: "news" as const, resolves_at: "2026-08-28T11:00:00Z" })) };
-  const res = await request("/admin/bank", { method: "POST", body: JSON.stringify(draft) });
-  expect(res.status).toBe(400);
-  expect((await res.json()).error).toBe("bank drafts must resolve after the lock");
-});
+      questions: validDraft.questions.map((q, i) => (i === 0 ? { ...q, resolves_at: "2026-08-27T18:00:00Z" } : q)),
 ```
 
-Use the file's existing request/auth helper rather than a new one.
+and assert the new message:
+
+```ts
+  expect((await res.json()).error).toBe("bank drafts must resolve after the lock");
+```
+
+Keep the file's existing `admin(app)` request helper. Also confirm the neighbouring happy-path bank test (~line 195, which posts `validDraft` unmodified) still passes — after Task 1 that fixture is all-`after-lock` with no weather, so it is a legal bank draft and should stay green.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -486,15 +490,15 @@ describe("the authoring contract", () => {
   }
 
   it("no longer demands an answer that exists before the lock", async () => {
-    const system = await systemPromptFor("2026-08-28");
+    const system = await systemPromptFor("2026-08-27");
     expect(system).not.toContain("11:00 AM ET");
     expect(system).toContain("resolves_at");
     expect(system).toContain("after-lock");
-    expect(system).toContain("noon ET on 2026-08-29");
+    expect(system).toContain("noon ET on 2026-08-28");
   });
 
   it("gives weather a measurement window that starts after the round opens", async () => {
-    const system = await systemPromptFor("2026-08-28");
+    const system = await systemPromptFor("2026-08-27");
     expect(system.toLowerCase()).toContain("measurement period must begin after the round opens");
   });
 });
@@ -521,7 +525,7 @@ it("tells the model that market-adapted questions lock at the market's close", a
       { status: 200, headers: { "content-type": "application/json" } },
     )) as unknown as typeof fetch;
 
-  await authorRound(deps, "2026-08-28");
+  await authorRound(deps, "2026-08-27");
 
   expect(calls[0]!.system.toLowerCase()).toContain("market's own close");
 });
@@ -627,7 +631,7 @@ describe("recent-question digest", () => {
 
     const { claude, calls } = fakeClaude([validDraft]);
     const { deps } = fakeDeps(db, claude);
-    await authorRound(deps, "2026-08-28");
+    await authorRound(deps, "2026-08-27");
 
     expect(calls[0]!.system).toContain("Will the index close higher? → YES, crowd 91% yes");
     expect(calls[0]!.system).toContain("Will the thing be verifiable? → VOID");
@@ -637,7 +641,7 @@ describe("recent-question digest", () => {
     const { db } = await makeTestDb();
     const { claude, calls } = fakeClaude([validDraft]);
     const { deps } = fakeDeps(db, claude);
-    await authorRound(deps, "2026-08-28");
+    await authorRound(deps, "2026-08-27");
     expect(calls[0]!.system).toContain("(no history yet)");
   });
 });
@@ -1107,7 +1111,7 @@ git commit -m "feat(mobile): the share carries a link when one is configured, an
 
 ## Final verification
 
-- [ ] `pnpm test` at the repo root — core ≥77, api ≥202, mobile ≥115, all green.
+- [ ] `pnpm test` at the repo root — core ≥83, api ≥232, mobile ≥122, all green.
 - [ ] `pnpm typecheck` at the repo root — clean in all three packages.
 - [ ] `grep -rn "locks_at" apps/api/src packages/core/src` — the only hits should be the derived `locks_at` fields in `routes/round.ts`'s JSON responses. Any hit in `pipeline/` is a miss.
 - [ ] `grep -rn "11:00 AM ET" apps/api/src` — no hits.
@@ -1120,3 +1124,267 @@ git commit -m "feat(mobile): the share carries a link when one is configured, an
 - **Story tier (audit §3):** the 50-call finding ceremony, you-vs-the-Oracle, the archive behind Plus, and new epithet rungs. Deliberately deferred — see the audit's §5 items 9–12.
 - **Seeding tier 2 (audit §2.5):** `/hold <slot>` before publish, `topic_key` structural dedupe, 14-day category balance, contestedness aggregates.
 - **After one week of live data,** read the LEAK WATCH lines before tuning anything else. If `late edge` is consistently near zero the pass worked; if drift is still large on a category, that category needs a shape rule like weather's.
+
+---
+
+### Task 8: the round survives its own early locks
+
+Added after the final whole-branch review, at Erik's request. Early per-question locks were an exception before this pass and are the norm after it — two places still assume the old world and now mislead the player. Both are consequences of this branch, not pre-existing.
+
+**Files:**
+- Modify: `apps/api/src/routes/round.ts` (`openRound` staleness, `reads_at` in the response)
+- Modify: `packages/core/src/schemas.ts` (`RoundTodaySchema.reads_at`)
+- Modify: `packages/core/test/round-schemas.test.ts` (fixture — adding a field to this schema has broken this fixture twice before)
+- Modify: `packages/core/src/copy.ts` (one new `system` line)
+- Modify: `apps/mobile/src/game/questionState.ts` (`allClosed`)
+- Modify: `apps/mobile/src/app/index.tsx` (the closed-but-not-sleeping state)
+- Modify: `apps/mobile/src/game/reminders.ts` (`planReminders` schedules against the earliest lock the player can still lose)
+- Modify: `apps/mobile/src/notifications/schedule.ts` (caller)
+- Test: `apps/api/test/round.test.ts`, `apps/mobile/test/questionState.test.ts`, `apps/mobile/test/reminders.test.ts`
+
+**Interfaces:**
+- Produces: `RoundTodaySchema.reads_at: string` — when the ledger is read (noon ET D+1), distinct from `locks_at` (when the *last* question closes, which may now be much earlier).
+- Produces: `allClosed(qs, now): boolean` in `questionState.ts`.
+- Changes: `planReminders(locksAt, roundDate, sealedCount, total)` → `planReminders(input: { roundLocksAt: string; roundDate: string; questions: ReadonlyArray<{ locks_at: string; sealed: boolean }>; now: number; total?: number })`.
+
+#### 8a — `/today` serves a round until its own noon, not until its last question closes
+
+`openRound` currently requires `now < max(question.locksAt)`. When every question locks early, `/today` 404s and the app falls to "THE ORACLE SLEEPS" for the hours until noon D+1 — despite a live round whose ledger is about to be read. The staleness guard should be the round's own noon.
+
+- [ ] **Step 1: Write the failing tests** in `apps/api/test/round.test.ts`, following the file's existing helpers:
+
+```ts
+it("serves a round whose questions have all closed early, until its own noon", async () => {
+  const { db } = await makeTestDb();
+  // Round of 2026-08-27: opens noon ET, reads noon ET 2026-08-28. Every
+  // question closed at 22:00Z on the 27th — hours before the round's noon.
+  await seedRound(db, {
+    date: "2026-08-27",
+    opensAt: new Date("2026-08-27T16:00:00Z"),
+    locksAt: new Date("2026-08-27T22:00:00Z"),
+  });
+  const res = await todayAt(db, new Date("2026-08-28T03:00:00Z")); // after every lock, before noon
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  expect(body.date).toBe("2026-08-27");
+  expect(body.locks_at).toBe("2026-08-27T22:00:00.000Z"); // still the LAST question's lock
+  expect(body.reads_at).toBe("2026-08-28T16:00:00.000Z"); // the round's own noon
+});
+
+it("stops serving once the round's own noon has passed", async () => {
+  const { db } = await makeTestDb();
+  await seedRound(db, {
+    date: "2026-08-27",
+    opensAt: new Date("2026-08-27T16:00:00Z"),
+    locksAt: new Date("2026-08-27T22:00:00Z"),
+  });
+  const res = await todayAt(db, new Date("2026-08-28T16:00:01Z"));
+  expect(res.status).toBe(404);
+});
+```
+
+`todayAt` is whatever this file already uses to issue `/v1/round/today` against a fixed clock; if the existing tests hard-code `new Date()` inside `openRound`, thread an injectable now through `openRound` rather than mocking global time, and say so in your report.
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `pnpm --filter @oracle/api test -- round`
+Expected: FAIL — the first 404s (stale by the old rule), and `reads_at` is absent.
+
+- [ ] **Step 3: Implement in `apps/api/src/routes/round.ts`**
+
+In `openRound`, replace the `now < lastLock` staleness test with the round's own noon, keeping `lastLock` for the response:
+
+```ts
+    const lastLock = qs.reduce((m, q) => Math.max(m, q.locksAt.getTime()), 0);
+    // Staleness is the ROUND's noon, not its last question's lock. Under
+    // per-question early locks every question can be closed hours before the
+    // ledger is read, and that round is still the live one — 404ing it drops
+    // the app into "THE ORACLE SLEEPS" while a real round awaits its reveal.
+    const readsAt = noonET(addDays(round.date, 1));
+    if (qs.length > 0 && now.getTime() < readsAt.getTime()) {
+      return { round, qs, lastLock: new Date(lastLock), readsAt };
+    }
+```
+
+Import `addDays` alongside the existing `noonET` from `../pipeline/clock`. Add `reads_at: readsAt.toISOString()` to the `/today` response body beside `locks_at`. `/today/crowd` and `/today/mine` call the same `openRound` and need no further change — confirm that in your report.
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `pnpm --filter @oracle/api test -- round crowd mine`
+Expected: PASS. The crowd/mine suites must stay green — they share `openRound`.
+
+- [ ] **Step 5: Add `reads_at` to the schema and fix the fixture**
+
+`packages/core/src/schemas.ts`, in `RoundTodaySchema` beside `locks_at`:
+
+```ts
+  reads_at: z.string(),
+```
+
+Then update the payload in `packages/core/test/round-schemas.test.ts` to carry `reads_at: "2026-08-22T16:00:00.000Z"`. **This fixture has broken twice before on schema growth** — it asserts `parse(payload)).toEqual(payload)`, so a missing field fails loudly.
+
+- [ ] **Step 6: Run core and commit 8a**
+
+Run: `pnpm --filter @oracle/core test && pnpm --filter @oracle/api test`
+
+```bash
+git add apps/api/src/routes/round.ts apps/api/test/round.test.ts packages/core/src/schemas.ts packages/core/test/round-schemas.test.ts
+git commit -m "fix(api): a round is live until its own noon, even after every question has closed"
+```
+
+#### 8b — home stops saying the oracle sleeps during a live round
+
+- [ ] **Step 1: Write the failing test** in `apps/mobile/test/questionState.test.ts`:
+
+```ts
+import { allClosed } from "../src/game/questionState";
+
+describe("allClosed", () => {
+  const at = (iso: string) => ({ locks_at: iso });
+  const NOW = Date.parse("2026-08-28T03:00:00Z");
+
+  it("is false while any question is still open", () => {
+    expect(allClosed([at("2026-08-27T22:00:00Z"), at("2026-08-28T16:00:00Z")], NOW)).toBe(false);
+  });
+
+  it("is true once every question has closed", () => {
+    expect(allClosed([at("2026-08-27T20:00:00Z"), at("2026-08-27T22:00:00Z")], NOW)).toBe(true);
+  });
+
+  it("is false for an empty round rather than vacuously true", () => {
+    expect(allClosed([], NOW)).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @oracle/mobile test -- questionState`
+Expected: FAIL — `allClosed` is not exported.
+
+- [ ] **Step 3: Implement** in `apps/mobile/src/game/questionState.ts`, beside `isClosed`:
+
+```ts
+// Every question shut while the round itself is still live — the hours
+// between the last early lock and noon. The round is not asleep; it is
+// waiting to be read.
+export function allClosed(qs: ReadonlyArray<{ locks_at: string }>, now: number): boolean {
+  return qs.length > 0 && qs.every((q) => isClosed(q, now));
+}
+```
+
+- [ ] **Step 4: Run it to verify it passes**
+
+Run: `pnpm --filter @oracle/mobile test -- questionState`
+Expected: PASS.
+
+- [ ] **Step 5: Add the copy line**
+
+`packages/core/src/copy.ts`, in the `system` pool:
+
+```ts
+  { id: "system.closed-1", pool: "system", text: "THE ORACLE HAS CLOSED. THE LEDGER IS READ AT NOON." },
+```
+
+Hand-check against `copy-lint.test.ts` before running: caps ✓, no emoji ✓, no `!` ✓, none of `CHECK TAP CLICK VISIT RESULTS DON'T MISS` ✓, 50 chars ✓, id prefixed with its pool ✓. The `system` pool floor is ≥5 and this makes 6.
+
+- [ ] **Step 6: Wire it into home**
+
+`apps/mobile/src/app/index.tsx`. The round screen already handles this case (`nextOpenQuestion` returns undefined → `CrowdReveal`); only home is wrong. Today it renders `SleepsPanel` on `!round`. Add a state, ABOVE that one, for a live round whose questions have all closed and which the player did not fully seal — the fully-sealed player already gets the correct "THE PROPHECY IS SEALED" branch, so do not disturb it:
+
+- compute `closed = !!round && allClosed(round.questions, now)` using the `now` already ticking in this component;
+- when `round && closed && !allSealed`: print the `system.closed-1` line in `colors.mutedInk`, with a `Countdown until={round.reads_at} prefix="THE LEDGER IS READ IN"`;
+- leave the `!round` → `SleepsPanel` branch exactly as it is.
+
+Check the surrounding branches: `round && !allSealed` currently renders the ENTER call, which must NOT also render when everything is closed — there is nothing to enter. Make the branches mutually exclusive.
+
+- [ ] **Step 7: Run mobile and core, then commit 8b**
+
+Run: `pnpm --filter @oracle/core test && pnpm --filter @oracle/mobile test && pnpm --filter @oracle/mobile typecheck`
+
+```bash
+git add packages/core/src/copy.ts apps/mobile/src/game/questionState.ts apps/mobile/test/questionState.test.ts apps/mobile/src/app/index.tsx
+git commit -m "feat(mobile): a round whose questions have all closed is not a sleeping oracle"
+```
+
+#### 8c — the closing nudge arrives before the thing it nudges about closes
+
+`planReminders` schedules today's closing call at `roundLocksAt − 3h`, where `roundLocksAt` is the *last* question's lock. With early locks that nudge can land after several cards have already shut, at which point "seal all five or the day does not rate" is unreachable and the notification is a lie.
+
+The voice spec caps the oracle at two notifications a day (`SUMMONS_LINES`: "IT WILL NOT SPEAK MORE THAN THAT"), so one nudge per day it stays — it just has to be scheduled against the first thing the player can still lose.
+
+- [ ] **Step 1: Write the failing tests** in `apps/mobile/test/reminders.test.ts`, alongside the existing cases:
+
+```ts
+const q = (locks_at: string, sealed = false) => ({ locks_at, sealed });
+
+it("schedules today's closing call against the earliest lock still to lose, not the last", () => {
+  const out = planReminders({
+    roundDate: "2026-08-27",
+    roundLocksAt: "2026-08-28T16:00:00Z",
+    questions: [q("2026-08-27T22:00:00Z"), q("2026-08-28T16:00:00Z")],
+    now: Date.parse("2026-08-27T16:30:00Z"),
+  });
+  const today = out.find((r) => r.kind === "closing" && r.date === "2026-08-27")!;
+  expect(today.at.toISOString()).toBe("2026-08-27T19:00:00.000Z"); // 22:00 − 3h
+});
+
+it("ignores locks the player has already sealed", () => {
+  const out = planReminders({
+    roundDate: "2026-08-27",
+    roundLocksAt: "2026-08-28T16:00:00Z",
+    questions: [q("2026-08-27T22:00:00Z", true), q("2026-08-28T16:00:00Z")],
+    now: Date.parse("2026-08-27T16:30:00Z"),
+  });
+  const today = out.find((r) => r.kind === "closing" && r.date === "2026-08-27")!;
+  expect(today.at.toISOString()).toBe("2026-08-28T13:00:00.000Z"); // the unsealed one, 16:00 − 3h
+});
+
+it("sends no closing call at all when its moment has already passed", () => {
+  const out = planReminders({
+    roundDate: "2026-08-27",
+    roundLocksAt: "2026-08-28T16:00:00Z",
+    questions: [q("2026-08-27T22:00:00Z"), q("2026-08-28T16:00:00Z")],
+    now: Date.parse("2026-08-27T21:00:00Z"), // past 19:00 — a nudge now would be about a card closing in an hour
+  });
+  expect(out.some((r) => r.kind === "closing" && r.date === "2026-08-27")).toBe(false);
+});
+
+it("speaks the partial line when a question has already closed unsealed", () => {
+  const out = planReminders({
+    roundDate: "2026-08-27",
+    roundLocksAt: "2026-08-28T16:00:00Z",
+    questions: [q("2026-08-27T14:00:00Z"), q("2026-08-28T16:00:00Z")],
+    now: Date.parse("2026-08-27T16:30:00Z"), // the first already closed, unsealed
+  });
+  const today = out.find((r) => r.kind === "closing" && r.date === "2026-08-27")!;
+  expect(today.body).toContain("ALL FIVE");
+});
+```
+
+Keep every existing test in the file passing — update their call sites to the new object signature rather than deleting them. The noon reminder and the six future-day projections keep their current behaviour off `roundLocksAt`.
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `pnpm --filter @oracle/mobile test -- reminders`
+Expected: FAIL — `planReminders` takes positional args and schedules off the round lock.
+
+- [ ] **Step 3: Implement** in `apps/mobile/src/game/reminders.ts`. Today's closing call is scheduled at `earliestUnsealedLock − REMINDER_LEAD_MS` and dropped when that moment is already past; a question that closed unsealed counts as partial, because the day can no longer rate whole. Days 1–6 keep projecting off `roundLocksAt` — no per-question data exists for a round that has not been published.
+
+- [ ] **Step 4: Run them to verify they pass**
+
+Run: `pnpm --filter @oracle/mobile test -- reminders`
+Expected: PASS.
+
+- [ ] **Step 5: Update the caller**
+
+`apps/mobile/src/notifications/schedule.ts`'s `resealReminders` and its call in `index.tsx` — pass the questions with their sealed flags from the round store. Keep the existing `r.at <= now` skip in `resealReminders`: it is belt-and-braces now rather than the only guard.
+
+- [ ] **Step 6: Run everything, then commit 8c**
+
+Run: `pnpm --filter @oracle/mobile test && pnpm --filter @oracle/mobile typecheck`
+
+```bash
+git add apps/mobile/src/game/reminders.ts apps/mobile/test/reminders.test.ts apps/mobile/src/notifications/schedule.ts apps/mobile/src/app/index.tsx
+git commit -m "fix(mobile): the closing call arrives before the first card you can still lose"
+```

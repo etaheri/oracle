@@ -3,62 +3,62 @@
     {
       "slot": 1,
       "category": "markets",
-      "text": "Will the S&P 500 close higher today than its previous close, per WSJ market data?",
-      "resolution_criteria": "Per the S&P 500 (SPX) official closing value on the WSJ Markets quote page, today's close > the prior session's close. Resolves at today's 4:00 PM ET market close — well before the 11:00 AM ET D+1 grace window.",
-      "source_name": "WSJ",
-      "source_url": "https://www.wsj.com/market-data/quotes/index/SPX",
+      "text": "Will the price of Bitcoin (BTC/USD) be higher exactly 20 hours after this round locks than it was at the moment of lock, per Coinbase's BTC-USD price chart?",
+      "resolution_criteria": "Per Coinbase's BTC-USD historical price chart (coinbase.com/price/bitcoin), compare the spot price at the exact instant this round locks to the spot price exactly 20 hours later. YES if the later price is strictly higher. Bitcoin trades continuously with no market close or weekend closure, so both readings exist regardless of which date this round publishes.",
+      "source_name": "Coinbase",
+      "source_url": "https://www.coinbase.com/price/bitcoin",
       "author_probability": 0.52,
       "is_big_one": false,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     },
     {
       "slot": 2,
-      "category": "weather",
-      "text": "Will tonight's overnight low temperature in Central Park undercut the NWS forecast overnight low issued this morning, per NWS observations?",
-      "resolution_criteria": "Per the National Weather Service Central Park (KNYC) observed overnight low vs. the NWS forecast low issued this morning for tonight, observed < forecast. NWS posts the overnight low observation by early morning D+1, resolvable well before 11:00 AM ET.",
-      "source_name": "NWS",
-      "source_url": "https://forecast.weather.gov/MapClick.php?lat=40.7829&lon=-73.9654",
-      "author_probability": 0.45,
+      "category": "sports",
+      "text": "Will at least one game across the NFL, NBA, NHL, or MLB (whichever leagues are in season) reach a final score within 20 hours of this round's lock, per official league box scores?",
+      "resolution_criteria": "Per the official schedules and box scores at NFL.com, NBA.com, NHL.com, and MLB.com, at least one regular-season, preseason, or playoff game among these four leagues is completed (final box score posted) within the rolling 20-hour window starting at this round's lock instant — not a calendar day or week. Checkable the moment that window closes, on any date of the year.",
+      "source_name": "NFL.com / NBA.com / NHL.com / MLB.com",
+      "source_url": "https://www.espn.com/schedule/",
+      "author_probability": 0.65,
       "is_big_one": false,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     },
     {
       "slot": 3,
       "category": "culture",
-      "text": "Will the #1 movie at the U.S. box office today be the same title that was #1 yesterday, per Box Office Mojo's daily chart?",
-      "resolution_criteria": "Per Box Office Mojo's daily domestic chart, today's #1 title matches yesterday's #1 title. Box Office Mojo posts today's daily estimates the same evening, well ahead of the 11:00 AM ET D+1 grace window.",
-      "source_name": "Box Office Mojo",
-      "source_url": "https://www.boxofficemojo.com/daily/",
+      "text": "Will the most-viewed English Wikipedia article (excluding the Main Page) on the UTC calendar day this round locks be a different article than the most-viewed article on the UTC calendar day immediately before it, per Wikimedia's daily pageview report?",
+      "resolution_criteria": "Per the Wikimedia Foundation's public pageview statistics (pageviews.wmcloud.org/topviews, backed by wikimedia.org's pageviews API), compare the #1 most-viewed article (excluding Main_Page and Special: pages) for the UTC calendar day containing this round's lock instant to the #1 article for the UTC calendar day immediately before it. YES if they differ. Wikipedia's pageview counters run continuously, every day of the year, with no weekday dependency.",
+      "source_name": "Wikimedia Toolforge — Topviews",
+      "source_url": "https://pageviews.wmcloud.org/topviews/",
       "author_probability": 0.6,
       "is_big_one": false,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     },
     {
       "slot": 4,
       "category": "news",
-      "text": "Will the lead headline on the NYTimes.com homepage tomorrow morning be a different story than today's lead headline, per nytimes.com?",
-      "resolution_criteria": "Per a same-time (7:00 AM ET) comparison of the lead headline on nytimes.com, tomorrow morning's top story differs from today's. Resolvable at 7:00 AM ET D+1, ahead of the 11:00 AM ET grace window.",
-      "source_name": "The New York Times",
-      "source_url": "https://www.nytimes.com",
-      "author_probability": 0.55,
+      "text": "Will the top headline shown on the NYTimes.com homepage change between the moment this round locks and 20 hours later, per the Internet Archive's Wayback Machine captures of nytimes.com?",
+      "resolution_criteria": "Per the Wayback Machine's saved captures of nytimes.com (web.archive.org/web/*/https://www.nytimes.com), compare the top/lead headline in the capture nearest this round's lock instant to the capture nearest 20 hours after it. YES if the headline text differs. The Wayback Machine captures major news homepages many times a day, on every day of the week including weekends.",
+      "source_name": "Internet Archive Wayback Machine (nytimes.com captures)",
+      "source_url": "https://web.archive.org/web/*/https://www.nytimes.com",
+      "author_probability": 0.65,
       "is_big_one": false,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     },
     {
       "slot": 5,
-      "category": "sports",
-      "text": "Will any MLB game scheduled for today be decided by 6 or more runs, per official MLB.com box scores?",
-      "resolution_criteria": "Per MLB.com's official box scores, at least one game scheduled for today ends with a final run differential of 6 or more. All scheduled games conclude by late evening ET, well ahead of the 11:00 AM ET D+1 grace window.",
-      "source_name": "MLB.com",
-      "source_url": "https://www.mlb.com/scores",
-      "author_probability": 0.5,
+      "category": "markets",
+      "text": "Will Bitcoin (BTC/USD) move by more than 1% in either direction within the 20 hours after this round locks, per Coinbase's BTC-USD price chart?",
+      "resolution_criteria": "Per Coinbase's BTC-USD historical price chart (coinbase.com/price/bitcoin), compute the percentage change between the spot price at the instant this round locks and the spot price exactly 20 hours later. YES if the absolute value of that change exceeds 1%. Bitcoin trades continuously with no market close, so both readings exist regardless of which date this round publishes.",
+      "source_name": "Coinbase",
+      "source_url": "https://www.coinbase.com/price/bitcoin",
+      "author_probability": 0.45,
       "is_big_one": true,
       "market_prob": null,
-      "locks_at": null
+      "resolves_at": "after-lock"
     }
   ]
 }

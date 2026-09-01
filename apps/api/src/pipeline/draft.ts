@@ -12,22 +12,39 @@ import { schema, type Db } from "../db/client";
 import { addDays, noonET } from "./clock";
 import { z } from "zod";
 
-export const DraftQuestionSchema = z.object({
-  slot: z.number().int().min(1).max(5),
-  category: z.enum(["markets", "sports", "weather", "culture", "news"]),
-  text: z.string().min(10),
-  resolution_criteria: z.string().min(10),
-  source_name: z.string().min(1),
-  source_url: z.string().url(),
-  author_probability: z.number().min(0.3).max(0.7),
-  is_big_one: z.boolean(),
-  // Set when the question was adapted from a live prediction market (feeds.ts);
-  // stamped into questions.market_prob for later reveal display.
-  market_prob: z.number().min(0).max(1).nullable().default(null),
-  // Leaky questions lock early (design spec §6): the instant the outcome
-  // starts to become knowable (tip-off, market close). null → noon D+1.
-  locks_at: z.iso.datetime({ offset: true }).nullable().default(null),
-});
+// The outcome's own clock. The model states a FACT — when does this become
+// publicly determinable — and the code derives the policy. `locks_at` used to
+// be an optional policy call the model made for itself, defaulting to noon
+// D+1, which is the maximally-leaky value; that default is why every question
+// stayed answerable after its answer existed (audit 2026-09-01 §1.1).
+export const RESOLVES_AFTER_LOCK = "after-lock";
+
+export const DraftQuestionSchema = z
+  .object({
+    slot: z.number().int().min(1).max(5),
+    category: z.enum(["markets", "sports", "weather", "culture", "news"]),
+    text: z.string().min(10),
+    resolution_criteria: z.string().min(10),
+    source_name: z.string().min(1),
+    source_url: z.string().url(),
+    author_probability: z.number().min(0.3).max(0.7),
+    is_big_one: z.boolean(),
+    // Set when the question was adapted from a live prediction market (feeds.ts);
+    // stamped into questions.market_prob for later reveal display.
+    market_prob: z.number().min(0).max(1).nullable().default(null),
+    // Required. Either the ISO-8601 instant the outcome first becomes
+    // publicly determinable, or "after-lock" when nothing about it is
+    // knowable before noon ET D+1.
+    resolves_at: z.union([z.iso.datetime({ offset: true }), z.literal(RESOLVES_AFTER_LOCK)]),
+  })
+  .superRefine((q, ctx) => {
+    // Weather's information arrives continuously, so "after-lock" is never
+    // true of it — a forecast is always partly knowable. Forcing an instant
+    // forces the lock to the end of the measurement window.
+    if (q.category === "weather" && q.resolves_at === RESOLVES_AFTER_LOCK) {
+      ctx.addIssue({ code: "custom", message: "weather must name a resolves_at instant", path: ["resolves_at"] });
+    }
+  });
 
 export const DraftSchema = z
   .object({ questions: z.array(DraftQuestionSchema).length(5) })
@@ -53,6 +70,17 @@ export const DraftSchema = z
 
 export type Draft = z.infer<typeof DraftSchema>;
 
+// The lock always moves to the information: a question can never remain
+// answerable once its outcome exists. Never later than the round's own noon.
+export function lockFromResolvesAt(resolvesAt: string, opensAt: Date, defaultLocksAt: Date): Date {
+  if (resolvesAt === RESOLVES_AFTER_LOCK) return defaultLocksAt;
+  const t = new Date(resolvesAt);
+  if (Number.isNaN(t.getTime()) || t.getTime() <= opensAt.getTime()) {
+    throw new Error("resolves_at out of range");
+  }
+  return t.getTime() < defaultLocksAt.getTime() ? t : defaultLocksAt;
+}
+
 export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<void> {
   const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (existing && existing.status !== "scheduled") throw new Error("round not editable");
@@ -61,15 +89,16 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
   const locksAtDefault = noonET(addDays(date, 1));
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
-  // Validate ALL rows (including each question's locks_at) before any write —
-  // this map throws on the first out-of-range locks_at, before we touch the
-  // DB at all. Critical: this must run before the delete-existing-draft
-  // block below, or a re-post with one bad locks_at would destroy a good
-  // scheduled round before the bad value is ever caught.
+  // Validate ALL rows (including each question's resolves_at) before any
+  // write — this map throws on the first "resolves_at out of range" or
+  // "weather must lock before noon", before we touch the DB at all.
+  // Critical: this must run before the delete-existing-draft block below, or
+  // a re-post with one bad resolves_at would destroy a good scheduled round
+  // before the bad value is ever caught.
   const rows = draft.questions.map((q) => {
-    const locksAt = q.locks_at ? new Date(q.locks_at) : locksAtDefault;
-    if (locksAt.getTime() <= opensAt.getTime() || locksAt.getTime() > locksAtDefault.getTime()) {
-      throw new Error("locks_at out of range");
+    const locksAt = lockFromResolvesAt(q.resolves_at, opensAt, locksAtDefault);
+    if (q.category === "weather" && locksAt.getTime() >= locksAtDefault.getTime()) {
+      throw new Error("weather must lock before noon");
     }
     return {
       roundDate: date,

@@ -123,6 +123,12 @@ describe("runTick", () => {
     done = await runTick(d3);
     expect(done).toContain("settle:2026-08-26");
     expect(sent3.some((t) => t.includes("reply if any outcome looks wrong"))).toBe(true);
+    const report = sent3.find((t) => t.includes("reply if any outcome looks wrong"))!;
+    expect(report).toContain("LEAK WATCH");
+    // No predictions on this round, so every slot reports honestly rather
+    // than inventing a drift from a sample of zero.
+    expect(report).toContain("too few seals");
+    expect(report).toContain("early-lock rate 0/5");
     const voided = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
     expect(voided.filter((q) => q.status === "void").length).toBe(2);
     for (const q of voided.filter((q) => q.status === "void")) {
@@ -191,6 +197,43 @@ describe("runTick", () => {
     expect(sent.length).toBe(0);
     const row = await db.query.draftBank.findFirst({ where: eq(schema.draftBank.id, entry!.id) });
     expect(row!.usedOn).toBeNull();
+  });
+
+  it("publishFromBank skips poisoned entries within a single call and still publishes the first good one", async () => {
+    const { db } = await makeTestDb();
+    const poisoned = { questions: [] }; // trivially fails DraftSchema
+    await db.insert(schema.draftBank).values([
+      { draft: poisoned, createdAt: new Date("2026-08-20T00:00:00Z") },
+      { draft: poisoned, createdAt: new Date("2026-08-21T00:00:00Z") },
+      { draft: validDraft, createdAt: new Date("2026-08-22T00:00:00Z") },
+    ]);
+    const { deps, sent } = fakeDeps(db, "2026-08-27T16:00:00Z");
+
+    const published = await publishFromBank(db, deps.telegram, "2026-08-27");
+
+    expect(published).toBe(true);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-08-27") });
+    expect(round!.status).toBe("open");
+    const rows = await db.query.draftBank.findMany();
+    expect(rows.every((r) => r.usedOn === "2026-08-27")).toBe(true); // all three burned this tick
+    expect(sent.filter((t) => t.includes("failed validation and was skipped")).length).toBe(2);
+    expect(sent.some((t) => t.includes("published from the evergreen bank"))).toBe(true);
+  });
+
+  it("publishFromBank bounds its retries per tick so a wholly-corrupt bank can't spin", async () => {
+    const { db } = await makeTestDb();
+    const poisoned = { questions: [] };
+    await db.insert(schema.draftBank).values(
+      Array.from({ length: 7 }, (_, i) => ({ draft: poisoned, createdAt: new Date(2026, 7, 20 + i) })),
+    );
+    const { deps, sent } = fakeDeps(db, "2026-08-27T16:00:00Z");
+
+    const published = await publishFromBank(db, deps.telegram, "2026-08-27");
+
+    expect(published).toBe(false);
+    const rows = await db.query.draftBank.findMany();
+    expect(rows.filter((r) => r.usedOn === "2026-08-27").length).toBe(5); // bounded, not all 7
+    expect(sent.filter((t) => t.includes("failed validation and was skipped")).length).toBe(5);
   });
 });
 

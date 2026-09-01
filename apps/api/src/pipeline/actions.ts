@@ -11,6 +11,7 @@ import { addDays, noonET } from "./clock";
 import { resolveQuestion } from "../resolution";
 import { settleRound } from "../settlement";
 import { DraftSchema, upsertDraft } from "./draft";
+import { crowdDrift, lateEdge, leakReport, loadLeakRows } from "./leak";
 import type { TelegramClient } from "./telegram";
 
 // The Oracle takes its position (design §2a) the instant the crowd is final.
@@ -77,8 +78,16 @@ export async function publish(db: Db, telegram: TelegramClient, date: string): P
 // the oldest unused bank entry, so the round never depends on the agent
 // being alive. An entry that fails DraftSchema (bank contents predate a
 // schema change, or were hand-inserted wrong) is poisoned — marked used on
-// this date without ever publishing — so the next tick tries the next one
-// instead of retrying the same bad row forever.
+// this date without ever publishing.
+//
+// A poisoned entry used to end the call: one bad row burned the whole tick,
+// so a bank of N stale rows (all persisted before some schema change) burns
+// itself out over N ticks, ten minutes apart, while the noon drop silently
+// produces nothing that day — on the one path whose entire purpose is to
+// never fail. So this tries past poisoned entries within the same call,
+// bounded so a wholly-corrupt bank can't spin the loop forever.
+const MAX_BANK_ATTEMPTS = 5;
+
 export async function publishFromBank(db: Db, telegram: TelegramClient, date: string): Promise<boolean> {
   // Belt-and-suspenders against decideActions' state snapshot going stale
   // (spec §2): a round for this date — locked, resolved, whatever status —
@@ -88,27 +97,30 @@ export async function publishFromBank(db: Db, telegram: TelegramClient, date: st
   const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (existing) return false;
 
-  const entry = await db.query.draftBank.findFirst({
-    where: isNull(schema.draftBank.usedOn),
-    orderBy: [asc(schema.draftBank.createdAt)],
-  });
-  if (!entry) return false;
+  for (let attempt = 0; attempt < MAX_BANK_ATTEMPTS; attempt++) {
+    const entry = await db.query.draftBank.findFirst({
+      where: isNull(schema.draftBank.usedOn),
+      orderBy: [asc(schema.draftBank.createdAt)],
+    });
+    if (!entry) return false;
 
-  const parsed = DraftSchema.safeParse(entry.draft);
-  if (!parsed.success) {
+    const parsed = DraftSchema.safeParse(entry.draft);
+    if (!parsed.success) {
+      await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
+      await telegram.send(`⚠ bank draft ${entry.id} failed validation and was skipped`);
+      continue;
+    }
+
+    await upsertDraft(db, date, parsed.data);
     await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
-    await telegram.send(`⚠ bank draft ${entry.id} failed validation and was skipped`);
-    return false;
+    const ok = await publish(db, telegram, date);
+    if (ok) {
+      const [left] = await db.select({ n: count() }).from(schema.draftBank).where(isNull(schema.draftBank.usedOn));
+      await telegram.send(`⚠ round ${date} published from the evergreen bank (${Number(left?.n ?? 0)} left)`);
+    }
+    return ok;
   }
-
-  await upsertDraft(db, date, parsed.data);
-  await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
-  const ok = await publish(db, telegram, date);
-  if (ok) {
-    const [left] = await db.select({ n: count() }).from(schema.draftBank).where(isNull(schema.draftBank.usedOn));
-    await telegram.send(`⚠ round ${date} published from the evergreen bank (${Number(left?.n ?? 0)} left)`);
-  }
-  return ok;
+  return false;
 }
 
 export async function voidQuestions(
@@ -146,11 +158,22 @@ export async function settle(deps: { db: Db; telegram: TelegramClient }, date: s
     orderBy: (questions, { asc }) => [asc(questions.slot)],
   });
 
+  const defaultLocksAt = noonET(addDays(date, 1));
+  const leakLines = await Promise.all(
+    qs.map(async (q) => {
+      const rows = await loadLeakRows(deps.db, q.id);
+      return { slot: q.slot, drift: crowdDrift(rows), edge: lateEdge(rows), locksAt: q.locksAt };
+    }),
+  );
+
   const lines = qs.map((q) => `${q.slot}. ${q.text} → ${q.outcome ? q.outcome.toUpperCase() : "?"}`);
   const report = [
     `Round ${date} settled`,
     ...lines,
     `settled: ${result.settled}`,
+    "",
+    ...leakReport(leakLines, defaultLocksAt),
+    "",
     "reply if any outcome looks wrong",
   ].join("\n");
 

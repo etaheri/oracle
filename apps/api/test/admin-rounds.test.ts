@@ -189,7 +189,7 @@ describe("POST /admin/questions/:id/resolve", () => {
 });
 
 describe("POST /admin/bank", () => {
-  it("accepts a valid bank draft (no locks_at) and returns an id", async () => {
+  it("accepts a valid bank draft (all after-lock) and returns an id", async () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const res = await admin(app)("/admin/bank", { method: "POST", body: JSON.stringify(validDraft) });
@@ -198,15 +198,15 @@ describe("POST /admin/bank", () => {
     expect(typeof body.id).toBe("string");
   });
 
-  it("rejects a draft with a non-null locks_at", async () => {
+  it("rejects a draft with a non-after-lock resolves_at", async () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const draftWithLock = {
-      questions: validDraft.questions.map((q, i) => (i === 0 ? { ...q, locks_at: "2026-08-27T18:00:00Z" } : q)),
+      questions: validDraft.questions.map((q, i) => (i === 0 ? { ...q, resolves_at: "2026-08-27T18:00:00Z" } : q)),
     };
     const res = await admin(app)("/admin/bank", { method: "POST", body: JSON.stringify(draftWithLock) });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "bank drafts must not set locks_at" });
+    expect(((await res.json()) as { error: string }).error).toBe("bank drafts must resolve after the lock");
   });
 });
 

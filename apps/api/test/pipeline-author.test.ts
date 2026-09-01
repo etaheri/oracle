@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { makeTestDb } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import { authorRound, rerollSlot, draftMessage } from "../src/pipeline/author";
@@ -36,6 +36,19 @@ function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null) {
 }
 
 const invalidDraft = { questions: [...validDraft.questions, { ...validDraft.questions[0]!, slot: 6 }] };
+
+const replacement = (resolvesAt: string) => ({
+  slot: 1,
+  category: "markets" as const,
+  text: "Will the replacement thing happen before the close?",
+  resolution_criteria: "Per the source page, at the stated deadline",
+  source_name: "SRC",
+  source_url: "https://example.com/y",
+  author_probability: 0.5,
+  is_big_one: false,
+  market_prob: null,
+  resolves_at: resolvesAt,
+});
 
 describe("authorRound", () => {
   it("throws when there is no claude client", async () => {
@@ -99,6 +112,26 @@ describe("authorRound", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("renders resolves_at through the derived lock, not the raw field", async () => {
+    const { db } = await makeTestDb();
+    const early = "2026-08-27T22:00:00Z";
+    const draft = {
+      questions: validDraft.questions.map((q) => (q.slot === 1 ? { ...q, resolves_at: early } : q)),
+    };
+    const { claude } = fakeClaude([draft]);
+    const { deps, sent } = fakeDeps(db, claude);
+
+    await authorRound(deps, "2026-08-27");
+
+    // Slot 1 authored an early resolves_at: shown as the derived instant.
+    expect(sent[0]).toContain(`· locks ${new Date(early).toISOString()}`);
+    // Every other slot is "after-lock" (the default noon lock): rendering the
+    // raw literal is meaningless to an operator — it must show as noon, the
+    // same branch a clamped-down late instant already uses.
+    expect(sent[0]).not.toContain("locks after-lock");
+    expect(sent[0]).toContain("locks at noon");
+  });
+
   it("includes the last 7 days of question texts as dedup context", async () => {
     const { db } = await makeTestDb();
     await db.insert(schema.rounds).values({ date: "2026-08-21", status: "resolved" });
@@ -124,6 +157,70 @@ describe("authorRound", () => {
   });
 });
 
+describe("recent-question digest", () => {
+  it("carries each question's outcome, crowd split, and void reason to the author, one per line in slot order", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-08-26", status: "resolved" });
+    // Inserted out of slot order on purpose: the digest must sort by
+    // roundDate/slot itself, not fall out of insertion order.
+    await db.insert(schema.questions).values([
+      {
+        roundDate: "2026-08-26", slot: 4, isBigOne: false, text: "Will attendance beat last year's?",
+        category: "sports", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "resolved",
+        outcome: "yes", crowdYesPct: null, crowdCount: 0,
+      },
+      {
+        roundDate: "2026-08-26", slot: 1, isBigOne: false, text: "Will the index close higher?",
+        category: "markets", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "resolved",
+        outcome: "yes", crowdYesPct: "91", crowdCount: 40,
+      },
+      {
+        roundDate: "2026-08-26", slot: 3, isBigOne: false, text: "Will the report drop before noon?",
+        category: "news", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "locked",
+      },
+      {
+        roundDate: "2026-08-26", slot: 2, isBigOne: false, text: "Will the thing be verifiable?",
+        category: "news", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "void", outcome: "void",
+      },
+    ]);
+
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    await authorRound(deps, "2026-08-27");
+
+    const system = calls[0]!.system;
+    expect(system).toContain("- Will the index close higher? → YES, crowd 91% yes");
+    expect(system).toContain("- Will the thing be verifiable? → VOID");
+    expect(system).toContain("- Will the report drop before noon? → not yet resolved");
+    expect(system).toContain("- Will attendance beat last year's? → YES, crowd unknown");
+
+    // One entry per line, and in slot order (1, 2, 3, 4) — not insertion order.
+    const idx1 = system.indexOf("Will the index close higher?");
+    const idx2 = system.indexOf("Will the thing be verifiable?");
+    const idx3 = system.indexOf("Will the report drop before noon?");
+    const idx4 = system.indexOf("Will attendance beat last year's?");
+    expect(idx1).toBeLessThan(idx2);
+    expect(idx2).toBeLessThan(idx3);
+    expect(idx3).toBeLessThan(idx4);
+  });
+
+  it("says so plainly when there is no history", async () => {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    await authorRound(deps, "2026-08-27");
+    expect(calls[0]!.system).toContain("(no history yet)");
+  });
+});
+
 describe("rerollSlot", () => {
   it("throws when there is no scheduled draft for the date", async () => {
     const { db } = await makeTestDb();
@@ -145,6 +242,7 @@ describe("rerollSlot", () => {
       source_url: "https://weather.gov/nyc",
       author_probability: 0.45,
       is_big_one: false,
+      resolves_at: "2026-08-27T21:00:00Z",
     };
     const { claude, calls } = fakeClaude([replacement]);
     const { deps, sent } = fakeDeps(db, claude);
@@ -190,7 +288,7 @@ describe("rerollSlot", () => {
     expect(slot3.status).toBe("open"); // unchanged
   });
 
-  it("g) an early locks_at in the reroll response is kept on the slot's row and shown in the telegram summary", async () => {
+  it("g) an early resolves_at in the reroll response is kept on the slot's row and shown in the telegram summary", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);
 
@@ -203,7 +301,7 @@ describe("rerollSlot", () => {
       source_url: "https://espn.com/game",
       author_probability: 0.5,
       is_big_one: false,
-      locks_at: "2026-08-27T23:00:00Z",
+      resolves_at: "2026-08-27T23:00:00Z",
     };
     const { claude } = fakeClaude([replacement]);
     const { deps, sent } = fakeDeps(db, claude);
@@ -217,7 +315,7 @@ describe("rerollSlot", () => {
     expect(sent[0]).toContain("· locks 2026-08-27T23:00:00.000Z");
   });
 
-  it("h) an out-of-range locks_at in the reroll response is clamped to noon D+1 and noted in the telegram message", async () => {
+  it("a resolves_at later than noon D+1 clamps down to the default lock (the min() rule)", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);
 
@@ -230,7 +328,7 @@ describe("rerollSlot", () => {
       source_url: "https://espn.com/game",
       author_probability: 0.5,
       is_big_one: false,
-      locks_at: "2026-08-29T00:00:00Z", // past noon D+1 — out of range
+      resolves_at: "2026-08-29T00:00:00Z", // past noon D+1
     };
     const { claude } = fakeClaude([replacement]);
     const { deps, sent } = fakeDeps(db, claude);
@@ -241,7 +339,37 @@ describe("rerollSlot", () => {
     const slot3 = qs.find((q) => q.slot === 3)!;
     expect(slot3.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z"); // clamped to default
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toContain("out of range");
+    expect(sent[0]).not.toContain("out of range");
+    expect(sent[0]).toContain("locks at noon");
+  });
+
+  it("reroll derives the slot's lock from resolves_at", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 1, "make it sharper");
+
+    const q = await db.query.questions.findFirst({
+      where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 1)),
+    });
+    expect(q!.locksAt.toISOString()).toBe("2026-08-27T22:00:00.000Z");
+  });
+
+  it("reroll refuses a resolves_at already past at open instead of silently defaulting", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude } = fakeClaude([replacement("2026-08-27T15:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await expect(rerollSlot(deps, "2026-08-27", 1, "guidance")).rejects.toThrow("resolves_at out of range");
+
+    // And the live draft is untouched — a refused reroll must never half-write.
+    const q = await db.query.questions.findFirst({
+      where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 1)),
+    });
+    expect(q!.text).toBe(validDraft.questions[0]!.text);
   });
 
   it("e) rejects a reroll response that flips is_big_one", async () => {
@@ -257,11 +385,12 @@ describe("rerollSlot", () => {
       source_url: "https://weather.gov/nyc",
       author_probability: 0.45,
       is_big_one: true, // slot 3 should never be the big one
+      resolves_at: "2026-08-27T21:00:00Z",
     };
     const { claude } = fakeClaude([flipped]);
     const { deps, sent } = fakeDeps(db, claude);
 
-    await expect(rerollSlot(deps, "2026-08-27", 3, "guidance")).rejects.toThrow();
+    await expect(rerollSlot(deps, "2026-08-27", 3, "guidance")).rejects.toThrow("reroll: is_big_one mismatch for slot 3");
 
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
     const slot3 = qs.find((q) => q.slot === 3)!;
@@ -342,5 +471,85 @@ describe("market-informed authoring", () => {
     expect(calls[0]!.system).not.toContain("LIVE MARKET SIGNALS");
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
     expect(qs).toHaveLength(5);
+  });
+
+  it("tells the model that market-adapted questions lock at the market's close", async () => {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    // One live signal, injected through marketFetch rather than the network.
+    // closeTime must sit inside feeds.ts's 36h horizon measured from
+    // `deps.now()` (fakeDeps pins it to 2026-08-27T12:00:00Z), NOT from the
+    // real clock — a wall-clock closeTime is filtered out and the block stays
+    // empty, which is a silently passing-for-the-wrong-reason test.
+    const feedNow = new Date("2026-08-27T12:00:00Z").getTime();
+    deps.marketFetch = (async (url: string) =>
+      new Response(
+        String(url).includes("manifold")
+          ? JSON.stringify([{ question: "Will X?", probability: 0.5, closeTime: feedNow + 3_600_000, volume: 900, uniqueBettorCount: 9, outcomeType: "BINARY", url: "https://manifold.markets/x" }])
+          : "[]",
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as unknown as typeof fetch;
+
+    await authorRound(deps, "2026-08-27");
+
+    expect(calls[0]!.system.toLowerCase()).toContain("market's own close");
+  });
+});
+
+describe("the authoring contract", () => {
+  async function systemPromptFor(date: string): Promise<string> {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    await authorRound(deps, date);
+    return calls[0]!.system;
+  }
+
+  it("no longer demands an answer that exists before the lock", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system).not.toContain("11:00 AM ET");
+    expect(system).toContain("resolves_at");
+    expect(system).toContain("after-lock");
+    expect(system).toContain("noon ET on 2026-08-28");
+  });
+
+  it("gives weather a measurement window that starts after the round opens", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system.toLowerCase()).toContain("measurement period must begin after the round opens");
+  });
+
+  it("tells the model weather's resolves_at must land before the round's own close, matching upsertDraft's hard enforcement", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system.toLowerCase()).toContain("must fall before noon et on 2026-08-28");
+  });
+
+  it("prefers resolves_at comfortably before noon so the named source has actually published by the 12:10 read", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system).toContain("comfortably before noon ET on 2026-08-28");
+    expect(system).toContain("12:10 ET on 2026-08-28");
+  });
+
+  it("the reroll prompt's resolution_criteria bullet no longer names a separate deadline than resolves_at", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude, calls } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 1, "make it sharper");
+
+    expect(calls[0]!.system).not.toContain("and the deadline");
+    expect(calls[0]!.system).toContain("resolution_criteria must name the exact measurement and the exact source page");
+  });
+
+  it("the reroll prompt also requires weather's resolves_at to fall before the round's own close", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude, calls } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 1, "make it sharper");
+
+    expect(calls[0]!.system.toLowerCase()).toContain("must fall before noon et on 2026-08-28");
   });
 });

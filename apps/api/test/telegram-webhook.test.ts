@@ -166,6 +166,7 @@ describe("POST /v1/telegram/:secret", () => {
       source_url: "https://weather.gov/nyc",
       author_probability: 0.45,
       is_big_one: false,
+      resolves_at: "2026-08-28T21:00:00Z",
     };
     const { claude } = fakeClaude([replacement]);
     const { deps, sent } = fakePipeline(db, claude, "2026-08-27T12:00:00Z");
@@ -196,6 +197,7 @@ describe("POST /v1/telegram/:secret", () => {
       source_url: "https://weather.gov/nyc",
       author_probability: 0.45,
       is_big_one: false,
+      resolves_at: "2026-08-28T21:00:00Z",
     };
     const { claude } = fakeClaude([replacement]);
     const { deps, sent } = fakePipeline(db, claude, "2026-08-27T12:00:00Z");
