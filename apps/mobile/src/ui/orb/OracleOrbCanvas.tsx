@@ -38,6 +38,13 @@ export function OracleOrbCanvas({
   const cx = tile / 2;
   const cy = tile / 2 + ORB_DY * tile;
 
+  // Computed on the JS thread: dispersionEnabled/interiorSamples are plain
+  // functions, not worklets, so the derived value below must capture their
+  // results rather than call them -- Reanimated cannot synchronously call a
+  // non-worklet JS function from the UI runtime.
+  const dispersion = dispersionEnabled(tier) ? 1 : 0;
+  const samples = interiorSamples(tier);
+
   const uniforms = useDerivedValue(() => {
     const u = live.value;
     return {
@@ -50,12 +57,12 @@ export function OracleOrbCanvas({
       centerDepth: u.centerDepth,
       centerLean: [u.centerLean, u.centerLean * 0.4],
       refraction: u.refraction,
-      dispersion: dispersionEnabled(tier) ? 1 : 0,
-      samples: interiorSamples(tier),
+      dispersion,
+      samples,
       rippleA: u.rippleA,
       rippleB: u.rippleB,
     };
-  }, [cx, cy, r, tier]);
+  }, [cx, cy, r, dispersion, samples]);
 
   // The halo lives outside the silhouette, so it is a Skia layer rather than a
   // shader term -- the shader returns transparent past d = 1 by design.
