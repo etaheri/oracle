@@ -3,7 +3,7 @@ import { AppState, Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
-import { useClock } from "@shopify/react-native-skia";
+import { useClock, useImage } from "@shopify/react-native-skia";
 import { locate, type OrbPoint } from "./orbTouch";
 import { assign, EMPTY_SLOTS, type RippleSlots } from "./orbRipples";
 import { nextState, settleTo, isTransient, targetsFor, transitionMs, type OrbState } from "./orbState";
@@ -12,6 +12,8 @@ import { orbCompiled } from "./orbShader";
 import { OracleOrbCanvas, type OrbUniforms } from "./OracleOrbCanvas";
 
 const FALLBACK = require("../../../assets/art/orb-fallback.png");
+const SHELL = require("../../../assets/art/orb-shell.png");
+const INTERIOR = require("../../../assets/art/orb-interior.png");
 
 export type OracleOrbHandle = {
   ripple(local?: OrbPoint): void;
@@ -32,13 +34,21 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   ref,
 ) {
   const reducedMotion = useReducedMotion();
-  const [imagesReady, setImagesReady] = useState(true);
-  const tier = resolve({ prop: quality, reducedMotion, compiled: orbCompiled(), imagesReady });
+
+  // The canvas's own images -- these gate the live tiers. A failure here is
+  // a shader with nothing to sample, so it must fall to static. This is a
+  // distinct signal from the *fallback* image failing (below): static is
+  // already the floor, so that failure has nowhere lower to report to.
+  const [canvasImagesFailed, setCanvasImagesFailed] = useState(false);
+  const shell = useImage(SHELL, () => setCanvasImagesFailed(true));
+  const interior = useImage(INTERIOR, () => setCanvasImagesFailed(true));
+  const tier = resolve({ prop: quality, reducedMotion, compiled: orbCompiled(), imagesReady: !canvasImagesFailed });
 
   const [current, setCurrent] = useState<OrbState>(state);
+  const previousState = useRef<OrbState>(current);
   const slots = useRef<RippleSlots>(EMPTY_SLOTS);
   const clock = useClock();
-  const paused = useSharedValue(0);
+  const paused = useSharedValue(AppState.currentState === "active" ? 0 : 1);
 
   // The animated targets. Each is its own shared value so Reanimated can
   // blend an interrupted transition rather than snapping it.
@@ -66,8 +76,9 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
 
   // Drive the uniforms toward the current state's targets.
   useEffect(() => {
+    const from = previousState.current;
     const to = targetsFor(current);
-    const ms = transitionMs(current, current);
+    const ms = transitionMs(from, current);
     const cfg = { duration: ms, easing: Easing.inOut(Easing.quad) };
     parallax.value = withTiming(to.parallax, cfg);
     centerDepth.value = withTiming(to.centerDepth, cfg);
@@ -75,6 +86,7 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
     refraction.value = withTiming(to.refraction, cfg);
     halo.value = withTiming(to.halo, cfg);
     timeScale.value = withTiming(to.timeScale, cfg);
+    previousState.current = current;
 
     // A transient resolves into its steady state on its own.
     if (!isTransient(current)) return;
@@ -154,22 +166,22 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
 
   const body =
     tier === "static" ? (
-      <Image
-        source={FALLBACK}
-        contentFit="contain"
-        style={{ width: tile, height: tile }}
-        onError={() => setImagesReady(false)}
-        accessible={false}
-      />
+      <Image source={FALLBACK} contentFit="contain" style={{ width: tile, height: tile }} accessible={false} />
     ) : (
-      <OracleOrbCanvas tile={tile} live={live} tier={tier} />
+      <OracleOrbCanvas tile={tile} live={live} tier={tier} shell={shell} interior={interior} />
     );
 
   // The press target is preserved in every tier, including static -- the
   // fallback must not silently drop interaction.
   if (!interactive) {
     return (
-      <View style={{ width: tile, height: tile }} accessibilityLabel={accessibilityLabel} accessible testID={testID}>
+      <View
+        style={{ width: tile, height: tile }}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="image"
+        accessible
+        testID={testID}
+      >
         {body}
       </View>
     );

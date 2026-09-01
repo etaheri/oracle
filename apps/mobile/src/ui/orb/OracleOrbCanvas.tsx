@@ -1,11 +1,8 @@
-import { Canvas, Circle, Fill, Image, ImageShader, RadialGradient, Shader, useImage, vec } from "@shopify/react-native-skia";
+import { Canvas, Circle, Fill, Image, ImageShader, RadialGradient, Shader, vec, type SkImage } from "@shopify/react-native-skia";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 import { ORB_D, ORB_DY } from "./orbTouch";
 import { INTERIOR_SIZE, ORB_EFFECT } from "./orbShader";
 import { dispersionEnabled, interiorSamples, type OrbTier } from "./orbQuality";
-
-const SHELL = require("../../../assets/art/orb-shell.png");
-const INTERIOR = require("../../../assets/art/orb-interior.png");
 
 // How far past the silhouette the halo reaches. The tile clears the orb by
 // about 5% a side, so this stays inside it and the canvas never has to grow
@@ -28,14 +25,15 @@ export function OracleOrbCanvas({
   tile,
   live,
   tier,
+  shell,
+  interior,
 }: {
   tile: number;
   live: SharedValue<OrbUniforms>;
   tier: OrbTier;
+  shell: SkImage | null;
+  interior: SkImage | null;
 }) {
-  const shell = useImage(SHELL);
-  const interior = useImage(INTERIOR);
-
   const r = (ORB_D * tile) / 2;
   const cx = tile / 2;
   const cy = tile / 2 + ORB_DY * tile;
