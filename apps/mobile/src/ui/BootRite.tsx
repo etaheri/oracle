@@ -6,7 +6,7 @@ import { getHeroAnchor, markBootDone, markOrbLanded } from "../game/bootGate";
 import { dustRect, orbRect } from "../game/heroStage";
 import { DecodeLine } from "./DecodeText";
 import { AsciiDust, GOLD } from "./TerminalPatina";
-import { OrbLayer } from "./OrbLayer";
+import { OracleOrb } from "./orb/OracleOrb";
 
 // The boot rite: one short machine-voice ceremony on cold start, covering the
 // app's first data fetch (brief §7 — "ASCII used for delight, loading,
@@ -131,7 +131,9 @@ export function BootRite() {
           <Animated.View style={[StyleSheet.absoluteFill, dustStyle]} pointerEvents="none">
             <AsciiDust size={dustBox.w} color={GOLD} intensity={0.7} gate={0.28} />
           </Animated.View>
-          <OrbLayer rect={{ x: (dustBox.w - orb.w) / 2, y: (dustBox.h - orb.h) / 2, w: orb.w, h: orb.h }} playing={false} />
+          <View style={{ position: "absolute", left: (dustBox.w - orb.w) / 2, top: (dustBox.h - orb.h) / 2 }}>
+            <OracleOrb tile={orb.w} state="dormant" />
+          </View>
         </Animated.View>
         {/* Out of flow, hung from the screen's midline: each printed line grows
             this column, and in flow that growth re-centered the pair and walked

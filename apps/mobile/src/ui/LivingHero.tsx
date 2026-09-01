@@ -4,10 +4,12 @@ import { Image } from "expo-image";
 import { Canvas, Circle, RadialGradient, vec } from "@shopify/react-native-skia";
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { orbGlowRgb } from "../game/orbMood";
+import { haloDwell, haloGate } from "../game/haloMood";
 import { ORB_CX, ORB_CY, dustRect, handSlot, orbRect, stageSize } from "../game/heroStage";
 import { setHeroAnchor } from "../game/bootGate";
 import { AsciiDust } from "./TerminalPatina";
-import { OrbLayer } from "./OrbLayer";
+import { GlassRefraction } from "./GlassRefraction";
+import { OracleOrb } from "./orb/OracleOrb";
 import { HandLayer } from "./HandLayer";
 
 // The living hero as a stage of layers (spec 2026-09-01-boot-orb-handoff):
@@ -21,13 +23,19 @@ const GLOW_DELAY_MS = 300;
 const GLOW_MS = 400;
 const HANDS_DELAY_MS = 450;
 
-export function LivingHero({ lean, phase = "live" }: { lean: number | null; phase?: HeroPhase }) {
+export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: number | null; playerCount?: number; phase?: HeroPhase }) {
   const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const { w, h } = stageSize(width);
   const orb = orbRect(width);
   const dust = dustRect(width);
   const [r, g, b] = orbGlowRgb(lean);
+  // The halo carries the day: density is turnout, restlessness is how split
+  // the crowd is (see haloMood). The glass refracts the very same field, so
+  // both read the same two values.
+  const gate = haloGate(playerCount);
+  const hold = haloDwell(lean);
+  const dustOrigin: readonly [number, number] = [orb.x - dust.x, orb.y - dust.y];
 
   // Anchor: the orb slot's rect in window coordinates, republished on every
   // layout so the rite reads a settled value at `done`.
@@ -53,7 +61,10 @@ export function LivingHero({ lean, phase = "live" }: { lean: number | null; phas
       <Image
         source={require("../../assets/art/creation-hands-orb.jpg")}
         contentFit="cover"
-        style={{ width: w, aspectRatio: 1408 / 768 }}
+        // The stage's height, not the still's own 1408/768 — a reduced-motion
+        // hero that is 6px shorter than the animated one would place the
+        // wordmark and epigraph on different rows for different users.
+        style={{ width: w, height: h }}
         accessible={false}
       />
     );
@@ -78,7 +89,7 @@ export function LivingHero({ lean, phase = "live" }: { lean: number | null; phas
           and the artwork — the hands and orb paint over them (brief §4: ASCII
           never obscures anatomy). */}
       <View pointerEvents="none" style={{ position: "absolute", left: dust.x, top: dust.y }}>
-        <AsciiDust size={dust.w} intensity={0.22} gate={0.18} />
+        <AsciiDust size={dust.w} intensity={0.22} gate={gate} hold={hold} />
       </View>
       <HandLayer rect={handSlot(width, "left")} side="left" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       <HandLayer rect={handSlot(width, "right")} side="right" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
@@ -88,11 +99,23 @@ export function LivingHero({ lean, phase = "live" }: { lean: number | null; phas
       <View
         ref={slotRef}
         onLayout={publishAnchor}
-        pointerEvents="none"
         style={{ position: "absolute", left: orb.x, top: orb.y, width: orb.w, height: orb.h }}
       >
-        {phase === "live" && <OrbLayer rect={{ x: 0, y: 0, w: orb.w, h: orb.h }} playing />}
+        {phase !== "cold" && (
+          <OracleOrb
+            tile={orb.w}
+            state={phase === "waking" ? "waking" : "attending"}
+            interactive
+            accessibilityLabel="Oracle"
+          />
+        )}
       </View>
+      {/* Above the orb, never behind it: refracted glyphs are light inside the
+          glass. Only once the orb is actually here — there is nothing to
+          refract through while the rite still holds it. */}
+      {phase === "live" && (
+        <GlassRefraction rect={orb} origin={dustOrigin} gate={gate} hold={hold} />
+      )}
     </View>
   );
 }
