@@ -106,6 +106,7 @@ export function AsciiDust({
   gate = 0.22,
   innerRatio = 0.24,
   outerRatio = 0.46,
+  hold = DUST_HOLD,
 }: {
   size?: number;
   color?: readonly [number, number, number];
@@ -113,6 +114,9 @@ export function AsciiDust({
   gate?: number;
   innerRatio?: number;
   outerRatio?: number;
+  // Per-cell dwell range. Home drives it from the crowd (see haloMood); the
+  // default is the calm, unknown-crowd cadence.
+  hold?: readonly [number, number];
 }) {
   const atlas = useImage(ATLAS);
   const clock = useClock();
@@ -129,8 +133,8 @@ export function AsciiDust({
     innerR: size * innerRatio,
     outerR: size * outerRatio,
     gate,
-    hold: DUST_HOLD,
-  }), [size, color, intensity, gate, innerRatio, outerRatio, reducedMotion]);
+    hold: [hold[0], hold[1]],
+  }), [size, color, intensity, gate, innerRatio, outerRatio, hold, reducedMotion]);
 
   if (!effect || !atlas) return null;
   return (
