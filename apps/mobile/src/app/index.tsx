@@ -14,7 +14,8 @@ import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
 import { epigraphFor } from "../game/epigraph";
-import { onBootDone } from "../game/bootGate";
+import { isBootDone, isOrbLanded, onBootDone, onOrbLanded } from "../game/bootGate";
+import { useHeroCues } from "../ui/useHeroCues";
 import { shieldNotice } from "../game/shieldNotice";
 import { revealReady } from "../game/revealReady";
 import { partialLine, spokenLine, riskLine, lapseNotice } from "../game/homeLines";
@@ -119,10 +120,17 @@ export default function Index() {
     // notice/rescue row above keeps reading the stale pre-purchase ledger.
     if (ok) void qc.invalidateQueries({ queryKey: ["me", "ledger"] });
   }, [qc]);
-  // Hold the print-in until the boot rite lifts — the static resolves in
-  // view as the overlay fades, instead of playing unseen behind it.
-  const [booted, setBooted] = useState(false);
+  // Cold-start choreography (spec 2026-09-01-boot-orb-handoff). `booted`:
+  // the rite's hold elapsed — the bottom-stack lines print now, the hero
+  // starts waking. `orbLanded`: the rite's orb arrived — the hero goes live
+  // and title/epigraph follow on the cue timers. Both seed from the gate's
+  // sync getters so a warm (re)mount renders live on its first frame.
+  const [booted, setBooted] = useState(isBootDone);
   useEffect(() => onBootDone(() => setBooted(true)), []);
+  const [orbLanded, setOrbLanded] = useState(isOrbLanded);
+  useEffect(() => onOrbLanded(() => setOrbLanded(true)), []);
+  const heroPhase = orbLanded ? "live" : booted ? "waking" : "cold";
+  const cues = useHeroCues(orbLanded);
 
   return (
     <Screen>
@@ -130,13 +138,13 @@ export default function Index() {
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(6) }}>
         {/* Temple moment: the near-touch, alive — transparent loop over the
             museum ground, glow tinted by the crowd's mood. */}
-        <LivingHero lean={lean} />
+        <LivingHero lean={lean} phase={heroPhase} />
         {/* The wordmark materializes out of ASCII (patina spec phase 2) and
             settles into carved stillness with a faint edge residue. */}
-        <MaterializeTitle active={booted} />
+        <MaterializeTitle active={cues.title} />
         <View style={{ gap: space(2), alignItems: "center", paddingHorizontal: space(5) }}>
-          <DecodeLine active={booted} text={`"${epigraph.text}"`} seed={epigraph.text} durationMs={700} size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }} />
-          <DecodeLine active={booted} text={`— ${epigraph.source.toUpperCase()}`} seed={epigraph.source} delayMs={500} size={10} color={colors.goldText} letterSpacing={3} />
+          <DecodeLine active={cues.epigraph} text={`"${epigraph.text}"`} seed={epigraph.text} durationMs={700} size={12} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 20 }} />
+          <DecodeLine active={cues.epigraph} text={`— ${epigraph.source.toUpperCase()}`} seed={epigraph.source} delayMs={500} size={10} color={colors.goldText} letterSpacing={3} />
         </View>
       </View>
       <View style={{ gap: space(3), paddingBottom: space(2) }}>
