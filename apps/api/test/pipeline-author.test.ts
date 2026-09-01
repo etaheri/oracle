@@ -434,4 +434,38 @@ describe("the authoring contract", () => {
     const system = await systemPromptFor("2026-08-27");
     expect(system.toLowerCase()).toContain("measurement period must begin after the round opens");
   });
+
+  it("tells the model weather's resolves_at must land before the round's own close, matching upsertDraft's hard enforcement", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system.toLowerCase()).toContain("must fall before noon et on 2026-08-28");
+  });
+
+  it("prefers resolves_at comfortably before noon so the named source has actually published by the 12:10 read", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system).toContain("comfortably before noon ET on 2026-08-28");
+    expect(system).toContain("12:10 ET on 2026-08-28");
+  });
+
+  it("the reroll prompt's resolution_criteria bullet no longer names a separate deadline than resolves_at", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude, calls } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 1, "make it sharper");
+
+    expect(calls[0]!.system).not.toContain("and the deadline");
+    expect(calls[0]!.system).toContain("resolution_criteria must name the exact measurement and the exact source page");
+  });
+
+  it("the reroll prompt also requires weather's resolves_at to fall before the round's own close", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const { claude, calls } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 1, "make it sharper");
+
+    expect(calls[0]!.system.toLowerCase()).toContain("must fall before noon et on 2026-08-28");
+  });
 });
