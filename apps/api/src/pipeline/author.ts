@@ -21,7 +21,11 @@ const draftQuestionProperties = {
   author_probability: { type: "number", minimum: 0.3, maximum: 0.7 },
   is_big_one: { type: "boolean" },
   market_prob: { type: ["number", "null"], minimum: 0, maximum: 1 },
-  locks_at: { type: ["string", "null"] },
+  resolves_at: {
+    type: "string",
+    description:
+      'ISO-8601 UTC instant at which this outcome first becomes publicly determinable from the named source, or the literal "after-lock" when nothing about it is knowable before the round locks.',
+  },
 };
 
 const draftQuestionRequired = [
@@ -34,7 +38,7 @@ const draftQuestionRequired = [
   "author_probability",
   "is_big_one",
   "market_prob",
-  "locks_at",
+  "resolves_at",
 ];
 
 const draftQuestionJsonSchema = {
@@ -68,18 +72,22 @@ LIVE MARKET SIGNALS — real prediction markets closing within 36 hours. These a
 ${lines.join("\n")}
 - Prefer adapting market-backed candidates where they fit the category skeleton, especially THE BIG ONE.
 - When a question is adapted from a listed market, set market_prob to that market's probability (0-1); otherwise set market_prob to null.
-- NEVER cite a prediction market as the resolution source — resolution always names a primary public source.`;
+- NEVER cite a prediction market as the resolution source — resolution always names a primary public source.
+- A question adapted from a listed market MUST set resolves_at to that market's own close: the price is public and converges on the answer, so answers have to close with it.`;
 }
 
 function authorSystemPrompt(date: string, recentTexts: string, signals: MarketSignal[]): string {
-  return `You author the daily round for ORACLE, a prediction game. Produce exactly 5 yes/no questions for the round dated ${date} (ET). Rules:
+  const lockDay = addDays(date, 1);
+  return `You author the daily round for ORACLE, a prediction game. Produce exactly 5 yes/no questions for the round dated ${date} (ET). The round opens at noon ET on ${date} and closes at noon ET on ${lockDay}. Rules:
 - Slots 1-4: four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the day's most contested story from any category.
-- Each question must be binary YES/NO in plain English, resolvable by 11:00 AM ET on ${addDays(date, 1)} from ONE named public source.
+- Each question must be binary YES/NO in plain English, resolvable from ONE named public source.
+- THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. For every question, set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. Answers are closed automatically at that instant, so an honest resolves_at costs you nothing and a late one hands the answer to whoever plays last. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
+- Prefer questions whose resolves_at lands inside the round's own window, close to noon ET on ${lockDay}: the ledger is read at 12:10 ET on ${lockDay}, and an "after-lock" question will not have an answer by then.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
-- resolution_criteria must name the exact measurement, the exact source page, and the deadline. Zero ambiguity: a stranger must be able to resolve it identically.
-- locks_at: if the outcome begins to become knowable before 11:00 AM ET on ${addDays(date, 1)} (a game tips off, a market closes, a scheduled release lands), set locks_at to that moment as an ISO-8601 UTC timestamp so answers lock before the information leaks. Otherwise null.
+- resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
+- WEATHER: the measurement period must begin after the round opens — never ask about a period already underway, because half its answer already exists. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
-- Avoid repeating these recent questions: ${recentTexts}${marketSignalsBlock(signals)}
+- Here is how your last seven days landed. Do not repeat them, and read the outcomes and crowd splits as feedback on your own question-writing: ${recentTexts}${marketSignalsBlock(signals)}
 Search the web for today's actual news before writing. When your draft is final, call the draft_round tool exactly once.`;
 }
 
@@ -143,11 +151,13 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
 
 function rerollSystemPrompt(date: string, slot: number, othersTexts: string, guidance: string): string {
   const isBigOne = slot === 5;
+  const lockDay = addDays(date, 1);
   return `You author a single replacement question for the ORACLE round dated ${date} (ET), slot ${slot}${isBigOne ? " (THE BIG ONE)" : ""}. Rules:
-- The question must be binary YES/NO in plain English, resolvable by 11:00 AM ET on ${addDays(date, 1)} from ONE named public source.
+- The question must be binary YES/NO in plain English, resolvable from ONE named public source.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement, the exact source page, and the deadline. Zero ambiguity: a stranger must be able to resolve it identically.
-- locks_at: if the outcome begins to become knowable before 11:00 AM ET on ${addDays(date, 1)} (a game tips off, a market closes, a scheduled release lands), set locks_at to that moment as an ISO-8601 UTC timestamp so answers lock before the information leaks. Otherwise null.
+- THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. For every question, set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. Answers are closed automatically at that instant, so an honest resolves_at costs you nothing and a late one hands the answer to whoever plays last. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
+- WEATHER: the measurement period must begin after the round opens — never ask about a period already underway, because half its answer already exists. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
 ${isBigOne ? "- This is THE BIG ONE: pick the day's most contested story from any category." : "- Pick a category different from the other four questions below."}
 Do not overlap these existing questions: ${othersTexts}

@@ -388,4 +388,50 @@ describe("market-informed authoring", () => {
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
     expect(qs).toHaveLength(5);
   });
+
+  it("tells the model that market-adapted questions lock at the market's close", async () => {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    // One live signal, injected through marketFetch rather than the network.
+    // closeTime must sit inside feeds.ts's 36h horizon measured from
+    // `deps.now()` (fakeDeps pins it to 2026-08-27T12:00:00Z), NOT from the
+    // real clock — a wall-clock closeTime is filtered out and the block stays
+    // empty, which is a silently passing-for-the-wrong-reason test.
+    const feedNow = new Date("2026-08-27T12:00:00Z").getTime();
+    deps.marketFetch = (async (url: string) =>
+      new Response(
+        String(url).includes("manifold")
+          ? JSON.stringify([{ question: "Will X?", probability: 0.5, closeTime: feedNow + 3_600_000, volume: 900, uniqueBettorCount: 9, outcomeType: "BINARY", url: "https://manifold.markets/x" }])
+          : "[]",
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as unknown as typeof fetch;
+
+    await authorRound(deps, "2026-08-27");
+
+    expect(calls[0]!.system.toLowerCase()).toContain("market's own close");
+  });
+});
+
+describe("the authoring contract", () => {
+  async function systemPromptFor(date: string): Promise<string> {
+    const { db } = await makeTestDb();
+    const { claude, calls } = fakeClaude([validDraft]);
+    const { deps } = fakeDeps(db, claude);
+    await authorRound(deps, date);
+    return calls[0]!.system;
+  }
+
+  it("no longer demands an answer that exists before the lock", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system).not.toContain("11:00 AM ET");
+    expect(system).toContain("resolves_at");
+    expect(system).toContain("after-lock");
+    expect(system).toContain("noon ET on 2026-08-28");
+  });
+
+  it("gives weather a measurement window that starts after the round opens", async () => {
+    const system = await systemPromptFor("2026-08-27");
+    expect(system.toLowerCase()).toContain("measurement period must begin after the round opens");
+  });
 });
