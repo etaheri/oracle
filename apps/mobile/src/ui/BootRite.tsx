@@ -4,7 +4,7 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from "react-native-reanim
 import { colors, space } from "../theme";
 import { markBootDone } from "../game/bootGate";
 import { DecodeLine } from "./DecodeText";
-import { AsciiDust } from "./TerminalPatina";
+import { AsciiDust, GOLD } from "./TerminalPatina";
 
 // The boot rite: one short machine-voice ceremony on cold start, covering the
 // app's first data fetch (brief §7 — "ASCII used for delight, loading,
@@ -49,7 +49,7 @@ export function BootRite() {
         onPress={() => setDone(true)}
         style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(4) }}
       >
-        <AsciiDust size={160} />
+        <AsciiDust size={160} color={GOLD} intensity={0.7} gate={0.28} />
         <View style={{ gap: space(2), alignItems: "center" }}>
           {LINES.slice(0, shown).map((line, i) => (
             <DecodeLine
