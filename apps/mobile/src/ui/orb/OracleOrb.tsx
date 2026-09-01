@@ -219,7 +219,8 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
     <Pressable
       onPress={handlePress}
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
+      accessibilityRole="image"
+      accessibilityHint="Responds to touch."
       testID={testID}
       style={{ width: tile, height: tile }}
     >
