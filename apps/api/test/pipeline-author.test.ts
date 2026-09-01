@@ -138,16 +138,31 @@ describe("authorRound", () => {
 });
 
 describe("recent-question digest", () => {
-  it("carries each question's outcome, crowd split, and void reason to the author", async () => {
+  it("carries each question's outcome, crowd split, and void reason to the author, one per line in slot order", async () => {
     const { db } = await makeTestDb();
     await db.insert(schema.rounds).values({ date: "2026-08-26", status: "resolved" });
+    // Inserted out of slot order on purpose: the digest must sort by
+    // roundDate/slot itself, not fall out of insertion order.
     await db.insert(schema.questions).values([
+      {
+        roundDate: "2026-08-26", slot: 4, isBigOne: false, text: "Will attendance beat last year's?",
+        category: "sports", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "resolved",
+        outcome: "yes", crowdYesPct: null, crowdCount: 0,
+      },
       {
         roundDate: "2026-08-26", slot: 1, isBigOne: false, text: "Will the index close higher?",
         category: "markets", resolutionCriteria: "per src", sourceName: "SRC",
         opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
         resolveBy: new Date("2026-08-27T17:00:00Z"), status: "resolved",
         outcome: "yes", crowdYesPct: "91", crowdCount: 40,
+      },
+      {
+        roundDate: "2026-08-26", slot: 3, isBigOne: false, text: "Will the report drop before noon?",
+        category: "news", resolutionCriteria: "per src", sourceName: "SRC",
+        opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z"),
+        resolveBy: new Date("2026-08-27T17:00:00Z"), status: "locked",
       },
       {
         roundDate: "2026-08-26", slot: 2, isBigOne: false, text: "Will the thing be verifiable?",
@@ -161,8 +176,20 @@ describe("recent-question digest", () => {
     const { deps } = fakeDeps(db, claude);
     await authorRound(deps, "2026-08-27");
 
-    expect(calls[0]!.system).toContain("Will the index close higher? → YES, crowd 91% yes");
-    expect(calls[0]!.system).toContain("Will the thing be verifiable? → VOID");
+    const system = calls[0]!.system;
+    expect(system).toContain("- Will the index close higher? → YES, crowd 91% yes");
+    expect(system).toContain("- Will the thing be verifiable? → VOID");
+    expect(system).toContain("- Will the report drop before noon? → not yet resolved");
+    expect(system).toContain("- Will attendance beat last year's? → YES, crowd unknown");
+
+    // One entry per line, and in slot order (1, 2, 3, 4) — not insertion order.
+    const idx1 = system.indexOf("Will the index close higher?");
+    const idx2 = system.indexOf("Will the thing be verifiable?");
+    const idx3 = system.indexOf("Will the report drop before noon?");
+    const idx4 = system.indexOf("Will attendance beat last year's?");
+    expect(idx1).toBeLessThan(idx2);
+    expect(idx2).toBeLessThan(idx3);
+    expect(idx3).toBeLessThan(idx4);
   });
 
   it("says so plainly when there is no history", async () => {

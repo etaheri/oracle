@@ -109,14 +109,18 @@ async function recentQuestionDigest(db: Db, date: string): Promise<string> {
     orderBy: (q, { asc }) => [asc(q.roundDate), asc(q.slot)],
   });
   if (rows.length === 0) return "(no history yet)";
+  // One entry per line: a semicolon join let one authored question text
+  // containing ";" or "→" corrupt every entry boundary after it. A newline
+  // is not a realistic character in a one-line yes/no question, so this
+  // entry format can't be split by the data it carries.
   return rows
     .map((r) => {
-      if (r.outcome === "void") return `${r.text} → VOID (unresolvable — do not write questions shaped like this)`;
-      if (r.outcome === null) return `${r.text} → not yet resolved`;
+      if (r.outcome === "void") return `- ${r.text} → VOID (unresolvable — do not write questions shaped like this)`;
+      if (r.outcome === null) return `- ${r.text} → not yet resolved`;
       const crowd = r.crowdYesPct === null ? "crowd unknown" : `crowd ${Math.round(Number(r.crowdYesPct))}% yes`;
-      return `${r.text} → ${r.outcome.toUpperCase()}, ${crowd}`;
+      return `- ${r.text} → ${r.outcome.toUpperCase()}, ${crowd}`;
     })
-    .join("; ");
+    .join("\n");
 }
 
 export async function authorRound(deps: PipelineDeps, date: string): Promise<void> {
