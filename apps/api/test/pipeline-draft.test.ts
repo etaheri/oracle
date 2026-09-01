@@ -26,6 +26,10 @@ describe("lockFromResolvesAt", () => {
     expect(lockFromResolvesAt("2026-08-29T09:00:00Z", OPENS, LOCKS).toISOString()).toBe(LOCKS.toISOString());
   });
 
+  it("an instant exactly at noon D+1 is kept, not clamped away", () => {
+    expect(lockFromResolvesAt(LOCKS.toISOString(), OPENS, LOCKS).toISOString()).toBe(LOCKS.toISOString());
+  });
+
   it("after-lock means the full window", () => {
     expect(lockFromResolvesAt(RESOLVES_AFTER_LOCK, OPENS, LOCKS).toISOString()).toBe(LOCKS.toISOString());
   });
@@ -170,5 +174,8 @@ describe("upsertDraft derives the lock", () => {
     await expect(upsertDraft(db, "2026-08-27", bad)).rejects.toThrow("resolves_at out of range");
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
     expect(qs).toHaveLength(5); // the good draft survived
+    expect(qs.every((q) => q.status === "scheduled")).toBe(true);
+    // Original text survived — the bad re-post never touched anything.
+    expect(qs.find((q) => q.slot === 1)!.text).toBe(validDraft.questions[0]!.text);
   });
 });

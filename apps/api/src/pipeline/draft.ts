@@ -89,11 +89,12 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
   const locksAtDefault = noonET(addDays(date, 1));
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
-  // Validate ALL rows (including each question's locks_at) before any write —
-  // this map throws on the first out-of-range locks_at, before we touch the
-  // DB at all. Critical: this must run before the delete-existing-draft
-  // block below, or a re-post with one bad locks_at would destroy a good
-  // scheduled round before the bad value is ever caught.
+  // Validate ALL rows (including each question's resolves_at) before any
+  // write — this map throws on the first "resolves_at out of range" or
+  // "weather must lock before noon", before we touch the DB at all.
+  // Critical: this must run before the delete-existing-draft block below, or
+  // a re-post with one bad resolves_at would destroy a good scheduled round
+  // before the bad value is ever caught.
   const rows = draft.questions.map((q) => {
     const locksAt = lockFromResolvesAt(q.resolves_at, opensAt, locksAtDefault);
     if (q.category === "weather" && locksAt.getTime() >= locksAtDefault.getTime()) {
