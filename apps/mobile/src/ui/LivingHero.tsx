@@ -93,9 +93,9 @@ export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: nu
       </View>
       <HandLayer rect={handSlot(width, "left")} side="left" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       <HandLayer rect={handSlot(width, "right")} side="right" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
-      {/* The orb slot always exists (it is what gets measured); the orb itself
-          mounts only once landed, so its loop starts on frame 0 — the frame the
-          rite's still was showing. */}
+      {/* The orb slot always exists — it's what gets measured for the boot
+          rite's anchor. The orb renders from waking onward, arriving in its
+          waking state and settling to attending. */}
       <View
         ref={slotRef}
         onLayout={publishAnchor}

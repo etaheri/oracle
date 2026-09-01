@@ -18,7 +18,7 @@ import { OracleOrb } from "./orb/OracleOrb";
 // as a still, with its dust ring, at exactly the size it has on Home. When the
 // hold elapses the field fades and the orb rises to Home's measured slot, its
 // own dust ring dissolving in flight so it never overlaps Home's dimmer one;
-// on landing Home's own orb takes over on frame 0 — THE ORB WAKES. With no
+// on landing, Home's orb takes over in its waking state — THE ORB WAKES. With no
 // anchor (deep link, unmeasured) the whole orb+dust group fades out together
 // with the field instead of sliding.
 const LINES = ["ORACLE OS V1.0", "THE ORB WAKES", "THE LEDGER OPENS"] as const;

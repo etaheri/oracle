@@ -34,9 +34,9 @@ float2 uvFor(float2 q) {
 }
 
 // A travelling band over the approximated sphere. Smooth falloff, no rings.
-float2 rippleWarp(float2 p, float4 rp, float now) {
+float2 rippleWarp(float2 p, float4 rp, float atTime) {
   if (rp.w <= 0.0) { return float2(0.0); }
-  float age = now - rp.z;
+  float age = atTime - rp.z;
   if (age < 0.0 || age > RIPPLE_LIFE) { return float2(0.0); }
   float2 away = p - rp.xy;
   float dist = length(away);
