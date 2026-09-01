@@ -231,7 +231,7 @@ describe("rerollSlot", () => {
     expect(sent[0]).toContain("· locks 2026-08-27T23:00:00.000Z");
   });
 
-  it("a resolves_at later than noon D+1 in the reroll response is silently clamped to the default lock", async () => {
+  it("a resolves_at later than noon D+1 clamps down to the default lock (the min() rule)", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);
 
@@ -301,11 +301,12 @@ describe("rerollSlot", () => {
       source_url: "https://weather.gov/nyc",
       author_probability: 0.45,
       is_big_one: true, // slot 3 should never be the big one
+      resolves_at: "2026-08-27T21:00:00Z",
     };
     const { claude } = fakeClaude([flipped]);
     const { deps, sent } = fakeDeps(db, claude);
 
-    await expect(rerollSlot(deps, "2026-08-27", 3, "guidance")).rejects.toThrow();
+    await expect(rerollSlot(deps, "2026-08-27", 3, "guidance")).rejects.toThrow("reroll: is_big_one mismatch for slot 3");
 
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
     const slot3 = qs.find((q) => q.slot === 3)!;
