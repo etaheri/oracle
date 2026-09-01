@@ -4,6 +4,7 @@
 // stored since the beginning; nothing ever read it.
 import { eq } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
+import { etNow } from "./clock";
 
 export interface SealRow { createdAt: Date; answer: boolean; brier: number | null }
 
@@ -45,21 +46,53 @@ export function earlyLockRate(qs: Array<{ locksAt: Date }>, defaultLocksAt: Date
 }
 
 const signed = (n: number) => (n >= 0 ? `+${n.toFixed(3)}` : n.toFixed(3));
-const stamp = (d: Date) => `${d.toISOString().slice(0, 16)}Z`;
+
+// The default lock ("locks noon") is always noon ET by construction
+// (defaultLocksAt = noonET(...)); an early lock is a real instant that must
+// read in the same zone, or the one column an operator scans to compare lock
+// times mixes UTC and ET side by side (review finding, minor 5).
+const stampET = (d: Date) => {
+  const { date, hour, minute } = etNow(d);
+  return `${date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}ET`;
+};
+
+// The legend lives on the header line, not buried in a comment only the
+// author reads — this is the only artifact that tells anyone whether the
+// window-integrity pass actually worked, and it has to be readable cold
+// (review finding, important 2).
+const HEADER =
+  "LEAK WATCH — drift: crowd swing, first quartile of sealers to last, in points; " +
+  "late edge: earlier-half mean brier minus later-half — positive means late sealers scored better, i.e. the leak";
 
 export function leakReport(
   lines: Array<{ slot: number; drift: number | null; edge: number | null; locksAt: Date }>,
   defaultLocksAt: Date,
 ): string[] {
   const body = lines.map((l) => {
-    const lock = l.locksAt.getTime() < defaultLocksAt.getTime() ? `locks ${stamp(l.locksAt)}` : "locks noon";
-    if (l.drift === null || l.edge === null) return `${l.slot} too few seals · ${lock}`;
-    return `${l.slot} drift ${l.drift}pp · late edge ${signed(l.edge)} · ${lock}`;
+    const lock = l.locksAt.getTime() < defaultLocksAt.getTime() ? `locks ${stampET(l.locksAt)}` : "locks noon ET";
+    // A voided question can gather plenty of seals (drift is computable)
+    // while carrying zero rated briers (edge is not) — the two metrics are
+    // independent and must render independently, or a real drift signal
+    // gets swallowed behind an unrelated missing edge (review finding,
+    // important 1). Only render the terse combined line when BOTH are
+    // absent; otherwise show each metric on its own terms.
+    if (l.drift === null && l.edge === null) return `${l.slot} too few seals · ${lock}`;
+    const driftPart = l.drift === null ? "drift too few seals" : `drift ${l.drift}pp`;
+    const edgePart = l.edge === null ? "late edge too few seals" : `late edge ${signed(l.edge)}`;
+    return `${l.slot} ${driftPart} · ${edgePart} · ${lock}`;
   });
-  return ["LEAK WATCH", ...body, `early-lock rate ${earlyLockRate(lines, defaultLocksAt)}`];
+  return [HEADER, ...body, `early-lock rate ${earlyLockRate(lines, defaultLocksAt)}`];
 }
 
 export async function loadLeakRows(db: Db, questionId: string): Promise<SealRow[]> {
   const rows = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, questionId) });
-  return rows.map((p) => ({ createdAt: p.createdAt, answer: p.answer, brier: p.brier === null ? null : Number(p.brier) }));
+  // Postgres numeric can hold 'NaN'; that would pass a plain !== null check
+  // and poison the mean in lateEdge. Treat it as unrated instead (review
+  // finding, minor 4).
+  const toBrier = (b: string | null): number | null => {
+    if (b === null) return null;
+    const n = Number(b);
+    return Number.isFinite(n) ? n : null;
+  };
+  return rows.map((p) => ({ createdAt: p.createdAt, answer: p.answer, brier: toBrier(p.brier) }));
 }
