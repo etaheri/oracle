@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "usesAppleSignIn": true,
-      "bundleIdentifier": "com.erikcitrine.oracle"
+      "bundleIdentifier": "com.erikt.oracle",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,11 +53,36 @@
           "organization": "SENTRY_ORG_TBD_BY_ERIK",
           "project": "oracle-mobile"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.erikt.oracle.OneSignalNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.erikt.oracle.onesignal"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "aaad68b1-71b3-49c2-ab03-434f36caef92"
+      }
+    },
+    "owner": "eriktaheris-team"
   }
 }
