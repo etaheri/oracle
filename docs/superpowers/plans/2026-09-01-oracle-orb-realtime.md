@@ -255,8 +255,8 @@ describe("locate", () => {
   it("reaches exactly 1 at the silhouette", () => {
     const hit = locate({ x: CX + R * 0.999, y: CY }, TILE)!;
     expect(hit.local.x).toBeCloseTo(0.999, 3);
-    // At the rim the normal lies in the screen plane.
-    expect(hit.normal[2]).toBeCloseTo(0, 2);
+    // At the rim the normal lies very nearly in the screen plane.
+    expect(hit.normal[2]).toBeLessThan(0.05);
   });
 
   it("rejects a touch outside the circle", () => {
@@ -961,9 +961,13 @@ float2 rippleWarp(float2 p, float4 rp, float now) {
   if (dist < 1e-4) { return float2(0.0); }
   // The front leaves the touch and crosses the interior over the ripple's life.
   float front = (age / RIPPLE_LIFE) * 2.2;
-  float band = exp(-pow((dist - front) * 3.2, 2.0));
-  // 0-80ms is local compression: the band starts tight and inverted.
-  float compress = 1.0 - smoothstep(0.0, 0.08, age) * 2.0;
+  // Squared directly: pow() with a negative base is undefined, and
+  // (dist - front) is negative everywhere ahead of the travelling front.
+  float e = (dist - front) * 3.2;
+  float band = exp(-e * e);
+  // The first 80ms compress inward; the wave then expands outward. That sign
+  // flip IS the local optical compression the brief asks for.
+  float compress = mix(-1.0, 1.0, smoothstep(0.0, 0.08, age));
   float decay = 1.0 - smoothstep(0.7, RIPPLE_LIFE, age);
   return normalize(away) * band * decay * compress * rp.w * 0.06;
 }
@@ -1109,6 +1113,8 @@ export function OracleOrbCanvas({
           <ImageShader
             image={interior}
             fit="none"
+            tx="clamp"
+            ty="clamp"
             rect={{ x: 0, y: 0, width: INTERIOR_SIZE, height: INTERIOR_SIZE }}
           />
         </Shader>
@@ -1174,7 +1180,7 @@ This task turns the baseline canvas into a live one: it owns the clock, drives t
 - [ ] **Step 1: Write the component**
 
 ```tsx
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
