@@ -134,8 +134,9 @@ describe("upsertDraft derives the lock", () => {
 
   it("refuses a weather question that would still lock at noon D+1", async () => {
     const { db } = await makeTestDb();
+    // validDraft has no weather (see helpers/draft.ts) — build one here.
     const draft = withQuestions((qs) =>
-      qs.map((q) => (q.category === "weather" ? { ...q, resolves_at: "2026-08-29T09:00:00Z" } : q)),
+      qs.map((q) => (q.slot === 3 ? { ...q, category: "weather" as const, resolves_at: "2026-08-29T09:00:00Z" } : q)),
     );
     await expect(upsertDraft(db, "2026-08-27", draft)).rejects.toThrow("weather must lock before noon");
   });
@@ -166,7 +167,13 @@ import { RESOLVES_AFTER_LOCK } from "../../src/pipeline/draft";
 export const validDraft = {
   questions: [1, 2, 3, 4, 5].map((slot) => ({
     slot,
-    category: (["markets", "sports", "weather", "culture", "news"] as const)[slot - 1]!,
+    // Slot 3 was weather. It cannot be any more: weather is forbidden from
+    // "after-lock", and an absolute instant would pin this fixture to one
+    // date — but 30+ existing tests upsert it at 2026-08-27/28/29 and
+    // pipeline-tick puts it in the draft bank. Date-independence is the
+    // fixture's job; weather gets built inline by the tests that need it.
+    // Still 4 distinct categories: markets, sports, news, culture.
+    category: (["markets", "sports", "news", "culture", "news"] as const)[slot - 1]!,
     text: `Will thing ${slot} happen tomorrow?`,
     resolution_criteria: `Official number per source, page X`,
     source_name: "SRC",
@@ -174,9 +181,7 @@ export const validDraft = {
     author_probability: 0.5,
     is_big_one: slot === 5,
     market_prob: null,
-    // Weather must lock at the end of its measurement window; everything
-    // else in the fixture is deliberately the full-window case.
-    resolves_at: slot === 3 ? "2026-08-28T11:00:00Z" : RESOLVES_AFTER_LOCK,
+    resolves_at: RESOLVES_AFTER_LOCK,
   })),
 };
 ```
@@ -345,20 +350,19 @@ it("reroll refuses a resolves_at already past at open instead of silently defaul
 });
 ```
 
-Add to `apps/api/test/admin-rounds.test.ts`:
+`apps/api/test/admin-rounds.test.ts` already has this test at ~line 205 — it currently builds a rejected bank draft with `locks_at: "2026-08-27T18:00:00Z"` on question 0. **Amend that existing test; do not add a second one.** Change the field and the expected error:
 
 ```ts
-it("rejects a bank draft whose questions name an absolute resolves_at", async () => {
-  // Bank drafts are used on an unknown future date; an absolute instant
-  // would be stale by the time it publishes.
-  const draft = { questions: validDraft.questions.map((q) => ({ ...q, category: "news" as const, resolves_at: "2026-08-28T11:00:00Z" })) };
-  const res = await request("/admin/bank", { method: "POST", body: JSON.stringify(draft) });
-  expect(res.status).toBe(400);
-  expect((await res.json()).error).toBe("bank drafts must resolve after the lock");
-});
+      questions: validDraft.questions.map((q, i) => (i === 0 ? { ...q, resolves_at: "2026-08-27T18:00:00Z" } : q)),
 ```
 
-Use the file's existing request/auth helper rather than a new one.
+and assert the new message:
+
+```ts
+  expect((await res.json()).error).toBe("bank drafts must resolve after the lock");
+```
+
+Keep the file's existing `admin(app)` request helper. Also confirm the neighbouring happy-path bank test (~line 195, which posts `validDraft` unmodified) still passes — after Task 1 that fixture is all-`after-lock` with no weather, so it is a legal bank draft and should stay green.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -486,15 +490,15 @@ describe("the authoring contract", () => {
   }
 
   it("no longer demands an answer that exists before the lock", async () => {
-    const system = await systemPromptFor("2026-08-28");
+    const system = await systemPromptFor("2026-08-27");
     expect(system).not.toContain("11:00 AM ET");
     expect(system).toContain("resolves_at");
     expect(system).toContain("after-lock");
-    expect(system).toContain("noon ET on 2026-08-29");
+    expect(system).toContain("noon ET on 2026-08-28");
   });
 
   it("gives weather a measurement window that starts after the round opens", async () => {
-    const system = await systemPromptFor("2026-08-28");
+    const system = await systemPromptFor("2026-08-27");
     expect(system.toLowerCase()).toContain("measurement period must begin after the round opens");
   });
 });
@@ -521,7 +525,7 @@ it("tells the model that market-adapted questions lock at the market's close", a
       { status: 200, headers: { "content-type": "application/json" } },
     )) as unknown as typeof fetch;
 
-  await authorRound(deps, "2026-08-28");
+  await authorRound(deps, "2026-08-27");
 
   expect(calls[0]!.system.toLowerCase()).toContain("market's own close");
 });
@@ -627,7 +631,7 @@ describe("recent-question digest", () => {
 
     const { claude, calls } = fakeClaude([validDraft]);
     const { deps } = fakeDeps(db, claude);
-    await authorRound(deps, "2026-08-28");
+    await authorRound(deps, "2026-08-27");
 
     expect(calls[0]!.system).toContain("Will the index close higher? → YES, crowd 91% yes");
     expect(calls[0]!.system).toContain("Will the thing be verifiable? → VOID");
@@ -637,7 +641,7 @@ describe("recent-question digest", () => {
     const { db } = await makeTestDb();
     const { claude, calls } = fakeClaude([validDraft]);
     const { deps } = fakeDeps(db, claude);
-    await authorRound(deps, "2026-08-28");
+    await authorRound(deps, "2026-08-27");
     expect(calls[0]!.system).toContain("(no history yet)");
   });
 });
