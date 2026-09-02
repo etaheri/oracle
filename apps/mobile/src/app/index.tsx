@@ -60,6 +60,10 @@ export default function Index() {
   const answers = useRoundStore((s) => s.answers);
   const router = useRouter();
   const chromeScale = useChromeScale();
+  // The state row reserves two printed lines. Most days it prints one — "THE
+  // PROPHECY IS SEALED" — but the partial-day line ("3 OF 5 SEALED · THE DAY
+  // RATES ONLY WHEN ALL FIVE ARE SEALED.") wraps, and sealing a single answer
+  // should not move the temple when you come back to it.
   const stateRowH = scaledRow(ROW_H.line, chromeScale) * 2;
   const noticeRowH = scaledRow(ROW_H.meta, chromeScale);
 

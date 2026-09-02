@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { api, ApiError } from "../src/api/client";
+import { api } from "../src/api/client";
 import { getDeviceToken, clearDeviceToken, type TokenStore } from "../src/api/auth";
 import { z } from "zod";
 

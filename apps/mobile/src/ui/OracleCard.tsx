@@ -91,9 +91,12 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   const [dragActive, setDragActive] = useState(false);
   useEffect(() => { onLean?.(liveConf, liveSide, dragActive); }, [liveConf, liveSide, dragActive, onLean]);
   const screenReader = useScreenReader();
-  // The status field ticks at the countdown's cadence; the card is on screen
-  // for at most a few minutes, so a 1s interval here is cheap.
-  const now = useNow(1000);
+  const sealed = !!entry?.sealed;
+  // The status field ticks at the countdown's cadence — but ONLY while the
+  // card is still open. Once it is sealed the string is the constant "ST:
+  // SEALED", and a second-by-second re-render of this component repaints two
+  // Skia canvases for a line that will never change again.
+  const now = useNow(sealed ? null : 1000);
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
   const buttonsMode = screenReader || reducedMotion;
@@ -138,7 +141,6 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
     else void Haptics.selectionAsync();
   }
 
-  const sealed = !!entry?.sealed;
   const sideSV = useSharedValue(0); // 1 = leaning YES, -1 = NO, 0 = unknown
   // 1 while a sealing release is in flight: tells onFinalize NOT to spring
   // the card home — the throw owns dragX from the moment the fingers let go.

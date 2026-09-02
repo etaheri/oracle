@@ -21,6 +21,15 @@ import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
 
+// The plaque's floor, shared by the frame that waits for it. The loading
+// frame exists so the plaque fills rather than flashes, and it only earns
+// that if the two are the same size: at 280 the frame still visibly grew
+// when the record landed. This is the loaded plaque's own height — its
+// padding, the epithet block, the rule, the lead stat and six supporting
+// rows — so the only step left is the epithet wrapping to a second line or
+// the claim row being offered, both of which are the record's own news.
+const PLAQUE_MIN_H = 380;
+
 // Seven rows at one size read as seven equal facts. The Oracle Score is the
 // headline — it is the number the epithet is derived from — so it takes the
 // temple voice and its own rule, and the six supporting stats stay machine
@@ -102,7 +111,7 @@ export default function Ledger() {
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
         {/* The frame holds while the record is fetched. It used to vanish and
             return, which read as a flash rather than a fill (spec §7). */}
-        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: 280, alignItems: "center", justifyContent: "center" }}>
+        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H, alignItems: "center", justifyContent: "center" }}>
           <AsciiDust />
           <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
         </View>
@@ -130,7 +139,7 @@ export default function Ledger() {
       <TopBar />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
-        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4) }}>
+        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H }}>
           <Eyebrow>Epithet of the last 28 days</Eyebrow>
           <View style={{ alignItems: "center", gap: space(2) }}>
             <Ritual bold size={24} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
