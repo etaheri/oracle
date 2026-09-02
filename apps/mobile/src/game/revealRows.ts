@@ -1,4 +1,4 @@
-import { COPY_BANK, selectLine, type Reveal } from "@oracle/core";
+import { CONSTANTS, COPY_BANK, selectLine, type Reveal } from "@oracle/core";
 import { VERDICT_MIN_PLAYERS } from "./crowdVerdict";
 import { numeral } from "./numerals";
 
@@ -68,8 +68,19 @@ export function receiptLine(q: Question): string | null {
 export function ledgerLines(l: Reveal["ledger"]): string[] {
   if (!l.settled) return ["THE VIGIL IS COUNTED SHORTLY"];
   const streakLine = l.streak > 0 ? `VIGIL: DAY ${l.streak}` : "THE VIGIL BEGINS AGAIN";
-  const scoreLine = l.oracle_score === null ? `${l.calls_rated} OF 50 CALLS WRITTEN` : `ORACLE SCORE ${l.oracle_score}`;
-  return [streakLine, scoreLine];
+  if (l.oracle_score !== null) return [streakLine, `ORACLE SCORE ${l.oracle_score}`];
+  // This used to read "0 OF 50 CALLS WRITTEN" — a progress bar toward an
+  // unnamed thing, in which nothing said what a CALL was, what 50 bought, or
+  // what was being written. Two lines instead: the first names the thing that
+  // does not exist yet, the second says exactly what brings it into being, and
+  // "WRITE IT" points back at "UNWRITTEN" so the pair reads as one sentence.
+  // The rites now define a call as an answer you sealed (rite V) and a rated
+  // call as one from a day where all five were (rite VII).
+  return [
+    streakLine,
+    "ORACLE SCORE UNWRITTEN",
+    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS WRITE IT`,
+  ];
 }
 
 // A day already past noon and still unresolved reads differently than one
@@ -105,9 +116,13 @@ export const TOO_FEW_LINE = "TOO FEW SPOKE TO READ THE CROWD";
 // along. Null for a row the player never answered — the outcome column
 // already speaks for those.
 export function callLine(q: Question): string | null {
-  if (!q.my) return null;
+  const crowd = crowdReadable(q) ? `CROWD ${q.crowd_yes_pct}% YES` : null;
+  // A row the player never answered still has something to say: what the
+  // crowd made of it. On a lapsed day that IS the page — four outcomes and
+  // four sources, and no sense of what was missed.
+  if (!q.my) return crowd;
   const mine = `YOU: ${q.my.answer ? "YES" : "NO"} @ ${q.my.confidence}%`;
-  return crowdReadable(q) ? `${mine} · CROWD ${q.crowd_yes_pct}% YES` : mine;
+  return crowd ? `${mine} · ${crowd}` : mine;
 }
 
 // How much of the day has actually been read. Shown in the day-points slot

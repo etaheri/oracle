@@ -330,6 +330,12 @@ Including "run `npm run reset-project` … create a blank **app** directory". Ha
 - ~~RiteConfirm's scrim.~~ (§7) — a real `Modal`, so it covers the window rather than stopping at Screen's gutters, and Android's back button withdraws the rite.
 - ~~Dead code.~~ (§7) — `ConfidenceSlider.tsx` and `epigraph.ts` deleted.
 
+**Follow-up from a device pass, 2026-09-02:**
+- **The reveal's scroll indicator was drawn inside the margin.** The scroller sits in `Screen`'s padded container, so iOS put the bar at the *scroller's* right edge — a gutter's width in from the screen, striking through the right-hand outcome column on every row. Hidden, matching the app's other two scrollers; the fold fade already says there is more below.
+- **§1.1's first fix did not land.** Naming the score in one rite left "0 OF 50 CALLS WRITTEN" on the reveal still reading as a progress bar toward an unnamed thing — because nothing ever said what a CALL was. The goal now takes three rites: V defines a call as an answer you sealed, VI says what fifty of them buy and what the score measures, VII says which ones count and that a partial day is not wasted. The reveal line is two lines that read as one sentence: `ORACLE SCORE UNWRITTEN` / `0 OF 50 RATED CALLS WRITE IT`.
+- **Spectator rows now carry the crowd.** On a lapsed day the page was four outcomes and four sources with no sense of what was missed; `callLine` returns the crowd figure for a row the player never answered.
+- **CORRECTION to §7.** That section claimed `allSpectator` reveals "hide the ledger lines". They do not — `ledgerLines` renders outside the `!allSpectator` guard, which is exactly why the lapsed screenshot showed `THE VIGIL BEGINS AGAIN`. The bullet was wrong; the real gap was the missing crowd figures, fixed above.
+
 **Still open:**
 15. Universal links + `oracle://` deep link into today's round. (§6.2) — needs a domain.
 17. `TURN THE LAST CARD` on the reveal. (§3.3)

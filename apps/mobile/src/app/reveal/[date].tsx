@@ -176,6 +176,16 @@ export default function RevealScreen() {
       <TopBar />
       <ScrollView
         contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}
+        // No indicator. This scroller sits inside Screen's padded container,
+        // so iOS drew the bar at the SCROLLER's right edge — a gutter's width
+        // in from the screen, floating in the margin and striking through the
+        // right-hand outcome column on every row. It could be pushed out to
+        // the true edge by bleeding the scroller and padding its content
+        // instead, but the app's other two scrollers (the rites, the crowd
+        // finale) both hide theirs, and this screen already has the fold fade
+        // below to say there is more — a grey system bar over the museum
+        // ground was the least in-voice thing on the page.
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
         onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; recomputeOverflow(); }}
         onContentSizeChange={(_w, h) => { contentH.current = h; recomputeOverflow(); }}

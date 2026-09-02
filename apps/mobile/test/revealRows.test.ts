@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Reveal } from "@oracle/core";
+import { CONSTANTS, type Reveal } from "@oracle/core";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine } from "../src/game/revealRows";
 
 type Question = Reveal["questions"][number];
@@ -112,16 +112,26 @@ describe("revealRows", () => {
 
   describe("ledgerLines", () => {
     it("settled with an active streak and no oracle score yet", () => {
+      // Was "0 OF 50 CALLS WRITTEN": a progress bar toward an unnamed thing,
+      // with "written" attached to the calls rather than to the score the
+      // calls produce. The pair now names what does not exist yet and exactly
+      // what brings it into being.
       expect(ledgerLines({ settled: true, streak: 4, calls_rated: 0, oracle_score: null })).toEqual([
         "VIGIL: DAY 4",
-        "0 OF 50 CALLS WRITTEN",
+        "ORACLE SCORE UNWRITTEN",
+        "0 OF 50 RATED CALLS WRITE IT",
       ]);
     });
     it("settled with streak reset to zero", () => {
       expect(ledgerLines({ settled: true, streak: 0, calls_rated: 12, oracle_score: null })).toEqual([
         "THE VIGIL BEGINS AGAIN",
-        "12 OF 50 CALLS WRITTEN",
+        "ORACLE SCORE UNWRITTEN",
+        "12 OF 50 RATED CALLS WRITE IT",
       ]);
+    });
+    it("counts to the engine's own threshold, not a private copy of it", () => {
+      expect(ledgerLines({ settled: true, streak: 1, calls_rated: 3, oracle_score: null }).join(" "))
+        .toContain(`OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS`);
     });
     it("settled once the oracle score exists", () => {
       expect(ledgerLines({ settled: true, streak: 6, calls_rated: 50, oracle_score: 73 })).toEqual([
@@ -174,8 +184,12 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
     it("drops the crowd clause on a row the crowd was never counted for", () => {
       expect(callLine(question({ outcome: null, crowd_yes_pct: null, crowd_count: null }))).toBe("YOU: YES @ 75%");
     });
-    it("says nothing for a row the player never answered", () => {
-      expect(callLine(question({ my: null }))).toBeNull();
+    it("gives a row the player never answered the crowd, which is what they missed", () => {
+      expect(callLine(question({ my: null, crowd_yes_pct: 62, crowd_count: 40 }))).toBe("CROWD 62% YES");
+    });
+    it("says nothing at all when there is neither a call nor a readable crowd", () => {
+      expect(callLine(question({ my: null, crowd_yes_pct: 100, crowd_count: 1 }))).toBeNull();
+      expect(callLine(question({ my: null, crowd_yes_pct: null, crowd_count: null }))).toBeNull();
     });
     it("still reads back a call the ledger refused to score", () => {
       expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null } })))

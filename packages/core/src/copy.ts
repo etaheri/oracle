@@ -154,16 +154,23 @@ export function vigilLine(streak: number, seedKey: string): string | null {
 // before their first card; the rest are the rules they meet later, and only
 // the standing link shows them. Twelve rules in one wall before card I was
 // ~150 words of tracked caps that nobody retains (audit 2026-09-02 §1.2), and
-// among them the game never once said what it was for (§1.1) — rite VI now
-// does, which is why it sits inside the opening rather than at the end.
+// among them the game never once said what it was for (§1.1).
+//
+// Rites V-VII are that goal, and they take three lines because the first
+// attempt took one and still did not land: it said "THE LEDGER RATES EVERY
+// CALL" while never defining a CALL, so "0 OF 50 CALLS" stayed a progress bar
+// toward an unnamed thing. V defines the noun, VI names what the number buys
+// and what it measures, VII says which calls count and reassures the player
+// that a partial day is not a wasted one.
 export const RITES_LINES = [
   // ── the opening: everything the first card depends on ──
   "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON, NEW YORK TIME.",
   "PULL TOWARD YES OR NO. THE LONGER THE PULL, THE GREATER THE CONVICTION. TO RELEASE IS TO SEAL.",
   "AN ANSWER SEALED CANNOT BE UNSEALED. THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
   "CONVICTION PAYS WHEN RIGHT. IT COSTS MORE WHEN WRONG.",
-  "THE LEDGER RATES EVERY CALL AGAINST WHAT HAPPENED. FIFTY RATED CALLS WRITE YOUR ORACLE SCORE.",
-  "SEAL ALL FIVE OR THE DAY DOES NOT RATE. POINTS AND VIGIL STILL COUNT.",
+  "EVERY ANSWER YOU SEAL IS A CALL. THE LEDGER RATES IT AGAINST WHAT HAPPENED.",
+  "FIFTY RATED CALLS WRITE YOUR ORACLE SCORE · HOW WELL YOU SEE, NOT HOW OFTEN YOU PLAY.",
+  "A DAY'S CALLS RATE ONLY IF ALL FIVE WERE SEALED. POINTS AND VIGIL COUNT EITHER WAY.",
   // ── the rest: met in play, kept on the standing link ──
   "A QUESTION CLOSES THE MOMENT ITS ANSWER BEGINS TO EXIST. SOME CLOSE BEFORE NOON.",
   "THE BIG ONE COUNTS DOUBLE. IN BOTH DIRECTIONS.",
@@ -177,7 +184,7 @@ export const RITES_LINES = [
 // How many of the rites a first-timer is shown before their first card. The
 // two screens share one numbered canon, so the opening's numerals (I..VI) are
 // the same numerals those rules carry in the full list.
-export const OPENING_RITES = 6;
+export const OPENING_RITES = 7;
 export const OPENING_RITES_LINES = RITES_LINES.slice(0, OPENING_RITES);
 
 // The plaque's gloss under the Oracle Score. The score is the whole premise —

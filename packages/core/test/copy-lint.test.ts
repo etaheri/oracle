@@ -91,7 +91,7 @@ describe("the rites", () => {
     // Early locks are the norm now: a player who finds a card already closed
     // must have been told this could happen.
     expect(all).toContain("BEFORE NOON");
-    expect(RITES_LINES.length).toBe(13);
+    expect(RITES_LINES.length).toBe(14);
   });
   it("name the goal, and define every noun the rest of the app leans on", () => {
     // The app said "THE DAY DOES NOT RATE", "YOUR VIGIL", "A BOUNTY" and
@@ -99,7 +99,10 @@ describe("the rites", () => {
     // (audit 2026-09-02 §1.1). Each now has exactly one rite that does.
     const all = RITES_LINES.join(" ");
     expect(all).toContain("ORACLE SCORE");
-    expect(all).toContain("RATES EVERY CALL");
+    // A CALL is the noun the reveal, the plaque and the partial-day notice all
+    // lean on. It has to be defined before it can be counted.
+    expect(all).toContain("EVERY ANSWER YOU SEAL IS A CALL");
+    expect(all).toContain("RATE ONLY IF ALL FIVE WERE SEALED");
     expect(all).toContain("A VIGIL IS A RUN OF UNBROKEN NOONS");
     expect(all).toContain("BOUNTY");
   });
