@@ -9,11 +9,17 @@ import { numeral } from "../ui/CardChrome";
 import { RITES_LINES, LITURGY_LINES } from "@oracle/core";
 import { markRitesSeen } from "../api/flags";
 import { colors, space } from "../theme";
+import { useChromeScale } from "../ui/useChromeScale";
 
 // The Rites: the rules of the game, machine voice, printed in once. Reached
 // from a first-timer's ENTER (index.tsx gate) and a standing quiet link.
 export default function Rites() {
   const router = useRouter();
+  // The numeral gutter is a reserved slot like any other (spec §4), so it has
+  // to grow with the type it holds: Ritual scales to CHROME_CAP, and VIII —
+  // the widest of the twelve — already fills 26pt at 1x, so a fixed gutter
+  // wrapped it onto a second line and knocked its rite out of alignment.
+  const gutter = Math.ceil(26 * useChromeScale());
   return (
     <Screen>
       <TopBar />
@@ -26,7 +32,7 @@ export default function Rites() {
         <View style={{ gap: space(3) }}>
           {RITES_LINES.map((line, i) => (
             <View key={line} style={{ flexDirection: "row", gap: space(3), alignItems: "flex-start" }}>
-              <Ritual size={13} color={colors.goldText} letterSpacing={1} style={{ width: 26, textAlign: "right" }}>
+              <Ritual size={13} color={colors.goldText} letterSpacing={1} style={{ width: gutter, textAlign: "right" }}>
                 {numeral(i + 1)}
               </Ritual>
               <DecodeLine

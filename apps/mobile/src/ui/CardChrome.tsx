@@ -2,6 +2,7 @@ import { View } from "react-native";
 import { colors, space } from "../theme";
 import { Ritual, Mono, Eyebrow } from "./Text";
 import { NUMERALS, numeral } from "../game/numerals";
+import { useChromeScale } from "./useChromeScale";
 
 export { NUMERALS, numeral };
 
@@ -10,25 +11,30 @@ export { NUMERALS, numeral };
 const DECK_RATIO = 0.7;
 
 const INSET = 9;
-const MARK_BOX = 14; // the glyph's centring box, straddling the rule's corner
+const MARK_BOX = 14; // the glyph's centring box at 1x, straddling the rule's corner
 
 // Register marks: the frame's corners, drawn as the machine's own '+' rather
 // than as rectangles (refinement spec §1.1). Same silhouette as the antique
 // card-printing / technical-drawing mark they replace, but now the frame is
 // type — it belongs to the same alphabet as the coordinate and the status.
 function RegisterMarks() {
+  // The box scales with the '+' inside it. The mark is type now, so it grows
+  // with the reader's text size like the rest of the chrome — and a fixed box
+  // would stop containing its own glyph's line box at the cap, decentring the
+  // mark off the corner it registers and cropping it on Android.
+  const box = Math.ceil(MARK_BOX * useChromeScale());
   const corners = [
-    { top: INSET - MARK_BOX / 2, left: INSET - MARK_BOX / 2 },
-    { top: INSET - MARK_BOX / 2, right: INSET - MARK_BOX / 2 },
-    { bottom: INSET - MARK_BOX / 2, left: INSET - MARK_BOX / 2 },
-    { bottom: INSET - MARK_BOX / 2, right: INSET - MARK_BOX / 2 },
+    { top: INSET - box / 2, left: INSET - box / 2 },
+    { top: INSET - box / 2, right: INSET - box / 2 },
+    { bottom: INSET - box / 2, left: INSET - box / 2 },
+    { bottom: INSET - box / 2, right: INSET - box / 2 },
   ];
   return (
     <>
       <View pointerEvents="none" style={{ position: "absolute", top: INSET, bottom: INSET, left: INSET, right: INSET, borderWidth: 1, borderColor: colors.lineSoft }} />
       {corners.map((c, i) => (
-        <View key={i} pointerEvents="none" style={{ position: "absolute", ...c, width: MARK_BOX, height: MARK_BOX, alignItems: "center", justifyContent: "center" }}>
-          <Mono size={11} color={colors.mark} letterSpacing={0} style={{ lineHeight: MARK_BOX }}>+</Mono>
+        <View key={i} pointerEvents="none" style={{ position: "absolute", ...c, width: box, height: box, alignItems: "center", justifyContent: "center" }}>
+          <Mono size={11} color={colors.mark} letterSpacing={0} style={{ lineHeight: box }}>+</Mono>
         </View>
       ))}
     </>
