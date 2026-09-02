@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
@@ -23,7 +23,18 @@ export default function Rites() {
   return (
     <Screen>
       <TopBar />
-      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
+      {/* Twelve rules do not fit a phone. The screen used to centre them in a
+          fixed box and rely on the count never growing — it was already at
+          602pt of content in a 619pt box before the numerals arrived, and the
+          gutter and its wider gaps pushed it 63pt past the edge, over BEGIN.
+          A scroller that grows to fill centres them while they fit and scrolls
+          once they do not, which is also the only thing that survives a reader
+          who has turned their text size up. */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: space(4) }}
+        showsVerticalScrollIndicator={false}
+      >
         <Eyebrow>The rites</Eyebrow>
         {/* These are rules, so they are numbered — in the same carved
             numerals the card slots and the round's progress row use, so a
@@ -52,8 +63,8 @@ export default function Rites() {
             <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
-      </View>
-      <View style={{ paddingBottom: space(2) }}>
+      </ScrollView>
+      <View style={{ paddingTop: space(3), paddingBottom: space(2) }}>
         <GoldButton
           title="BEGIN"
           onPress={() => { void markRitesSeen(); router.replace("/round"); }}
