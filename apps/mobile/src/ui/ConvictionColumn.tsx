@@ -86,7 +86,9 @@ export function ConvictionColumn({ conf, side }: { conf: number | null; side: bo
           a fill bar: belief runs 55 (the least lean that says anything) to
           95 (no certainty before the ledger). The floor is the ante. */}
       <View style={{ alignItems: "center", gap: 3 }}>
-        <Mono size={8} color={colors.mutedInk}>95</Mono>
+        {/* The ceiling lights when you reach it: belief stops at 95, and the
+            column is the only thing that can say so while the card is moving. */}
+        <Mono size={8} color={conf === 95 ? tone : colors.mutedInk}>95</Mono>
         <View style={{ borderWidth: 1, borderColor: committed ? tone : colors.line, backgroundColor: colors.frescoWhite, paddingVertical: 5, paddingHorizontal: 6, gap: 2, alignItems: "center" }}>
           {Array.from({ length: CELLS }, (_, i) => CELLS - 1 - i).map((row) => {
             const lit = row < printed;

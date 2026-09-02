@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
-import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
@@ -241,23 +240,23 @@ export default function RevealScreen() {
         </View>
         {big && (
           <Animated.View entering={FadeInDown.delay(BIG_ONE_DELAY).duration(500).easing(easeOut)}>
-          <GoldFrame style={{ backgroundColor: colors.goldWash }}>
+          <GoldFrame style={{ backgroundColor: colors.frescoWhite }}>
             {contrarianWin && !reducedMotion && (
               <Animated.View pointerEvents="none" entering={TideFlash} style={[StyleSheet.absoluteFill, { backgroundColor: colors.goldWash }]} />
             )}
-            {/* Temple voice: art sits inside the frame, never behind body text (spec §3b). */}
-            <View style={{ height: 110, overflow: "hidden" }}>
-              <Image
-                source={require("../../../assets/art/orb-pointing-hand.jpg")}
-                contentFit="cover"
-                contentPosition={{ top: "40%", left: "50%" }}
-                style={{ width: "100%", height: "100%" }}
-                accessible={false}
-              />
-              <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 1, backgroundColor: colors.line }} />
-            </View>
-            <View style={{ padding: space(3), gap: space(2) }}>
-              <Ritual bold size={11} letterSpacing={4}>✶ THE BIG ONE</Ritual>
+            {/* This is the card the player pulled, read back to them, so it is
+                set as that card was: fresco ground, the slot numeral carved at
+                the head, the category bracketed beneath it. It used to open
+                with a 110pt strip of cropped photograph whose cyan halo and
+                saturated sleeve belonged to no other surface in the app — a
+                banner, in a product that otherwise never uses one. The gold
+                frame already says which question this is; it does not need a
+                picture to say it twice. */}
+            <View style={{ padding: space(5), paddingBottom: space(3), gap: space(3) }}>
+              <View style={{ alignItems: "center", gap: space(2) }}>
+                <Ritual bold size={18} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(big.slot)}</Ritual>
+                <Ritual bold size={11} letterSpacing={4}>[ ✶ THE BIG ONE ]</Ritual>
+              </View>
               <Serif size={17}>{big.text}</Serif>
               {bigState === "pending" && (
                 <Mono size={11} color={colors.mutedInk}>{receiptLine(big)}</Mono>

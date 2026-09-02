@@ -134,10 +134,17 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   }
   // Ratchet haptics: crossing the commit threshold is a distinct thunk;
   // every conviction step past it (in either direction) is a light tick.
+  // The ceiling is 95 — belief stops short of certainty on purpose, and the
+  // scale simply stops responding past LEAN_FULL. That silence was the bug:
+  // the hand got the same light tick at the top of the scale as in the middle
+  // and no signal that further pull was doing nothing. The top step lands a
+  // distinct, heavier stop — the ratchet hitting its pin — once per arrival.
+  const CEILING_STEP = 8;
   function onStepChange(step: number, prev: number) {
     if (step === -1) { setLiveConf(null); return; }
     setLiveConf(55 + step * 5);
     if (prev === -1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    else if (step === CEILING_STEP && prev !== CEILING_STEP) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
     else void Haptics.selectionAsync();
   }
 
@@ -198,7 +205,9 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
         const c = holdConfidence(Date.now() - start);
         if (hold.current && c !== hold.current.last) {
           hold.current.last = c;
-          void Haptics.selectionAsync();
+          // Same stop at the ceiling for the hold-to-charge twin.
+          if (c === 95) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
+          else void Haptics.selectionAsync();
           setLiveConf(c);
         }
       }, 50),
