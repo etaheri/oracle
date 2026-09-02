@@ -171,6 +171,13 @@ export default function Index() {
     <Screen>
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
+        // The orb lives in the middle of this scroller and answers a touch the
+        // instant it lands; it yields a deliberate vertical drag back to the
+        // scroll on its own (OracleOrb's failOffsetY). Nothing to configure
+        // for the other half of that bargain: Fabric's RCTScrollView pins
+        // UIScrollView's delaysContentTouches to NO at construction, so the
+        // press reaches the glass immediately rather than after the ~150ms
+        // UIKit would otherwise spend deciding whether it was a scroll.
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
       >
         <SystemHeader stamp={dateStamp(stampDate)} />

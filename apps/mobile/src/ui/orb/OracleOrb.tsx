@@ -33,6 +33,22 @@ const INTERIOR = require("../../../assets/art/orb-interior.png");
 // it opened: letting go is a release, not a second slow gesture.
 const RELEASE_MS = 380;
 
+// The two offsets that let the orb and a scrolling screen share one surface.
+// Home is a ScrollView now and the orb sits at the middle of it, so a pan
+// that activated on the first pixel of movement owned every pull that began
+// on the glass. These are OracleCard's own numbers, deliberately: the app
+// composes both of its pull surfaces by the same rule — the gesture is the
+// orb's only once the finger has committed sideways, and is surrendered
+// outright once it has committed downward.
+//
+// This is also why `minDistance(0)` had to go. failOffsetY is consulted ONLY
+// while the gesture is still unrecognized (rn-gesture-handler 2.32: "when the
+// finger moves outside this range along Y axis AND GESTURE HASN'T YET
+// ACTIVATED it will fail"), and minDistance(0) activated on the first move —
+// before there was any direction to judge.
+const LEAN_COMMIT = 12;
+const YIELD_TO_SCROLL = 16;
+
 // How often the accelerometer is read. 30Hz is plenty for a field this
 // low-frequency, and is the difference between a sensor you can feel in the
 // battery and one you cannot.
@@ -269,11 +285,19 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
     bloomTick.current = setTimeout(() => void Haptics.selectionAsync(), HOLD_FULL_MS);
   }, [tier]);
 
+  // Stand the press down without answering it: the finger is off the orb's
+  // books and the bloom tick — feedback for a hold that is no longer being
+  // held — must not survive it. Every ending goes through here, the ones that
+  // ripple (below) and the ones that go quiet (`abandon`).
+  const cancelTouch = useCallback(() => {
+    touching.current = false;
+    if (bloomTick.current) clearTimeout(bloomTick.current);
+    bloomTick.current = null;
+  }, []);
+
   const endTouch = useCallback(
     (x: number, y: number, strength: number, haptic: "light" | "medium") => {
-      touching.current = false;
-      if (bloomTick.current) clearTimeout(bloomTick.current);
-      bloomTick.current = null;
+      cancelTouch();
       // A drag can leave the glass. The ripple still belongs to the sphere,
       // so it starts at the rim under where the finger went.
       const len = Math.hypot(x, y);
@@ -281,13 +305,43 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
       fire(at, strength, haptic);
       onPress?.(at);
     },
-    [fire, onPress],
+    [cancelTouch, fire, onPress],
   );
 
   useEffect(() => () => { if (bloomTick.current) clearTimeout(bloomTick.current); }, []);
 
+  // A genuine release, from whichever side reaches it first. A lean that
+  // committed sideways recognizes as a pan and ends at `onFinalize`; a tap or
+  // a still hold never activates the pan at all, so its release arrives as a
+  // lifted finger instead — and on iOS those two land in opposite orders.
+  // `onGlass` is the latch: the first one through spends the touch, and the
+  // second finds nothing left to answer.
+  const release = () => {
+    "worklet";
+    if (!onGlass.value) return;
+    onGlass.value = 0;
+    // Read the bloom before releasing it: how far the hold opened is what
+    // the ripple and the haptic are both weighed against.
+    const b = bloom.value;
+    runOnJS(endTouch)(touchX.value, touchY.value, releaseStrength(b), releaseHaptic(b));
+    bloom.value = withTiming(0, { duration: RELEASE_MS, easing: Easing.out(Easing.quad) });
+  };
+
+  // The same ending, in silence. Everything the press opened still has to
+  // close, but a touch the scroll took — or the system cancelled — is not a
+  // question the orb was asked: no ripple, no haptic, no onPress. The player
+  // was reaching past the glass, not for it.
+  const abandon = () => {
+    "worklet";
+    if (!onGlass.value) return;
+    onGlass.value = 0;
+    runOnJS(cancelTouch)();
+    bloom.value = withTiming(0, { duration: RELEASE_MS, easing: Easing.out(Easing.quad) });
+  };
+
   const pan = Gesture.Pan()
-    .minDistance(0)
+    .activeOffsetX([-LEAN_COMMIT, LEAN_COMMIT])
+    .failOffsetY([-YIELD_TO_SCROLL, YIELD_TO_SCROLL])
     .maxPointers(1)
     .onBegin((e) => {
       const p = normalize({ x: e.x, y: e.y }, tile);
@@ -305,22 +359,35 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
       bloom.value = withTiming(1, { duration: HOLD_FULL_MS, easing: Easing.out(Easing.quad) });
       runOnJS(beginTouch)();
     })
-    .onUpdate((e) => {
+    // The fingertip, read at the touch layer rather than in onUpdate. These
+    // fire from the first pixel whether or not the pan has recognized yet, so
+    // the lens still follows a lean that never commits far enough sideways to
+    // become a pan — which onUpdate, an active-only callback, could no longer
+    // do once the activation threshold above went in.
+    .onTouchesMove((e) => {
       if (!onGlass.value) return;
-      const p = normalize({ x: e.x, y: e.y }, tile);
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const p = normalize({ x: t.x, y: t.y }, tile);
       touchX.value = p.x;
       touchY.value = p.y;
       leadX.value = withSpring(p.x, WAKE_SPRING);
       leadY.value = withSpring(p.y, WAKE_SPRING);
     })
-    .onFinalize(() => {
-      if (!onGlass.value) return;
-      onGlass.value = 0;
-      // Read the bloom before releasing it: how far the hold opened is what
-      // the ripple and the haptic are both weighed against.
-      const b = bloom.value;
-      runOnJS(endTouch)(touchX.value, touchY.value, releaseStrength(b), releaseHaptic(b));
-      bloom.value = withTiming(0, { duration: RELEASE_MS, easing: Easing.out(Easing.quad) });
+    // A lifted finger is always a release; a finger that stops being tracked
+    // while still down is always a theft (the vertical hand-off above fires
+    // this, and so does the scroll view cancelling the touch under us).
+    .onTouchesUp(release)
+    .onTouchesCancelled(abandon)
+    .onFinalize((_e, success) => {
+      // `success` is true only for a pan that recognized AND then ended — a
+      // lean the player finished. A false finalize is the hand-off or a
+      // cancellation, neither of which the orb answers. The tap that never
+      // recognized at all also finalizes false, and is already spent by
+      // `onTouchesUp` above; `release`/`abandon` are latched, so whichever
+      // arrives second is a no-op.
+      if (success) release();
+      else abandon();
     });
 
   // The stir. A steady state only -- dormant is the rite's frozen still, and
