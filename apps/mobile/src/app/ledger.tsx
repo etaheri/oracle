@@ -21,13 +21,24 @@ import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
 
-// The Forecaster's Ledger (voice spec §6): a museum specimen plaque. Stats in
-// machine voice, one epithet with its receipt — identity only with evidence.
+// Seven rows at one size read as seven equal facts. The Oracle Score is the
+// headline — it is the number the epithet is derived from — so it takes the
+// temple voice and its own rule, and the six supporting stats stay machine
+// voice beneath it (refinement spec §7).
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
       <Mono size={11} color={colors.mutedInk} letterSpacing={2}>{label}</Mono>
       <Mono size={11} color={colors.ink} letterSpacing={2}>{value}</Mono>
+    </View>
+  );
+}
+
+function LeadStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+      <Mono size={11} color={colors.goldText} letterSpacing={2}>{label}</Mono>
+      <Ritual bold size={20} color={colors.ink} letterSpacing={1}>{value}</Ritual>
     </View>
   );
 }
@@ -87,9 +98,14 @@ export default function Ledger() {
   if (!ledger.data) return (
     <Screen>
       <TopBar />
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
-        <AsciiDust />
-        <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
+        <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
+        {/* The frame holds while the record is fetched. It used to vanish and
+            return, which read as a flash rather than a fill (spec §7). */}
+        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: 280, alignItems: "center", justifyContent: "center" }}>
+          <AsciiDust />
+          <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+        </View>
       </View>
     </Screen>
   );
@@ -122,7 +138,8 @@ export default function Ledger() {
           </View>
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(2) }}>
-            <Stat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+            <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+            <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
             <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
             <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />
             <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
