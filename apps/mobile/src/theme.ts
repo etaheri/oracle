@@ -16,6 +16,7 @@ export const colors = {
   warmCenter: "#F2BE91", // decorative — orb center; text-tier on midnight (10.4:1)
   line: "rgba(23,25,31,0.16)",
   lineSoft: "rgba(23,25,31,0.08)",
+  mark: "rgba(23,25,31,0.30)", // register marks — a glyph reads lighter than a rule, so it sits a step above `line`
   goldWash: "rgba(170,138,80,0.10)",
   ultramarineWash: "rgba(36,61,120,0.06)",
   vermilionWash: "rgba(168,75,53,0.06)",

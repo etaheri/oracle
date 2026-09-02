@@ -10,6 +10,8 @@ import { getSwipeHinted, markSwipeHinted } from "../api/flags";
 import { ApiError } from "../api/client";
 import { useSubmit } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { cardStatus } from "../game/cardStatus";
+import { useNow } from "../game/useNow";
 import { capture } from "../analytics/analytics";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
@@ -90,6 +92,9 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
   const [dragActive, setDragActive] = useState(false);
   useEffect(() => { onLean?.(liveConf, liveSide, dragActive); }, [liveConf, liveSide, dragActive, onLean]);
   const screenReader = useScreenReader();
+  // The status field ticks at the countdown's cadence; the card is on screen
+  // for at most a few minutes, so a 1s interval here is cheap.
+  const now = useNow(1000);
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
   const buttonsMode = screenReader || reducedMotion;
@@ -275,11 +280,11 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
   }
 
   const closesEarly = roundLocksAt !== null && q.locks_at !== roundLocksAt;
-  const title = q.is_big_one
-    ? `✶ The Big One · pays double · costs double${closesEarly ? " · closes early" : ""}`
-    : closesEarly
-      ? `${q.category} · closes early`
-      : q.category;
+  const title = q.is_big_one ? "✶ THE BIG ONE" : q.category;
+  const modifiers = [
+    q.is_big_one ? "PAYS DOUBLE · COSTS DOUBLE" : null,
+    closesEarly ? "CLOSES EARLY" : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <View>
@@ -290,7 +295,14 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
           cardW.value = e.nativeEvent.layout.width;
         }}
       >
-        <CardChrome slot={q.slot} title={title} big={q.is_big_one} coordinate={`:: ${numeral(q.slot)} / ${date} / PER ${q.source_name.toUpperCase()}`}>
+        <CardChrome
+          slot={q.slot}
+          title={title}
+          modifiers={modifiers || undefined}
+          big={q.is_big_one}
+          coordinate={`:: ${numeral(q.slot)} / ${date} / PER ${q.source_name.toUpperCase()}`}
+          status={cardStatus(q.locks_at, now, sealed)}
+        >
           {/* The question floats centered in the card's field, tarot-fashion;
               the controls anchor at the foot. The face is also the grab
               surface: pull it toward a side and release to seal (buttonsMode

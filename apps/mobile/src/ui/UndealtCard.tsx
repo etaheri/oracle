@@ -14,7 +14,7 @@ import type { RoundToday } from "@oracle/core";
 // The top of the stack's resting pose is exported so the live card can take
 // over from EXACTLY here when the thrown card uncovers it — the stack card
 // and the live card must read as the same object.
-export const STACK_TOP_Y = 9;
+export const STACK_TOP_Y = 16;
 export const STACK_TOP_ROTATE = "-0.7deg";
 
 export function UndealtCard({ q, index }: { q: RoundToday["questions"][number]; index: number }) {
@@ -25,7 +25,7 @@ export function UndealtCard({ q, index }: { q: RoundToday["questions"][number]; 
         position: "absolute",
         left: 0,
         right: 0,
-        top: STACK_TOP_Y + index * 9,
+        top: STACK_TOP_Y + index * 14,
         transform: [{ rotate: index === 0 ? STACK_TOP_ROTATE : "0.9deg" }],
       }}
     >

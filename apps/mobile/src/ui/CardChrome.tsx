@@ -10,34 +10,45 @@ export { NUMERALS, numeral };
 const DECK_RATIO = 0.7;
 
 const INSET = 9;
-const TICK = 14;
-const OVER = 5; // how far register marks overshoot the frame corner
+const MARK_BOX = 14; // the glyph's centring box, straddling the rule's corner
 
-// Register marks: the frame's rules extended past each corner — the shared
-// glyph of antique card printing and technical drawings (see design/references).
+// Register marks: the frame's corners, drawn as the machine's own '+' rather
+// than as rectangles (refinement spec §1.1). Same silhouette as the antique
+// card-printing / technical-drawing mark they replace, but now the frame is
+// type — it belongs to the same alphabet as the coordinate and the status.
 function RegisterMarks() {
-  const ticks: { top?: number; bottom?: number; left?: number; right?: number; w: number; h: number }[] = [];
-  for (const v of ["top", "bottom"] as const) {
-    for (const h of ["left", "right"] as const) {
-      ticks.push({ [v]: INSET, [h]: INSET - OVER, w: TICK, h: 1 });
-      ticks.push({ [v]: INSET - OVER, [h]: INSET, w: 1, h: TICK });
-    }
-  }
+  const corners = [
+    { top: INSET - MARK_BOX / 2, left: INSET - MARK_BOX / 2 },
+    { top: INSET - MARK_BOX / 2, right: INSET - MARK_BOX / 2 },
+    { bottom: INSET - MARK_BOX / 2, left: INSET - MARK_BOX / 2 },
+    { bottom: INSET - MARK_BOX / 2, right: INSET - MARK_BOX / 2 },
+  ];
   return (
     <>
       <View pointerEvents="none" style={{ position: "absolute", top: INSET, bottom: INSET, left: INSET, right: INSET, borderWidth: 1, borderColor: colors.lineSoft }} />
-      {ticks.map((t, i) => (
-        <View key={i} pointerEvents="none" style={{ position: "absolute", top: t.top, bottom: t.bottom, left: t.left, right: t.right, width: t.w, height: t.h, backgroundColor: colors.line }} />
+      {corners.map((c, i) => (
+        <View key={i} pointerEvents="none" style={{ position: "absolute", ...c, width: MARK_BOX, height: MARK_BOX, alignItems: "center", justifyContent: "center" }}>
+          <Mono size={11} color={colors.mark} letterSpacing={0} style={{ lineHeight: MARK_BOX }}>+</Mono>
+        </View>
       ))}
     </>
   );
 }
 
-// coordinate: the card's one terminal detail (brief §8: "a feature card
-// reveals a static terminal coordinate or symbol cluster") — a quiet mono
-// line tucked into the bottom margin, discovered rather than announced.
-export function CardChrome({ slot, title, coordinate, big = false, fill = false, children }: {
-  slot: number; title: string; coordinate?: string; big?: boolean; fill?: boolean; children: React.ReactNode;
+// The card's terminal margin (brief §8: "a feature card reveals a static
+// terminal coordinate or symbol cluster"). Two quiet mono fields, optically
+// symmetric: provenance on the left, live state on the right.
+export function CardChrome({ slot, title, modifiers, coordinate, status, big = false, fill = false, children }: {
+  slot: number;
+  // The category alone. Modifiers ride their own line — a single long title
+  // wrapped badly at the eyebrow's tracking.
+  title: string;
+  modifiers?: string;
+  coordinate?: string;
+  status?: string;
+  big?: boolean;
+  fill?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <View
@@ -54,12 +65,23 @@ export function CardChrome({ slot, title, coordinate, big = false, fill = false,
       <RegisterMarks />
       <View style={{ alignItems: "center", gap: space(2) }}>
         <Ritual bold size={18} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(slot)}</Ritual>
-        <Eyebrow>{title}</Eyebrow>
+        {/* Brackets are the app's terminal signature (they frame the footer
+            rail's controls). On an undealt card the contents are static and
+            the brackets stay solid — the frame is known, the prophecy is not. */}
+        <Eyebrow>{`[ ${title} ]`}</Eyebrow>
+        {modifiers ? (
+          <Mono size={9.5} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{modifiers}</Mono>
+        ) : null}
       </View>
       <View style={{ flex: 1, gap: space(3), paddingTop: space(3) }}>{children}</View>
       {coordinate ? (
         <Mono size={8.5} color={colors.mutedInk} letterSpacing={1.5} style={{ position: "absolute", left: INSET + 11, bottom: INSET + 8 }}>
           {coordinate}
+        </Mono>
+      ) : null}
+      {status ? (
+        <Mono size={8.5} color={colors.mutedInk} letterSpacing={1.5} style={{ position: "absolute", right: INSET + 11, bottom: INSET + 8 }}>
+          {status}
         </Mono>
       ) : null}
     </View>
