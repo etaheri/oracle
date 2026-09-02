@@ -6,7 +6,7 @@ import * as Notifications from "expo-notifications";
 import { SUMMONS_LINES } from "@oracle/core";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
-import { Eyebrow, Mono } from "../ui/Text";
+import { Mono } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { appleRestore } from "../api/identity";
@@ -30,38 +30,42 @@ export default function Summons() {
       }
     })();
   };
+  const onSpeak = async () => {
+    try {
+      // OneSignal owns the ask when it's live; local reminders still need OS
+      // permission in dark mode, so that path falls back to the plain
+      // expo-notifications prompt.
+      if (KEYS.oneSignalAppId) await requestPushPermission();
+      else await Notifications.requestPermissionsAsync();
+    } catch {}
+    leave();
+  };
   return (
     <Screen>
       <TopBar />
-      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
-        <Eyebrow>The summons</Eyebrow>
-        <View style={{ gap: space(2) }}>
+      {/* One question, and almost nothing else (spec §6). This screen exists
+          to be answered in two seconds; every line that is not the question
+          is weight the answer has to carry. */}
+      <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: space(2) }}>
+        <View style={{ gap: space(3) }}>
           {SUMMONS_LINES.map((line, i) => (
-            <DecodeLine key={line} text={line} delayMs={i * 160} durationMs={450} size={12} color={colors.ink} letterSpacing={2} style={{ lineHeight: 20, textAlign: "center" }} />
+            <DecodeLine key={line} text={line} delayMs={i * 160} durationMs={450} size={13} color={colors.ink} letterSpacing={2} style={{ lineHeight: 22, textAlign: "center" }} />
           ))}
         </View>
       </View>
       <View style={{ gap: space(2), paddingBottom: space(2) }}>
-        <GoldButton
-          title="LET IT SPEAK"
-          onPress={async () => {
-            try {
-              // OneSignal owns the ask when it's live; local reminders still
-              // need OS permission in dark mode, so that path falls back to
-              // the plain expo-notifications prompt.
-              if (KEYS.oneSignalAppId) await requestPushPermission();
-              else await Notifications.requestPermissionsAsync();
-            } catch {}
-            leave();
-          }}
-        />
+        <GoldButton title="LET IT SPEAK" onPress={onSpeak} />
         <QuietLink title="Not now" onPress={leave} />
         {restoreState === "none" && (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
             NO RECORD BEARS THIS NAME.
           </Mono>
         )}
-        <QuietLink title="Restore a claimed record" onPress={handleRestore} />
+        {/* The restore link is not part of the question — it is a door for
+            someone who arrived here by accident. It sits apart. */}
+        <View style={{ paddingTop: space(3) }}>
+          <QuietLink title="Restore a claimed record" onPress={handleRestore} />
+        </View>
       </View>
     </Screen>
   );

@@ -23,6 +23,8 @@ import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { maybeSummon } from "../notifications/summons";
 import { colors, space } from "../theme";
+import { useChromeScale } from "../ui/useChromeScale";
+import { scaledRow } from "../game/typeScaling";
 
 // The throw UNCOVERS the stack — the next card was already on the table as
 // the deck's top, so the live card enters from exactly that resting pose: a
@@ -96,6 +98,7 @@ export default function Round() {
     announcedFor.current = lastSealedId;
     AccessibilityInfo.announceForAccessibility(`The crowd: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count).line}`);
   }, [lastSealedId, answers, crowd.data]);
+  const chromeScale = useChromeScale();
 
   if (today.isLoading) return (
     <Screen>
@@ -129,7 +132,6 @@ export default function Round() {
             <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : Uncover}>
               <OracleCard
                 q={current}
-                date={today.data.date}
                 roundLocksAt={today.data.locks_at}
                 onSealed={() => setLastSealedId(current.id)}
                 onLean={onLean}
@@ -163,7 +165,7 @@ export default function Round() {
       </View>
       {/* One fixed-height footer slot: reading, verdict, and hint trade
           places without nudging the layout above them. */}
-      <View style={{ height: 40, justifyContent: "center" }}>
+      <View style={{ height: scaledRow(40, chromeScale), justifyContent: "center" }}>
         {lean.conf !== null ? (
           // The oracle reads the pull aloud — stationary, in the footer's
           // slot — with the honest stake printed underneath: what this
@@ -172,7 +174,7 @@ export default function Round() {
             <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>
               {floorSeen ? confidenceReading(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
             </Mono>
-            <Mono size={9} color={colors.mutedInk} letterSpacing={1}>
+            <Mono size={10} color={colors.mutedInk} letterSpacing={1}>
               {payoffLine(lean.conf, current?.is_big_one ?? false)}
             </Mono>
           </View>
@@ -189,7 +191,7 @@ export default function Round() {
             <DecodeLine text="CONSULTING THE CROWD…" cursor size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
           )
         ) : current ? (
-          <Mono size={9} color={colors.mutedInk} style={{ textAlign: "center" }}>
+          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>
             The crowd's leaning is hidden until you commit.
           </Mono>
         ) : null}

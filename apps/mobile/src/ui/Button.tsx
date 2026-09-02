@@ -3,22 +3,31 @@ import * as Haptics from "expo-haptics";
 import { colors, space, typeScale, trackTail } from "../theme";
 import { Mono, role } from "./Text";
 
-export function GoldButton({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
+export function GoldButton({ title, onPress, disabled, destructive = false }: { title: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
+  // A destructive rite must not press like an invitation: it wears the
+  // vermilion sleeve, and its press is a warning weight rather than the
+  // medium tap that confirms an ordinary action.
+  const tone = destructive ? colors.vermilion : colors.agedGold;
+  const textTone = destructive ? colors.vermilion : colors.goldText;
+  const wash = destructive ? colors.vermilionWash : colors.goldWash;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onPress(); }}
+      onPress={() => {
+        Haptics.impactAsync(destructive ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
       style={({ pressed }) => ({
-        borderWidth: 1, borderColor: disabled ? colors.line : colors.agedGold,
+        borderWidth: 1, borderColor: disabled ? colors.line : tone,
         minHeight: 48, justifyContent: "center", alignItems: "center",
         paddingVertical: space(3), paddingHorizontal: space(4),
         opacity: pressed ? 0.7 : disabled ? 0.4 : 1,
-        backgroundColor: pressed ? colors.goldWash : "transparent",
+        backgroundColor: pressed ? wash : "transparent",
       })}
     >
-      <Mono {...typeScale.action} color={disabled ? colors.mutedInk : colors.goldText} style={{ textTransform: "uppercase", ...trackTail(typeScale.action.letterSpacing) }}>{title}</Mono>
+      <Mono {...typeScale.action} color={disabled ? colors.mutedInk : textTone} style={{ textTransform: "uppercase", ...trackTail(typeScale.action.letterSpacing) }}>{title}</Mono>
     </Pressable>
   );
 }

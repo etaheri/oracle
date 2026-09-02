@@ -10,6 +10,8 @@ import { getSwipeHinted, markSwipeHinted } from "../api/flags";
 import { ApiError } from "../api/client";
 import { useSubmit } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
+import { cardStatus } from "../game/cardStatus";
+import { useNow } from "../game/useNow";
 import { capture } from "../analytics/analytics";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
@@ -52,9 +54,8 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
   );
 }
 
-export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
+export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   q: RoundToday["questions"][number];
-  date: string;
   // The round's overall lock (if any): a question whose own lock differs
   // from it closes ahead of the round, and the title says so.
   roundLocksAt: string | null;
@@ -90,6 +91,12 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
   const [dragActive, setDragActive] = useState(false);
   useEffect(() => { onLean?.(liveConf, liveSide, dragActive); }, [liveConf, liveSide, dragActive, onLean]);
   const screenReader = useScreenReader();
+  const sealed = !!entry?.sealed;
+  // The status field ticks at the countdown's cadence — but ONLY while the
+  // card is still open. Once it is sealed the string is the constant "ST:
+  // SEALED", and a second-by-second re-render of this component repaints two
+  // Skia canvases for a line that will never change again.
+  const now = useNow(sealed ? null : 1000);
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
   const buttonsMode = screenReader || reducedMotion;
@@ -134,7 +141,6 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
     else void Haptics.selectionAsync();
   }
 
-  const sealed = !!entry?.sealed;
   const sideSV = useSharedValue(0); // 1 = leaning YES, -1 = NO, 0 = unknown
   // 1 while a sealing release is in flight: tells onFinalize NOT to spring
   // the card home — the throw owns dragX from the moment the fingers let go.
@@ -274,12 +280,17 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
     }
   }
 
+  // Slot and provenance only. The day used to ride here too, but source_name
+  // is unbounded and the card's margin is now one shared row with the live
+  // status field — so something had to give, and the date is the redundant
+  // half: the round's own TopBar prints DAY <date> a few inches above this.
+  const coordinate = `:: ${numeral(q.slot)} / PER ${q.source_name.toUpperCase()}`;
   const closesEarly = roundLocksAt !== null && q.locks_at !== roundLocksAt;
-  const title = q.is_big_one
-    ? `✶ The Big One · pays double · costs double${closesEarly ? " · closes early" : ""}`
-    : closesEarly
-      ? `${q.category} · closes early`
-      : q.category;
+  const title = q.is_big_one ? "✶ THE BIG ONE" : q.category;
+  const modifiers = [
+    q.is_big_one ? "PAYS DOUBLE · COSTS DOUBLE" : null,
+    closesEarly ? "CLOSES EARLY" : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <View>
@@ -290,7 +301,14 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
           cardW.value = e.nativeEvent.layout.width;
         }}
       >
-        <CardChrome slot={q.slot} title={title} big={q.is_big_one} coordinate={`:: ${numeral(q.slot)} / ${date} / PER ${q.source_name.toUpperCase()}`}>
+        <CardChrome
+          slot={q.slot}
+          title={title}
+          modifiers={modifiers || undefined}
+          big={q.is_big_one}
+          coordinate={coordinate}
+          status={cardStatus(q.locks_at, now, sealed)}
+        >
           {/* The question floats centered in the card's field, tarot-fashion;
               the controls anchor at the foot. The face is also the grab
               surface: pull it toward a side and release to seal (buttonsMode

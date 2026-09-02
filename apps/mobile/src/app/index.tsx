@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, role } from "../ui/Text";
 import { SystemHeader } from "../ui/SystemHeader";
@@ -31,6 +31,8 @@ import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useChromeScale } from "../ui/useChromeScale";
+import { scaledRow } from "../game/typeScaling";
 
 // The rescue offer at the breaking point (revenue-rites spec): the line has
 // no {streak} token (verbatim per copy bank), so no fillSlots is needed here.
@@ -38,20 +40,14 @@ const RESCUE_LINE = COPY_BANK.find((l) => l.id === "paywall.rescue-1")!.text;
 const RESCUE_CONFIRM_LINE = COPY_BANK.find((l) => l.id === "streak.shield-1")!.text;
 const STORE_SILENT_LINE = "THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.";
 
-// The call's reserved height: two rows of state line and the framed action. Home used to be a plain column, so every query that
-// resolved — the round, the ledger, yesterday's reveal — changed the bottom
-// stack's height and shoved the hero, wordmark and epigraph up the screen
-// (~50px when `today` landed, again when the notice arrived). The slot is this
-// tall from the first frame and its contents bottom-align inside it, so the
-// common day's arrival moves nothing above it.
-const CALL_SLOT_H = ROW_H.line * 2 + space(3) + 48;
-
-// The state row reserves two printed lines. Most days it prints one — "THE
-// PROPHECY IS SEALED" — but the partial-day line ("3 OF 5 SEALED · THE DAY
-// RATES ONLY WHEN ALL FIVE ARE SEALED.") wraps, and sealing a single answer
-// should not move the temple when you come back to it.
-function StateRow({ children }: { children: React.ReactNode }) {
-  return <View style={{ minHeight: ROW_H.line * 2, justifyContent: "flex-end" }}>{children}</View>;
+// The call's reserved height: two rows of state line and the framed action.
+// Home used to be a plain column, so every query that resolved — the round,
+// the ledger, yesterday's reveal — changed the bottom stack's height and
+// shoved the hero, wordmark and epigraph up the screen. The slot is this tall
+// from the first frame and its contents bottom-align inside it. It scales
+// with the OS text size, because the rows inside it do (spec §4).
+function callSlotHeight(scale: number) {
+  return scaledRow(ROW_H.line, scale) * 2 + space(3) + Math.ceil(48 * scale);
 }
 
 function yesterdayOf(date: string | undefined): string {
@@ -63,6 +59,13 @@ export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
   const router = useRouter();
+  const chromeScale = useChromeScale();
+  // The state row reserves two printed lines. Most days it prints one — "THE
+  // PROPHECY IS SEALED" — but the partial-day line ("3 OF 5 SEALED · THE DAY
+  // RATES ONLY WHEN ALL FIVE ARE SEALED.") wraps, and sealing a single answer
+  // should not move the temple when you come back to it.
+  const stateRowH = scaledRow(ROW_H.line, chromeScale) * 2;
+  const noticeRowH = scaledRow(ROW_H.meta, chromeScale);
 
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
@@ -130,6 +133,13 @@ export default function Index() {
     // notice/rescue row above keeps reading the stale pre-purchase ledger.
     if (ok) void qc.invalidateQueries({ queryKey: ["me", "ledger"] });
   }, [qc]);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // A daily-ritual app with a fixed drop time guarantees the pull instinct.
+    await qc.invalidateQueries();
+    setRefreshing(false);
+  }, [qc]);
   // Cold-start choreography (spec 2026-09-01-boot-orb-handoff). `booted`:
   // the rite's hold elapsed — the bottom-stack lines print now, the hero
   // starts waking. `orbLanded`: the rite's orb arrived — the hero goes live
@@ -163,106 +173,118 @@ export default function Index() {
 
   return (
     <Screen>
-      <SystemHeader stamp={dateStamp(stampDate)} />
-      {/* The temple register: hero, wordmark, clock. Centred in whatever the
-          reserved call slot below leaves it, so it is at its final position on
-          the first frame and stays there whatever resolves later. */}
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}>
-        {/* Temple moment: the near-touch, alive — transparent loop over the
-            museum ground, glow tinted by the crowd's mood. */}
-        <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} greet={greetOrb} />
-        {/* The wordmark materializes out of ASCII (patina spec phase 2) and
-            settles into carved stillness with a faint edge residue. */}
-        <MaterializeTitle active={cues.title} />
-        {/* The live line: what the oracle is doing, right now. */}
-        <OracleClock round={round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} />
-      </View>
-      <View style={{ gap: space(3) }}>
-        <View style={{ minHeight: CALL_SLOT_H, justifyContent: "flex-end", gap: space(3) }}>
-          {showLedgerCta && (
-            <>
-              <DecodeLine active={booted} text="YESTERDAY'S LEDGER IS READ" {...role.line} color={colors.goldText} />
-              <GoldButton title="READ THE LEDGER" onPress={() => router.push(`/reveal/${yesterday}`)} />
-            </>
-          )}
-          {round && !allSealed && (
-            <>
-              {/* One gold voice per screen. When yesterday's ledger owns the
-                  frame, today's state line steps down to muted chrome rather
-                  than stacking a second headline in the same colour beneath
-                  the first. */}
-              <StateRow>
-                <DecodeLine
-                  active={booted}
-                  text={partial ?? spokenLine(round.player_count)}
-                  {...(showLedgerCta ? role.meta : role.line)}
-                  color={showLedgerCta ? colors.mutedInk : colors.goldText}
-                />
-              </StateRow>
-              {showLedgerCta ? (
-                <QuietLink title="Enter today's round" onPress={enterRound} />
-              ) : (
-                <GoldButton title="ENTER" onPress={enterRound} />
-              )}
-            </>
-          )}
-          {round && allSealed && (
-            <>
-              <StateRow>
-                <DecodeLine
-                  active={booted}
-                  text="THE PROPHECY IS SEALED"
-                  {...(showLedgerCta ? role.meta : role.line)}
-                  color={showLedgerCta ? colors.mutedInk : colors.goldText}
-                />
-              </StateRow>
-              {showLedgerCta ? (
-                <QuietLink title="Behold the crowd" onPress={() => router.push("/round")} />
-              ) : (
-                <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
-              )}
-            </>
-          )}
-          {!round && !today.isLoading && (
-            <StateRow>
-              <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor {...role.line} color={colors.mutedInk} />
-            </StateRow>
-          )}
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        // The orb lives in the middle of this scroller and answers a touch the
+        // instant it lands; it yields a deliberate vertical drag back to the
+        // scroll on its own (OracleOrb's failOffsetY). Nothing to configure
+        // for the other half of that bargain: Fabric's RCTScrollView pins
+        // UIScrollView's delaysContentTouches to NO at construction, so the
+        // press reaches the glass immediately rather than after the ~150ms
+        // UIKit would otherwise spend deciding whether it was a scroll.
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
+      >
+        <SystemHeader stamp={dateStamp(stampDate)} />
+        {/* The temple register: hero, wordmark, clock. Centred in whatever the
+            reserved call slot below leaves it, so it is at its final position on
+            the first frame and stays there whatever resolves later. */}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}>
+          {/* Temple moment: the near-touch, alive — transparent loop over the
+              museum ground, glow tinted by the crowd's mood. */}
+          <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} greet={greetOrb} />
+          {/* The wordmark materializes out of ASCII (patina spec phase 2) and
+              settles into carved stillness with a faint edge residue. */}
+          <MaterializeTitle active={cues.title} />
+          {/* The live line: what the oracle is doing, right now. */}
+          <OracleClock round={round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} />
         </View>
-        {/* The notice rides the ledger query and lands long after first paint —
-            this is the row that used to arrive and shove everything above it.
-            The slot exists from frame one whether or not there is a line. */}
-        <View style={{ minHeight: ROW_H.meta, justifyContent: "center" }}>
-          {notice && (
-            noticeLinksToPlus ? (
-              // hitSlop, not minHeight: the notice keeps its one reserved row
-              // while the tap target reaches 44pt. The underline is the only
-              // thing separating a notice you can act on from one that is just
-              // the machine talking — it is free now that the footer rail has
-              // stopped underlining everything.
-              <Pressable accessibilityRole="button" hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => router.push("/plus")}>
-                <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textDecorationLine: "underline" }]}>{notice}</Mono>
-              </Pressable>
-            ) : (
-              <Mono {...role.meta} color={colors.mutedInk}>{notice}</Mono>
-            )
-          )}
-        </View>
-        {showRescue && (
-          <View style={{ gap: space(2), alignItems: "center" }}>
-            <Mono {...role.meta} color={rescueResult === "success" ? colors.goldText : colors.mutedInk}>
-              {rescueResult === "success" ? RESCUE_CONFIRM_LINE : rescueResult === "error" ? STORE_SILENT_LINE : RESCUE_LINE}
-            </Mono>
-            {rescueResult !== "success" && <GoldButton title={PAYWALL_CTA_LINES.rescue} onPress={doRescue} />}
+        <View style={{ gap: space(3) }}>
+          <View style={{ minHeight: callSlotHeight(chromeScale), justifyContent: "flex-end", gap: space(3) }}>
+            {showLedgerCta && (
+              <>
+                <DecodeLine active={booted} text="YESTERDAY'S LEDGER IS READ" {...role.line} color={colors.goldText} />
+                <GoldButton title="READ THE LEDGER" onPress={() => router.push(`/reveal/${yesterday}`)} />
+              </>
+            )}
+            {round && !allSealed && (
+              <>
+                {/* One gold voice per screen. When yesterday's ledger owns the
+                    frame, today's state line steps down to muted chrome rather
+                    than stacking a second headline in the same colour beneath
+                    the first. */}
+                <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
+                  <DecodeLine
+                    active={booted}
+                    text={partial ?? spokenLine(round.player_count)}
+                    {...(showLedgerCta ? role.meta : role.line)}
+                    color={showLedgerCta ? colors.mutedInk : colors.goldText}
+                  />
+                </View>
+                {showLedgerCta ? (
+                  <QuietLink title="Enter today's round" onPress={enterRound} />
+                ) : (
+                  <GoldButton title="ENTER" onPress={enterRound} />
+                )}
+              </>
+            )}
+            {round && allSealed && (
+              <>
+                <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
+                  <DecodeLine
+                    active={booted}
+                    text="THE PROPHECY IS SEALED"
+                    {...(showLedgerCta ? role.meta : role.line)}
+                    color={showLedgerCta ? colors.mutedInk : colors.goldText}
+                  />
+                </View>
+                {showLedgerCta ? (
+                  <QuietLink title="Behold the crowd" onPress={() => router.push("/round")} />
+                ) : (
+                  <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
+                )}
+              </>
+            )}
+            {!round && !today.isLoading && (
+              <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
+                <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor {...role.line} color={colors.mutedInk} />
+              </View>
+            )}
           </View>
-        )}
-      </View>
-      {/* The footer rail. Space divides it from the notice above, not a rule —
-          the brief asks for very restrained borders, and the brackets already
-          say these are controls. */}
-      <View style={{ marginTop: space(4) }}>
-        <FooterNav items={navItems} />
-      </View>
+          {/* The notice rides the ledger query and lands long after first paint —
+              this is the row that used to arrive and shove everything above it.
+              The slot exists from frame one whether or not there is a line. */}
+          <View style={{ minHeight: noticeRowH, justifyContent: "center" }}>
+            {notice && (
+              noticeLinksToPlus ? (
+                // hitSlop, not minHeight: the notice keeps its one reserved row
+                // while the tap target reaches 44pt. The underline is the only
+                // thing separating a notice you can act on from one that is just
+                // the machine talking — it is free now that the footer rail has
+                // stopped underlining everything.
+                <Pressable accessibilityRole="button" hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => router.push("/plus")}>
+                  <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textDecorationLine: "underline" }]}>{notice}</Mono>
+                </Pressable>
+              ) : (
+                <Mono {...role.meta} color={colors.mutedInk}>{notice}</Mono>
+              )
+            )}
+          </View>
+          {showRescue && (
+            <View style={{ gap: space(2), alignItems: "center" }}>
+              <Mono {...role.meta} color={rescueResult === "success" ? colors.goldText : colors.mutedInk}>
+                {rescueResult === "success" ? RESCUE_CONFIRM_LINE : rescueResult === "error" ? STORE_SILENT_LINE : RESCUE_LINE}
+              </Mono>
+              {rescueResult !== "success" && <GoldButton title={PAYWALL_CTA_LINES.rescue} onPress={doRescue} />}
+            </View>
+          )}
+        </View>
+        {/* The footer rail. Space divides it from the notice above, not a rule —
+            the brief asks for very restrained borders, and the brackets already
+            say these are controls. */}
+        <View style={{ marginTop: space(4) }}>
+          <FooterNav items={navItems} />
+        </View>
+      </ScrollView>
     </Screen>
   );
 }

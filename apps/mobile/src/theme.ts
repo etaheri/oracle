@@ -3,6 +3,7 @@
 // ratios noted are against museumWhite.
 export const colors = {
   museumWhite: "#F7F6F2", // primary ground — the museum field
+  museumWhiteClear: "rgba(247,246,242,0)", // the same ground at zero alpha — the far end of a fade INTO the ground, so a gradient never has to spell the colour out at a call site
   frescoWhite: "#F3F0E9", // card face — the artifact on the museum wall
   ink: "#17191F", // primary text (16.3:1)
   mutedInk: "#666A73", // secondary text, captions, chrome (5.0:1)
@@ -16,6 +17,7 @@ export const colors = {
   warmCenter: "#F2BE91", // decorative — orb center; text-tier on midnight (10.4:1)
   line: "rgba(23,25,31,0.16)",
   lineSoft: "rgba(23,25,31,0.08)",
+  mark: "rgba(23,25,31,0.30)", // register marks — a glyph reads lighter than a rule, so it sits a step above `line`
   goldWash: "rgba(170,138,80,0.10)",
   ultramarineWash: "rgba(36,61,120,0.06)",
   vermilionWash: "rgba(168,75,53,0.06)",

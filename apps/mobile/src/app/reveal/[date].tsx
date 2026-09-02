@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
-import { useCanvasRef } from "@shopify/react-native-skia";
+import { useQueryClient } from "@tanstack/react-query";
+import { Canvas, Fill, LinearGradient, useCanvasRef, vec } from "@shopify/react-native-skia";
 import { Screen } from "../../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../../ui/Text";
 import { GoldButton } from "../../ui/Button";
@@ -13,6 +14,7 @@ import { TopBar } from "../../ui/TopBar";
 import { AsciiDust } from "../../ui/TerminalPatina";
 import { DecodeLine } from "../../ui/DecodeText";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
+import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
 import { payoff } from "@oracle/core";
@@ -28,6 +30,12 @@ const ROW_STAGGER = 90;
 const POINTS_DELAY = ROW_DELAY + 4 * ROW_STAGGER + 200;
 const BIG_ONE_DELAY = POINTS_DELAY + 350;
 
+// The fold: how tall the fade at the bottom of the reveal is. Deep enough to
+// read as the page dissolving rather than as a band lying on top of it — this
+// screen is the one people screenshot, and it spends most of its height under
+// the Big One's gold frame, where a hard edge reads as a rendering seam.
+const FOLD_H = 32;
+
 // One golden surge through the Big One frame when the player beat the tide.
 const TideFlash = new Keyframe({
   0: { opacity: 0 },
@@ -41,6 +49,24 @@ export default function RevealScreen() {
   const reducedMotion = useReducedMotion();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await qc.invalidateQueries({ queryKey: ["reveal", date] });
+    setRefreshing(false);
+  }, [qc, date]);
+  // The Big One and the share button live below the fold on smaller devices —
+  // refs for the raw measurements so onLayout/onContentSizeChange never
+  // trigger a render loop, state only for the boolean that gates the fade.
+  const [overflows, setOverflows] = useState(false);
+  // ...and the fade retires the moment the reader reaches the end of it: a
+  // marker for content below is a lie once there is no content below.
+  const [atBottom, setAtBottom] = useState(false);
+  const viewportH = useRef(0);
+  const contentH = useRef(0);
+  const recomputeOverflow = () => setOverflows(contentH.current > viewportH.current + 1);
   const loaded = !!reveal.data && !("pending" in reveal.data);
   // reveal.data's reference changes on every refetch (staleTime 0 + AppState
   // focus refetches), so the resolved-outcomes effect below can re-run for
@@ -126,13 +152,34 @@ export default function RevealScreen() {
 
   async function onShare() {
     setSharing(true);
-    try { await shareCard(canvasRef, cardData); } catch {} finally { setSharing(false); }
+    setShareError(null);
+    try {
+      await shareCard(canvasRef, cardData);
+    } catch {
+      // Every other failure in this app has a written line; this one used to
+      // be swallowed whole, so a failed share simply did nothing.
+      setShareError("THE PROPHECY WOULD NOT LEAVE. TRY AGAIN.");
+    } finally {
+      setSharing(false);
+    }
   }
 
   return (
     <Screen>
       <TopBar />
-      <ScrollView contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}>
+      <ScrollView
+        contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
+        onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; recomputeOverflow(); }}
+        onContentSizeChange={(_w, h) => { contentH.current = h; recomputeOverflow(); }}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+          // Setting the same boolean back is a React bail-out, so this is free
+          // on every frame that does not actually cross the end.
+          setAtBottom(contentOffset.y + layoutMeasurement.height >= contentSize.height - 1);
+        }}
+      >
         <Eyebrow>
           {anyPending
             ? `Day ${d.date} · the ledger is still being read`
@@ -147,7 +194,7 @@ export default function RevealScreen() {
           {!allSpectator && (
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
-              <Mono size={9} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
+              <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
               {d.first_hour && d.day_points > 0 && (
                 <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
               )}
@@ -157,19 +204,34 @@ export default function RevealScreen() {
             <Mono key={i} size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </Animated.View>
-        <View>
+        {/* The day's four ordinary calls, in the card's vocabulary rather
+            than a settings list (refinement spec §2): the slot numeral is
+            the anchor, the prophecy keeps the temple voice it was asked in,
+            and the receipt drops to machine voice underneath it. One rule
+            closes the group instead of four rules boxing every row. */}
+        <View style={{ borderBottomWidth: 1, borderBottomColor: colors.line }}>
           {d.questions.filter((q) => q.slot !== 5).map((q, i) => {
             const st = rowState(q);
             const color = st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
+            const receipt = receiptLine(q);
             return (
-              <Animated.View key={q.id} entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
-                style={{ flexDirection: "row", gap: space(2), paddingVertical: space(2), borderBottomWidth: 1, borderBottomColor: colors.lineSoft, alignItems: "baseline" }}>
-                <Mono size={12} color={color}>{rowMark(st)}</Mono>
-                <View style={{ flex: 1 }}>
-                  <Mono size={11} color={colors.mutedInk} numberOfLines={2}>{q.text}</Mono>
-                  <Mono size={9} color={colors.mutedInk} numberOfLines={2}>{receiptLine(q)}</Mono>
+              <Animated.View
+                key={q.id}
+                entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
+                style={{ flexDirection: "row", gap: space(3), paddingVertical: space(3), alignItems: "flex-start" }}
+              >
+                <Ritual size={13} color={color} letterSpacing={1} style={{ width: 22, textAlign: "center" }}>
+                  {numeral(q.slot)}
+                </Ritual>
+                <View style={{ flex: 1, gap: space(1) }}>
+                  <Serif size={15} color={colors.ink} numberOfLines={3} style={{ lineHeight: 21 }}>{q.text}</Serif>
+                  {receipt ? (
+                    <Mono size={10} color={colors.mutedInk} numberOfLines={2} style={{ lineHeight: 15 }}>{receipt}</Mono>
+                  ) : null}
                 </View>
-                <Mono size={12} color={color}>{rowRight(q)}</Mono>
+                {/* The mark rides with the value: outcome must never be
+                    carried by colour alone (brief §11). */}
+                <Mono size={12} color={color} letterSpacing={1}>{`${rowMark(st)} ${rowRight(q)}`}</Mono>
               </Animated.View>
             );
           })}
@@ -235,7 +297,26 @@ export default function RevealScreen() {
             <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />
           </Animated.View>
         )}
+        {shareError && (
+          <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
+        )}
       </ScrollView>
+      {overflows && !atBottom && (
+        // The Big One and the share button live below the fold on smaller
+        // devices, and nothing said so. It has to be an actual fade: this was
+        // a flat 0.9-opacity band with a hard top edge, and over the Big One's
+        // gilded frame that edge read as a rendering seam rather than as the
+        // page continuing. Skia, the same way GoldFrame draws its leaf — Fill
+        // takes the canvas, so the gradient needs no measurement, only its own
+        // height.
+        <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: FOLD_H }}>
+          <Canvas style={StyleSheet.absoluteFill}>
+            <Fill>
+              <LinearGradient start={vec(0, 0)} end={vec(0, FOLD_H)} colors={[colors.museumWhiteClear, colors.museumWhite]} />
+            </Fill>
+          </Canvas>
+        </View>
+      )}
       <ShareCardCanvas canvasRef={canvasRef} data={cardData} />
     </Screen>
   );

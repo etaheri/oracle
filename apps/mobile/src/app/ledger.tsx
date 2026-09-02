@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Alert } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCanvasRef } from "@shopify/react-native-skia";
@@ -10,6 +10,7 @@ import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
+import { RiteConfirm } from "../ui/RiteConfirm";
 import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
@@ -20,8 +21,19 @@ import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
 
-// The Forecaster's Ledger (voice spec §6): a museum specimen plaque. Stats in
-// machine voice, one epithet with its receipt — identity only with evidence.
+// The plaque's floor, shared by the frame that waits for it. The loading
+// frame exists so the plaque fills rather than flashes, and it only earns
+// that if the two are the same size: at 280 the frame still visibly grew
+// when the record landed. This is the loaded plaque's own height — its
+// padding, the epithet block, the rule, the lead stat and six supporting
+// rows — so the only step left is the epithet wrapping to a second line or
+// the claim row being offered, both of which are the record's own news.
+const PLAQUE_MIN_H = 380;
+
+// Seven rows at one size read as seven equal facts. The Oracle Score is the
+// headline — it is the number the epithet is derived from — so it takes the
+// temple voice and its own rule, and the six supporting stats stay machine
+// voice beneath it (refinement spec §7).
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -31,11 +43,21 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function LeadStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+      <Mono size={11} color={colors.goldText} letterSpacing={2}>{label}</Mono>
+      <Ritual bold size={20} color={colors.ink} letterSpacing={1}>{value}</Ritual>
+    </View>
+  );
+}
+
 export default function Ledger() {
   const ledger = useMeLedger();
   const qc = useQueryClient();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const router = useRouter();
   const plusActive = usePlusStore((s) => s.plusActive);
 
@@ -52,65 +74,72 @@ export default function Ledger() {
     return () => { alive = false; };
   }, []);
 
+  // Which rite is being asked, if any. Only one can be open at a time.
+  const [rite, setRite] = useState<"collision" | "strike" | null>(null);
+
   const handleClaim = () => {
     void (async () => {
       const result = await appleClaim();
-      if (result === "claimed") {
-        qc.invalidateQueries({ queryKey: ["me", "ledger"] });
-      } else if (result === "collision") {
-        Alert.alert("THE RECORD ALREADY BEARS A NAME.", undefined, [
-          { text: "CANCEL", style: "cancel" },
-          {
-            text: "RESTORE",
-            onPress: () => {
-              void (async () => {
-                const r = await appleRestore();
-                if (r === "restored") {
-                  qc.invalidateQueries();
-                  router.replace("/");
-                }
-              })();
-            },
-          },
-        ]);
+      if (result === "claimed") qc.invalidateQueries({ queryKey: ["me", "ledger"] });
+      else if (result === "collision") setRite("collision");
+    })();
+  };
+
+  const confirmRestore = () => {
+    setRite(null);
+    void (async () => {
+      const r = await appleRestore();
+      if (r === "restored") {
+        qc.invalidateQueries();
+        router.replace("/");
       }
     })();
   };
 
-  const handleStrike = () => {
-    Alert.alert("THE RECORD WILL BE STRUCK", "THIS IS NOT UNDONE.", [
-      { text: "CANCEL", style: "cancel" },
-      {
-        text: "STRIKE",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            const ok = await strikeRecord();
-            if (ok) router.replace("/");
-          })();
-        },
-      },
-    ]);
+  const confirmStrike = () => {
+    setRite(null);
+    void (async () => {
+      const ok = await strikeRecord();
+      if (ok) router.replace("/");
+    })();
   };
 
   if (!ledger.data) return (
     <Screen>
       <TopBar />
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
-        <AsciiDust />
-        <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
+        <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
+        {/* The frame holds while the record is fetched. It used to vanish and
+            return, which read as a flash rather than a fill (spec §7). */}
+        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H, alignItems: "center", justifyContent: "center" }}>
+          <AsciiDust />
+          <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+        </View>
       </View>
     </Screen>
   );
 
   const d = ledger.data;
   const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
+
+  async function handleShare() {
+    setSharing(true);
+    setShareError(null);
+    try {
+      await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title);
+    } catch {
+      setShareError("THE PLAQUE WOULD NOT LEAVE. TRY AGAIN.");
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <Screen>
       <TopBar />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
-        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4) }}>
+        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H }}>
           <Eyebrow>Epithet of the last 28 days</Eyebrow>
           <View style={{ alignItems: "center", gap: space(2) }}>
             <Ritual bold size={24} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
@@ -118,7 +147,8 @@ export default function Ledger() {
           </View>
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(2) }}>
-            <Stat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+            <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+            <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
             <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
             <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />
             <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
@@ -153,19 +183,33 @@ export default function Ledger() {
         {!plusActive && <QuietLink title="Oracle plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
           {LITURGY_LINES.map((line) => (
-            <Mono key={line} size={9} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
+            <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
-        <GoldButton
-          title={sharing ? "PREPARING…" : "DECLARE YOURSELF"}
-          onPress={async () => {
-            setSharing(true);
-            try { await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title); } catch {} finally { setSharing(false); }
-          }}
-        />
-        <QuietLink title="Strike the record" onPress={handleStrike} />
+        <GoldButton title={sharing ? "PREPARING…" : "DECLARE YOURSELF"} onPress={handleShare} />
+        {shareError && (
+          <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
+        )}
+        <QuietLink title="Strike the record" onPress={() => setRite("strike")} />
         <PlaqueShareCanvas canvasRef={canvasRef} data={d} />
       </View>
+      <RiteConfirm
+        visible={rite === "collision"}
+        title="THE RECORD ALREADY BEARS A NAME"
+        body="RESTORE IT, AND THIS DEVICE TAKES UP THE RECORD THAT NAME ALREADY HOLDS."
+        confirmLabel="RESTORE THE RECORD"
+        onConfirm={confirmRestore}
+        onWithdraw={() => setRite(null)}
+      />
+      <RiteConfirm
+        visible={rite === "strike"}
+        title="THE RECORD WILL BE STRUCK"
+        body="EVERY VIGIL, EVERY CALL, EVERY EPITHET. THIS IS NOT UNDONE."
+        confirmLabel="STRIKE THE RECORD"
+        destructive
+        onConfirm={confirmStrike}
+        onWithdraw={() => setRite(null)}
+      />
     </Screen>
   );
 }
