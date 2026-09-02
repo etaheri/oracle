@@ -71,7 +71,16 @@ function RootLayout() {
     // does not provide one.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.museumWhite } }} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.museumWhite } }}>
+          {/* Everything else keeps the filesystem default (the iOS slide), which is
+              right for ledger and reveal/[date] — those are drill-downs into a record.
+              The round is a change of mode, not a step down a hierarchy, so it dissolves
+              rather than slides. Plus and summons are interstitials, not places: as
+              modals they're dismissible and don't pretend to occupy a spot in history. */}
+          <Stack.Screen name="round" options={{ animation: "fade", animationDuration: 260 }} />
+          <Stack.Screen name="plus" options={{ presentation: "modal" }} />
+          <Stack.Screen name="summons" options={{ presentation: "modal" }} />
+        </Stack>
         {chooseRite(callingSeen) === "calling" ? (
           <CallingRite />
         ) : chooseRite(callingSeen) === "boot" ? (

@@ -24,7 +24,7 @@ export default function Summons() {
       const r = await appleRestore();
       if (r === "restored") {
         qc.invalidateQueries();
-        router.replace("/");
+        router.dismissTo("/");
       } else if (r === "none") {
         setRestoreState("none");
       }

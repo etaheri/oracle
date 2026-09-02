@@ -104,7 +104,7 @@ export default function Ledger() {
       const r = await appleRestore();
       if (r === "restored") {
         qc.invalidateQueries();
-        router.replace("/");
+        router.dismissTo("/");
       }
     })();
   };
@@ -118,7 +118,7 @@ export default function Ledger() {
       // Without this the struck player lands on a Home still showing their
       // old vigil and epithet until each query happens to refetch.
       qc.clear();
-      router.replace("/");
+      router.dismissTo("/");
     })();
   };
 

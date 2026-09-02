@@ -110,7 +110,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
         </View>
       </GoldFrame>
       <View style={{ paddingBottom: space(2) }}>
-        <GoldButton title="RETURN AT NOON" onPress={() => router.replace("/")} />
+        <GoldButton title="RETURN AT NOON" onPress={() => router.dismissTo("/")} />
       </View>
     </View>
   );
