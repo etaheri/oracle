@@ -70,17 +70,17 @@ export function CardChrome({ slot, title, modifiers, coordinate, status, big = f
             the brackets stay solid — the frame is known, the prophecy is not. */}
         <Eyebrow>{`[ ${title} ]`}</Eyebrow>
         {modifiers ? (
-          <Mono size={9.5} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{modifiers}</Mono>
+          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{modifiers}</Mono>
         ) : null}
       </View>
       <View style={{ flex: 1, gap: space(3), paddingTop: space(3) }}>{children}</View>
       {coordinate ? (
-        <Mono size={8.5} color={colors.mutedInk} letterSpacing={1.5} style={{ position: "absolute", left: INSET + 11, bottom: INSET + 8 }}>
+        <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ position: "absolute", left: INSET + 11, bottom: INSET + 8 }}>
           {coordinate}
         </Mono>
       ) : null}
       {status ? (
-        <Mono size={8.5} color={colors.mutedInk} letterSpacing={1.5} style={{ position: "absolute", right: INSET + 11, bottom: INSET + 8 }}>
+        <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ position: "absolute", right: INSET + 11, bottom: INSET + 8 }}>
           {status}
         </Mono>
       ) : null}

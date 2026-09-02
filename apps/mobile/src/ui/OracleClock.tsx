@@ -6,6 +6,8 @@ import { DecodeLine } from "./DecodeText";
 import { useNextRound } from "../api/hooks";
 import { formatCountdown, msUntil } from "../game/countdown";
 import { useNow } from "../game/useNow";
+import { useChromeScale } from "./useChromeScale";
+import { scaledRow } from "../game/typeScaling";
 
 const READING_LINE = COPY_BANK.find((l) => l.id === "system.reading-1")!.text;
 
@@ -20,7 +22,6 @@ const READING_LINE = COPY_BANK.find((l) => l.id === "system.reading-1")!.text;
 //
 // The block holds a fixed height whichever line it is printing, so a round
 // resolving — or a countdown running out — never moves the wordmark above it.
-const CLOCK_H = ROW_H.meta + space(1) + ROW_H.clock;
 
 export type ClockRound = { locks_at: string | null } | null | undefined;
 
@@ -35,6 +36,8 @@ export function OracleClock({ round, allSealed, loading, active }: {
   const asleep = !round && !loading;
   const next = useNextRound(asleep);
   const now = useNow(1000);
+  const scale = useChromeScale();
+  const clockH = scaledRow(ROW_H.meta, scale) + space(1) + scaledRow(ROW_H.clock, scale);
 
   const until = round ? round.locks_at : asleep ? (next.data?.opens_at ?? null) : null;
   const prefix = round
@@ -46,7 +49,7 @@ export function OracleClock({ round, allSealed, loading, active }: {
   const ms = msUntil(until, now);
 
   return (
-    <View style={{ height: CLOCK_H, alignItems: "center", justifyContent: "center", gap: space(1) }}>
+    <View style={{ height: clockH, alignItems: "center", justifyContent: "center", gap: space(1) }}>
       {ms !== null ? (
         <>
           <DecodeLine active={active} text={prefix} seed={prefix} {...role.meta} color={colors.mutedInk} />

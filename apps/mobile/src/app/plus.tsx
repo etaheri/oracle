@@ -51,15 +51,15 @@ export default function Plus() {
           </View>
         )}
         {errorLine && <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{errorLine}</Mono>}
-        <Mono size={9} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center", lineHeight: 15 }}>
+        <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center", lineHeight: 15 }}>
           AUTO-RENEWS UNTIL CANCELLED IN APP STORE SETTINGS. THE FREE GAME IS NEVER GATED.
         </Mono>
       </View>
       <View style={{ gap: space(2), paddingBottom: space(2) }}>
         <QuietLink title={PAYWALL_CTA_LINES.restore} onPress={() => restore()} />
         <View style={{ flexDirection: "row", justifyContent: "center", gap: space(4) }}>
-          <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Mono size={9} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
-          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}><Mono size={9} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
         </View>
       </View>
     </Screen>

@@ -31,6 +31,8 @@ import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useChromeScale } from "../ui/useChromeScale";
+import { scaledRow } from "../game/typeScaling";
 
 // The rescue offer at the breaking point (revenue-rites spec): the line has
 // no {streak} token (verbatim per copy bank), so no fillSlots is needed here.
@@ -38,20 +40,14 @@ const RESCUE_LINE = COPY_BANK.find((l) => l.id === "paywall.rescue-1")!.text;
 const RESCUE_CONFIRM_LINE = COPY_BANK.find((l) => l.id === "streak.shield-1")!.text;
 const STORE_SILENT_LINE = "THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.";
 
-// The call's reserved height: two rows of state line and the framed action. Home used to be a plain column, so every query that
-// resolved — the round, the ledger, yesterday's reveal — changed the bottom
-// stack's height and shoved the hero, wordmark and epigraph up the screen
-// (~50px when `today` landed, again when the notice arrived). The slot is this
-// tall from the first frame and its contents bottom-align inside it, so the
-// common day's arrival moves nothing above it.
-const CALL_SLOT_H = ROW_H.line * 2 + space(3) + 48;
-
-// The state row reserves two printed lines. Most days it prints one — "THE
-// PROPHECY IS SEALED" — but the partial-day line ("3 OF 5 SEALED · THE DAY
-// RATES ONLY WHEN ALL FIVE ARE SEALED.") wraps, and sealing a single answer
-// should not move the temple when you come back to it.
-function StateRow({ children }: { children: React.ReactNode }) {
-  return <View style={{ minHeight: ROW_H.line * 2, justifyContent: "flex-end" }}>{children}</View>;
+// The call's reserved height: two rows of state line and the framed action.
+// Home used to be a plain column, so every query that resolved — the round,
+// the ledger, yesterday's reveal — changed the bottom stack's height and
+// shoved the hero, wordmark and epigraph up the screen. The slot is this tall
+// from the first frame and its contents bottom-align inside it. It scales
+// with the OS text size, because the rows inside it do (spec §4).
+function callSlotHeight(scale: number) {
+  return scaledRow(ROW_H.line, scale) * 2 + space(3) + Math.ceil(48 * scale);
 }
 
 function yesterdayOf(date: string | undefined): string {
@@ -63,6 +59,9 @@ export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
   const router = useRouter();
+  const chromeScale = useChromeScale();
+  const stateRowH = scaledRow(ROW_H.line, chromeScale) * 2;
+  const noticeRowH = scaledRow(ROW_H.meta, chromeScale);
 
   const round = today.data;
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
@@ -178,7 +177,7 @@ export default function Index() {
         <OracleClock round={round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} />
       </View>
       <View style={{ gap: space(3) }}>
-        <View style={{ minHeight: CALL_SLOT_H, justifyContent: "flex-end", gap: space(3) }}>
+        <View style={{ minHeight: callSlotHeight(chromeScale), justifyContent: "flex-end", gap: space(3) }}>
           {showLedgerCta && (
             <>
               <DecodeLine active={booted} text="YESTERDAY'S LEDGER IS READ" {...role.line} color={colors.goldText} />
@@ -191,14 +190,14 @@ export default function Index() {
                   frame, today's state line steps down to muted chrome rather
                   than stacking a second headline in the same colour beneath
                   the first. */}
-              <StateRow>
+              <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
                 <DecodeLine
                   active={booted}
                   text={partial ?? spokenLine(round.player_count)}
                   {...(showLedgerCta ? role.meta : role.line)}
                   color={showLedgerCta ? colors.mutedInk : colors.goldText}
                 />
-              </StateRow>
+              </View>
               {showLedgerCta ? (
                 <QuietLink title="Enter today's round" onPress={enterRound} />
               ) : (
@@ -208,14 +207,14 @@ export default function Index() {
           )}
           {round && allSealed && (
             <>
-              <StateRow>
+              <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
                 <DecodeLine
                   active={booted}
                   text="THE PROPHECY IS SEALED"
                   {...(showLedgerCta ? role.meta : role.line)}
                   color={showLedgerCta ? colors.mutedInk : colors.goldText}
                 />
-              </StateRow>
+              </View>
               {showLedgerCta ? (
                 <QuietLink title="Behold the crowd" onPress={() => router.push("/round")} />
               ) : (
@@ -224,15 +223,15 @@ export default function Index() {
             </>
           )}
           {!round && !today.isLoading && (
-            <StateRow>
+            <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
               <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor {...role.line} color={colors.mutedInk} />
-            </StateRow>
+            </View>
           )}
         </View>
         {/* The notice rides the ledger query and lands long after first paint —
             this is the row that used to arrive and shove everything above it.
             The slot exists from frame one whether or not there is a line. */}
-        <View style={{ minHeight: ROW_H.meta, justifyContent: "center" }}>
+        <View style={{ minHeight: noticeRowH, justifyContent: "center" }}>
           {notice && (
             noticeLinksToPlus ? (
               // hitSlop, not minHeight: the notice keeps its one reserved row

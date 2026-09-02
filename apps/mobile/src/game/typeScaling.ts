@@ -1,8 +1,8 @@
 // Dynamic Type, capped rather than fluid (refinement spec §4). Home's
-// no-shift choreography depends on reserved slots being constants known at
-// layout time (CALL_SLOT_H, CLOCK_H, ROW_H); letting chrome scale without a
-// ceiling would dissolve it. So chrome grows to a ceiling and the reserved
-// slots grow with it by exactly the same factor, while the temple voice —
+// no-shift choreography depends on reserved slot heights being known before
+// their contents arrive; letting chrome scale without a ceiling would
+// dissolve it. So chrome grows to a ceiling and the reserved slots grow with
+// it by exactly the same factor (see scaledRow), while the temple voice —
 // the question, the prophecy, the content — scales freely.
 export const CHROME_CAP = 1.3;
 

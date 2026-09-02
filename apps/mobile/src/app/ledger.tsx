@@ -143,7 +143,7 @@ export default function Ledger() {
         {!plusActive && <QuietLink title="Oracle plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
           {LITURGY_LINES.map((line) => (
-            <Mono key={line} size={9} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
+            <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
         <GoldButton

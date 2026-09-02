@@ -25,7 +25,7 @@ export default function Rites() {
         </View>
         <View style={{ gap: space(1), marginTop: space(2) }}>
           {LITURGY_LINES.map((line) => (
-            <Mono key={line} size={9} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
+            <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
       </View>
