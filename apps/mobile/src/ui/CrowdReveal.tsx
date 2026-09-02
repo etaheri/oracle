@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { colors, space } from "../theme";
 import { Serif, Mono, Eyebrow } from "./Text";
 import { GoldButton } from "./Button";
+import { GoldFrame } from "./GoldFrame";
 import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { asciiGauge } from "../game/terminalPrint";
@@ -52,32 +53,41 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
   return (
     <View style={{ flex: 1, gap: space(4) }}>
       <Eyebrow>The crowd is revealed</Eyebrow>
-      <View style={{ gap: space(4), flex: 1 }}>
-        {sealed.map((q) => {
-          const c = byId.get(q.id)!;
-          const mine = answers[q.id]!;
-          const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
-          const against = contrarianApplies(mySidePct, c.player_count);
-          return (
-            <View key={q.id} style={{ gap: space(1.5) }}>
-              <Serif size={15} color={colors.mutedInk} numberOfLines={2}>{q.text}</Serif>
-              <CrowdBar pct={c.crowd_yes_pct} />
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>
-                <Mono size={10} color={against ? colors.goldText : colors.mutedInk}>
-                  {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
-                </Mono>
+      {/* The round's second artifact (refinement spec §5). It followed a
+          gilded card and arrived as an unframed list; the gold-leaf frame
+          says this is the same document, now countersigned by the crowd. */}
+      <GoldFrame style={{ flex: 1, backgroundColor: colors.frescoWhite }}>
+        <View style={{ flex: 1, padding: space(4), gap: space(4) }}>
+          {sealed.map((q) => {
+            const c = byId.get(q.id)!;
+            const mine = answers[q.id]!;
+            const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
+            const against = contrarianApplies(mySidePct, c.player_count);
+            return (
+              <View key={q.id} style={{ gap: space(1.5) }}>
+                <Serif size={15} color={colors.ink} numberOfLines={2}>{q.text}</Serif>
+                <CrowdBar pct={c.crowd_yes_pct} />
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>
+                  <Mono size={10} color={against ? colors.goldText : colors.mutedInk}>
+                    {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
+                  </Mono>
+                </View>
               </View>
-            </View>
-          );
-        })}
-      </View>
-      <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
-        {playerCount === 1 ? "1 ORACLE HAS SPOKEN" : `${playerCount} ORACLES HAVE SPOKEN`}
-      </Mono>
-      <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>
-        The ledger is read tomorrow at noon.
-      </Mono>
+            );
+          })}
+          <View style={{ flex: 1 }} />
+          <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
+          <View style={{ gap: space(1) }}>
+            <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
+              {playerCount === 1 ? "1 ORACLE HAS SPOKEN" : `${playerCount} ORACLES HAVE SPOKEN`}
+            </Mono>
+            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={1}>
+              THE LEDGER IS READ TOMORROW AT NOON
+            </Mono>
+          </View>
+        </View>
+      </GoldFrame>
       <View style={{ paddingBottom: space(2) }}>
         <GoldButton title="RETURN AT NOON" onPress={() => router.replace("/")} />
       </View>
