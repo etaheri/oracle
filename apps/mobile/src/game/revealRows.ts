@@ -1,4 +1,6 @@
 import { COPY_BANK, selectLine, type Reveal } from "@oracle/core";
+import { VERDICT_MIN_PLAYERS } from "./crowdVerdict";
+import { numeral } from "./numerals";
 
 type Question = Reveal["questions"][number];
 
@@ -81,4 +83,40 @@ const LAPSED_LINES = COPY_BANK.filter((l) => l.id.startsWith("noon.lapsed"));
 // A lapsed player's reveal gets a line, not a page of dots (audit #6).
 export function lapsedLine(seedKey: string): string {
   return selectLine(LAPSED_LINES, seedKey, ["lapsed"])?.text ?? LAPSED_LINES[0]!.text;
+}
+
+// Was the crowd big enough to be worth reading back? Same floor the round's
+// footer verdict and the finale use — a percentage over three players is
+// mostly the reader (audit 2026-09-02 §2.1).
+export function crowdReadable(q: Question): boolean {
+  return q.crowd_yes_pct !== null && q.crowd_count !== null && q.crowd_count >= VERDICT_MIN_PLAYERS;
+}
+
+// Said in the crowd's place on the Big One, where a silent hole in a gilded
+// frame reads as a rendering fault. Past tense: by reveal time the crowd is
+// not still gathering, there simply were not enough of them.
+export const TOO_FEW_LINE = "TOO FEW SPOKE TO READ THE CROWD";
+
+// The ordinary rows' missing half (audit 2026-09-02 §3.1). The reveal printed
+// the question, the source and the points, and nothing else — so the app whose
+// liturgy is "NOTHING IS FORGOTTEN" could not tell you, one day later, what
+// you had actually said on four of the day's five calls. Both halves are
+// already in the payload; the Big One's own block has read them back all
+// along. Null for a row the player never answered — the outcome column
+// already speaks for those.
+export function callLine(q: Question): string | null {
+  if (!q.my) return null;
+  const mine = `YOU: ${q.my.answer ? "YES" : "NO"} @ ${q.my.confidence}%`;
+  return crowdReadable(q) ? `${mine} · CROWD ${q.crowd_yes_pct}% YES` : mine;
+}
+
+// How much of the day has actually been read. Shown in the day-points slot
+// while any row is still pending: the score at that moment is real but
+// partial, and a number that silently climbs on the next refresh is exactly
+// the revision the liturgy promises never happens (audit 2026-09-02 §3.2).
+export function readingLine(questions: ReadonlyArray<Question>): string {
+  const read = questions.filter((q) => q.outcome !== null).length;
+  // Roman numerals have no zero, and `numeral(0)` falls back to arabic — so
+  // the one count the ceremony can actually open on would print "0 OF V".
+  return `${read === 0 ? "NONE" : numeral(read)} OF ${numeral(questions.length)} READ`;
 }

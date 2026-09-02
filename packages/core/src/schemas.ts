@@ -73,6 +73,10 @@ export const RevealSchema = z.object({
       text: z.string(),
       outcome: z.enum(["yes", "no", "void"]).nullable(),
       crowd_yes_pct: z.number().nullable(),
+      // Distinct predictors on this question at resolution — null before it
+      // resolves. The reveal reads the crowd only above the same floor the
+      // round footer uses.
+      crowd_count: z.number().int().nullable(),
       market_prob: z.number().nullable(),
       my: z
         .object({

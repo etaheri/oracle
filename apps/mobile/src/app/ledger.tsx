@@ -17,7 +17,7 @@ import { useMeLedger } from "../api/hooks";
 import { appleClaim, appleRestore, strikeRecord } from "../api/identity";
 import { usePlusStore } from "../monetization/plusState";
 import { colors, space } from "../theme";
-import { LITURGY_LINES, calibrationVerdict } from "@oracle/core";
+import { LITURGY_LINES, SCORE_GLOSS, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
 
@@ -25,10 +25,12 @@ import { scoreValue } from "../game/scoreProgress";
 // frame exists so the plaque fills rather than flashes, and it only earns
 // that if the two are the same size: at 280 the frame still visibly grew
 // when the record landed. This is the loaded plaque's own height — its
-// padding, the epithet block, the rule, the lead stat and six supporting
-// rows — so the only step left is the epithet wrapping to a second line or
-// the claim row being offered, both of which are the record's own news.
-const PLAQUE_MIN_H = 380;
+// padding, the epithet block, the rule, the lead stat, the score gloss
+// beneath it and six supporting rows — so the only step left is the epithet
+// wrapping to a second line or the claim row being offered, both of which are
+// the record's own news. Raised from 380 when the gloss was added: it is two
+// lines of size-10 mono plus its gap at ordinary text sizes.
+const PLAQUE_MIN_H = 420;
 
 // Seven rows at one size read as seven equal facts. The Oracle Score is the
 // headline — it is the number the epithet is derived from — so it takes the
@@ -159,6 +161,16 @@ export default function Ledger() {
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(2) }}>
             <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+            {/* The score is the premise of the whole app — the ledger naming
+                who can actually see — and it used to sit here as a bare label
+                over a progress string that never said what fifty was fifty OF
+                (audit 2026-09-02 §1.1). One line, in the row's own register:
+                how it is earned while it is unwritten, what it measures once
+                it is. The second half is also the legal wall, stated to the
+                player rather than only to the spec. */}
+            <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 15 }}>
+              {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
+            </Mono>
             <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
             <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
             <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />

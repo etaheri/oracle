@@ -149,20 +149,45 @@ export function vigilLine(streak: number, seedKey: string): string | null {
 // The Rites: the rules, spoken once before a first seal and kept on a quiet
 // link forever. Declaratives only — the machine explains itself the way it
 // does everything else. Hand-written, linted, versioned.
+//
+// ORDER IS LOAD-BEARING. The first OPENING_RITES are what a player needs
+// before their first card; the rest are the rules they meet later, and only
+// the standing link shows them. Twelve rules in one wall before card I was
+// ~150 words of tracked caps that nobody retains (audit 2026-09-02 §1.2), and
+// among them the game never once said what it was for (§1.1) — rite VI now
+// does, which is why it sits inside the opening rather than at the end.
 export const RITES_LINES = [
+  // ── the opening: everything the first card depends on ──
   "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON, NEW YORK TIME.",
-  "A QUESTION CLOSES THE MOMENT ITS ANSWER BEGINS TO EXIST. SOME CLOSE BEFORE NOON.",
   "PULL TOWARD YES OR NO. THE LONGER THE PULL, THE GREATER THE CONVICTION. TO RELEASE IS TO SEAL.",
-  "AN ANSWER SEALED CANNOT BE UNSEALED.",
-  "THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
+  "AN ANSWER SEALED CANNOT BE UNSEALED. THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
   "CONVICTION PAYS WHEN RIGHT. IT COSTS MORE WHEN WRONG.",
-  "THE BIG ONE COUNTS DOUBLE. IN BOTH DIRECTIONS.",
-  "STAND AGAINST THE TIDE AND PREVAIL: THE LEDGER ADDS A BOUNTY.",
-  "SEAL ALL FIVE WITHIN THE FIRST HOUR. THE DAY PAYS TEN PERCENT MORE.",
+  "THE LEDGER RATES EVERY CALL AGAINST WHAT HAPPENED. FIFTY RATED CALLS WRITE YOUR ORACLE SCORE.",
   "SEAL ALL FIVE OR THE DAY DOES NOT RATE. POINTS AND VIGIL STILL COUNT.",
-  "MISS A NOON AND THE SHIELD MAY HOLD. ONE IS GRANTED EACH MONTH.",
+  // ── the rest: met in play, kept on the standing link ──
+  "A QUESTION CLOSES THE MOMENT ITS ANSWER BEGINS TO EXIST. SOME CLOSE BEFORE NOON.",
+  "THE BIG ONE COUNTS DOUBLE. IN BOTH DIRECTIONS.",
+  "STAND AGAINST THE TIDE AND PREVAIL: THE LEDGER ADDS A BOUNTY. TWENTY MUST HAVE SPOKEN.",
+  "SEAL ALL FIVE WITHIN THE FIRST HOUR. THE DAY PAYS TEN PERCENT MORE.",
+  "A VIGIL IS A RUN OF UNBROKEN NOONS. THE LEDGER COUNTS YOURS.",
+  "MISS A NOON AND A SHIELD MAY HOLD A VIGIL OF THREE DAYS OR MORE. ONE IS GRANTED EACH MONTH.",
   "THE LEDGER IS READ AT NOON. NOTHING IS REVISED.",
 ] as const;
+
+// How many of the rites a first-timer is shown before their first card. The
+// two screens share one numbered canon, so the opening's numerals (I..VI) are
+// the same numerals those rules carry in the full list.
+export const OPENING_RITES = 6;
+export const OPENING_RITES_LINES = RITES_LINES.slice(0, OPENING_RITES);
+
+// The plaque's gloss under the Oracle Score. The score is the whole premise —
+// the ledger naming who can actually see — and until now no screen in the app
+// said what it was, what "rates" meant, or what fifty was fifty OF (audit
+// 2026-09-02 §1.1). Two states: how it is earned, then what it is.
+export const SCORE_GLOSS = Object.freeze({
+  unwritten: "FIFTY RATED CALLS WRITE IT. A DAY RATES ONLY WHEN ALL FIVE ARE SEALED.",
+  written: "YOUR CALIBRATION, READ AGAINST WHAT HAPPENED. NOTHING PURCHASABLE TOUCHES IT.",
+} as const);
 
 // The Calling: the one-time cinematic on the app's very first open — the
 // machine recounts the search and assigns the player their role. Lore only;

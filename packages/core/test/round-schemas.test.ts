@@ -38,6 +38,7 @@ describe("round schemas", () => {
           text: "Q?",
           outcome: "void",
           crowd_yes_pct: null,
+          crowd_count: null,
           market_prob: null,
           my: null,
           source_name: "NWS",

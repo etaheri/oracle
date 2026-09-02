@@ -9,6 +9,7 @@ import { GoldFrame } from "./GoldFrame";
 import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { asciiGauge } from "../game/terminalPrint";
+import { GATHERING_LINE, VERDICT_MIN_PLAYERS } from "../game/crowdVerdict";
 import { contrarianApplies, type RoundToday } from "@oracle/core";
 
 // The crowd bar in the machine's own alphabet: [#######·····], the fill
@@ -71,12 +72,24 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               const mine = answers[q.id]!;
               const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
               const against = contrarianApplies(mySidePct, c.player_count);
+              // Under the floor the percentage is mostly the player: at one
+              // sealed answer this frame printed a full gauge and "100% SAY
+              // YES" directly above a footer reading "1 ORACLE HAS SPOKEN".
+              // The round's footer verdict already holds its tongue here
+              // (crowdVerdict); the finale now holds it from the same floor
+              // and the same string. The player's own call still prints —
+              // it is the one thing that is true at any crowd size.
+              const gathering = c.player_count < VERDICT_MIN_PLAYERS;
               return (
                 <View key={q.id} style={{ gap: space(1.5) }}>
                   <Serif size={15} color={colors.ink} numberOfLines={2}>{q.text}</Serif>
-                  <CrowdBar pct={c.crowd_yes_pct} />
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>
+                  {gathering ? (
+                    <Mono size={10} color={colors.mutedInk} letterSpacing={1}>{GATHERING_LINE}</Mono>
+                  ) : (
+                    <CrowdBar pct={c.crowd_yes_pct} />
+                  )}
+                  <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
+                    {!gathering && <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>}
                     <Mono size={10} color={against ? colors.goldText : colors.mutedInk}>
                       {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>

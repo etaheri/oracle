@@ -184,4 +184,31 @@ describe("reveal ledger and evidence", () => {
     expect(after.ledger.calls_rated).toBe(0); // only 1 of 5 answered — incomplete round doesn't rate
     expect(after.ledger.oracle_score).toBeNull();
   });
+
+  it("carries crowd_count on every row — the client's floor for reading the crowd back", async () => {
+    // RevealSchema requires this field, so dropping it server-side breaks the
+    // whole reveal screen at parse time. It is also what lets the reveal
+    // refuse to print a percentage over a crowd of three, the way the round
+    // footer and the finale already do (audit 2026-09-02 §2.1, §3.1).
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const a = await playerOn(app);
+    await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "a" }) });
+
+    vi.setSystemTime(new Date("2026-08-20T17:05:00Z"));
+    // Locked but not yet judged — the window home sends the player into the
+    // moment the first row resolves.
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-20"));
+    type Row = { slot: number; crowd_count: number | null; crowd_yes_pct: number | null };
+    const pending = (await (await a("/v1/round/2026-08-20/reveal")).json()) as { questions: Row[] };
+    // Unresolved: the crowd has not been counted yet, and says so.
+    expect(pending.questions.every((q) => q.crowd_count === null)).toBe(true);
+
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+    const read = (await (await a("/v1/round/2026-08-20/reveal")).json()) as { questions: Row[] };
+    expect(read.questions.find((q) => q.slot === 1)!.crowd_count).toBe(1); // the one player who answered it
+    expect(read.questions.find((q) => q.slot === 2)!.crowd_count).toBe(0); // nobody answered this one
+  });
 });

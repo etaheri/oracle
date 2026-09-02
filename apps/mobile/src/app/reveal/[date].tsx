@@ -19,7 +19,7 @@ import type { QuestionResult } from "../../game/sharePattern";
 import { payoff } from "@oracle/core";
 import { useReveal } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
-import { rowState, rowMark, rowRight, receiptLine, ledgerLines, pendingLine, lapsedLine } from "../../game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
@@ -34,6 +34,14 @@ const BIG_ONE_DELAY = POINTS_DELAY + 350;
 // screen is the one people screenshot, and it spends most of its height under
 // the Big One's gold frame, where a hard edge reads as a rendering seam.
 const FOLD_H = 32;
+
+// The day-points headline's reserved height: the 54pt Ritual number's own
+// line box plus the gap and the machine-voice label under it. Both states of
+// the slot — the score, and the withheld count while the ledger is still
+// being read — sit inside it, so the transition is an arrival rather than a
+// shove. The conditional FIRST HOUR line is allowed to grow it: that one is
+// the day's own news, the way the plaque's claim row is.
+const POINTS_SLOT_H = 84;
 
 // One golden surge through the Big One frame when the player beat the tide.
 const TideFlash = new Keyframe({
@@ -192,8 +200,29 @@ export default function RevealScreen() {
         {allSpectator && !anyPending && (
           <DecodeLine text={lapsedLine(d.date)} size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
         )}
-        <Animated.View entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)} style={{ alignItems: "center", gap: space(1) }}>
-          {!allSpectator && (
+        <Animated.View
+          entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)}
+          // The headline slot is one height in both states. It holds a 54pt
+          // Ritual numeral over its label when the day is read, and the
+          // withheld count over its own label while it is not — and a player
+          // pulling to refresh mid-resolution watches this exact block swap.
+          // Reserved, the number simply arrives; unreserved, the whole page
+          // under it jumps ~35pt at the moment of the ceremony.
+          style={{ alignItems: "center", justifyContent: "center", gap: space(1), minHeight: POINTS_SLOT_H }}
+        >
+          {/* The day's score is withheld until the day is actually read.
+              day_points sums `points ?? 0`, so mid-resolution — which retries
+              hourly, and home sends the player here the moment ONE row
+              resolves — this printed a real, low number that silently climbed
+              on the next refresh. In an app whose liturgy is "NOTHING IS
+              REVISED", a provisional score is the wrong trade: the slot says
+              how much has been read instead, and the number arrives once. */}
+          {!allSpectator && (anyPending ? (
+            <>
+              <Ritual bold size={24} color={colors.mutedInk} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{readingLine(d.questions)}</Ritual>
+              <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS WITHHELD</Mono>
+            </>
+          ) : (
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
@@ -201,7 +230,7 @@ export default function RevealScreen() {
                 <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
               )}
             </>
-          )}
+          ))}
           {ledgerLines(d.ledger).map((line, i) => (
             <Mono key={i} size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
@@ -216,6 +245,7 @@ export default function RevealScreen() {
             const st = rowState(q);
             const color = st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
             const receipt = receiptLine(q);
+            const call = callLine(q);
             return (
               <Animated.View
                 key={q.id}
@@ -227,6 +257,13 @@ export default function RevealScreen() {
                 </Ritual>
                 <View style={{ flex: 1, gap: space(1) }}>
                   <Serif size={15} color={colors.ink} numberOfLines={3} style={{ lineHeight: 21 }}>{q.text}</Serif>
+                  {/* What you said, and what the crowd said — the Big One's
+                      block has always read both back; the four ordinary calls
+                      showed only their points, so a day later the ledger could
+                      not tell you what you had answered. */}
+                  {call ? (
+                    <Mono size={10} color={colors.mutedInk} style={{ lineHeight: 15 }}>{call}</Mono>
+                  ) : null}
                   {receipt ? (
                     <Mono size={10} color={colors.mutedInk} numberOfLines={2} style={{ lineHeight: 15 }}>{receipt}</Mono>
                   ) : null}
@@ -274,7 +311,10 @@ export default function RevealScreen() {
                       </Mono>
                     </View>
                   )}
-                  <Mono size={10} color={colors.mutedInk}>CROWD SAID {big.crowd_yes_pct}% YES</Mono>
+                  {/* Same floor as the round footer and the finale: over a
+                      handful of players the percentage is mostly the reader,
+                      and this frame is the one people screenshot. */}
+                  <Mono size={10} color={colors.mutedInk}>{crowdReadable(big) ? `CROWD SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>
                   {big.market_prob != null && (
                     <Mono size={10} color={colors.mutedInk}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
                   )}
@@ -294,7 +334,9 @@ export default function RevealScreen() {
           </GoldFrame>
           </Animated.View>
         )}
-        {results.some((r) => r !== "none") && (
+        {/* A half-read day must not leave the app: the card carries the same
+            provisional score the slot above is withholding. */}
+        {!anyPending && results.some((r) => r !== "none") && (
           <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 300).duration(400).easing(easeOut)}>
             <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />
           </Animated.View>

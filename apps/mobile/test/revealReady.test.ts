@@ -6,7 +6,7 @@ const q = (
   my: Reveal["questions"][number]["my"],
   outcome: Reveal["questions"][number]["outcome"] = "yes"
 ): Reveal["questions"][number] => ({
-  id: "00000000-0000-0000-0000-000000000001", slot: 1, text: "Q?", outcome, crowd_yes_pct: 60, market_prob: null, my,
+  id: "00000000-0000-0000-0000-000000000001", slot: 1, text: "Q?", outcome, crowd_yes_pct: 60, crowd_count: 40, market_prob: null, my,
   source_name: "S", source_url: null, evidence_quote: null, void_reason: null, oracle_p_yes: null,
 });
 const reveal = (

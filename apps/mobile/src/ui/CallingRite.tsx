@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from "react-native-reanim
 import * as Haptics from "expo-haptics";
 import { CALLING_LINES } from "@oracle/core";
 import { colors, space } from "../theme";
+import { Mono } from "./Text";
 import { markBootDone, markOrbLanded } from "../game/bootGate";
 import { markCallingSeen } from "../api/flags";
 import { callingHaptic } from "../game/calling";
@@ -15,6 +16,14 @@ import { AsciiDust, GOLD } from "./TerminalPatina";
 // lands in the hand, the last one is for the player, then home resolves
 // underneath. Runs once ever (oracle.calling_seen); every later cold start
 // gets the plain BootRite. Tap anywhere skips.
+// The whole rite is ~13.6s of screen that answers to nothing visible. It has
+// always been tap-anywhere skippable and the Pressable carries the a11y label
+// for it, but nothing SAID so, so a first-time installer (or a judge) met a
+// screen that appeared frozen (audit 2026-09-02 §1.3). A control label, not
+// ambient copy — the same quarantine PAYWALL_CTA_LINES claims: a button is a
+// CTA, and the reduced-motion branch below already offers CONTINUE.
+const SKIP_LABEL = "SKIP";
+
 const BEAT_MS = 2400; // one beat: print (~900ms) + hold
 const PRINT_MS = 900;
 const FINAL_HOLD_MS = 2000;
@@ -82,9 +91,13 @@ export function CallingRite() {
 
   return (
     <Animated.View exiting={FadeOut.duration(FADE_MS)} style={[StyleSheet.absoluteFill, styles.field]}>
+      {/* A plain tap surface, deliberately not announced: the whole field is
+          skippable for a thumb, but the SKIP control below is the one thing
+          VoiceOver should offer — a screen-reader button the size of the
+          screen, wrapping the very text it is meant to read, is worse than
+          no button at all. */}
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Skip introduction"
+        accessible={false}
         onPress={() => setDone(true)}
         style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}
       >
@@ -104,6 +117,23 @@ export function CallingRite() {
             </Animated.View>
           ))}
         </View>
+        {/* Held back until the first beat has landed, so the rite opens on
+            its own words rather than on its exit. Absolutely positioned: it
+            must not enter the centred column's layout and shift the lines.
+            The whole field is still the tap target; this only says so. */}
+        {shown > 1 && (
+          <Animated.View entering={FadeIn.duration(600)} style={styles.skip}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Skip introduction"
+              hitSlop={{ top: 16, bottom: 16, left: 32, right: 32 }}
+              onPress={() => setDone(true)}
+              style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", opacity: pressed ? 0.5 : 1 })}
+            >
+              <Mono size={9} color={colors.mutedInk} letterSpacing={4} style={{ marginRight: -4 }}>{SKIP_LABEL}</Mono>
+            </Pressable>
+          </Animated.View>
+        )}
       </Pressable>
     </Animated.View>
   );
@@ -112,5 +142,6 @@ export function CallingRite() {
 const styles = StyleSheet.create({
   field: { backgroundColor: colors.museumWhite, zIndex: 100, justifyContent: "center" },
   column: { gap: space(2), alignItems: "center", paddingHorizontal: space(4) },
+  skip: { position: "absolute", left: 0, right: 0, bottom: space(8), alignItems: "center" },
   line: { lineHeight: 18, textAlign: "center" },
 });

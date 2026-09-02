@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
-import { useRouter } from "expo-router";
 import { Screen } from "../ui/Screen";
 import { Mono, Ritual } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
@@ -21,7 +20,6 @@ import { useToday, useCrowdSoFar } from "../api/hooks";
 import { getFloorNoticed, markFloorNoticed } from "../api/flags";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
-import { maybeSummon } from "../notifications/summons";
 import { colors, space } from "../theme";
 import { useChromeScale } from "../ui/useChromeScale";
 import { scaledRow } from "../game/typeScaling";
@@ -37,7 +35,6 @@ const Uncover = new Keyframe({
 
 export default function Round() {
   const today = useToday();
-  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const answers = useRoundStore((s) => s.answers);
   // The last thrown card's id: its crowd verdict prints in the stationary
@@ -78,13 +75,13 @@ export default function Round() {
 
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
-  const allSealed = qs.length > 0 && qs.every((q) => answers[q.id]?.sealed);
-  // The summons, the moment the spread is fully sealed for the first time
-  // this mount — once, ever, across the whole app (voice spec §4).
-  const summoned = useRef(false);
-  useEffect(() => {
-    if (allSealed && !summoned.current) { summoned.current = true; void maybeSummon((href) => router.push(href)); }
-  }, [allSealed]);
+  // The summons does NOT fire here. It used to, on the fifth seal — and
+  // `allSealed` flips in the same commit that swaps the live card for the
+  // crowd finale, so the permission interstitial pushed itself over the top
+  // of the one screen the whole anti-herding wall exists to pay off (audit
+  // 2026-09-02 §1.4). Home asks instead, on any focus after a first seal
+  // (index.tsx), which puts the question after the crowd has been beheld and
+  // covers the partial player who never returns to a finished spread.
   const crowd = useCrowdSoFar(anySealed);
   useHydratePlayedState(!!today.data);
   // The payout reaches screen-reader players too: speak each card's verdict

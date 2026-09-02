@@ -17,6 +17,7 @@ import { crowdLean } from "../game/orbMood";
 import { isBootDone, isOrbLanded, onBootDone, onOrbLanded } from "../game/bootGate";
 import { useHeroCues } from "../ui/useHeroCues";
 import { shieldNotice } from "../game/shieldNotice";
+import { rescueOffered } from "../game/rescueOffer";
 import { revealReady } from "../game/revealReady";
 import { partialLine, spokenLine, riskLine, lapseNotice } from "../game/homeLines";
 import { msUntil } from "../game/countdown";
@@ -95,9 +96,12 @@ export default function Index() {
     useCallback(() => {
       void getRevealSeen().then(setRevealSeen);
       void getRitesSeen().then(setRitesSeen);
-      // Covers the partial player: round.tsx only fires the summons on the
-      // full seal, so someone who never returns to a finished spread is
-      // still asked here, once, on any focus after their first seal.
+      // The one summons, ever (voice spec §4), and this is now its only
+      // trigger. The round screen used to ask on the fifth seal, which put
+      // the OS permission prompt straight over the crowd finale; asking on
+      // any focus after a first seal lands it after the crowd has been
+      // beheld, and still catches the partial player who never returns to a
+      // finished spread.
       if (anySealed) void maybeSummon((href) => router.push(href));
     }, [anySealed, router])
   );
@@ -118,11 +122,18 @@ export default function Index() {
   // one moment protection actually matters. Shield/vigil lines stay plain.
   const noticeLinksToPlus = notice !== null && (notice === risk || notice === lapse);
   // The one-row rescue offer: only below an ACTUAL risk notice (not when a
-  // shield notice from yesterday is taking priority), only when there is no
-  // subscription and no shield already in reserve to cover the miss.
+  // shield notice from yesterday is taking priority). Every other condition
+  // — the streak floor a shield will actually defend, an existing
+  // subscription, a shield already in reserve — lives in rescueOffer.ts,
+  // where it is tested against settleStreak itself.
   const plusActive = usePlusStore((s) => s.plusActive);
-  const noShieldsInReserve = !!ledger.data && !ledger.data.free_shield_available && ledger.data.paid_shields === 0;
-  const showRescue = notice === risk && risk !== null && !plusActive && noShieldsInReserve;
+  const showRescue = !!ledger.data && rescueOffered({
+    atRisk: notice === risk && risk !== null,
+    streak: ledger.data.streak,
+    plusActive,
+    freeShieldAvailable: ledger.data.free_shield_available,
+    paidShields: ledger.data.paid_shields,
+  });
   const [rescueResult, setRescueResult] = useState<"idle" | "success" | "error">("idle");
   const qc = useQueryClient();
   const doRescue = useCallback(async () => {
@@ -161,7 +172,7 @@ export default function Index() {
   const navItems: NavItem[] = [
     { label: "YOUR LEDGER", a11yLabel: "The forecaster's ledger", onPress: () => router.push("/ledger") },
     ...(showLedgerCta ? [] : [{ label: "YESTERDAY", a11yLabel: "Yesterday's ledger", onPress: () => router.push(`/reveal/${yesterday}`) }]),
-    { label: "THE RITES", a11yLabel: "The rites", onPress: () => router.push("/rites") },
+    { label: "THE RITES", a11yLabel: "The rites", onPress: () => router.push({ pathname: "/rites", params: { all: "1" } }) },
   ];
 
   return (

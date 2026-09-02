@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { crowdVerdict } from "../src/game/crowdVerdict";
+import { CONSTANTS } from "@oracle/core";
+import { crowdVerdict, GATHERING_LINE, UNCOUNTED_TIDE } from "../src/game/crowdVerdict";
 
 describe("crowdVerdict", () => {
   it("reads WITH THE TIDE when the crowd clearly sides with the player", () => {
@@ -23,11 +24,43 @@ describe("crowdVerdict", () => {
     expect(crowdVerdict(false, 61, 50).against).toBe(true);
   });
   it("holds its tongue under five players", () => {
-    expect(crowdVerdict(true, 0, 1)).toEqual({ line: "THE CROWD IS STILL GATHERING", against: false });
-    expect(crowdVerdict(true, 25, 4)).toEqual({ line: "THE CROWD IS STILL GATHERING", against: false });
+    expect(crowdVerdict(true, 0, 1)).toEqual({ line: GATHERING_LINE, against: false });
+    expect(crowdVerdict(true, 25, 4)).toEqual({ line: GATHERING_LINE, against: false });
   });
-  it("names the tide from five players but promises the bounty only from twenty", () => {
-    expect(crowdVerdict(true, 30, 5)).toEqual({ line: "30% SAY YES · AGAINST THE TIDE", against: false });
-    expect(crowdVerdict(true, 30, 20)).toEqual({ line: "30% SAY YES · AGAINST THE TIDE", against: true });
+
+  // The honesty rule: "AGAINST THE TIDE" is the phrase the plaque stat, the
+  // epithet and the reveal's gold moment all use. It may only be said when
+  // the bounty will actually pay — the distinction used to live in the text
+  // colour alone, which the brief forbids.
+  it("never says AGAINST THE TIDE unless the bounty will pay", () => {
+    for (let n = 0; n <= 40; n++) {
+      for (const pct of [0, 10, 25, 39, 40, 50, 61, 75, 100]) {
+        for (const answer of [true, false]) {
+          const v = crowdVerdict(answer, pct, n);
+          if (v.line.includes("AGAINST THE TIDE")) expect(v.against, `n=${n} pct=${pct}`).toBe(true);
+          if (v.against) expect(v.line, `n=${n} pct=${pct}`).toContain("AGAINST THE TIDE");
+        }
+      }
+    }
+  });
+  it("still names the minority side between the two floors, without promising a bounty", () => {
+    expect(crowdVerdict(true, 30, 5)).toEqual({ line: `30% SAY YES · ${UNCOUNTED_TIDE}`, against: false });
+    expect(crowdVerdict(true, 30, CONSTANTS.CONTRARIAN_MIN_CROWD - 1)).toEqual({
+      line: `30% SAY YES · ${UNCOUNTED_TIDE}`,
+      against: false,
+    });
+    expect(crowdVerdict(true, 30, CONSTANTS.CONTRARIAN_MIN_CROWD)).toEqual({
+      line: "30% SAY YES · AGAINST THE TIDE",
+      against: true,
+    });
+  });
+  it("tracks the engine's thresholds rather than its own copy of them", () => {
+    // The band edges are derived from CONTRARIAN_CROWD_PCT; if it is tuned,
+    // these move with it instead of the line silently lying.
+    const edge = CONSTANTS.CONTRARIAN_CROWD_PCT;
+    expect(crowdVerdict(true, edge - 1, 50).line).toContain("AGAINST THE TIDE");
+    expect(crowdVerdict(true, edge, 50).line).toContain("THE CROWD SPLITS");
+    expect(crowdVerdict(true, 100 - edge - 1, 50).line).toContain("THE CROWD SPLITS");
+    expect(crowdVerdict(true, 100 - edge, 50).line).toContain("WITH THE TIDE");
   });
 });

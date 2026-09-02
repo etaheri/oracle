@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, fillSlots, type CopyLine } from "../src/copy";
+import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, fillSlots, type CopyLine } from "../src/copy";
+import { CONSTANTS } from "../src/constants";
 
 const BANNED = ["CHECK", "TAP", "CLICK", "VISIT", "RESULTS", "DON'T MISS"];
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
@@ -90,10 +91,49 @@ describe("the rites", () => {
     // Early locks are the norm now: a player who finds a card already closed
     // must have been told this could happen.
     expect(all).toContain("BEFORE NOON");
-    expect(RITES_LINES.length).toBe(12);
+    expect(RITES_LINES.length).toBe(13);
   });
-  it("partial and summons lines hold the register", () => {
-    for (const l of [PARTIAL_LINE, ...SUMMONS_LINES]) {
+  it("name the goal, and define every noun the rest of the app leans on", () => {
+    // The app said "THE DAY DOES NOT RATE", "YOUR VIGIL", "A BOUNTY" and
+    // "ORACLE SCORE" across four screens and defined none of them
+    // (audit 2026-09-02 §1.1). Each now has exactly one rite that does.
+    const all = RITES_LINES.join(" ");
+    expect(all).toContain("ORACLE SCORE");
+    expect(all).toContain("RATES EVERY CALL");
+    expect(all).toContain("A VIGIL IS A RUN OF UNBROKEN NOONS");
+    expect(all).toContain("BOUNTY");
+  });
+  it("name the two floors the engine actually enforces", () => {
+    // The rites used to say only "THE SHIELD MAY HOLD", so a two-day vigil
+    // could be sold a rescue that settleStreak would refuse to spend; and the
+    // bounty's crowd floor was never stated at all. Both are spelled out in
+    // words here and enforced by constants elsewhere — these are the
+    // tripwires that keep copy and engine in step.
+    const all = RITES_LINES.join(" ");
+    expect(CONSTANTS.SHIELD_MIN_STREAK).toBe(3);
+    expect(all).toContain("THREE DAYS OR MORE");
+    expect(CONSTANTS.CONTRARIAN_MIN_CROWD).toBe(20);
+    expect(all).toContain("TWENTY MUST HAVE SPOKEN");
+    expect(CONSTANTS.ORACLE_SCORE_MIN_CALLS).toBe(50);
+    expect(all).toContain("FIFTY RATED CALLS");
+  });
+  it("open with a subset of the same numbered canon, not a second copy of it", () => {
+    // The two screens must never drift: the opening is literally the head of
+    // RITES_LINES, so a rule's numeral means the same thing on both.
+    expect(OPENING_RITES_LINES.length).toBe(OPENING_RITES);
+    expect([...OPENING_RITES_LINES]).toEqual(RITES_LINES.slice(0, OPENING_RITES));
+    expect(OPENING_RITES).toBeLessThan(RITES_LINES.length);
+  });
+  it("open on what the first card actually depends on", () => {
+    const opening = OPENING_RITES_LINES.join(" ");
+    for (const word of ["FIVE QUESTIONS", "PULL", "SEALED", "CROWD", "CONVICTION", "ORACLE SCORE", "ALL FIVE"]) {
+      expect(opening, word).toContain(word);
+    }
+    // ...and defer what is only met later in play.
+    for (const word of ["FIRST HOUR", "SHIELD", "BIG ONE"]) expect(opening, word).not.toContain(word);
+  });
+  it("partial, summons and score-gloss lines hold the register", () => {
+    for (const l of [PARTIAL_LINE, ...SUMMONS_LINES, ...Object.values(SCORE_GLOSS)]) {
       expect(l, l).toBe(l.toUpperCase());
       expect(l, l).not.toMatch(EMOJI);
       expect(l, l).not.toContain("!");

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Reveal } from "@oracle/core";
-import { rowState, rowMark, rowRight, receiptLine, ledgerLines, pendingLine, lapsedLine } from "../src/game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine } from "../src/game/revealRows";
 
 type Question = Reveal["questions"][number];
 
@@ -11,6 +11,7 @@ function question(overrides: Partial<Question> = {}): Question {
     text: "Will it happen?",
     outcome: "yes",
     crowd_yes_pct: 60,
+    crowd_count: 40,
     market_prob: 0.55,
     my: { answer: true, confidence: 75, points: 12, brier: 0.1 },
     source_name: "reuters",
@@ -154,5 +155,51 @@ describe("revealRows", () => {
     it("is deterministic for the same seed", () => {
       expect(lapsedLine("2026-08-28")).toBe(lapsedLine("2026-08-28"));
     });
+  });
+});
+
+describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)", () => {
+  describe("callLine", () => {
+    it("prints the call and the crowd when the crowd was big enough to read", () => {
+      expect(callLine(question({ my: { answer: true, confidence: 75, points: 12, brier: 0.1 }, crowd_yes_pct: 62, crowd_count: 40 })))
+        .toBe("YOU: YES @ 75% · CROWD 62% YES");
+      expect(callLine(question({ my: { answer: false, confidence: 55, points: -10, brier: 0.3 }, crowd_yes_pct: 62, crowd_count: 40 })))
+        .toBe("YOU: NO @ 55% · CROWD 62% YES");
+    });
+    it("drops the crowd clause rather than reading a crowd of three", () => {
+      expect(callLine(question({ crowd_yes_pct: 100, crowd_count: 1 }))).toBe("YOU: YES @ 75%");
+      expect(callLine(question({ crowd_yes_pct: 50, crowd_count: 4 }))).toBe("YOU: YES @ 75%");
+      expect(callLine(question({ crowd_yes_pct: 50, crowd_count: 5 }))).toBe("YOU: YES @ 75% · CROWD 50% YES");
+    });
+    it("drops the crowd clause on a row the crowd was never counted for", () => {
+      expect(callLine(question({ outcome: null, crowd_yes_pct: null, crowd_count: null }))).toBe("YOU: YES @ 75%");
+    });
+    it("says nothing for a row the player never answered", () => {
+      expect(callLine(question({ my: null }))).toBeNull();
+    });
+    it("still reads back a call the ledger refused to score", () => {
+      expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null } })))
+        .toBe("YOU: YES @ 90% · CROWD 60% YES");
+    });
+  });
+
+  describe("crowdReadable", () => {
+    it("holds the same floor the round footer and the finale hold", () => {
+      expect(crowdReadable(question({ crowd_count: 4 }))).toBe(false);
+      expect(crowdReadable(question({ crowd_count: 5 }))).toBe(true);
+      expect(crowdReadable(question({ crowd_count: null }))).toBe(false);
+      expect(crowdReadable(question({ crowd_yes_pct: null, crowd_count: 40 }))).toBe(false);
+    });
+  });
+});
+
+describe("readingLine (audit 2026-09-02 §3.2)", () => {
+  const day = (outcomes: Array<"yes" | null>) =>
+    outcomes.map((o, i) => question({ slot: i + 1, outcome: o }));
+
+  it("counts the rows that have actually been read, in the app's own numerals", () => {
+    expect(readingLine(day(["yes", "yes", null, null, null]))).toBe("II OF V READ");
+    expect(readingLine(day([null, null, null, null, null]))).toBe("NONE OF V READ");
+    expect(readingLine(day(["yes", "yes", "yes", "yes", "yes"]))).toBe("V OF V READ");
   });
 });
