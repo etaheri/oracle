@@ -61,3 +61,16 @@ export async function getCallingSeen(): Promise<boolean> {
 export async function markCallingSeen(): Promise<void> {
   try { await (await store()).setItemAsync(CALLING_SEEN_KEY, "1"); } catch {}
 }
+
+const ORB_GREETED_KEY = "oracle.orb_greeted"; // holds the last DATE the orb greeted
+
+// The orb's once-a-day self-ripple. Storage failure → null → the greeting
+// plays again on the next cold start: it is a two-second courtesy, not a rite,
+// and a repeated one costs far less than a player who never learns the glass
+// answers a touch.
+export async function getOrbGreeted(): Promise<string | null> {
+  try { return await (await store()).getItemAsync(ORB_GREETED_KEY); } catch { return null; }
+}
+export async function markOrbGreeted(date: string): Promise<void> {
+  try { await (await store()).setItemAsync(ORB_GREETED_KEY, date); } catch {}
+}

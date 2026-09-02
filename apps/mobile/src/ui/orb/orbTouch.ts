@@ -13,15 +13,24 @@ export const ORB_DY = -0.0177;
 export type OrbPoint = { x: number; y: number };
 export type OrbHit = { local: OrbPoint; normal: readonly [number, number, number] };
 
-export function locate(touch: OrbPoint, tile: number): OrbHit | null {
-  if (!Number.isFinite(tile) || tile <= 0) return null;
-  if (!Number.isFinite(touch.x) || !Number.isFinite(touch.y)) return null;
-
+// Tile pixels to the orb's own [-1,1], with no judgement about whether the
+// point is on the glass. A drag does not stop at the rim -- the fingertip
+// carries on off the sphere, and the interior needs to hear that so it can
+// release rather than stick to the edge. `locate` is this plus the hit test.
+export function normalize(touch: OrbPoint, tile: number): OrbPoint {
+  "worklet";
   const r = (ORB_D * tile) / 2;
   const cx = tile / 2;
   const cy = tile / 2 + ORB_DY * tile;
-  const x = (touch.x - cx) / r;
-  const y = (touch.y - cy) / r;
+  return { x: (touch.x - cx) / r, y: (touch.y - cy) / r };
+}
+
+export function locate(touch: OrbPoint, tile: number): OrbHit | null {
+  "worklet";
+  if (!Number.isFinite(tile) || tile <= 0) return null;
+  if (!Number.isFinite(touch.x) || !Number.isFinite(touch.y)) return null;
+
+  const { x, y } = normalize(touch, tile);
 
   const d2 = x * x + y * y;
   // Outside the silhouette is not a touch on the orb — the tile's corners

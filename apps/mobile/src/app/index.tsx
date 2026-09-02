@@ -21,7 +21,7 @@ import { revealReady } from "../game/revealReady";
 import { partialLine, spokenLine, riskLine, lapseNotice } from "../game/homeLines";
 import { msUntil } from "../game/countdown";
 import { useNow } from "../game/useNow";
-import { getRevealSeen, getRitesSeen } from "../api/flags";
+import { getOrbGreeted, getRevealSeen, getRitesSeen, markOrbGreeted } from "../api/flags";
 import { resealReminders } from "../notifications/schedule";
 import { maybeSummon } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
@@ -144,6 +144,15 @@ export default function Index() {
 
   const enterRound = useCallback(() => router.push(ritesSeen ? "/round" : "/rites"), [ritesSeen, router]);
   const stampDate = round?.date ?? new Date().toISOString().slice(0, 10);
+  // The day's first arrival: the orb ripples once, unprompted, a beat after
+  // it lands. `undefined` while the flag reads — greeting on an unread flag
+  // would fire it every single launch. The orb greets at most once per mount
+  // whatever this does, so stampDate settling from the fallback to the
+  // round's own date cannot produce a second one.
+  const [greetedOn, setGreetedOn] = useState<string | null | undefined>(undefined);
+  useEffect(() => { void getOrbGreeted().then(setGreetedOn); }, []);
+  const greetOrb = greetedOn !== undefined && greetedOn !== stampDate;
+  useEffect(() => { if (greetOrb) void markOrbGreeted(stampDate); }, [greetOrb, stampDate]);
   // Yesterday's ledger keeps a rail slot only while it is not already the
   // screen's headline action.
   const navItems: NavItem[] = [
@@ -161,7 +170,7 @@ export default function Index() {
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}>
         {/* Temple moment: the near-touch, alive — transparent loop over the
             museum ground, glow tinted by the crowd's mood. */}
-        <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} />
+        <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} greet={greetOrb} />
         {/* The wordmark materializes out of ASCII (patina spec phase 2) and
             settles into carved stillness with a faint edge residue. */}
         <MaterializeTitle active={cues.title} />

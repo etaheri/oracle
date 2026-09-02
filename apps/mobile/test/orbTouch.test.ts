@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { locate, ORB_D, ORB_DY } from "../src/ui/orb/orbTouch";
+import { locate, normalize, ORB_D, ORB_DY } from "../src/ui/orb/orbTouch";
 
 // A 310px tile, the size the hero stage gives the orb on a typical phone.
 const TILE = 310;
@@ -53,5 +53,33 @@ describe("locate", () => {
   it("survives a degenerate tile without producing NaN", () => {
     expect(locate({ x: 0, y: 0 }, 0)).toBeNull();
     expect(locate({ x: Number.NaN, y: 0 }, TILE)).toBeNull();
+  });
+});
+
+describe("normalize", () => {
+  it("puts the orb's centre at the origin", () => {
+    // The centre sits ORB_DY above the tile's own centre.
+    const p = normalize({ x: 155, y: 155 + ORB_DY * 310 }, 310);
+    expect(p.x).toBeCloseTo(0, 10);
+    expect(p.y).toBeCloseTo(0, 10);
+  });
+
+  it("puts the rim at unit distance", () => {
+    const r = (ORB_D * 310) / 2;
+    const p = normalize({ x: 155 + r, y: 155 + ORB_DY * 310 }, 310);
+    expect(p.x).toBeCloseTo(1, 10);
+  });
+
+  it("keeps reporting a finger that has slid off the glass", () => {
+    // A drag does not end at the rim -- the fingertip carries on, and the
+    // interior has to be told so it can let go rather than stick.
+    const p = normalize({ x: 310, y: 0 }, 310);
+    expect(Math.hypot(p.x, p.y)).toBeGreaterThan(1);
+  });
+
+  it("agrees with locate wherever locate answers at all", () => {
+    const hit = locate({ x: 200, y: 120 }, 310);
+    expect(hit).not.toBeNull();
+    expect(normalize({ x: 200, y: 120 }, 310)).toEqual(hit!.local);
   });
 });

@@ -24,7 +24,7 @@ const GLOW_DELAY_MS = 300;
 const GLOW_MS = 400;
 const HANDS_DELAY_MS = 450;
 
-export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: number | null; playerCount?: number; phase?: HeroPhase }) {
+export function LivingHero({ lean, playerCount = 0, phase = "live", greet = false }: { lean: number | null; playerCount?: number; phase?: HeroPhase; greet?: boolean }) {
   const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const { w, h } = stageSize(width);
@@ -108,21 +108,35 @@ export function LivingHero({ lean, playerCount = 0, phase = "live" }: { lean: nu
       <HandLayer rect={handSlot(width, "left")} side="left" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       <HandLayer rect={handSlot(width, "right")} side="right" enter={handsEnter} stageWidth={width} delayMs={HANDS_DELAY_MS} />
       {/* The orb slot always exists — it's what gets measured for the boot
-          rite's anchor. The orb renders from waking onward, mounted dormant
-          to match the rite's still and rising to attending once it lands
-          (see orbState above). */}
+          rite's anchor. The orb mounts from waking onward, dormant, so the
+          Skia decode is warm and the slot is real before the handoff; it
+          rises to attending once the rite's orb lands (see orbState above).
+          It is not DRAWN until then, though: during `waking` the rite's orb
+          is still in flight toward this exact slot, and painting ours here
+          as well put a second, identical orb at the destination while the
+          first was still travelling to it. Opacity, not conditional render —
+          the mount is the whole point, and opacity changes neither layout
+          nor measureInWindow. */}
       <View
         ref={slotRef}
         onLayout={publishAnchor}
         style={{ position: "absolute", left: orb.x, top: orb.y, width: orb.w, height: orb.h }}
       >
         {phase !== "cold" && (
-          <OracleOrb
-            tile={orb.w}
-            state={orbState}
-            interactive
-            accessibilityLabel="Oracle"
-          />
+          <View
+            style={{ opacity: phase === "live" ? 1 : 0 }}
+            // An orb nobody can see must not take a tap either — the rite's
+            // own skip target owns every touch until it hands off.
+            pointerEvents={phase === "live" ? "auto" : "none"}
+          >
+            <OracleOrb
+              tile={orb.w}
+              state={orbState}
+              interactive
+              greet={greet}
+              accessibilityLabel="Oracle"
+            />
+          </View>
         )}
       </View>
       {/* Above the orb, never behind it: refracted glyphs are light inside the

@@ -1,12 +1,26 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { AppState, Pressable, View } from "react-native";
+import { AppState, View } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
-import { Easing, useDerivedValue, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
+import { Accelerometer } from "expo-sensors";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  Easing,
+  runOnJS,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useClock, useImage, type DataSourceParam, type SkImage } from "@shopify/react-native-skia";
-import { locate, type OrbPoint } from "./orbTouch";
+import { normalize, type OrbPoint } from "./orbTouch";
 import { assign, EMPTY_SLOTS, type RippleSlots } from "./orbRipples";
-import { nextState, settleTo, isTransient, targetsFor, transitionMs, type OrbState } from "./orbState";
+import { leanVector, nextState, settleTo, isFrozen, isTransient, targetsFor, transitionMs, type OrbState } from "./orbState";
+import { HOLD_FULL_MS, offsetsFor, releaseHaptic, releaseStrength } from "./orbGesture";
+import { GREET_DELAY_MS, GREET_STRENGTH, STIR_HALO, STIR_RISE_MS, nextStirDelay, stirVector, stirs } from "./orbIdle";
+import { TILT_REF_BETA, TILT_SMOOTH, smooth, tiltOffset, trackReference } from "./orbTilt";
 import { resolve, rippleCapacity, type OrbQualityProp } from "./orbQuality";
 import { orbCompiled } from "./orbShader";
 import { OracleOrbCanvas, type OrbUniforms } from "./OracleOrbCanvas";
@@ -14,6 +28,24 @@ import { OracleOrbCanvas, type OrbUniforms } from "./OracleOrbCanvas";
 const FALLBACK = require("../../../assets/art/orb-fallback.png");
 const SHELL = require("../../../assets/art/orb-shell.png");
 const INTERIOR = require("../../../assets/art/orb-interior.png");
+
+// How long the bloom takes to close again once the finger lifts. Faster than
+// it opened: letting go is a release, not a second slow gesture.
+const RELEASE_MS = 380;
+
+// How often the accelerometer is read. 30Hz is plenty for a field this
+// low-frequency, and is the difference between a sensor you can feel in the
+// battery and one you cannot.
+const TILT_INTERVAL_MS = 33;
+
+// How long a tilt takes to let go when the app leaves the foreground. The
+// sensor stops, so without this the interior would freeze mid-slide.
+const TILT_RELEASE_MS = 400;
+
+// The warm centre chases the fingertip on a spring, and never catches it.
+// That lag is the wake -- the interior has weight, so the light arrives where
+// your finger was a moment ago.
+const WAKE_SPRING = { damping: 14, stiffness: 90, mass: 0.9 } as const;
 
 // `useImage`'s own state (@shopify/react-native-skia's `useLoading`) is a
 // fresh `useState(null)` per mount, so a mount can never see a cache hit
@@ -48,11 +80,15 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   state?: OrbState;
   quality?: OrbQualityProp;
   interactive?: boolean;
+  // The day's first arrival: the orb ripples once, by itself, a beat after it
+  // settles. Nothing on this screen says the glass is touchable, so the orb
+  // says it in the only language it has.
+  greet?: boolean;
   accessibilityLabel?: string;
   testID?: string;
   onPress?(local: OrbPoint): void;
 }>(function OracleOrb(
-  { tile, state = "attending", quality = "auto", interactive = false, accessibilityLabel = "Oracle", testID, onPress },
+  { tile, state = "attending", quality = "auto", interactive = false, greet = false, accessibilityLabel = "Oracle", testID, onPress },
   ref,
 ) {
   const reducedMotion = useReducedMotion();
@@ -83,6 +119,33 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   const timeScale = useSharedValue(targetsFor(state).timeScale);
   const rippleA = useSharedValue<readonly [number, number, number, number]>([0, 0, 0, 0]);
   const rippleB = useSharedValue<readonly [number, number, number, number]>([0, 0, 0, 0]);
+
+  // Touch. `touch` is the fingertip exactly -- the lens under it must not lag,
+  // or the glass reads as sticky. `lead` is the same point on a spring, and
+  // is what the warm centre follows. `bloom` is how far the hold has opened,
+  // and multiplies every one of the gesture's offsets, so at rest the whole
+  // interaction layer contributes exactly nothing.
+  const touchX = useSharedValue(0);
+  const touchY = useSharedValue(0);
+  const leadX = useSharedValue(0);
+  const leadY = useSharedValue(0);
+  const bloom = useSharedValue(0);
+  const onGlass = useSharedValue(0);
+
+  // The tilt: the interior answering the phone being moved. Smoothed on the
+  // JS thread as samples arrive, then read as one more addend on the lean.
+  const tiltX = useSharedValue(0);
+  const tiltY = useSharedValue(0);
+  // The frame the tilt is measured against. A plain ref, not a shared value:
+  // only the sensor callback ever touches it, and it never drives a frame.
+  const tiltRef = useRef<{ x: number; z: number } | null>(null);
+
+  // The stir: the orb's own small unprompted motion, added on top of whatever
+  // the state is already doing.
+  const stirX = useSharedValue(0);
+  const stirY = useSharedValue(0);
+  const stirHalo = useSharedValue(0);
+  const touching = useRef(false);
 
   // The orb's own accumulated time. It is integrated from the clock rather
   // than read off it, for two reasons: timeScale becomes a *rate*, so slowing
@@ -118,9 +181,14 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   }, [current, parallax, centerDepth, centerLean, refraction, halo, timeScale]);
 
   // Stop the clock when the app is not in front. No work while backgrounded.
+  // `foreground` mirrors this in React state as well, because the sensor
+  // subscription below is a real cost that has to be torn down, not just a
+  // uniform that can be frozen.
+  const [foreground, setForeground] = useState(AppState.currentState === "active");
   useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
       paused.value = s === "active" ? 0 : 1;
+      setForeground(s === "active");
     });
     return () => sub.remove();
   }, [paused]);
@@ -132,26 +200,34 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
     const dt = lastTick.value < 0 ? 0 : Math.max(0, Math.min(0.1, now - lastTick.value));
     lastTick.value = now;
     if (!paused.value) elapsed.value += dt * timeScale.value;
+    // The gesture reads the *sprung* point, not the fingertip: the lean is
+    // what has weight. The lens below reads the fingertip itself.
+    const off = offsetsFor({ x: leadX.value, y: leadY.value }, bloom.value);
     return {
       t: elapsed.value,
       now,
       parallax: parallax.value,
-      centerDepth: centerDepth.value,
-      centerLean: centerLean.value,
+      centerDepth: centerDepth.value + off.depth,
+      centerLean: leanVector(
+        centerLean.value,
+        off.leanX + stirX.value + tiltX.value,
+        off.leanY + stirY.value + tiltY.value,
+      ),
       refraction: refraction.value,
-      halo: halo.value,
+      halo: halo.value + off.halo + stirHalo.value,
       rippleA: rippleA.value,
       rippleB: rippleB.value,
+      contact: [touchX.value, touchY.value, off.contact],
     };
   }, []);
 
   const fire = useCallback(
-    (local: OrbPoint) => {
+    (local: OrbPoint, strength: number, haptic: "light" | "medium" | null) => {
       const capacity = rippleCapacity(tier);
       if (capacity === 0) return;
       const nowMs = Date.now();
       const nowSec = clock.value / 1000;
-      slots.current = assign(slots.current, { origin: local, startMs: nowMs, strength: 1 }, nowMs, capacity);
+      slots.current = assign(slots.current, { origin: local, startMs: nowMs, strength }, nowMs, capacity);
       const pack = (i: 0 | 1): readonly [number, number, number, number] => {
         const r = slots.current[i];
         if (!r) return [0, 0, 0, 0];
@@ -161,7 +237,10 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
       };
       rippleA.value = pack(0);
       rippleB.value = pack(1);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // The greeting passes null: the orb moving on its own must never be
+      // mistaken for the phone registering a touch the player did not make.
+      if (haptic === "light") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      else if (haptic === "medium") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     },
     [tier, clock, rippleA, rippleB],
   );
@@ -169,23 +248,168 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   useImperativeHandle(
     ref,
     () => ({
-      ripple: (local) => fire(local ?? { x: 0, y: 0 }),
+      ripple: (local) => fire(local ?? { x: 0, y: 0 }, 1, "light"),
       transitionTo: (s) => setCurrent((c) => nextState(c, s)),
       settle: () => setCurrent((c) => settleTo(c)),
     }),
     [fire],
   );
 
-  const handlePress = useCallback(
-    (e: { nativeEvent: { locationX: number; locationY: number } }) => {
-      const hit = locate({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY }, tile);
-      // A press on the tile's corner is not a press on the glass.
-      if (!hit) return;
-      fire(hit.local);
-      onPress?.(hit.local);
+  // A hold that reaches full bloom says so, once, in the quietest haptic
+  // there is. Nothing marks the moment visually -- the interior just stops
+  // opening -- so this is the only way to feel that you have all of it.
+  const bloomTick = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const beginTouch = useCallback(() => {
+    touching.current = true;
+    // The static tier has no bloom to complete, and `fire` already withholds
+    // the release haptic there. A tick with nothing behind it would be the
+    // one piece of feedback that outlived the thing it was describing.
+    if (tier === "static") return;
+    if (bloomTick.current) clearTimeout(bloomTick.current);
+    bloomTick.current = setTimeout(() => void Haptics.selectionAsync(), HOLD_FULL_MS);
+  }, [tier]);
+
+  const endTouch = useCallback(
+    (x: number, y: number, strength: number, haptic: "light" | "medium") => {
+      touching.current = false;
+      if (bloomTick.current) clearTimeout(bloomTick.current);
+      bloomTick.current = null;
+      // A drag can leave the glass. The ripple still belongs to the sphere,
+      // so it starts at the rim under where the finger went.
+      const len = Math.hypot(x, y);
+      const at = len > 1 ? { x: x / len, y: y / len } : { x, y };
+      fire(at, strength, haptic);
+      onPress?.(at);
     },
-    [tile, fire, onPress],
+    [fire, onPress],
   );
+
+  useEffect(() => () => { if (bloomTick.current) clearTimeout(bloomTick.current); }, []);
+
+  const pan = Gesture.Pan()
+    .minDistance(0)
+    .maxPointers(1)
+    .onBegin((e) => {
+      const p = normalize({ x: e.x, y: e.y }, tile);
+      // A press on the tile's corner is not a press on the glass.
+      if (p.x * p.x + p.y * p.y > 1) {
+        onGlass.value = 0;
+        return;
+      }
+      onGlass.value = 1;
+      touchX.value = p.x;
+      touchY.value = p.y;
+      // Placed, not sprung: the centre starts leaning from where you landed.
+      leadX.value = p.x;
+      leadY.value = p.y;
+      bloom.value = withTiming(1, { duration: HOLD_FULL_MS, easing: Easing.out(Easing.quad) });
+      runOnJS(beginTouch)();
+    })
+    .onUpdate((e) => {
+      if (!onGlass.value) return;
+      const p = normalize({ x: e.x, y: e.y }, tile);
+      touchX.value = p.x;
+      touchY.value = p.y;
+      leadX.value = withSpring(p.x, WAKE_SPRING);
+      leadY.value = withSpring(p.y, WAKE_SPRING);
+    })
+    .onFinalize(() => {
+      if (!onGlass.value) return;
+      onGlass.value = 0;
+      // Read the bloom before releasing it: how far the hold opened is what
+      // the ripple and the haptic are both weighed against.
+      const b = bloom.value;
+      runOnJS(endTouch)(touchX.value, touchY.value, releaseStrength(b), releaseHaptic(b));
+      bloom.value = withTiming(0, { duration: RELEASE_MS, easing: Easing.out(Easing.quad) });
+    });
+
+  // The stir. A steady state only -- dormant is the rite's frozen still, and
+  // a transient already owns the interior for its own duration.
+  const stirring = interactive && tier !== "static" && stirs(current);
+  useEffect(() => {
+    if (!stirring) return;
+    const rise = { duration: STIR_RISE_MS, easing: Easing.inOut(Easing.sin) };
+    let running = true;
+    let id: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      id = setTimeout(() => {
+        if (!running) return;
+        // Never under a finger -- the orb is already answering one -- and
+        // never while the app is away, where the frames go to nobody.
+        if (!touching.current && !paused.value) {
+          const [x, y] = stirVector(Math.random());
+          stirX.value = withSequence(withTiming(x, rise), withTiming(0, rise));
+          stirY.value = withSequence(withTiming(y, rise), withTiming(0, rise));
+          stirHalo.value = withSequence(withTiming(STIR_HALO, rise), withTiming(0, rise));
+        }
+        schedule();
+      }, nextStirDelay(Math.random()));
+    };
+    schedule();
+    return () => {
+      running = false;
+      clearTimeout(id);
+      stirX.value = withTiming(0, rise);
+      stirY.value = withTiming(0, rise);
+      stirHalo.value = withTiming(0, rise);
+    };
+  }, [stirring, paused, stirX, stirY, stirHalo]);
+
+  // The tilt. Subscribed only while the orb is live and the app is in front:
+  // an accelerometer left running behind a locked screen is a battery cost
+  // paid for frames nobody sees.
+  // Not while dormant: Home mounts its orb in that state during the boot
+  // rite's slide, and an accelerometer moving the interior would break the
+  // very thing dormant exists to guarantee -- that what is held IS the
+  // reference image.
+  const tilting = interactive && tier !== "static" && foreground && !isFrozen(current);
+  useEffect(() => {
+    if (!tilting) return;
+    let cancelled = false;
+    let sub: { remove(): void } | null = null;
+    void Accelerometer.isAvailableAsync().then((ok) => {
+      // A device with no accelerometer keeps every other behaviour; the orb
+      // simply never hears about the phone moving.
+      if (!ok || cancelled) return;
+      Accelerometer.setUpdateInterval(TILT_INTERVAL_MS);
+      sub = Accelerometer.addListener(({ x, z }) => {
+        // The very first sample only establishes the frame. Measuring it
+        // against a zero reference would throw the interior hard to one side
+        // the instant the sensor wakes.
+        if (!tiltRef.current) {
+          tiltRef.current = { x, z };
+          return;
+        }
+        const [ox, oy] = tiltOffset(x - tiltRef.current.x, z - tiltRef.current.z);
+        tiltX.value = smooth(tiltX.value, ox, TILT_SMOOTH);
+        tiltY.value = smooth(tiltY.value, oy, TILT_SMOOTH);
+        // The frame creeps toward however the phone is actually being held,
+        // so a tilt that is simply held fades back to the canonical orb
+        // instead of parking the brand object off its own axis.
+        tiltRef.current = {
+          x: trackReference(tiltRef.current.x, x, TILT_REF_BETA),
+          z: trackReference(tiltRef.current.z, z, TILT_REF_BETA),
+        };
+      });
+    });
+    return () => {
+      cancelled = true;
+      sub?.remove();
+      tiltRef.current = null;
+      const cfg = { duration: TILT_RELEASE_MS, easing: Easing.out(Easing.quad) };
+      tiltX.value = withTiming(0, cfg);
+      tiltY.value = withTiming(0, cfg);
+    };
+  }, [tilting, tiltX, tiltY]);
+
+  // The greeting, once, on the first steady state the orb reaches.
+  const greeted = useRef(false);
+  useEffect(() => {
+    if (!greet || greeted.current || !interactive || tier === "static" || !stirs(current)) return;
+    greeted.current = true;
+    const id = setTimeout(() => fire({ x: 0, y: 0 }, GREET_STRENGTH, null), GREET_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [greet, interactive, tier, current, fire]);
 
   // A live tier still renders the fallback until both rasters are actually
   // in hand -- while they're loading, and forever if a load rejects (which
@@ -216,15 +440,24 @@ export const OracleOrb = forwardRef<OracleOrbHandle, {
   }
 
   return (
-    <Pressable
-      onPress={handlePress}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="image"
-      accessibilityHint="Responds to touch."
-      testID={testID}
-      style={{ width: tile, height: tile }}
-    >
-      {body}
-    </Pressable>
+    <GestureDetector gesture={pan}>
+      <View
+        style={{ width: tile, height: tile }}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="image"
+        accessibilityHint="Responds to touch."
+        accessible
+        // A screen reader cannot hold or drag the glass, so its activation
+        // gets the whole gesture's answer at once: a full ripple from the
+        // centre. Same as a tap, minus the aiming.
+        onAccessibilityTap={() => {
+          fire({ x: 0, y: 0 }, 1, "light");
+          onPress?.({ x: 0, y: 0 });
+        }}
+        testID={testID}
+      >
+        {body}
+      </View>
+    </GestureDetector>
   );
 });

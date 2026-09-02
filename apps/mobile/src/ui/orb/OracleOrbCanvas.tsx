@@ -28,11 +28,16 @@ export type OrbUniforms = {
   now: number;
   parallax: number;
   centerDepth: number;
-  centerLean: number;
+  // A true vector now, not a scalar with a baked-in direction: a finger on
+  // the glass leans the warm centre toward itself, and that direction is
+  // wherever the finger is. orbState.leanVector composes it.
+  centerLean: readonly [number, number];
   refraction: number;
   halo: number;
   rippleA: readonly [number, number, number, number];
   rippleB: readonly [number, number, number, number];
+  // xy fingertip in [-1,1], z strength. All zero when nothing is touching.
+  contact: readonly [number, number, number];
 };
 
 export function OracleOrbCanvas({
@@ -69,12 +74,13 @@ export function OracleOrbCanvas({
       now: u.now,
       parallax: u.parallax,
       centerDepth: u.centerDepth,
-      centerLean: [u.centerLean, u.centerLean * 0.4],
+      centerLean: u.centerLean,
       refraction: u.refraction,
       dispersion,
       samples,
       rippleA: u.rippleA,
       rippleB: u.rippleB,
+      contact: u.contact,
     };
   }, [cx, cy, r, dispersion, samples]);
 

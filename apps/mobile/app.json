@@ -54,7 +54,13 @@
           "project": "oracle-mobile"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "ORACLE lets the orb answer the way you move the phone. Motion is read on-device only and never leaves it."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

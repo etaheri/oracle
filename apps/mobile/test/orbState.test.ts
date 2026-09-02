@@ -4,6 +4,8 @@ import {
   nextState,
   settleTo,
   targetsFor,
+  isFrozen,
+  leanVector,
   transitionMs,
   type OrbState,
 } from "../src/ui/orb/orbState";
@@ -115,5 +117,36 @@ describe("nextState", () => {
 
   it("lets a real state change interrupt a transient", () => {
     expect(nextState("waking", "sealed")).toBe("sealed");
+  });
+});
+
+describe("leanVector", () => {
+  it("reproduces the shipped lean exactly when nothing is touching the orb", () => {
+    // Baseline identity: with no gesture and no stir, the composed lean must
+    // be the scalar mapping the shader shipped with, or every state's look
+    // changes the day a gesture layer is added.
+    const s = targetsFor("attending").centerLean;
+    expect(leanVector(s, 0, 0)).toEqual([s, s * 0.4]);
+  });
+
+  it("is nothing at all when the state asks for nothing", () => {
+    expect(leanVector(0, 0, 0)).toEqual([0, 0]);
+  });
+
+  it("adds a gesture's offset on top of the state's own lean", () => {
+    const s = 0.08;
+    expect(leanVector(s, 0.1, -0.05)).toEqual([s + 0.1, s * 0.4 - 0.05]);
+  });
+});
+
+describe("isFrozen", () => {
+  it("freezes only the boot rite's still", () => {
+    // dormant IS the reference image, held motionless while the rite slides
+    // it across the screen. Nothing may animate it -- not the accelerometer,
+    // not a stir. Every other state is live.
+    expect(isFrozen("dormant")).toBe(true);
+    for (const s of ALL.filter((s) => s !== "dormant")) {
+      expect(isFrozen(s)).toBe(false);
+    }
   });
 });

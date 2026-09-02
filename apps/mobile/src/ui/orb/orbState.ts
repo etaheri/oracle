@@ -49,8 +49,30 @@ const TRANSIENT: Record<OrbState, OrbState | null> = {
   spent: null,
 };
 
+// The direction the state's scalar lean points. The warm centre's ambient
+// off-axis drift has always been this diagonal; naming it is what lets a
+// gesture or a stir add its own displacement on top without disturbing it.
+const LEAN_DIR = [1, 0.4] as const;
+
+// The state's lean plus whatever a gesture or a stir is adding. With both
+// offsets at zero this is exactly the scalar mapping the shader shipped with,
+// which is the whole point: the interior at rest is untouched by the
+// existence of an interaction layer.
+export function leanVector(stateLean: number, offsetX: number, offsetY: number): readonly [number, number] {
+  "worklet";
+  return [stateLean * LEAN_DIR[0] + offsetX, stateLean * LEAN_DIR[1] + offsetY];
+}
+
 export function targetsFor(state: OrbState): OrbTargets {
   return TARGETS[state];
+}
+
+// The one state that must not move at all. Derived from timeScale rather than
+// naming dormant directly, so "frozen" stays whatever the targets table says
+// it is. The boot rite holds a still, and a still that answers a sensor is
+// not a still.
+export function isFrozen(state: OrbState): boolean {
+  return TARGETS[state].timeScale === 0;
 }
 
 export function isTransient(state: OrbState): boolean {

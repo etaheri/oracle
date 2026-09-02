@@ -26,8 +26,16 @@ uniform float dispersion;
 uniform float samples;     // 2 = high tier, 1 = reduced
 uniform float4 rippleA;    // xy origin in [-1,1], z start seconds, w strength
 uniform float4 rippleB;
+uniform float3 contact;    // xy fingertip in [-1,1], z strength -- 0 when
+                           // nothing is touching the glass
 
 const float RIPPLE_LIFE = 1.3;
+// How deep the fingertip presses. Small: the interior yields, it does not
+// dent. A tenth of this is already visible against a low-frequency field.
+const float CONTACT_DEPTH = 0.075;
+// The well's tightness. High enough that the lens is plainly a fingertip and
+// not a second warm centre.
+const float CONTACT_FALLOFF = 11.0;
 
 float2 uvFor(float2 q) {
   return (q * 0.5 + 0.5) * texSize;
@@ -51,7 +59,21 @@ float2 rippleWarp(float2 p, float4 rp, float atTime) {
   // flip IS the local optical compression the brief asks for.
   float compress = mix(-1.0, 1.0, smoothstep(0.0, 0.08, age));
   float decay = 1.0 - smoothstep(0.7, RIPPLE_LIFE, age);
-  return normalize(away) * band * decay * compress * rp.w * 0.06;
+  return normalize(away) * band * decay * compress * rp.w * 0.09;
+}
+
+// The interior yielding under a fingertip. The sample coordinate is pulled
+// TOWARD the contact, which magnifies the field beneath it -- a lens pressed
+// into soft glass, not a highlight painted on top of it. It follows the
+// finger exactly; the warm centre is what lags behind, and that lag is the
+// wake.
+float2 contactLens(float2 p, float3 ct) {
+  if (ct.z <= 0.0) { return float2(0.0); }
+  float2 away = p - ct.xy;
+  float dist = length(away);
+  if (dist < 1e-4) { return float2(0.0); }
+  float well = exp(-dist * dist * CONTACT_FALLOFF);
+  return -normalize(away) * well * ct.z * CONTACT_DEPTH;
 }
 
 half4 main(float2 xy) {
@@ -74,8 +96,9 @@ half4 main(float2 xy) {
   float2 lean = centerLean * core;
 
   float2 ripple = rippleWarp(p, rippleA, now) + rippleWarp(p, rippleB, now);
+  float2 lens = contactLens(p, contact);
 
-  float2 base = p + refr + depth - lean + ripple;
+  float2 base = p + refr + depth - lean + ripple + lens;
 
   // Two interior layers drifting in opposition. The field is smooth and
   // low-frequency, so a double sample reads as depth rather than as a ghost.
