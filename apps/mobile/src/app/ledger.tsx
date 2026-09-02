@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Alert } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCanvasRef } from "@shopify/react-native-skia";
@@ -10,6 +10,7 @@ import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
+import { RiteConfirm } from "../ui/RiteConfirm";
 import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
@@ -52,45 +53,34 @@ export default function Ledger() {
     return () => { alive = false; };
   }, []);
 
+  // Which rite is being asked, if any. Only one can be open at a time.
+  const [rite, setRite] = useState<"collision" | "strike" | null>(null);
+
   const handleClaim = () => {
     void (async () => {
       const result = await appleClaim();
-      if (result === "claimed") {
-        qc.invalidateQueries({ queryKey: ["me", "ledger"] });
-      } else if (result === "collision") {
-        Alert.alert("THE RECORD ALREADY BEARS A NAME.", undefined, [
-          { text: "CANCEL", style: "cancel" },
-          {
-            text: "RESTORE",
-            onPress: () => {
-              void (async () => {
-                const r = await appleRestore();
-                if (r === "restored") {
-                  qc.invalidateQueries();
-                  router.replace("/");
-                }
-              })();
-            },
-          },
-        ]);
+      if (result === "claimed") qc.invalidateQueries({ queryKey: ["me", "ledger"] });
+      else if (result === "collision") setRite("collision");
+    })();
+  };
+
+  const confirmRestore = () => {
+    setRite(null);
+    void (async () => {
+      const r = await appleRestore();
+      if (r === "restored") {
+        qc.invalidateQueries();
+        router.replace("/");
       }
     })();
   };
 
-  const handleStrike = () => {
-    Alert.alert("THE RECORD WILL BE STRUCK", "THIS IS NOT UNDONE.", [
-      { text: "CANCEL", style: "cancel" },
-      {
-        text: "STRIKE",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            const ok = await strikeRecord();
-            if (ok) router.replace("/");
-          })();
-        },
-      },
-    ]);
+  const confirmStrike = () => {
+    setRite(null);
+    void (async () => {
+      const ok = await strikeRecord();
+      if (ok) router.replace("/");
+    })();
   };
 
   if (!ledger.data) return (
@@ -163,9 +153,26 @@ export default function Ledger() {
             try { await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title); } catch {} finally { setSharing(false); }
           }}
         />
-        <QuietLink title="Strike the record" onPress={handleStrike} />
+        <QuietLink title="Strike the record" onPress={() => setRite("strike")} />
         <PlaqueShareCanvas canvasRef={canvasRef} data={d} />
       </View>
+      <RiteConfirm
+        visible={rite === "collision"}
+        title="THE RECORD ALREADY BEARS A NAME"
+        body="RESTORE IT, AND THIS DEVICE TAKES UP THE RECORD THAT NAME ALREADY HOLDS."
+        confirmLabel="RESTORE THE RECORD"
+        onConfirm={confirmRestore}
+        onWithdraw={() => setRite(null)}
+      />
+      <RiteConfirm
+        visible={rite === "strike"}
+        title="THE RECORD WILL BE STRUCK"
+        body="EVERY VIGIL, EVERY CALL, EVERY EPITHET. THIS IS NOT UNDONE."
+        confirmLabel="STRIKE THE RECORD"
+        destructive
+        onConfirm={confirmStrike}
+        onWithdraw={() => setRite(null)}
+      />
     </Screen>
   );
 }
