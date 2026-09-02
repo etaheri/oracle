@@ -43,7 +43,12 @@ export default function Rites() {
             numerals the card slots and the round's progress row use, so a
             rite and a call are visibly the same kind of thing (spec §6).
             Left-aligned: a numbered list that is centred is a poem. */}
-        <View style={{ gap: space(3) }}>
+        {/* The numerals hang in a left margin, so the text column needs that
+            margin back on the right — otherwise the whole block sits off
+            centre between a centred eyebrow and a centred liturgy, which is
+            exactly how it read on device. Balanced, the column is centred and
+            the numerals sit in the margin, the way a printed liturgy sets. */}
+        <View style={{ gap: space(3), paddingRight: gutter + space(3) }}>
           {RITES_LINES.map((line, i) => (
             <View key={line} style={{ flexDirection: "row", gap: space(3), alignItems: "flex-start" }}>
               <Ritual size={13} color={colors.goldText} letterSpacing={1} style={{ width: gutter, textAlign: "right" }}>
