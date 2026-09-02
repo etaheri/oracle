@@ -13,6 +13,7 @@ import { TopBar } from "../../ui/TopBar";
 import { AsciiDust } from "../../ui/TerminalPatina";
 import { DecodeLine } from "../../ui/DecodeText";
 import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
+import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
 import { payoff } from "@oracle/core";
@@ -157,19 +158,34 @@ export default function RevealScreen() {
             <Mono key={i} size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </Animated.View>
-        <View>
+        {/* The day's four ordinary calls, in the card's vocabulary rather
+            than a settings list (refinement spec §2): the slot numeral is
+            the anchor, the prophecy keeps the temple voice it was asked in,
+            and the receipt drops to machine voice underneath it. One rule
+            closes the group instead of four rules boxing every row. */}
+        <View style={{ borderBottomWidth: 1, borderBottomColor: colors.line }}>
           {d.questions.filter((q) => q.slot !== 5).map((q, i) => {
             const st = rowState(q);
             const color = st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
+            const receipt = receiptLine(q);
             return (
-              <Animated.View key={q.id} entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
-                style={{ flexDirection: "row", gap: space(2), paddingVertical: space(2), borderBottomWidth: 1, borderBottomColor: colors.lineSoft, alignItems: "baseline" }}>
-                <Mono size={12} color={color}>{rowMark(st)}</Mono>
-                <View style={{ flex: 1 }}>
-                  <Mono size={11} color={colors.mutedInk} numberOfLines={2}>{q.text}</Mono>
-                  <Mono size={9} color={colors.mutedInk} numberOfLines={2}>{receiptLine(q)}</Mono>
+              <Animated.View
+                key={q.id}
+                entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
+                style={{ flexDirection: "row", gap: space(3), paddingVertical: space(3), alignItems: "flex-start" }}
+              >
+                <Ritual size={13} color={color} letterSpacing={1} style={{ width: 22, textAlign: "center" }}>
+                  {numeral(q.slot)}
+                </Ritual>
+                <View style={{ flex: 1, gap: space(1) }}>
+                  <Serif size={15} color={colors.ink} numberOfLines={3} style={{ lineHeight: 21 }}>{q.text}</Serif>
+                  {receipt ? (
+                    <Mono size={10} color={colors.mutedInk} numberOfLines={2} style={{ lineHeight: 15 }}>{receipt}</Mono>
+                  ) : null}
                 </View>
-                <Mono size={12} color={color}>{rowRight(q)}</Mono>
+                {/* The mark rides with the value: outcome must never be
+                    carried by colour alone (brief §11). */}
+                <Mono size={12} color={color} letterSpacing={1}>{`${rowMark(st)} ${rowRight(q)}`}</Mono>
               </Animated.View>
             );
           })}
