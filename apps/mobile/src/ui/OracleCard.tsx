@@ -54,9 +54,8 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
   );
 }
 
-export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
+export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   q: RoundToday["questions"][number];
-  date: string;
   // The round's overall lock (if any): a question whose own lock differs
   // from it closes ahead of the round, and the title says so.
   roundLocksAt: string | null;
@@ -279,6 +278,11 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
     }
   }
 
+  // Slot and provenance only. The day used to ride here too, but source_name
+  // is unbounded and the card's margin is now one shared row with the live
+  // status field — so something had to give, and the date is the redundant
+  // half: the round's own TopBar prints DAY <date> a few inches above this.
+  const coordinate = `:: ${numeral(q.slot)} / PER ${q.source_name.toUpperCase()}`;
   const closesEarly = roundLocksAt !== null && q.locks_at !== roundLocksAt;
   const title = q.is_big_one ? "✶ THE BIG ONE" : q.category;
   const modifiers = [
@@ -300,7 +304,7 @@ export function OracleCard({ q, date, roundLocksAt, onSealed, onLean }: {
           title={title}
           modifiers={modifiers || undefined}
           big={q.is_big_one}
-          coordinate={`:: ${numeral(q.slot)} / ${date} / PER ${q.source_name.toUpperCase()}`}
+          coordinate={coordinate}
           status={cardStatus(q.locks_at, now, sealed)}
         >
           {/* The question floats centered in the card's field, tarot-fashion;

@@ -74,15 +74,24 @@ export function CardChrome({ slot, title, modifiers, coordinate, status, big = f
         ) : null}
       </View>
       <View style={{ flex: 1, gap: space(3), paddingTop: space(3) }}>{children}</View>
-      {coordinate ? (
-        <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ position: "absolute", left: INSET + 11, bottom: INSET + 8 }}>
-          {coordinate}
-        </Mono>
-      ) : null}
-      {status ? (
-        <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ position: "absolute", right: INSET + 11, bottom: INSET + 8 }}>
-          {status}
-        </Mono>
+      {/* One row, not two independent corners. Pinned to opposite edges these
+          two fields simply grew into each other: IBM Plex Mono advances 0.6em,
+          so at size 10 a full coordinate runs ~238pt from the left while a
+          ticking LOCK ends ~84pt in from the right — they cross on a 375pt
+          device. A flex row makes the collision impossible, and the coordinate
+          is the side that gives way: the status is the half that is alive, so
+          the provenance is what truncates. */}
+      {coordinate || status ? (
+        <View style={{ position: "absolute", left: INSET + 11, right: INSET + 11, bottom: INSET + 8, flexDirection: "row", alignItems: "flex-end", gap: space(2) }}>
+          <Mono size={10} color={colors.mutedInk} letterSpacing={1} numberOfLines={1} style={{ flex: 1 }}>
+            {coordinate}
+          </Mono>
+          {status ? (
+            <Mono size={10} color={colors.mutedInk} letterSpacing={1}>
+              {status}
+            </Mono>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );

@@ -132,7 +132,6 @@ export default function Round() {
             <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : Uncover}>
               <OracleCard
                 q={current}
-                date={today.data.date}
                 roundLocksAt={today.data.locks_at}
                 onSealed={() => setLastSealedId(current.id)}
                 onLean={onLean}
