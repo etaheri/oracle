@@ -71,15 +71,18 @@ export function ledgerLines(l: Reveal["ledger"]): string[] {
   if (l.oracle_score !== null) return [streakLine, `ORACLE SCORE ${l.oracle_score}`];
   // This used to read "0 OF 50 CALLS WRITTEN" — a progress bar toward an
   // unnamed thing, in which nothing said what a CALL was, what 50 bought, or
-  // what was being written. Two lines instead: the first names the thing that
-  // does not exist yet, the second says exactly what brings it into being, and
-  // "WRITE IT" points back at "UNWRITTEN" so the pair reads as one sentence.
-  // The rites now define a call as an answer you sealed (rite V) and a rated
-  // call as one from a day where all five were (rite VII).
+  // what was being written. The first line now names the thing that does not
+  // exist yet; the second counts toward it AND states the rate.
+  //
+  // The rate is the load-bearing half. This screen is about ONE day, and every
+  // surface of that day says five — five questions, five numerals, seal all
+  // five. A bare "OF 50" on it reads as the same scale, and the honest
+  // question a player asks is "fifty of what, there are only five?". "FIVE A
+  // DAY" answers it in three words and makes fifty legible as ten days.
   return [
     streakLine,
     "ORACLE SCORE UNWRITTEN",
-    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS WRITE IT`,
+    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS · FIVE A DAY`,
   ];
 }
 

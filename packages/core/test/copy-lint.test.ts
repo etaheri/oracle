@@ -119,6 +119,10 @@ describe("the rites", () => {
     expect(all).toContain("TWENTY MUST HAVE SPOKEN");
     expect(CONSTANTS.ORACLE_SCORE_MIN_CALLS).toBe(50);
     expect(all).toContain("FIFTY RATED CALLS");
+    // ...and the rate that converts it, without which fifty reads as the same
+    // scale as the five questions every other surface talks about. Five a day
+    // is why fifty is ten days.
+    expect(all).toContain("FIVE A DAY");
   });
   it("open with a subset of the same numbered canon, not a second copy of it", () => {
     // The two screens must never drift: the opening is literally the head of
@@ -134,6 +138,14 @@ describe("the rites", () => {
     }
     // ...and defer what is only met later in play.
     for (const word of ["FIRST HOUR", "SHIELD", "BIG ONE"]) expect(opening, word).not.toContain(word);
+  });
+  it("scale every cumulative number against the daily one", () => {
+    // "0 OF 50" on a screen whose every other surface says five is the honest
+    // question a player actually asked. Anywhere the lifetime count appears,
+    // the per-day rate appears with it.
+    for (const line of [...RITES_LINES, ...Object.values(SCORE_GLOSS)]) {
+      if (/FIFTY/.test(line)) expect(line, line).toMatch(/FIVE (A DAY|CALLS A DAY)/);
+    }
   });
   it("partial, summons and score-gloss lines hold the register", () => {
     for (const l of [PARTIAL_LINE, ...SUMMONS_LINES, ...Object.values(SCORE_GLOSS)]) {

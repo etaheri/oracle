@@ -159,9 +159,17 @@ export function vigilLine(streak: number, seedKey: string): string | null {
 // Rites V-VII are that goal, and they take three lines because the first
 // attempt took one and still did not land: it said "THE LEDGER RATES EVERY
 // CALL" while never defining a CALL, so "0 OF 50 CALLS" stayed a progress bar
-// toward an unnamed thing. V defines the noun, VI names what the number buys
-// and what it measures, VII says which calls count and reassures the player
-// that a partial day is not a wasted one.
+// toward an unnamed thing. V defines the noun, VI names what the number buys,
+// VII says which calls count and reassures the player that a partial day is
+// not a wasted one.
+//
+// VI states the RATE, and that is the whole point of it. Fifty is a lifetime
+// count sitting in a game whose every surface says five — five questions, five
+// numerals, seal all five — so read cold it looks like the same scale, and the
+// honest question is "fifty of what, there are only five?". "FIVE A DAY, SO
+// TEN DAYS AT THE LEAST" converts it on the spot. At the least, not exactly:
+// a voided question earns no brier, so a day can rate fewer than five and the
+// tenth day is a floor, never a promise.
 export const RITES_LINES = [
   // ── the opening: everything the first card depends on ──
   "FIVE QUESTIONS. ONCE A DAY. NOON TO NOON, NEW YORK TIME.",
@@ -169,7 +177,7 @@ export const RITES_LINES = [
   "AN ANSWER SEALED CANNOT BE UNSEALED. THE CROWD IS HIDDEN UNTIL YOU COMMIT.",
   "CONVICTION PAYS WHEN RIGHT. IT COSTS MORE WHEN WRONG.",
   "EVERY ANSWER YOU SEAL IS A CALL. THE LEDGER RATES IT AGAINST WHAT HAPPENED.",
-  "FIFTY RATED CALLS WRITE YOUR ORACLE SCORE · HOW WELL YOU SEE, NOT HOW OFTEN YOU PLAY.",
+  "FIFTY RATED CALLS WRITE YOUR ORACLE SCORE. FIVE A DAY, SO TEN DAYS AT THE LEAST.",
   "A DAY'S CALLS RATE ONLY IF ALL FIVE WERE SEALED. POINTS AND VIGIL COUNT EITHER WAY.",
   // ── the rest: met in play, kept on the standing link ──
   "A QUESTION CLOSES THE MOMENT ITS ANSWER BEGINS TO EXIST. SOME CLOSE BEFORE NOON.",
@@ -192,7 +200,7 @@ export const OPENING_RITES_LINES = RITES_LINES.slice(0, OPENING_RITES);
 // said what it was, what "rates" meant, or what fifty was fifty OF (audit
 // 2026-09-02 §1.1). Two states: how it is earned, then what it is.
 export const SCORE_GLOSS = Object.freeze({
-  unwritten: "FIFTY RATED CALLS WRITE IT. A DAY RATES ONLY WHEN ALL FIVE ARE SEALED.",
+  unwritten: "FIVE CALLS A DAY, FIFTY TO WRITE IT. A DAY RATES ONLY IF ALL FIVE WERE SEALED.",
   written: "YOUR CALIBRATION, READ AGAINST WHAT HAPPENED. NOTHING PURCHASABLE TOUCHES IT.",
 } as const);
 

@@ -113,25 +113,28 @@ describe("revealRows", () => {
   describe("ledgerLines", () => {
     it("settled with an active streak and no oracle score yet", () => {
       // Was "0 OF 50 CALLS WRITTEN": a progress bar toward an unnamed thing,
-      // with "written" attached to the calls rather than to the score the
-      // calls produce. The pair now names what does not exist yet and exactly
-      // what brings it into being.
+      // on a screen about ONE day of five questions — so fifty read as the
+      // same scale. The pair now names what does not exist yet, counts toward
+      // it, and states the rate that makes fifty mean ten days.
       expect(ledgerLines({ settled: true, streak: 4, calls_rated: 0, oracle_score: null })).toEqual([
         "VIGIL: DAY 4",
         "ORACLE SCORE UNWRITTEN",
-        "0 OF 50 RATED CALLS WRITE IT",
+        "0 OF 50 RATED CALLS · FIVE A DAY",
       ]);
     });
     it("settled with streak reset to zero", () => {
       expect(ledgerLines({ settled: true, streak: 0, calls_rated: 12, oracle_score: null })).toEqual([
         "THE VIGIL BEGINS AGAIN",
         "ORACLE SCORE UNWRITTEN",
-        "12 OF 50 RATED CALLS WRITE IT",
+        "12 OF 50 RATED CALLS · FIVE A DAY",
       ]);
     });
     it("counts to the engine's own threshold, not a private copy of it", () => {
       expect(ledgerLines({ settled: true, streak: 1, calls_rated: 3, oracle_score: null }).join(" "))
         .toContain(`OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS`);
+      // The lifetime count never appears without the daily rate beside it.
+      expect(ledgerLines({ settled: true, streak: 1, calls_rated: 3, oracle_score: null }).join(" "))
+        .toContain("FIVE A DAY");
     });
     it("settled once the oracle score exists", () => {
       expect(ledgerLines({ settled: true, streak: 6, calls_rated: 50, oracle_score: 73 })).toEqual([
