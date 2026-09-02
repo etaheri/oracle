@@ -42,6 +42,7 @@ export default function RevealScreen() {
   const reducedMotion = useReducedMotion();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const loaded = !!reveal.data && !("pending" in reveal.data);
   // reveal.data's reference changes on every refetch (staleTime 0 + AppState
   // focus refetches), so the resolved-outcomes effect below can re-run for
@@ -127,7 +128,16 @@ export default function RevealScreen() {
 
   async function onShare() {
     setSharing(true);
-    try { await shareCard(canvasRef, cardData); } catch {} finally { setSharing(false); }
+    setShareError(null);
+    try {
+      await shareCard(canvasRef, cardData);
+    } catch {
+      // Every other failure in this app has a written line; this one used to
+      // be swallowed whole, so a failed share simply did nothing.
+      setShareError("THE PROPHECY WOULD NOT LEAVE. TRY AGAIN.");
+    } finally {
+      setSharing(false);
+    }
   }
 
   return (
@@ -250,6 +260,9 @@ export default function RevealScreen() {
           <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 300).duration(400).easing(easeOut)}>
             <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />
           </Animated.View>
+        )}
+        {shareError && (
+          <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
         )}
       </ScrollView>
       <ShareCardCanvas canvasRef={canvasRef} data={cardData} />

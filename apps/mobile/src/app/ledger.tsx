@@ -37,6 +37,7 @@ export default function Ledger() {
   const qc = useQueryClient();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const router = useRouter();
   const plusActive = usePlusStore((s) => s.plusActive);
 
@@ -95,6 +96,19 @@ export default function Ledger() {
 
   const d = ledger.data;
   const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
+
+  async function handleShare() {
+    setSharing(true);
+    setShareError(null);
+    try {
+      await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title);
+    } catch {
+      setShareError("THE PLAQUE WOULD NOT LEAVE. TRY AGAIN.");
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <Screen>
       <TopBar />
@@ -146,13 +160,10 @@ export default function Ledger() {
             <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
-        <GoldButton
-          title={sharing ? "PREPARING…" : "DECLARE YOURSELF"}
-          onPress={async () => {
-            setSharing(true);
-            try { await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title); } catch {} finally { setSharing(false); }
-          }}
-        />
+        <GoldButton title={sharing ? "PREPARING…" : "DECLARE YOURSELF"} onPress={handleShare} />
+        {shareError && (
+          <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
+        )}
         <QuietLink title="Strike the record" onPress={() => setRite("strike")} />
         <PlaqueShareCanvas canvasRef={canvasRef} data={d} />
       </View>

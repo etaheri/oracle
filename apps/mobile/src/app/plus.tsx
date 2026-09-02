@@ -11,15 +11,16 @@ import { COPY_BANK, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES } from "@oracle/core"
 import { getOffering, purchasePackage, restore } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
+import { PRIVACY_URL } from "../config/links";
 
 const CREED = COPY_BANK.filter((l) => l.pool === "paywall" && l.id.startsWith("paywall.creed"));
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
-const PRIVACY_URL = "https://PRIVACY_URL_TBD_TASK_12"; // Task 12 replaces with Erik's real URL before submission
 
 export default function Plus() {
   const [offering, setOffering] = useState<PurchasesOffering | null | "loading">("loading");
   const [errorLine, setErrorLine] = useState<string | null>(null);
   const plusActive = usePlusStore((s) => s.plusActive);
+  const privacyUrl = PRIVACY_URL;
   useEffect(() => { getOffering().then(setOffering); }, []);
   useEffect(() => { capture("paywall_viewed"); }, []);
 
@@ -62,7 +63,9 @@ export default function Plus() {
         <QuietLink title={PAYWALL_CTA_LINES.restore} onPress={() => restore()} />
         <View style={{ flexDirection: "row", justifyContent: "center", gap: space(4) }}>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
-          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
+          {privacyUrl && (
+            <Pressable onPress={() => Linking.openURL(privacyUrl)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
+          )}
         </View>
       </View>
     </Screen>
