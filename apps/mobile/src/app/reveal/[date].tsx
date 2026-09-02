@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCanvasRef } from "@shopify/react-native-skia";
+import { Canvas, Fill, LinearGradient, useCanvasRef, vec } from "@shopify/react-native-skia";
 import { Screen } from "../../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../../ui/Text";
 import { GoldButton } from "../../ui/Button";
@@ -29,6 +29,12 @@ const ROW_DELAY = 200;
 const ROW_STAGGER = 90;
 const POINTS_DELAY = ROW_DELAY + 4 * ROW_STAGGER + 200;
 const BIG_ONE_DELAY = POINTS_DELAY + 350;
+
+// The fold: how tall the fade at the bottom of the reveal is. Deep enough to
+// read as the page dissolving rather than as a band lying on top of it — this
+// screen is the one people screenshot, and it spends most of its height under
+// the Big One's gold frame, where a hard edge reads as a rendering seam.
+const FOLD_H = 32;
 
 // One golden surge through the Big One frame when the player beat the tide.
 const TideFlash = new Keyframe({
@@ -55,6 +61,9 @@ export default function RevealScreen() {
   // refs for the raw measurements so onLayout/onContentSizeChange never
   // trigger a render loop, state only for the boolean that gates the fade.
   const [overflows, setOverflows] = useState(false);
+  // ...and the fade retires the moment the reader reaches the end of it: a
+  // marker for content below is a lie once there is no content below.
+  const [atBottom, setAtBottom] = useState(false);
   const viewportH = useRef(0);
   const contentH = useRef(0);
   const recomputeOverflow = () => setOverflows(contentH.current > viewportH.current + 1);
@@ -163,6 +172,13 @@ export default function RevealScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
         onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; recomputeOverflow(); }}
         onContentSizeChange={(_w, h) => { contentH.current = h; recomputeOverflow(); }}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+          // Setting the same boolean back is a React bail-out, so this is free
+          // on every frame that does not actually cross the end.
+          setAtBottom(contentOffset.y + layoutMeasurement.height >= contentSize.height - 1);
+        }}
       >
         <Eyebrow>
           {anyPending
@@ -285,10 +301,21 @@ export default function RevealScreen() {
           <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
         )}
       </ScrollView>
-      {overflows && (
+      {overflows && !atBottom && (
         // The Big One and the share button live below the fold on smaller
-        // devices, and nothing said so.
-        <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 24, backgroundColor: colors.museumWhite, opacity: 0.9 }} />
+        // devices, and nothing said so. It has to be an actual fade: this was
+        // a flat 0.9-opacity band with a hard top edge, and over the Big One's
+        // gilded frame that edge read as a rendering seam rather than as the
+        // page continuing. Skia, the same way GoldFrame draws its leaf — Fill
+        // takes the canvas, so the gradient needs no measurement, only its own
+        // height.
+        <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: FOLD_H }}>
+          <Canvas style={StyleSheet.absoluteFill}>
+            <Fill>
+              <LinearGradient start={vec(0, 0)} end={vec(0, FOLD_H)} colors={[colors.museumWhiteClear, colors.museumWhite]} />
+            </Fill>
+          </Canvas>
+        </View>
       )}
       <ShareCardCanvas canvasRef={canvasRef} data={cardData} />
     </Screen>

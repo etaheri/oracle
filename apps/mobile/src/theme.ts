@@ -3,6 +3,7 @@
 // ratios noted are against museumWhite.
 export const colors = {
   museumWhite: "#F7F6F2", // primary ground — the museum field
+  museumWhiteClear: "rgba(247,246,242,0)", // the same ground at zero alpha — the far end of a fade INTO the ground, so a gradient never has to spell the colour out at a call site
   frescoWhite: "#F3F0E9", // card face — the artifact on the museum wall
   ink: "#17191F", // primary text (16.3:1)
   mutedInk: "#666A73", // secondary text, captions, chrome (5.0:1)
