@@ -44,7 +44,7 @@ export function RiteConfirm({ visible, title, body, confirmLabel, destructive = 
           <Mono size={11} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: 18 }}>{body}</Mono>
         ) : null}
         <View style={{ gap: space(2) }}>
-          <GoldButton title={confirmLabel} onPress={onConfirm} />
+          <GoldButton title={confirmLabel} onPress={onConfirm} destructive={destructive} />
           <QuietLink title="Withdraw" onPress={onWithdraw} />
         </View>
       </View>

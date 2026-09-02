@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCanvasRef } from "@shopify/react-native-skia";
 import { Screen } from "../../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../../ui/Text";
@@ -43,6 +44,20 @@ export default function RevealScreen() {
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await qc.invalidateQueries({ queryKey: ["reveal", date] });
+    setRefreshing(false);
+  }, [qc, date]);
+  // The Big One and the share button live below the fold on smaller devices —
+  // refs for the raw measurements so onLayout/onContentSizeChange never
+  // trigger a render loop, state only for the boolean that gates the fade.
+  const [overflows, setOverflows] = useState(false);
+  const viewportH = useRef(0);
+  const contentH = useRef(0);
+  const recomputeOverflow = () => setOverflows(contentH.current > viewportH.current + 1);
   const loaded = !!reveal.data && !("pending" in reveal.data);
   // reveal.data's reference changes on every refetch (staleTime 0 + AppState
   // focus refetches), so the resolved-outcomes effect below can re-run for
@@ -143,7 +158,12 @@ export default function RevealScreen() {
   return (
     <Screen>
       <TopBar />
-      <ScrollView contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}>
+      <ScrollView
+        contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
+        onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; recomputeOverflow(); }}
+        onContentSizeChange={(_w, h) => { contentH.current = h; recomputeOverflow(); }}
+      >
         <Eyebrow>
           {anyPending
             ? `Day ${d.date} · the ledger is still being read`
@@ -265,6 +285,11 @@ export default function RevealScreen() {
           <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
         )}
       </ScrollView>
+      {overflows && (
+        // The Big One and the share button live below the fold on smaller
+        // devices, and nothing said so.
+        <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 24, backgroundColor: colors.museumWhite, opacity: 0.9 }} />
+      )}
       <ShareCardCanvas canvasRef={canvasRef} data={cardData} />
     </Screen>
   );
