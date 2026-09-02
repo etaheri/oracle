@@ -19,7 +19,7 @@
 - **Reduced motion:** every animation must check `useReducedMotion()` and degrade to a static or instant state.
 - **Accessibility:** ASCII and colour never carry meaning alone (brief §11). Touch targets ≥44pt. Nothing below 10px that a user is expected to read.
 - **Pure logic in `src/game/*.ts`,** no `react-native` imports in any file under test. Tests live in `apps/mobile/test/*.test.ts`.
-- **Verification commands** (run from `apps/mobile`): `pnpm test`, `pnpm typecheck`. Both must pass before every commit.
+- **Verification commands** (run from `apps/mobile`): `pnpm test`, `pnpm typecheck`. Both must pass before every commit. **Never run `pnpm lint`** — this repo has the script but has never had ESLint installed, and `expo lint` silently auto-installs it plus ~2,400 lockfile lines. Check for unused imports by grepping the symbol in the file.
 - **Working branch:** `design/refinement-pass`. Commit after every task.
 
 ---
@@ -344,7 +344,7 @@ Replace the `<View>` wrapping `d.questions.filter((q) => q.slot !== 5).map(...)`
 - [ ] **Step 3: Verify**
 
 Run from `apps/mobile`: `pnpm typecheck`
-Expected: no errors. (`rowMark` is still imported and now used here; confirm no unused-import lint error with `pnpm lint`.)
+Expected: no errors. (`rowMark` is still imported and now used here; confirm with `grep -n rowMark` in the file.)
 
 - [ ] **Step 4: Commit**
 
@@ -1058,8 +1058,8 @@ The `<Eyebrow>The summons</Eyebrow>` is deleted — the screen has one question 
 
 - [ ] **Step 2: Verify**
 
-Run from `apps/mobile`: `pnpm typecheck && pnpm lint`
-Expected: no errors, and no unused-import warning for `Eyebrow` (remove it from the import if it is now unused).
+Run from `apps/mobile`: `pnpm typecheck`
+Expected: no errors. Then `grep -n "Eyebrow" src/app/summons.tsx` — if the only hit is the import line, remove it.
 
 - [ ] **Step 3: Commit**
 
@@ -1325,7 +1325,7 @@ Only render it while the content actually overflows: track `const [overflows, se
 
 - [ ] **Step 5: Verify**
 
-Run from `apps/mobile`: `pnpm test && pnpm typecheck && pnpm lint`
+Run from `apps/mobile`: `pnpm test && pnpm typecheck`
 Expected: all pass.
 
 - [ ] **Step 6: Commit**
@@ -1340,7 +1340,6 @@ git commit -m "feat(mobile): the day can be pulled again, and a strike presses l
 ## Final verification
 
 - [ ] Run the full suite from the repo root: `pnpm test && pnpm typecheck`
-- [ ] Run `cd apps/mobile && pnpm lint`
 - [ ] Launch on device/simulator and walk the whole flow: boot rite → Home → Rites → Round (pull a card, seal it, watch the status field tick) → CrowdReveal → Ledger (strike rite, withdraw) → Plus → Reveal → share.
 - [ ] Repeat the walk with **Settings → Accessibility → Larger Text** at maximum, confirming no clipped chrome and no shifted temple register on Home.
 - [ ] Repeat the walk with **Reduce Motion** on, confirming the RiteConfirm appears without animation and every decode resolves instantly.
