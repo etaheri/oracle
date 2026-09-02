@@ -15,11 +15,11 @@ import { useChromeScale } from "../ui/useChromeScale";
 // from a first-timer's ENTER (index.tsx gate) and a standing quiet link.
 export default function Rites() {
   const router = useRouter();
-  // The numeral gutter is a reserved slot like any other (spec §4), so it has
-  // to grow with the type it holds: Ritual scales to CHROME_CAP, and VIII —
-  // the widest of the twelve — already fills 26pt at 1x, so a fixed gutter
-  // wrapped it onto a second line and knocked its rite out of alignment.
-  const gutter = Math.ceil(26 * useChromeScale());
+  // The numeral gutter is a reserved slot like any other (spec §4). VIII is
+  // the widest of the twelve — four Cinzel glyphs at size 13 plus tracking is
+  // ~34pt — so the slot is 40 at 1x and grows from there. It was 26, which
+  // wrapped VIII onto a second line and knocked its rite out of alignment.
+  const gutter = Math.ceil(40 * useChromeScale());
   return (
     <Screen>
       <TopBar />
@@ -32,7 +32,10 @@ export default function Rites() {
           who has turned their text size up. */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: space(4) }}
+        // No centring: twelve rules always exceed a phone, and centring
+        // content taller than its container pushes the head of the list out
+        // of the scrollable area — the eyebrow and rule I became unreachable.
+        contentContainerStyle={{ flexGrow: 1, paddingVertical: space(4), gap: space(4) }}
         showsVerticalScrollIndicator={false}
       >
         <Eyebrow>The rites</Eyebrow>
