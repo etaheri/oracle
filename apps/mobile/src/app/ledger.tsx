@@ -113,7 +113,12 @@ export default function Ledger() {
     setRite(null);
     void (async () => {
       const ok = await strikeRecord();
-      if (ok) router.replace("/");
+      if (!ok) return;
+      // Every cached answer belonged to a record that no longer exists.
+      // Without this the struck player lands on a Home still showing their
+      // old vigil and epithet until each query happens to refetch.
+      qc.clear();
+      router.replace("/");
     })();
   };
 

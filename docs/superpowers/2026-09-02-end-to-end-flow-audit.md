@@ -3,7 +3,7 @@
 **Date:** 2026-09-02 (28 days to Shipaton deadline)
 **Scope:** the whole app as it stands on `main` @ `9ade86d` — the new player's first ten minutes, the returning player's day, gameplay comprehension, monetization honesty, and what stands between here and the App Store.
 **Baseline:** typecheck clean in all three packages; 596 tests green (core 82, mobile 249, api 265).
-**Status:** the three honesty fixes (§9.1-3) and the legibility batch (§9.4-9) were applied in the same session and are marked FIXED below — 616 tests green after. §9.10-14 stand as written.
+**Status:** everything in §9 that does not need a credential Erik has yet to create was applied in the same session and is marked FIXED below — 619 tests green after. What remains is listed at the end of §9.
 **Relationship to prior audits:** `2026-08-31-gameplay-audit.md` and `2026-09-01-window-seeding-story-audit.md` are largely **executed** — the contrarian bonus is additive, the crowd floor exists, `/today` self-locks, `resolves_at` is required and the lock is derived in code, the author gets outcome feedback, receipts print on the reveal, RevenueCat ships, the evergreen bank exists. This document does not re-litigate those. It reads the app as a player meets it, and it goes at what is still wrong.
 
 ---
@@ -172,7 +172,7 @@ So a player on a 2-day vigil, three hours before lock, is shown:
 
 **Fix:** one character — gate the risk line (or at minimum `showRescue`) on `streak >= CONSTANTS.SHIELD_MIN_STREAK`. While there, `RITES_LINES` XI and the paywall creed should say the floor out loud: *"A SHIELD DEFENDS A VIGIL OF THREE DAYS OR MORE."*
 
-### 4.2 MAJOR · The purchased shield exists only if a webhook lands
+### 4.2 MAJOR · The purchased shield exists only if a webhook lands — **FIXED 2026-09-02**
 
 `purchaseRescue()` returns true the moment StoreKit succeeds; the entitlement is granted **only** by `POST /v1/webhooks/revenuecat`. There is no client-side reconciliation and no server-side verification path. If `REVENUECAT_WEBHOOK_SECRET` is unset the endpoint 401s every event and **every purchase in the app silently grants nothing** — and that secret is not in `wrangler.jsonc`'s documented secret list (see §6.3).
 
@@ -180,7 +180,7 @@ Home papers over it: on success it prints "THE SHIELD HELD…" and invalidates t
 
 Minimum: verify the ledger actually reflects the grant before printing the confirmation, and fall back to a "the ledger will record it shortly" line.
 
-### 4.3 MAJOR · Striking the record leaves the native SDKs logged in as a deleted device
+### 4.3 MAJOR · Striking the record leaves the native SDKs logged in as a deleted device — **FIXED 2026-09-02**
 
 `strikeRecord()` deletes the server rows and clears the device token. It does not touch RevenueCat or OneSignal.
 
@@ -198,7 +198,7 @@ Prices from the store, restore link, auto-renew disclosure, "THE FREE GAME IS NE
 
 ## 5. Notifications — the second hit has no trigger
 
-### 5.1 CRITICAL · Server push is written, tested, and called by nothing
+### 5.1 CRITICAL · Server push is written, tested, and called by nothing — **FIXED 2026-09-02**
 
 `push/compose.ts` and `push/onesignal.ts` are complete and covered by `compose.test.ts`. Nothing in `src/` imports them:
 
@@ -211,7 +211,7 @@ $ grep -rn "composeHingePushes\|sendPushes" apps/api/src | grep -v src/push/
 
 So the results-ready push — dopamine hit #2's trigger, the design spec's second of two hits, and the entire premise of the OneSignal "Keep Them Coming Back" award — **does not fire**.
 
-### 5.2 CRITICAL · The external ids would not match even if it were wired
+### 5.2 CRITICAL · The external ids would not match even if it were wired — **FIXED 2026-09-02**
 
 Client (`notifications/onesignal.ts:34`):
 ```ts
@@ -224,7 +224,7 @@ include_aliases: { external_id: [p.userId] },
 
 `composeHingePushes` returns `userId` (the `users` row). The client registers `deviceId` (the `devices` row). **Different UUIDs.** Every send would 400/404 and be silently counted as `skipped`. This has to be fixed before the wiring is worth doing — pick one identity and use it on both sides (device id is the safer choice, since it survives a restore and matches the RevenueCat app user id).
 
-### 5.3 MAJOR · Local reminders are never re-scheduled after permission is granted
+### 5.3 MAJOR · Local reminders are never re-scheduled after permission is granted — **FIXED 2026-09-02**
 
 `resealReminders` returns early when permission is not granted, and it is triggered only by:
 
@@ -255,11 +255,11 @@ With §5.1 unfixed, the local reminders are the *only* thing bringing anyone bac
 
 There is also no `expo-updates` config and no `runtimeVersion` — the spec's plan for iterating via OTA during the traction window (design §7, §10) is not wired.
 
-### 6.3 MAJOR · The documented secret list is stale
+### 6.3 MAJOR · The documented secret list is stale — **FIXED 2026-09-02**
 
 `wrangler.jsonc`'s comment lists eight secrets. `WorkerEnv` declares two more that are not in it — **`REVENUECAT_WEBHOOK_SECRET`** and **`APPLE_BUNDLE_ID`** — plus the two OneSignal keys that §5.1 will need. An unset `REVENUECAT_WEBHOOK_SECRET` silently 401s every purchase event (§4.2), and an unset `APPLE_BUNDLE_ID` falls back to `"com.erikt.oracle"`, which happens to be right today and is a landmine if the bundle id ever changes.
 
-### 6.4 MINOR · The evergreen bank's poison-skip is only half a guard
+### 6.4 MINOR · The evergreen bank's poison-skip is only half a guard — **FIXED 2026-09-02**
 
 `publishFromBank` retries past entries that fail `DraftSchema.safeParse`, but `upsertDraft` is called **outside** that try/catch and throws on `"resolves_at out of range"` / `"weather must lock before noon"`. Such an entry is never marked used, so it jams the loop on every tick — on the one path whose entire purpose is that the drop never fails.
 
@@ -315,13 +315,22 @@ Including "run `npm run reset-project` … create a blank **app** directory". Ha
 10. Reconcile the OneSignal external id (device id on both sides), then wire `composeHingePushes` → `sendPushes` into `settle`, with the four Plan-4 obligations from `compose.ts`'s own header. (§5.1, §5.2)
 11. Re-run `resealReminders` after the permission grant. (§5.3)
 
-**Before submission — blockers:**
-12. Real Sentry org in `app.json`; `EXPO_PUBLIC_PRIVACY_URL` and `EXPO_PUBLIC_SHARE_URL` set in EAS. (§6.1)
-13. Confirm `REVENUECAT_WEBHOOK_SECRET` and `APPLE_BUNDLE_ID` are set, and update the `wrangler.jsonc` comment. (§6.3)
-14. Reset RevenueCat/OneSignal identity on strike. (§4.3)
+**The second hit — ✅ DONE 2026-09-02:**
+10. ~~Reconcile the OneSignal external id, then wire `composeHingePushes` → `sendPushes` into `settle`.~~ (§5.1, §5.2) — the sender now addresses a player's DEVICE ids, the alias the client actually logs in as, and `settle` composes and sends before it narrates, reporting `push: N sent, M skipped` in the Telegram round report. All four Plan-4 obligations are met and tested: the lapsed line fires only on the transition into silence (the previous round's own predictions are the marker, so no new column), a batch cannot exist for an unsettled round, "results" is per-player so an all-void day no longer claims the ledger read them, and the audience is `settleRound`'s own stamp rather than every install that ever existed. **Keyless it no-ops cleanly** — nothing here waits on the OneSignal account; when it exists, it is two secrets.
+11. ~~Re-run `resealReminders` after the permission grant.~~ (§5.3) — moved onto Home's focus effect, which is where the summons returns to. Covers strictly more than the old data-only effect did.
 
-**If there is room:**
-15. Universal links + `oracle://` deep link into today's round. (§6.2)
-16. Client-side entitlement reconciliation after purchase. (§4.2)
+**Before submission — ✅ what could be done was:**
+12. Sentry: the placeholder org is gone. `app.config.js` configures the plugin from `SENTRY_ORG` and **drops it entirely when unset**, so a build can never carry a pretend org — Sentry degrades dark like every other SDK here. ⏳ **Still needs Erik:** `SENTRY_ORG`, and `EXPO_PUBLIC_PRIVACY_URL` / `EXPO_PUBLIC_SHARE_URL` in EAS (both need a domain / an ASC app id; the code already degrades correctly without them). (§6.1)
+13. ~~Update the `wrangler.jsonc` comment.~~ (§6.3) — now mirrors `WorkerEnv`, grouped by what breaks without each secret. An unset `REVENUECAT_WEBHOOK_SECRET` also logs a distinct error instead of looking identical to an attacker probing. ⏳ **Still needs Erik:** actually setting them.
+14. ~~Reset RevenueCat/OneSignal identity on strike.~~ (§4.3) — `resetIdentity()` on both SDKs, plus `queryClient.clear()`, so the struck player does not land on Home still wearing their old epithet.
+
+**Also done, from the smaller lists:**
+- ~~Client-side entitlement reconciliation after purchase.~~ (§4.2) — the rescue watches the ledger for the shield rather than asserting it, and says `THE STORE ANSWERED. THE LEDGER WILL RECORD IT SHORTLY.` across the gap. The block now outlives its own offer, so the confirmation no longer vanishes in the same frame as the thing it confirms.
+- ~~The evergreen bank's poison-skip.~~ (§6.4) — an entry that passes the schema but throws in `upsertDraft` is burned and skipped like any other, instead of jamming every tick.
+- ~~RiteConfirm's scrim.~~ (§7) — a real `Modal`, so it covers the window rather than stopping at Screen's gutters, and Android's back button withdraws the rite.
+- ~~Dead code.~~ (§7) — `ConfidenceSlider.tsx` and `epigraph.ts` deleted.
+
+**Still open:**
+15. Universal links + `oracle://` deep link into today's round. (§6.2) — needs a domain.
 17. `TURN THE LAST CARD` on the reveal. (§3.3)
-18. Constants instead of the three hardcoded thresholds; delete the two dead modules. (§2.3, §7)
+- The remaining §7 notes: the 10s crowd poll on Home, `idempotency_key` validated and never read, the all-closed/none-sealed frame.

@@ -17,6 +17,8 @@ export interface WorkerEnv {
   PIPELINE_RESOLVE_MODEL?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   APPLE_BUNDLE_ID?: string;
+  ONESIGNAL_APP_ID?: string;
+  ONESIGNAL_API_KEY?: string;
 }
 
 // Enablement gate (spec §11): the pipeline is fully wired but stays inert
@@ -33,6 +35,7 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
       resolve: env.PIPELINE_RESOLVE_MODEL ?? "claude-sonnet-5",
     },
     now: () => new Date(),
+    push: { ONESIGNAL_APP_ID: env.ONESIGNAL_APP_ID, ONESIGNAL_API_KEY: env.ONESIGNAL_API_KEY },
   };
 }
 

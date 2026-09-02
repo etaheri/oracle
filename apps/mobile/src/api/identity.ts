@@ -3,6 +3,8 @@ import { z } from "zod";
 import { api, ApiError } from "./client";
 import { getDeviceToken, clearDeviceToken } from "./auth";
 import { capture } from "../analytics/analytics";
+import { resetIdentity as resetPurchaseIdentity } from "../monetization/purchases";
+import { resetIdentity as resetPushIdentity } from "../notifications/onesignal";
 
 // The claim/restore trigger only needs the identity token (which carries the
 // stable `sub`) to prove "this Apple ID exists" — no name/email scope, since
@@ -58,6 +60,12 @@ export async function strikeRecord(): Promise<boolean> {
       body: JSON.stringify({}),
     });
     await clearDeviceToken();
+    // The device row is gone; the native SDKs are still keyed to its id. Drop
+    // both identities with the token, or the next launch buys entitlements
+    // the webhook cannot deliver and registers for pushes nobody can address
+    // (audit 2026-09-02 §4.3). Best-effort: the record IS struck either way,
+    // and reporting failure here would be a lie about what happened.
+    await Promise.allSettled([resetPurchaseIdentity(), resetPushIdentity()]);
     return true;
   } catch {
     return false;

@@ -88,6 +88,27 @@ export async function purchaseRescue(): Promise<boolean> {
   }
 }
 
+// Striking the record deletes the device row server-side and mints a fresh
+// one on the next call. Without this, `configured` stayed true and the SDK
+// stayed logged in as the DELETED device id — so every later purchase was
+// attributed to a device the RevenueCat webhook can no longer resolve
+// ("unknown app_user_id"), and the entitlement was lost for good until the
+// app was force-quit (audit 2026-09-02 §4.3). Log out, forget, and let the
+// next initPurchases configure against the new identity.
+export async function resetIdentity(): Promise<void> {
+  const wasConfigured = configured;
+  configured = false;
+  inflight = null;
+  usePlusStore.setState({ plusActive: false, loading: true });
+  if (!wasConfigured) return;
+  try {
+    await Purchases.logOut();
+  } catch {
+    // Already anonymous, or the store is unreachable — either way the local
+    // state above is what guards the next purchase.
+  }
+}
+
 export async function restore(): Promise<void> {
   if (!configured) return;
   try {

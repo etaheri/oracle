@@ -6,7 +6,25 @@
   "observability": { "enabled": true },
   "triggers": { "crons": ["*/10 * * * *"] },
   "vars": { "PIPELINE_AUTHOR_MODEL": "claude-opus-5", "PIPELINE_RESOLVE_MODEL": "claude-sonnet-5" }
-  // secrets (wrangler secret put): DEVICE_TOKEN_SECRET, ADMIN_SECRET, DATABASE_URL,
-  // ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET,
-  // PIPELINE_ENABLED ("true" to arm the cron pipeline)
+  // secrets (wrangler secret put) — this list is WorkerEnv in src/worker.ts;
+  // keep the two in step.
+  //
+  //   REQUIRED
+  //     DATABASE_URL            Neon connection string
+  //     DEVICE_TOKEN_SECRET     HMAC key for device tokens; also salts the mint throttle's ip hash
+  //     ADMIN_SECRET            x-admin-secret header on /admin/*
+  //
+  //   REVENUE — without this, /v1/webhooks/revenuecat 401s EVERY event and
+  //   every purchase silently grants nothing. Set it before shipping a paywall.
+  //     REVENUECAT_WEBHOOK_SECRET
+  //     APPLE_BUNDLE_ID         audience for Sign in with Apple; defaults to com.erikt.oracle
+  //
+  //   PIPELINE (the cron stays inert without the first one)
+  //     PIPELINE_ENABLED        "true" to arm the cron pipeline
+  //     ANTHROPIC_API_KEY
+  //     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET
+  //
+  //   PUSH — absent, the hinge push at settle no-ops and the settle report
+  //   says "push: 0 sent". Nothing else changes.
+  //     ONESIGNAL_APP_ID, ONESIGNAL_API_KEY
 }

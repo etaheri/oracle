@@ -30,7 +30,15 @@ export const webhookRoutes = new Hono<AppContext>().post("/revenuecat", async (c
   const { db, env } = c.get("deps");
   const secret = env.REVENUECAT_WEBHOOK_SECRET;
   const auth = c.req.header("authorization") ?? "";
-  if (!secret || auth !== `Bearer ${secret}`) return c.json({ error: "unauthorized" }, 401);
+  if (!secret) {
+    // An UNSET secret and a WRONG secret both 401, and RevenueCat retries
+    // both the same way — so a deployment that simply forgot the secret looks
+    // exactly like an attacker probing, while every real purchase silently
+    // grants nothing. Observability is on for this Worker; say which it is.
+    console.error("revenuecat webhook: REVENUECAT_WEBHOOK_SECRET is not set — every purchase event is being rejected");
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  if (auth !== `Bearer ${secret}`) return c.json({ error: "unauthorized" }, 401);
 
   const body = await c.req.json().catch(() => null);
   const parsed = EventSchema.safeParse((body as { event?: unknown } | null)?.event);

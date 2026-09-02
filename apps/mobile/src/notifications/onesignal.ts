@@ -33,11 +33,32 @@ export async function initOneSignal(): Promise<void> {
         // rather than silently no-op forever (mirrors the thrown-error path).
         return;
       }
-      OneSignal.login(deviceId); // external id = device id (spec §5)
+      // external id = device id (spec §5). THE SERVER TARGETS THIS EXACT
+      // VALUE: push/compose.ts resolves each user to their device ids and
+      // sendPushes passes them as include_aliases.external_id. It used to
+      // send user ids here, which matched nothing — every push would have
+      // been silently dropped (audit 2026-09-02 §5.2). If this login key ever
+      // changes, that resolution changes with it.
+      OneSignal.login(deviceId);
       ready = true;
     })().finally(() => { inflight = null; });
   }
   return inflight;
+}
+
+// See purchases.resetIdentity — the struck record's device id is gone, and a
+// push alias pointing at it would address nobody. The native SDK stays
+// initialized (that must never run twice); only the login is dropped, so the
+// next initOneSignal logs in as the freshly minted device.
+export async function resetIdentity(): Promise<void> {
+  if (!ready) return;
+  ready = false;
+  inflight = null;
+  try {
+    OneSignal.logout();
+  } catch {
+    // Nothing to log out of; `ready` is already false, which is what matters.
+  }
 }
 
 export async function requestPushPermission(): Promise<void> {

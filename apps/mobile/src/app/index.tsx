@@ -28,7 +28,7 @@ import { maybeSummon } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
-import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES } from "@oracle/core";
+import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES, type MeLedger } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -40,6 +40,15 @@ import { scaledRow } from "../game/typeScaling";
 const RESCUE_LINE = COPY_BANK.find((l) => l.id === "paywall.rescue-1")!.text;
 const RESCUE_CONFIRM_LINE = COPY_BANK.find((l) => l.id === "streak.shield-1")!.text;
 const STORE_SILENT_LINE = "THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.";
+// The store took the purchase but the shield has not reached the ledger yet:
+// it is granted server-side by the RevenueCat webhook, so there is a real gap
+// between "charged" and "protected". Printing the confirmation across that gap
+// told the player they were safe before anything made them safe (audit
+// 2026-09-02 §4.2). This line is true in the gap, and the ledger's own row is
+// the thing that eventually says otherwise.
+const STORE_PENDING_LINE = "THE STORE ANSWERED. THE LEDGER WILL RECORD IT SHORTLY.";
+const SHIELD_LANDING_TRIES = 3;
+const SHIELD_LANDING_GAP_MS = 2000;
 
 // The call's reserved height: two rows of state line and the framed action.
 // Home used to be a plain column, so every query that resolved — the round,
@@ -72,9 +81,6 @@ export default function Index() {
   const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
   const sealedCount = round ? round.questions.filter((q) => answers[q.id]?.sealed).length : 0;
   const partial = round ? partialLine(sealedCount, round.questions.length) : null;
-  useEffect(() => {
-    if (round?.locks_at) void resealReminders(round.locks_at, round.date, sealedCount);
-  }, [round?.date, round?.locks_at, sealedCount]);
   // Fires once per day's round, the moment it first renders live (still
   // open) here — not on every 30s re-render from the risk-line clock below.
   const openedFor = useRef<string | null>(null);
@@ -96,6 +102,18 @@ export default function Index() {
     useCallback(() => {
       void getRevealSeen().then(setRevealSeen);
       void getRitesSeen().then(setRitesSeen);
+      // The local reminder schedule is rewritten here rather than in a plain
+      // effect on the round data. resealReminders returns early without
+      // notification permission, and the ONLY moment permission is ever
+      // granted is the summons — which is pushed from this very screen and
+      // dismissed back onto it. On a data-only trigger the day-one player
+      // granted permission and then had nothing reschedule, so their first
+      // closing call and first noon knock were never written, and whether
+      // they got any reminders at all came down to which control they used to
+      // leave the round (audit 2026-09-02 §5.3). Focus covers that return,
+      // and the round values in the deps below still cover every data change
+      // while focused — strictly more than the old effect did.
+      if (round?.locks_at) void resealReminders(round.locks_at, round.date, sealedCount);
       // The one summons, ever (voice spec §4), and this is now its only
       // trigger. The round screen used to ask on the fifth seal, which put
       // the OS permission prompt straight over the crowd finale; asking on
@@ -103,7 +121,7 @@ export default function Index() {
       // beheld, and still catches the partial player who never returns to a
       // finished spread.
       if (anySealed) void maybeSummon((href) => router.push(href));
-    }, [anySealed, router])
+    }, [anySealed, router, round?.date, round?.locks_at, sealedCount])
   );
   const showLedgerCta = revealReady(reveal.data) && revealSeen !== yesterday;
   const crowd = useCrowdSoFar(anySealed);
@@ -134,15 +152,23 @@ export default function Index() {
     freeShieldAvailable: ledger.data.free_shield_available,
     paidShields: ledger.data.paid_shields,
   });
-  const [rescueResult, setRescueResult] = useState<"idle" | "success" | "error">("idle");
+  const [rescueResult, setRescueResult] = useState<"idle" | "waiting" | "success" | "pending" | "error">("idle");
   const qc = useQueryClient();
   const doRescue = useCallback(async () => {
-    setRescueResult("idle");
-    const ok = await purchaseRescue();
-    setRescueResult(ok ? "success" : "error");
-    // The bought shield lands in the ledger server-side; without this the
-    // notice/rescue row above keeps reading the stale pre-purchase ledger.
-    if (ok) void qc.invalidateQueries({ queryKey: ["me", "ledger"] });
+    setRescueResult("waiting");
+    const shieldsNow = () => qc.getQueryData<MeLedger>(["me", "ledger"])?.paid_shields ?? 0;
+    const before = shieldsNow();
+    if (!(await purchaseRescue())) { setRescueResult("error"); return; }
+    // The shield is granted by the RevenueCat webhook, not by the purchase
+    // call, so it arrives on the server's schedule. Watch the ledger for it
+    // rather than asserting it: only a shield we can actually SEE in reserve
+    // earns the confirmation line.
+    for (let i = 0; i < SHIELD_LANDING_TRIES; i++) {
+      await qc.refetchQueries({ queryKey: ["me", "ledger"] });
+      if (shieldsNow() > before) { setRescueResult("success"); return; }
+      if (i < SHIELD_LANDING_TRIES - 1) await new Promise((r) => setTimeout(r, SHIELD_LANDING_GAP_MS));
+    }
+    setRescueResult("pending");
   }, [qc]);
   // Cold-start choreography (spec 2026-09-01-boot-orb-handoff). `booted`:
   // the rite's hold elapsed — the bottom-stack lines print now, the hero
@@ -268,12 +294,28 @@ export default function Index() {
             )
           )}
         </View>
-        {showRescue && (
+        {/* The block outlives its own offer. The instant a shield lands,
+            `showRescue` goes false — there is one in reserve now — so the
+            confirmation used to flash and vanish in the same frame as the
+            thing it was confirming. Anything the machine has to say about a
+            purchase stays until the player moves on. */}
+        {(showRescue || rescueResult !== "idle") && (
           <View style={{ gap: space(2), alignItems: "center" }}>
             <Mono {...role.meta} color={rescueResult === "success" ? colors.goldText : colors.mutedInk}>
-              {rescueResult === "success" ? RESCUE_CONFIRM_LINE : rescueResult === "error" ? STORE_SILENT_LINE : RESCUE_LINE}
+              {rescueResult === "success"
+                ? RESCUE_CONFIRM_LINE
+                : rescueResult === "pending"
+                  ? STORE_PENDING_LINE
+                  : rescueResult === "error"
+                    ? STORE_SILENT_LINE
+                    : RESCUE_LINE}
             </Mono>
-            {rescueResult !== "success" && <GoldButton title={PAYWALL_CTA_LINES.rescue} onPress={doRescue} />}
+            {(rescueResult === "idle" || rescueResult === "error") && (
+              <GoldButton title={PAYWALL_CTA_LINES.rescue} onPress={doRescue} />
+            )}
+            {rescueResult === "waiting" && (
+              <Mono {...role.meta} color={colors.mutedInk}>CONSULTING THE STORE…</Mono>
+            )}
           </View>
         )}
       </View>

@@ -13,6 +13,8 @@ import { settleRound } from "../settlement";
 import { DraftSchema, upsertDraft } from "./draft";
 import { crowdDrift, lateEdge, leakReport, loadLeakRows } from "./leak";
 import type { TelegramClient } from "./telegram";
+import { composeHingePushes } from "../push/compose";
+import { sendPushes, type PushEnv } from "../push/onesignal";
 
 // The Oracle takes its position (design §2a) the instant the crowd is final.
 // Raw mean at cold start, skill-weighted + extremized once FORECAST_MIN_RATED
@@ -111,7 +113,19 @@ export async function publishFromBank(db: Db, telegram: TelegramClient, date: st
       continue;
     }
 
-    await upsertDraft(db, date, parsed.data);
+    // upsertDraft throws too — "resolves_at out of range" for an entry whose
+    // instant is now in the past, or "weather must lock before noon". Those
+    // throws used to escape the loop entirely, so the row was never marked
+    // used and jammed every subsequent tick, on the one path whose whole
+    // purpose is that the drop never fails. Poisoned is poisoned however it
+    // is discovered: burn the row and try the next one.
+    try {
+      await upsertDraft(db, date, parsed.data);
+    } catch (err) {
+      await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
+      await telegram.send(`⚠ bank draft ${entry.id} could not be scheduled and was skipped: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
     await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
     const ok = await publish(db, telegram, date);
     if (ok) {
@@ -151,8 +165,24 @@ export async function voidQuestions(
   await telegram.send(`⚠ voided unresolved questions (unverifiable within 24 hours of lock):\n${texts.map((t) => `- ${t}`).join("\n")}`);
 }
 
-export async function settle(deps: { db: Db; telegram: TelegramClient }, date: string): Promise<void> {
+export async function settle(deps: { db: Db; telegram: TelegramClient; push?: PushEnv }, date: string): Promise<void> {
   const result = await settleRound(deps.db, date);
+
+  // The hinge push (voice spec §4 beat 3): the day's second dopamine hit,
+  // fired the moment the ledger is actually readable. It composes AFTER
+  // settleRound because the audience is settleRound's own stamp and the
+  // vigil lines quote the streak it just wrote. Best-effort in both
+  // directions — a push failure must never leave a settled round unnarrated,
+  // and with no OneSignal keys the whole thing no-ops and says so.
+  let pushLine = "push: not configured";
+  try {
+    const pushes = await composeHingePushes(deps.db, date);
+    const { sent, skipped } = await sendPushes(deps.push ?? {}, pushes);
+    pushLine = `push: ${sent} sent, ${skipped} skipped (${pushes.length} composed)`;
+  } catch (err) {
+    pushLine = `push: FAILED — ${err instanceof Error ? err.message : String(err)}`;
+  }
+
   const qs = await deps.db.query.questions.findMany({
     where: eq(schema.questions.roundDate, date),
     orderBy: (questions, { asc }) => [asc(questions.slot)],
@@ -171,6 +201,7 @@ export async function settle(deps: { db: Db; telegram: TelegramClient }, date: s
     `Round ${date} settled`,
     ...lines,
     `settled: ${result.settled}`,
+    pushLine,
     "",
     ...leakReport(leakLines, defaultLocksAt),
     "",

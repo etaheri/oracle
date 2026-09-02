@@ -220,6 +220,34 @@ describe("runTick", () => {
     expect(sent.some((t) => t.includes("published from the evergreen bank"))).toBe(true);
   });
 
+  it("publishFromBank burns an entry that passes the schema but cannot be scheduled", async () => {
+    // A stale absolute instant ("resolves_at out of range") or a weather
+    // question is valid JSON and valid DraftSchema, but upsertDraft throws on
+    // it. That throw used to escape the loop, leaving the row unmarked so it
+    // jammed every subsequent tick — on the one path whose whole purpose is
+    // that the noon drop never fails.
+    const { db } = await makeTestDb();
+    const stale = {
+      ...validDraft,
+      questions: validDraft.questions.map((q, i) =>
+        i === 0 ? { ...q, resolves_at: "2020-01-01T00:00:00.000Z" } : q,
+      ),
+    };
+    await db.insert(schema.draftBank).values([
+      { draft: stale, createdAt: new Date("2026-08-20T00:00:00Z") },
+      { draft: validDraft, createdAt: new Date("2026-08-21T00:00:00Z") },
+    ]);
+    const { deps, sent } = fakeDeps(db, "2026-08-27T16:00:00Z");
+
+    const published = await publishFromBank(db, deps.telegram, "2026-08-27");
+
+    expect(published).toBe(true);
+    const rows = await db.query.draftBank.findMany();
+    expect(rows.every((r) => r.usedOn === "2026-08-27")).toBe(true); // the poisoned row is burned, not left to jam
+    expect(sent.some((t) => t.includes("could not be scheduled and was skipped"))).toBe(true);
+    expect(sent.some((t) => t.includes("published from the evergreen bank"))).toBe(true);
+  });
+
   it("publishFromBank bounds its retries per tick so a wholly-corrupt bank can't spin", async () => {
     const { db } = await makeTestDb();
     const poisoned = { questions: [] };

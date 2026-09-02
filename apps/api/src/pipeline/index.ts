@@ -12,6 +12,7 @@ import { authorRound } from "./author";
 import { resolveWithClaude } from "./resolve";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
+import type { PushEnv } from "../push/onesignal";
 
 export interface PipelineDeps {
   db: Db;
@@ -19,6 +20,10 @@ export interface PipelineDeps {
   claude: ClaudeClient | null;
   models: { author: string; resolve: string };
   now(): Date;
+  // OneSignal credentials for the hinge push at settle. Absent (or absent
+  // keys) → sendPushes no-ops cleanly and the settle report says so, which is
+  // the state until the account exists.
+  push?: PushEnv;
   // Fetch used for market signal feeds (feeds.ts); defaults to global fetch.
   // Injectable so tests never touch the network.
   marketFetch?: typeof fetch;
@@ -60,7 +65,7 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           break;
 
         case "settle":
-          await settle({ db: deps.db, telegram: deps.telegram }, action.date);
+          await settle({ db: deps.db, telegram: deps.telegram, push: deps.push }, action.date);
           done.push(`settle:${action.date}`);
           break;
 

@@ -47,13 +47,6 @@
           "mode": "production"
         }
       ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "SENTRY_ORG_TBD_BY_ERIK",
-          "project": "oracle-mobile"
-        }
-      ],
       "expo-font",
       [
         "expo-sensors",
