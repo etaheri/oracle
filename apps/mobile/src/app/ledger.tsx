@@ -43,11 +43,22 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+// The lead treatment celebrates a number you have earned, so it only applies
+// to one. Before fifty calls are rated `scoreValue` returns a progress
+// sentence — "UNWRITTEN · 0 OF 50" — and at Ritual 20 that ran straight
+// through its own label and off the plaque's edge. A sentence is not a
+// headline: unearned, the row keeps the machine voice the six stats below it
+// use, and only the real score gets carved.
 function LeadStat({ label, value }: { label: string; value: string }) {
+  const earned = /^\d+$/.test(value);
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
       <Mono size={11} color={colors.goldText} letterSpacing={2}>{label}</Mono>
-      <Ritual bold size={20} color={colors.ink} letterSpacing={1}>{value}</Ritual>
+      {earned ? (
+        <Ritual bold size={20} color={colors.ink} letterSpacing={1}>{value}</Ritual>
+      ) : (
+        <Mono size={11} color={colors.goldText} letterSpacing={2} numberOfLines={1} style={{ flexShrink: 1 }}>{value}</Mono>
+      )}
     </View>
   );
 }

@@ -184,7 +184,10 @@ export default function RevealScreen() {
           {anyPending
             ? `Day ${d.date} · the ledger is still being read`
             : allSpectator
-              ? `Day ${d.date} · the ledger was read without you`
+              // The lapsed line directly below says "the ledger was read
+              // without you" in full, and with more feeling. Saying it in the
+              // eyebrow too printed the same sentence twice, stacked.
+              ? `Day ${d.date}`
               : `Day ${d.date} · the ledger is read`}
         </Eyebrow>
         {allSpectator && !anyPending && (
