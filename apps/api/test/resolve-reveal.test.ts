@@ -271,4 +271,44 @@ describe("the reveal serves the weighed day", () => {
     expect(body.vigil_mult).toBeCloseTo(1.05, 10);
     expect(body.day_points).toBe(-32);
   });
+
+  // The first hour used to pay only on positive totals -- a wins-only
+  // multiplier, convex at zero, which is the shape that pays for
+  // overconfidence (core: dayPoints, and the negative control in
+  // scoring-day.test.ts). It is now symmetric, and the only end-to-end proof
+  // of that is a losing day sealed inside the hour: nothing else in this
+  // suite seals all five in-hour AND reads day_points.
+  //
+  // ±15 is chosen so the weighed magnitude lands on a half-integer: 15 × 1.1
+  // = 16.5. So ±17 fails three ways at once -- ±15 if the bonus ever goes
+  // back to skipping losing days, -16 if the route reaches for plain
+  // Math.round (which breaks .5 ties toward +infinity and would make the
+  // losing day one point cheaper than its mirror), and anything else if the
+  // rate itself moves.
+  for (const [label, points, expected] of [
+    ["a losing day", -3, -17],
+    ["a winning day", 3, 17],
+  ] as const) {
+    it(`weighs ${label} sealed inside the first hour by the same rate`, async () => {
+      vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+      const { db } = await makeTestDb();
+      const app = createApp({ db, env });
+      const a = await playerOn(app);
+      const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+
+      // All five, inside the hour -- both halves of `allFirstHour`.
+      for (const [i, q] of qs.entries()) {
+        await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: q.id, answer: true, confidence: 85, idempotency_key: `k${i}` }) });
+      }
+      for (const q of qs) await resolveQuestion(db, q.id, "yes");
+
+      const [u] = await db.query.users.findMany();
+      await db.update(schema.predictions).set({ points }).where(eq(schema.predictions.userId, u!.id));
+
+      const body = (await (await a("/v1/round/2026-08-20/reveal")).json()) as { first_hour: boolean; vigil_mult: number | null; day_points: number };
+      expect(body.first_hour).toBe(true);
+      expect(body.vigil_mult).toBeNull(); // unstamped: the first hour is the only weight here
+      expect(body.day_points).toBe(expected);
+    });
+  }
 });
