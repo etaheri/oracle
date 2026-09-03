@@ -989,7 +989,7 @@ EOF
 - Test: `apps/api/test/resolve-reveal.test.ts` (append)
 
 **Interfaces:**
-- Consumes: `schema.userRounds` (Task 6), `vigilPoints` (Task 5).
+- Consumes: `schema.userRounds` (Task 6). **Not** `vigilPoints` — the reveal multiplies by the STAMPED multiplier, never one re-derived from a live streak (see Step 4's note; that is why Task 6 exists).
 - Produces: `RevealSchema` gains `vigil_mult: z.number().nullable()`. `day_points` becomes the **weighed** total when `vigil_mult` is non-null, and the raw total when it is null (in which case the client must withhold it — Task 9).
 
 - [ ] **Step 1: Write the failing test**
