@@ -107,8 +107,12 @@ export const meRoutes = new Hono<AppContext>()
       where: isNotNull(schema.questions.oracleProbYes),
       orderBy: (q, { asc }) => [asc(q.roundDate), asc(q.slot)],
     });
+    // p === 0.5 is the Oracle declining to call the question (same rule as
+    // oracleCall/oracleCallRight/dayCallCounts, spec §3) -- it must leave the
+    // denominator, not enter scored as a brier of 0.25 and consume one of the
+    // fifty calls the Oracle needs before its score is written.
     const oracleBriers = forecast
-      .filter((q) => q.outcome === "yes" || q.outcome === "no")
+      .filter((q) => (q.outcome === "yes" || q.outcome === "no") && Number(q.oracleProbYes) !== 0.5)
       .map((q) => oracleBrierOf(Number(q.oracleProbYes), q.outcome as "yes" | "no"));
 
     // Days outseen: complete rounds only, the same rule every other rated

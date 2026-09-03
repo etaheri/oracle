@@ -346,6 +346,10 @@ describe("the ledger's rival", () => {
   it("excludes voids and the machine's abstentions from both sides", async () => {
     const body = (await ledgerFor(voidHeavyPlayer)) as LedgerBody;
     expect(body.oracle.days_compared).toBe(1);
+    // 5 questions: 2 void, 1 Oracle abstention (p=0.5), 2 called. The
+    // abstention must not enter as a brier of 0.25 and consume one of the
+    // fifty calls the Oracle needs before its score is written.
+    expect(body.oracle.calls_rated).toBe(2);
   });
   it("does not count a round as compared until it resolves, even when both sides have already committed", async () => {
     const body = (await ledgerFor(sealedButUnresolvedPlayer)) as LedgerBody;
