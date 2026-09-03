@@ -176,3 +176,158 @@ describe("standing", () => {
     expect(body.cohort_size).toBe(20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The ledger's rival: THE ORACLE's own record, on the same fifty-call floor
+// the player meets.
+// ---------------------------------------------------------------------------
+
+/** A fresh device + the user it minted, so a fixture can seed that user's own record. */
+async function freshPlayer(app: ReturnType<typeof createApp>) {
+  const res = await app.request("/v1/auth/device", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ platform: "ios" }) });
+  const { token, user_id } = (await res.json()) as { token: string; user_id: string };
+  return {
+    userId: user_id,
+    get: (path: string) => app.request(path, { headers: { authorization: `Bearer ${token}` } }),
+  };
+}
+
+/**
+ * Seal one round directly at the DB layer (bypassing /v1/predictions, so no
+ * fake clock is needed): the caller answers every question, the Oracle
+ * forecasts every question, and each question resolves to the given outcome.
+ */
+async function sealDay(
+  db: Awaited<ReturnType<typeof makeTestDb>>["db"],
+  userId: string,
+  qs: Array<{ id: string; slot: number }>,
+  rows: Array<{ outcome: "yes" | "no" | "void"; playerAnswer: boolean; oracleP: number }>,
+) {
+  for (let i = 0; i < qs.length; i++) {
+    const r = rows[i]!;
+    await db.insert(schema.predictions).values({ questionId: qs[i]!.id, userId, answer: r.playerAnswer, confidence: 75 });
+    await db.update(schema.questions).set({ oracleProbYes: String(r.oracleP) }).where(eq(schema.questions.id, qs[i]!.id));
+    await resolveQuestion(db, qs[i]!.id, r.outcome);
+  }
+}
+
+/** A fresh device, no rounds played, and no Oracle forecasts anywhere. */
+async function newPlayer() {
+  const { db } = await makeTestDb();
+  const app = createApp({ db, env });
+  return freshPlayer(app);
+}
+
+/**
+ * Two complete rounds. Day 1: the player gets 4 of 5 right, the Oracle 3 --
+ * the player outseeing it. Day 2: the player gets 2 right, the Oracle 4 --
+ * the Oracle outseeing the player, which must NOT count as outseen.
+ */
+async function twoDayPlayer() {
+  const { db } = await makeTestDb();
+  const app = createApp({ db, env });
+  const p = await freshPlayer(app);
+  const day1 = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+  await sealDay(db, p.userId, day1, [
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: true, oracleP: 0.3 }, // player right, Oracle wrong
+    { outcome: "yes", playerAnswer: false, oracleP: 0.3 }, // both wrong
+  ]); // player 4 right, Oracle 3 right
+  const day2 = await seedRound(db, { date: "2026-08-22", opensAt: new Date("2026-08-22T16:00:00Z"), locksAt: new Date("2026-08-23T16:00:00Z") });
+  await sealDay(db, p.userId, day2, [
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: false, oracleP: 0.8 }, // Oracle right, player wrong
+    { outcome: "yes", playerAnswer: false, oracleP: 0.8 }, // Oracle right, player wrong
+    { outcome: "yes", playerAnswer: false, oracleP: 0.3 }, // both wrong
+  ]); // player 2 right, Oracle 4 right
+  return p;
+}
+
+/** One complete round: the player and the Oracle each get 3 of 5 right. A tie. */
+async function tiedPlayer() {
+  const { db } = await makeTestDb();
+  const app = createApp({ db, env });
+  const p = await freshPlayer(app);
+  const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+  await sealDay(db, p.userId, qs, [
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "yes", playerAnswer: true, oracleP: 0.3 }, // player right, Oracle wrong
+    { outcome: "yes", playerAnswer: false, oracleP: 0.8 }, // Oracle right, player wrong
+    { outcome: "yes", playerAnswer: false, oracleP: 0.3 }, // both wrong
+  ]); // 3 right each
+  return p;
+}
+
+/** One round, sealed by the caller for only 3 of its 5 questions -- incomplete. */
+async function partialPlayer() {
+  const { db } = await makeTestDb();
+  const app = createApp({ db, env });
+  const p = await freshPlayer(app);
+  const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+  for (const q of qs) await db.update(schema.questions).set({ oracleProbYes: "0.8" }).where(eq(schema.questions.id, q.id));
+  for (let i = 0; i < 3; i++) await db.insert(schema.predictions).values({ questionId: qs[i]!.id, userId: p.userId, answer: true, confidence: 75 });
+  for (const q of qs) await resolveQuestion(db, q.id, "yes");
+  return p;
+}
+
+/**
+ * One complete round with two voids and one Oracle abstention (pYes = 0.5,
+ * an uncalled question). Both sides' right-counts must skip all three,
+ * without stopping the day from counting as compared.
+ */
+async function voidHeavyPlayer() {
+  const { db } = await makeTestDb();
+  const app = createApp({ db, env });
+  const p = await freshPlayer(app);
+  const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+  await sealDay(db, p.userId, qs, [
+    { outcome: "void", playerAnswer: true, oracleP: 0.8 },
+    { outcome: "void", playerAnswer: true, oracleP: 0.3 },
+    { outcome: "yes", playerAnswer: true, oracleP: 0.5 }, // Oracle abstains
+    { outcome: "yes", playerAnswer: true, oracleP: 0.8 }, // both right
+    { outcome: "no", playerAnswer: false, oracleP: 0.2 }, // both right
+  ]);
+  return p;
+}
+
+async function ledgerFor(setup: () => Promise<Awaited<ReturnType<typeof freshPlayer>>>) {
+  const p = await setup();
+  return (await p.get("/v1/me/ledger")).json();
+}
+
+interface LedgerBody {
+  oracle: { score: number | null; calls_rated: number; days_outseen: number; days_compared: number };
+}
+
+describe("the ledger's rival", () => {
+  it("reads UNWRITTEN for the machine below the fifty-call floor", async () => {
+    const body = (await ledgerFor(newPlayer)) as LedgerBody;
+    expect(body.oracle.score).toBeNull();
+    expect(body.oracle.calls_rated).toBeGreaterThanOrEqual(0);
+  });
+  it("counts a complete day the player won as outseen", async () => {
+    // Seeded: 2 complete rounds. Day 1 player 4 right / oracle 3.
+    //         Day 2 player 2 right / oracle 4.
+    const body = (await ledgerFor(twoDayPlayer)) as LedgerBody;
+    expect(body.oracle.days_compared).toBe(2);
+    expect(body.oracle.days_outseen).toBe(1);
+  });
+  it("never counts a tie as outseeing", async () => {
+    const body = (await ledgerFor(tiedPlayer)) as LedgerBody; // 3 right each, one round
+    expect(body.oracle.days_compared).toBe(1);
+    expect(body.oracle.days_outseen).toBe(0);
+  });
+  it("compares only complete rounds", async () => {
+    const body = (await ledgerFor(partialPlayer)) as LedgerBody; // sealed 3 of 5, one round
+    expect(body.oracle.days_compared).toBe(0);
+    expect(body.oracle.days_outseen).toBe(0);
+  });
+  it("excludes voids and the machine's abstentions from both sides", async () => {
+    const body = (await ledgerFor(voidHeavyPlayer)) as LedgerBody;
+    expect(body.oracle.days_compared).toBe(1);
+  });
+});

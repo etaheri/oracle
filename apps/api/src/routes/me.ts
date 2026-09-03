@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { count, eq, inArray, isNotNull, lt, and } from "drizzle-orm";
-import { assignEpithet, contrarianApplies, CONSTANTS } from "@oracle/core";
+import { assignEpithet, contrarianApplies, CONSTANTS, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -99,6 +99,51 @@ export const meRoutes = new Hono<AppContext>()
       percentile = Math.round((100 * below) / cohortSize);
     }
 
+    // THE ORACLE's own record, on the same floor the player meets -- so for
+    // the first ten days the machine reads UNWRITTEN beside them. Computed on
+    // read over questions alone: no table, no settlement hook, nothing for
+    // resettleRound to corrupt.
+    const forecast = await db.query.questions.findMany({
+      where: isNotNull(schema.questions.oracleProbYes),
+      orderBy: (q, { asc }) => [asc(q.roundDate), asc(q.slot)],
+    });
+    const oracleBriers = forecast
+      .filter((q) => q.outcome === "yes" || q.outcome === "no")
+      .map((q) => oracleBrierOf(Number(q.oracleProbYes), q.outcome as "yes" | "no"));
+
+    // Days outseen: complete rounds only, the same rule every other rated
+    // surface uses. A tie is not an outseeing.
+    const forecastByDate = new Map<string, typeof forecast>();
+    for (const q of forecast) {
+      const list = forecastByDate.get(q.roundDate) ?? [];
+      list.push(q);
+      forecastByDate.set(q.roundDate, list);
+    }
+    let daysCompared = 0;
+    let daysOutseen = 0;
+    for (const [date, n] of byDate.entries()) {
+      const dayQs = forecastByDate.get(date);
+      if (!dayQs || n !== sizeOf.get(date) || dayQs.length !== sizeOf.get(date)) continue;
+      const byId = new Map(dayQs.map((q) => [q.id, q]));
+      let you = 0;
+      let machine = 0;
+      for (const q of dayQs) {
+        if (q.outcome !== "yes" && q.outcome !== "no") continue;
+        if (oracleCallRight(Number(q.oracleProbYes), q.outcome) === true) machine += 1;
+      }
+      // Iterate `preds`, NOT `resolved`. The `Row` objects in `resolved`
+      // carry a precomputed `correct` flag and no `questionId` or `answer`,
+      // so they cannot be matched back to a question. `preds` is the raw
+      // prediction rows and is already in scope above.
+      for (const p of preds) {
+        const q = byId.get(p.questionId);
+        if (!q || (q.outcome !== "yes" && q.outcome !== "no")) continue;
+        if ((p.answer ? "yes" : "no") === q.outcome) you += 1;
+      }
+      daysCompared += 1;
+      if (you > machine) daysOutseen += 1;
+    }
+
     return c.json({
       oracle_score: user?.oracleScore ?? null,
       percentile,
@@ -123,5 +168,11 @@ export const meRoutes = new Hono<AppContext>()
       claimed: Boolean(user?.appleSub),
       epithet,
       computed_through: new Date().toISOString().slice(0, 10),
+      oracle: {
+        score: oracleScore(oracleBriers),
+        calls_rated: oracleBriers.length,
+        days_outseen: daysOutseen,
+        days_compared: daysCompared,
+      },
     });
   });
