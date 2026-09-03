@@ -34,7 +34,7 @@ export default function Rites() {
   const gutter = Math.ceil(40 * useChromeScale());
   return (
     <Screen>
-      <TopBar />
+      <TopBar showReturn={!opening} />
       {/* The full canon does not fit a phone. The screen used to centre it in a
           fixed box and rely on the count never growing — it was already at
           602pt of content in a 619pt box before the numerals arrived, and the
@@ -95,18 +95,18 @@ export default function Rites() {
           </View>
         )}
       </ScrollView>
-      <View style={{ paddingTop: space(3), paddingBottom: space(2) }}>
-        {opening ? (
+      {/* BEGIN is a commitment and earns the gold. RETURN is not: the full
+          canon is a reference, and TopBar's ‹ RETURN is pinned above the
+          scroller and never leaves — a second, louder exit made the most
+          emphatic element on the rulebook the way out of it. */}
+      {opening && (
+        <View style={{ paddingTop: space(3), paddingBottom: space(2) }}>
           <GoldButton
             title="BEGIN"
             onPress={() => { void markRitesSeen(); router.replace("/round"); }}
           />
-        ) : (
-          // Reached from the standing link (or from the opening's own link),
-          // this is a reference, not a gate — it returns where it came from.
-          <GoldButton title="RETURN" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />
-        )}
-      </View>
+        </View>
+      )}
     </Screen>
   );
 }
