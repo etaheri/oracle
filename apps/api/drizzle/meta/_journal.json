@@ -36,6 +36,13 @@
       "when": 1788274761000,
       "tag": "0004_revenue_rites",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788441018770,
+      "tag": "0005_the_vigil_weighs",
+      "breakpoints": true
     }
   ]
 }

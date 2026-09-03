@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, timestamp, date, numeric, jsonb, uniqueIndex, index, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, boolean, timestamp, date, numeric, jsonb, uniqueIndex, index, pgEnum, primaryKey } from "drizzle-orm/pg-core";
 
 export const questionStatus = pgEnum("question_status", ["draft", "approved", "scheduled", "open", "locked", "resolved", "void"]);
 export const outcome = pgEnum("outcome", ["yes", "no", "void"]);
@@ -104,3 +104,15 @@ export const webhookEvents = pgTable("webhook_events", {
   id: text("id").primaryKey(),
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// One row per user per round: how heavily the ledger weighed that day.
+//
+// Stamped once by settleRound from the vigil the player carried INTO the day,
+// and never revised -- the reveal computes day_points on read, so a live read
+// of users.streak_current would silently rewrite every past day each time the
+// streak moved. "NOTHING IS REVISED" is a promise the schema has to keep.
+export const userRounds = pgTable("user_rounds", {
+  userId: uuid("user_id").notNull().references(() => users.id),
+  date: date("date").notNull(),
+  vigilMult: numeric("vigil_mult").notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.date] })]);
