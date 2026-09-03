@@ -21,12 +21,15 @@ describe("standingLine", () => {
 import { vigilStat } from "../src/game/standing";
 
 describe("vigilStat", () => {
-  it("is a plain count while the vigil carries no weight", () => {
+  it("is a plain count only when there is no weight to name", () => {
     expect(vigilStat(0)).toBe("0 DAYS");
-    expect(vigilStat(1)).toBe("1 DAY");
   });
 
-  it("names the weight the vigil has earned", () => {
+  it("names the weight from the very first day", () => {
+    // 1.05 is a real multiplier on a real day's points. Naming it here is
+    // deliberate, and it is NOT tied to the shield's three-day floor.
+    expect(vigilStat(1)).toBe("1 DAY · ×1.05");
+    expect(vigilStat(2)).toBe("2 DAYS · ×1.1");
     expect(vigilStat(3)).toBe("3 DAYS · ×1.15");
     expect(vigilStat(10)).toBe("10 DAYS · ×1.5");
   });

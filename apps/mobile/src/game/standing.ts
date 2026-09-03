@@ -1,4 +1,4 @@
-import { CONSTANTS, vigilMultiplier } from "@oracle/core";
+import { vigilMultiplier } from "@oracle/core";
 
 // Where this record stands among every written Oracle Score. The API withholds
 // the percentile until the caller has a score AND the cohort is worth
@@ -13,11 +13,12 @@ export function standingLine(percentile: number | null, cohortSize: number): str
 
 // The vigil's row says what the vigil now does. A bare day count was honest
 // when the streak was a pride number; it is not, now that it weighs the day.
-// The weight stays unmentioned below SHIELD_MIN_STREAK: a vigil too short for
-// a shield to defend is not yet a stake worth naming on the row.
+// The weight is named whenever it EXISTS -- from the first day, where it is
+// 1.05. Deliberately not gated on SHIELD_MIN_STREAK: that is the shield's
+// floor, not the multiplier's, and tying the two would make this row report a
+// weight of nothing the moment either constant moved.
 export function vigilStat(streak: number): string {
   const days = `${streak} ${streak === 1 ? "DAY" : "DAYS"}`;
-  if (streak < CONSTANTS.SHIELD_MIN_STREAK) return days;
   const m = vigilMultiplier(streak);
-  return `${days} · ×${String(Number(m.toFixed(2)))}`;
+  return m <= 1 ? days : `${days} · ×${String(Number(m.toFixed(2)))}`;
 }
