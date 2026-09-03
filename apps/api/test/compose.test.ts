@@ -100,10 +100,33 @@ describe("composeHingePushes", () => {
 
     const pushes = await composeHingePushes(db, "2026-08-20");
     const requires = (id: string) => (COPY.find((l) => l.id === id)?.requires ?? []) as string[];
+
+    // The obligation is one-directional, and so is the assertion. A player
+    // whose every call voided has "results" UNsatisfied, so no results line is
+    // ever eligible to them -- that is a guarantee, and this is the test.
     const voidedPush = pushes.find((p) => p.userId === voided.userId)!;
     expect(requires(voidedPush.lineId)).not.toContain("results");
+
+    // The scored player is the non-vacuity control, and it must NOT be
+    // written as "they drew a results line". selectLine picks uniformly from
+    // every ELIGIBLE line, and satisfying "results" only ADDS the results
+    // lines to a pool that still holds every generic noon line -- so which
+    // one a scored player draws is a hash of their randomly-minted user id,
+    // not a property of the obligation. Asserting on that draw failed about
+    // one run in eight, and passed the other seven for no better reason.
+    //
+    // What actually needs to hold is that the pools differ: results lines are
+    // reachable once "results" is satisfied and unreachable before. That is a
+    // fact about the bank, so assert it against the bank.
+    const noon = COPY.filter((l) => l.pool === "noon");
+    const eligible = (satisfied: string[]) =>
+      noon.filter((l) => (l.requires ?? []).every((r) => satisfied.includes(r)));
+    expect(eligible(["results"]).some((l) => (l.requires ?? []).includes("results"))).toBe(true);
+    expect(eligible([]).every((l) => !(l.requires ?? []).includes("results"))).toBe(true);
+
+    // And the scored player must still have been given a line at all.
     const scoredPush = pushes.find((p) => p.userId === scored.userId)!;
-    expect(requires(scoredPush.lineId)).toContain("results");
+    expect(noon.some((l) => l.id === scoredPush.lineId)).toBe(true);
   });
 });
 
