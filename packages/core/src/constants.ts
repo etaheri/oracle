@@ -36,4 +36,9 @@ export const CONSTANTS = {
   // crowd's own verdict floor takes. Below it the board still reports the
   // field's size; it just stops claiming a placing inside it.
   BOARD_MIN_FIELD: 5,
+  // The board's window. Named here rather than as literals at the call site
+  // because the reveal reserves height against them.
+  BOARD_TOP_ROWS: 3,      // rows from the summit
+  BOARD_NEIGHBOURS: 2,    // rows either side of the caller
+  BOARD_ROWS_MAX: 8,      // 1 summary line + BOARD_TOP_ROWS + 2*BOARD_NEIGHBOURS + the pinned Oracle
 } as const;

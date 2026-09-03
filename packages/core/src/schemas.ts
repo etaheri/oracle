@@ -121,6 +121,20 @@ export const RoundBoardSchema = z.object({
   your_rank: z.number().int().nullable(),
   best_points: z.number().int().nullable(),
   median_points: z.number().int().nullable(),
+  // The field as a room rather than a rank. Machine-assigned designations
+  // only -- nothing a user typed reaches this array, which is what keeps the
+  // board free of a moderation surface. Empty below BOARD_MIN_FIELD.
+  rows: z.array(
+    z.object({
+      name: z.string(),
+      points: z.number().int(),
+      rank: z.number().int(),
+      is_you: z.boolean(),
+      // The machine stands in the list on the same ladder as the rows
+      // beside it: big-one weight in, first hour / vigil / bounty out.
+      is_oracle: z.boolean(),
+    }),
+  ),
 });
 export type RoundBoard = z.infer<typeof RoundBoardSchema>;
 
@@ -147,5 +161,15 @@ export const MeLedgerSchema = z.object({
   claimed: z.boolean(),
   epithet: z.object({ id: z.string(), title: z.string(), receipt: z.string() }),
   computed_through: z.string(),
+  // THE ORACLE's own record, on the same fifty-call floor the player meets --
+  // so for the first ten days the machine reads UNWRITTEN beside them.
+  oracle: z.object({
+    score: z.number().int().nullable(),
+    calls_rated: z.number().int(),
+    // Complete rounds in which the player got more calls right than the
+    // machine did, and how many complete rounds were compared at all.
+    days_outseen: z.number().int(),
+    days_compared: z.number().int(),
+  }),
 });
 export type MeLedger = z.infer<typeof MeLedgerSchema>;
