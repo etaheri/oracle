@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, countDistinct, eq, inArray } from "drizzle-orm";
-import { dayPoints } from "@oracle/core";
+import { dayPoints, weighDay } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -122,7 +122,7 @@ export const roundRoutes = new Hono<AppContext>()
 
     return c.json({
       date,
-      day_points: vigilMult === null ? raw : Math.round(raw * vigilMult),
+      day_points: vigilMult === null ? raw : weighDay(raw, vigilMult),
       vigil_mult: vigilMult,
       first_hour: allFirstHour,
       questions: qs.map((q) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dayPoints, oracleScore, vigilMultiplier, vigilPoints } from "../src/scoring";
+import { dayPoints, oracleScore, vigilMultiplier, vigilPoints, weighDay } from "../src/scoring";
 import { CONSTANTS } from "../src/constants";
 
 describe("dayPoints", () => {
@@ -45,6 +45,28 @@ describe("vigilMultiplier", () => {
     expect(vigilMultiplier(CONSTANTS.VIGIL_MULT_MAX_DAYS + 1)).toBe(vigilMultiplier(CONSTANTS.VIGIL_MULT_MAX_DAYS));
     expect(vigilMultiplier(400)).toBe(vigilMultiplier(CONSTANTS.VIGIL_MULT_MAX_DAYS));
     expect(vigilMultiplier(-5)).toBe(1);
+  });
+});
+
+describe("weighDay", () => {
+  it("rounds the magnitude, so a losing day is never cheaper than its mirror", () => {
+    // -31.5 is exactly where Math.round's toward-+infinity tie-breaking shows.
+    expect(weighDay(30, 1.05)).toBe(32);
+    expect(weighDay(-30, 1.05)).toBe(-32);
+  });
+
+  it("is exactly odd across the range both callers use", () => {
+    for (const m of [1, 1.05, 1.1, 1.15, 1.35, 1.5]) {
+      for (let total = -400; total <= 400; total++) {
+        expect(weighDay(-total, m), `total=${total} m=${m}`).toBe(-weighDay(total, m));
+      }
+    }
+  });
+
+  it("leaves a total alone at a multiplier of one", () => {
+    expect(weighDay(83, 1)).toBe(83);
+    expect(weighDay(-83, 1)).toBe(-83);
+    expect(weighDay(0, 1.5)).toBe(0);
   });
 });
 

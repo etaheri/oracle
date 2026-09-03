@@ -65,6 +65,21 @@ export function vigilMultiplier(streak: number): number {
 }
 
 /**
+ * Weigh a day's total by a multiplier, rounding the MAGNITUDE so a losing day
+ * is never cheaper than the winning day of the same size. Math.round breaks
+ * .5 ties toward +infinity, which is asymmetric -- and symmetry is the whole
+ * property the vigil rests on (spec §A.3).
+ *
+ * Both callers come through here: `vigilPoints`, which starts from a streak,
+ * and the reveal route, which starts from a multiplier stamped at settlement
+ * and has no streak to hand. The route must never re-derive one.
+ */
+export function weighDay(dayTotal: number, multiplier: number): number {
+  const weighed = dayTotal * multiplier;
+  return Math.sign(weighed) * Math.round(Math.abs(weighed));
+}
+
+/**
  * The weighed day. Applied to the day's TOTAL, after the first-hour bonus,
  * and to negative totals exactly as to positive ones -- a long vigil
  * amplifies a bad day as much as a good one. That symmetry is what keeps the
@@ -72,9 +87,5 @@ export function vigilMultiplier(streak: number): number {
  * stake that makes a vigil worth defending.
  */
 export function vigilPoints(dayTotal: number, streak: number): number {
-  // Round the MAGNITUDE, not the signed value: Math.round breaks .5 ties
-  // toward +infinity, which would make a losing day one point cheaper than
-  // the winning day of the same size. Symmetry is the whole property here.
-  const weighed = dayTotal * vigilMultiplier(streak);
-  return Math.sign(weighed) * Math.round(Math.abs(weighed));
+  return weighDay(dayTotal, vigilMultiplier(streak));
 }

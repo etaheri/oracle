@@ -248,4 +248,27 @@ describe("the reveal serves the weighed day", () => {
     expect(after.vigil_mult).toBeCloseTo(1.5, 10);
     expect(after.day_points).toBe(Math.round(raw * 1.5));
   });
+
+  it("weighs a losing day exactly as it weighs a winning one", async () => {
+    // Plain Math.round breaks .5 ties toward +infinity: -30 * 1.05 = -31.5,
+    // which Math.round would report as -31 -- one point cheaper than the
+    // +32 a +30 day of the same size would show. The route must round the
+    // magnitude, same as vigilPoints does.
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await playerOn(app);
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 85, idempotency_key: "k" }) });
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+
+    const [u] = await db.query.users.findMany();
+    await db.update(schema.predictions).set({ points: -30 }).where(eq(schema.predictions.userId, u!.id));
+    await db.insert(schema.userRounds).values({ userId: u!.id, date: "2026-08-20", vigilMult: "1.05" });
+
+    const res = await a("/v1/round/2026-08-20/reveal");
+    const body = (await res.json()) as { vigil_mult: number | null; day_points: number };
+    expect(body.vigil_mult).toBeCloseTo(1.05, 10);
+    expect(body.day_points).toBe(-32);
+  });
 });
