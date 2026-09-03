@@ -1329,19 +1329,43 @@ export const RITES_LINES = [
 
 Then: `export const OPENING_RITES = 9;`
 
-- [ ] **Step 4: Run the core suite**
+- [ ] **Step 4: Amend the two existing assertions this task deliberately breaks**
+
+Both are in `packages/core/test/copy-lint.test.ts` and both are expected — do not work around them.
+
+**`copy-lint.test.ts:94`** pins the canon's length:
+```ts
+    expect(RITES_LINES.length).toBe(14);
+```
+becomes `.toBe(15)`.
+
+**`copy-lint.test.ts:140`** asserts the opening defers three rules:
+```ts
+    for (const word of ["FIRST HOUR", "SHIELD", "BIG ONE"]) expect(opening, word).not.toContain(word);
+```
+becomes:
+```ts
+    // SHIELD was deferred here on 2026-09-02, when a shield defended a vigil
+    // that did nothing. It is now a real-money purchase offered on Home and a
+    // permanent plaque row, defending a vigil that weighs every day played —
+    // the one deferred rule a player can be CHARGED for before meeting it.
+    // The bounty and the first hour stay deferred: they cost nothing to miss.
+    for (const word of ["FIRST HOUR", "BIG ONE"]) expect(opening, word).not.toContain(word);
+```
+
+- [ ] **Step 5: Run the core suite**
 
 Run: `cd packages/core && pnpm test`
-Expected: PASS. If `copy-select.test.ts` or `schemas.test.ts` asserts a rite count, update it. Every line must still satisfy caps / no-`!` / no-CTA / ≤140 chars — check the two new lines against that by eye if the lint is silent about length.
+Expected: PASS. Every line must still satisfy caps / no-`!` / no-CTA / ≤140 chars.
 
-- [ ] **Step 5: Confirm the mobile numeral gutter still fits**
+- [ ] **Step 6: Confirm the mobile numeral gutter still fits**
 
 `rites.tsx` sizes its numeral gutter for the widest numeral; the canon now runs to XV. Run:
 
 Run: `cd apps/mobile && pnpm typecheck`
 Expected: clean. Note for the device pass: **verify XIII/XIV/XV do not wrap the gutter** — `gutter` is `40 * useChromeScale()` and was sized when the canon ended at XIV.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/core/src/copy.ts packages/core/test/copy-lint.test.ts
@@ -1378,7 +1402,10 @@ Add to `packages/core/test/copy-lint.test.ts`:
 
 ```ts
   it("the paywall states the mechanic it charges for", () => {
-    const creed = COPY_BANK.filter((l) => l.pool === "paywall" && l.id.startsWith("paywall.creed")).map((l) => l.text).join(" ");
+    // The whole pool, not just the creed: the Oracle Score clause lives in
+    // paywall.terms-1, and `plus.tsx` renders creed lines while the terms line
+    // is the one that has to stay true about what money cannot buy.
+    const creed = COPY_BANK.filter((l) => l.pool === "paywall").map((l) => l.text).join(" ");
     expect(CONSTANTS.SHIELD_MIN_STREAK).toBe(3);
     expect(creed).toContain("THREE DAYS OR MORE");
     // What the subscription actually grants, in the player's words.
@@ -1393,21 +1420,24 @@ Add to `packages/core/test/copy-lint.test.ts`:
 Run: `cd packages/core && pnpm vitest run test/copy-lint.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Rewrite the creed**
+- [ ] **Step 3: Rewrite the creed — and fix the line the vigil's stake made false**
 
-Replace the four `paywall.creed`/`paywall.terms` lines in `COPY_BANK` with:
+`paywall.terms-1` currently reads *"PAYING NEVER IMPROVES A PROPHECY. ONLY PROTECTS ITS RECORD."*
+Under Task 5 that is **no longer true**: a shield defends a vigil, and a vigil now multiplies
+the day's points, so paying *does* indirectly improve points. What it still never touches is
+the Oracle Score. Rewrite it rather than deleting it — `copy-lint.test.ts:61` requires at
+least 5 lines in the `paywall` pool, and deleting would leave exactly 5 with no margin.
+
+Replace the four `paywall.creed`/`paywall.terms` lines with these five, keeping
+`paywall.rescue-1` unchanged (six paywall lines in total):
 
 ```ts
   { id: "paywall.creed-1", pool: "paywall", text: "A SHIELD HOLDS A VIGIL OF THREE DAYS OR MORE THROUGH ONE MISSED NOON." },
   { id: "paywall.creed-2", pool: "paywall", text: "THE ORACLE GRANTS ONE EACH MONTH. PLUS ADDS THREE SHIELDS A PERIOD, TO A RESERVE OF FIVE." },
   { id: "paywall.creed-3", pool: "paywall", text: "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." },
-  { id: "paywall.creed-4", pool: "paywall", text: "NOTHING HERE TOUCHES YOUR ORACLE SCORE. THAT NUMBER IS EARNED OR IT IS NOTHING." },
+  { id: "paywall.creed-4", pool: "paywall", text: "THE VIGIL IS FRAGILE. THE SHIELD IS NOT." },
+  { id: "paywall.terms-1", pool: "paywall", text: "PAYING DEFENDS A VIGIL. IT NEVER IMPROVES A PROPHECY, AND NEVER TOUCHES YOUR ORACLE SCORE." },
 ```
-
-Keep `paywall.rescue-1` unchanged. Delete `paywall.terms-1` only if nothing renders it — check with:
-
-Run: `grep -rn "paywall.terms" apps/mobile/src apps/api/src packages/core/src`
-If anything references it, keep it.
 
 - [ ] **Step 4: Run and watch it pass**
 
