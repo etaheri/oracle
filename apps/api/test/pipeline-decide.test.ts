@@ -16,9 +16,9 @@ describe("decideActions", () => {
     const acts = decideActions(at(12), { ...empty, openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false } });
     expect(acts[0]).toEqual({ kind: "lock", date: "2026-08-26" });
   });
-  it("locks then publishes in one noon tick", () => {
+  it("locks then publishes in one noon tick, forecasting today right after", () => {
     const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
-    expect(acts.map((a) => a.kind)).toEqual(["lock", "publish"]);
+    expect(acts.map((a) => a.kind)).toEqual(["lock", "publish", "forecast"]);
   });
   it("never publishes while another round is open and not yet lockable", () => {
     const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
@@ -68,8 +68,11 @@ describe("decideActions", () => {
     expect(acts).toContainEqual({ kind: "settle", date: "2026-08-26" });
   });
   it("falls through to the bank at noon when nothing is scheduled for today", () => {
-    expect(decideActions(at(12), { ...empty, bankCount: 2 })).toEqual([{ kind: "publish-bank", date: "2026-08-27" }]);
-    expect(decideActions(at(12), { ...empty, bankCount: 2, scheduledDates: ["2026-08-27"] }).map((a) => a.kind)).toEqual(["publish"]);
+    expect(decideActions(at(12), { ...empty, bankCount: 2 })).toEqual([
+      { kind: "publish-bank", date: "2026-08-27" },
+      { kind: "forecast", date: "2026-08-27" },
+    ]);
+    expect(decideActions(at(12), { ...empty, bankCount: 2, scheduledDates: ["2026-08-27"] }).map((a) => a.kind)).toEqual(["publish", "forecast"]);
     expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false } })).toEqual([]);
     expect(decideActions(at(11, 50), { ...empty, bankCount: 2 })).toEqual([]);
   });
@@ -173,5 +176,43 @@ describe("the forecast action", () => {
     // Never fires once claude is available again.
     const recovered = decideActions({ date: "2026-09-03", hour: 23, minute: 5 } as ETNow, openNeeding);
     expect(recovered.some((a) => a.kind === "alert" && a.message.includes("Claude client"))).toBe(false);
+  });
+
+  // 2026-09-03 review: the Oracle must commit in the SAME tick that opens the
+  // round -- ahead of every player -- not an hour later on the minute<10
+  // catch-up throttle.
+  describe("same-tick commitment (spec §2.1: the Oracle answers first)", () => {
+    const noon = { date: "2026-09-03", hour: 12, minute: 0 } as ETNow;
+
+    it("decides forecast for today right after publish, with no open round yet", () => {
+      const acts = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: ["2026-09-03"], bankCount: 0, claudeAvailable: true });
+      expect(acts).toEqual([
+        { kind: "publish", date: "2026-09-03" },
+        { kind: "forecast", date: "2026-09-03" },
+      ]);
+    });
+
+    it("decides forecast for today right after publish-bank", () => {
+      const acts = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 3, claudeAvailable: true });
+      expect(acts).toEqual([
+        { kind: "publish-bank", date: "2026-09-03" },
+        { kind: "forecast", date: "2026-09-03" },
+      ]);
+    });
+
+    it("still catches up on an already-open round that needs a forecast (same-tick attempt not applicable)", () => {
+      const acts = decideActions(
+        { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
+        { openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true }, lockedRound: null, scheduledDates: [], bankCount: 0, claudeAvailable: true },
+      );
+      expect(acts).toEqual([{ kind: "forecast", date: "2026-09-03" }]);
+    });
+
+    it("decides neither publish's nor publish-bank's forecast when claudeAvailable is false", () => {
+      const published = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: ["2026-09-03"], bankCount: 0, claudeAvailable: false });
+      expect(published).toEqual([{ kind: "publish", date: "2026-09-03" }]);
+      const banked = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 3, claudeAvailable: false });
+      expect(banked).toEqual([{ kind: "publish-bank", date: "2026-09-03" }]);
+    });
   });
 });

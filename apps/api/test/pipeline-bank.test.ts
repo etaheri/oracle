@@ -67,8 +67,8 @@ describe("decideActions — author-bank", () => {
     // The bank is thin at both, and neither hour refills it: 17:00 authors
     // tomorrow, noon drops today.
     const low = { ...empty, bankCount: 1, scheduledDates: ["2026-08-27"] };
-    expect(decideActions(at(17, 0), low).map((a) => a.kind)).toEqual(["publish", "author"]);
-    expect(decideActions(at(12, 0), low).map((a) => a.kind)).toEqual(["publish"]);
+    expect(decideActions(at(17, 0), low).map((a) => a.kind)).toEqual(["publish", "forecast", "author"]);
+    expect(decideActions(at(12, 0), low).map((a) => a.kind)).toEqual(["publish", "forecast"]);
     // And the 03:00 tick touches nothing else.
     expect(decideActions(at(3, 0), { ...low, scheduledDates: ["2026-08-27", "2026-08-28"] })).toEqual([
       { kind: "author-bank" },

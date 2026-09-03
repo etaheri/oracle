@@ -96,9 +96,12 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     actions.push({ kind: "lock", date: state.openRound.date });
   }
 
-  // FORECAST — the Oracle owes the open round a position, and takes it
-  // before the answers exist. Hourly throttle (minute<10) like authoring:
-  // the call makes chained web searches and a failure simply retries.
+  // FORECAST (catch-up) — the same-tick attempt pushed right after PUBLISH /
+  // PUBLISH-BANK below is the normal path; this is only for when that attempt
+  // failed (or claudeAvailable was false) and an already-open round still
+  // needsForecast. Hourly throttle (minute<10) like authoring — the call
+  // makes chained web searches and a failure simply retries — and the
+  // throttle belongs ONLY here, never on the same-tick attempt.
   // Never past the lock: at that point a forecast would be a look-up.
   // Gated on claudeAvailable: with no client the call would only throw, and
   // it would throw every ten minutes for up to 24h straight (spec amendment,
@@ -118,6 +121,17 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
   const openBlocksPublish = state.openRound !== null && !state.openRound.lockPassed;
   if (hour >= 12 && state.scheduledDates.includes(today) && !openBlocksPublish) {
     actions.push({ kind: "publish", date: today });
+    // The Oracle commits in the SAME tick that opens the round — before any
+    // player has seen a single question (spec §2.1: "commits… earlier than
+    // any player can", "the Oracle answers first"). loadPipelineState ran
+    // before this publish executes, so state.openRound is still null/closed
+    // here; stampOracleForecast queries questions by roundDate regardless of
+    // status, so it works on the rows publish is about to open. If this
+    // attempt fails (or claudeAvailable is false), the FORECAST block above
+    // is the catch-up: an already-open round that still needsForecast.
+    if (state.claudeAvailable) {
+      actions.push({ kind: "forecast", date: today });
+    }
   }
 
   // PUBLISH FROM THE BANK — noon with nothing scheduled for today: the drop
@@ -131,6 +145,11 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     state.bankCount > 0
   ) {
     actions.push({ kind: "publish-bank", date: today });
+    // Same same-tick commitment as PUBLISH above — the bank drop must not
+    // leave the Oracle waiting an extra hour any more than an authored one.
+    if (state.claudeAvailable) {
+      actions.push({ kind: "forecast", date: today });
+    }
   }
 
   // RESOLVE / VOID / SETTLE on the locked round. Late, never wrong (design
