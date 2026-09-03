@@ -920,7 +920,32 @@ describe("settleRound stamps the vigil", () => {
     void b;
   });
 
-  it("is idempotent — a re-settle never revises the stamp", async () => {
+  it("a crash-retry re-entering the loop never revises the stamp", async () => {
+    // The real retry path, and the ONLY test that exercises onConflictDoNothing.
+    // settleRound's own second call returns early on round status, and
+    // resettleRound never enters the per-user loop at all — so both would pass
+    // this vacuously. Simulate the crash instead: clear the settled-through
+    // marker and reopen the round, so the user is genuinely re-processed. Their
+    // streak is now 1 rather than 0, so a do-UPDATE would rewrite the stamp
+    // from 1.00 to 1.05. It must not.
+    vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    await playedRound(db, app, "2026-08-20", [{ p: a, slots: [1] }]);
+    await settleRound(db, "2026-08-20");
+    expect(Number((await db.query.userRounds.findMany())[0]!.vigilMult)).toBe(1);
+
+    await db.update(schema.users).set({ streakSettledThrough: null });
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-20"));
+    await settleRound(db, "2026-08-20");
+
+    const stamped = await db.query.userRounds.findMany();
+    expect(stamped).toHaveLength(1);
+    expect(Number(stamped[0]!.vigilMult)).toBe(1); // NOT 1.05
+  });
+
+  it("a resettle recomputes truth without touching the stamp", async () => {
     vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
@@ -967,7 +992,7 @@ Expected: PASS.
 - [ ] **Step 5: Full suite + typecheck**
 
 Run: `cd apps/api && pnpm test && pnpm typecheck`
-Expected: 275 passing, typecheck clean.
+Expected: the four new tests pass; no previously-green test goes red; the one known compose.test.ts failure is still the only red.
 
 - [ ] **Step 6: Commit**
 
