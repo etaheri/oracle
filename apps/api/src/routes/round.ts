@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
-import { CONSTANTS, dayPoints, weighDay } from "@oracle/core";
+import { CONSTANTS, dayPoints, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -196,7 +196,7 @@ export const roundRoutes = new Hono<AppContext>()
 
     // Below the floor the board reports the field's size and nothing else.
     if (field.length < CONSTANTS.BOARD_MIN_FIELD) {
-      return c.json({ date, field_size: field.length, your_points: yourPoints, your_rank: null, best_points: null, median_points: null });
+      return c.json({ date, field_size: field.length, your_points: yourPoints, your_rank: null, best_points: null, median_points: null, rows: [] });
     }
 
     const sorted = [...field].sort((a, b) => b - a);
@@ -211,6 +211,72 @@ export const roundRoutes = new Hono<AppContext>()
           return Math.sign(m) * Math.round(Math.abs(m));
         })();
 
+    // THE ORACLE stands in the field. Its day is scored on the same ladder as
+    // the rows beside it: the big one's double weight is IN (a call earns it),
+    // the contrarian bounty, the first hour and the vigil are OUT (a crowd, a
+    // clock and a purchasable shield confer those). oracleQuestionPoints takes
+    // no crowd argument at all, so there is no path by which one could reach it.
+    const oracleTotal = qs.every((q) => q.oracleProbYes !== null)
+      ? oracleDayTotal(
+          qs.map((q) => ({
+            pYes: Number(q.oracleProbYes),
+            outcome: q.outcome as "yes" | "no" | "void",
+            isBigOne: q.isBigOne,
+          })),
+        )
+      : null;
+
+    // EVERY ROW IS RANKED AGAINST THE PLAYER FIELD, the machine included.
+    //
+    // Not against the combined list. `field_size` and `your_rank` are shipped
+    // numbers about the human field -- the app already renders RANK 7 OF 9 --
+    // and ranking rows against players-plus-machine would silently make a
+    // player's row rank disagree with the your_rank printed beside it the
+    // moment the Oracle outscored them. So the Oracle's row carries its
+    // placing AMONG THE HUMANS: how many players beat it, plus one. A player
+    // and the Oracle can therefore share a rank, which is the honest reading
+    // of "the machine placed third among you".
+    const rankIn = (points: number) => 1 + field.filter((p) => p > points).length;
+
+    const entries: Array<{ userId: string | null; points: number }> = rows
+      .filter((r) => Number(r.answered) === qs.length)
+      .map((r) => ({ userId: r.userId, points: Number(r.points ?? 0) }));
+    if (oracleTotal !== null) entries.push({ userId: null, points: oracleTotal });
+    entries.sort((a, b) => b.points - a.points);
+    const ranked = entries.map((e) => ({
+      ...e,
+      rank: rankIn(e.points),
+      is_you: e.userId === userId,
+      is_oracle: e.userId === null,
+    }));
+
+    // The window: the summit, plus the caller's own neighbourhood, plus the
+    // machine wherever it landed -- a reader should never have to scroll to
+    // find out where the Oracle placed. Indices, then one pass, so overlapping
+    // windows merge instead of repeating a row.
+    const meIdx = ranked.findIndex((r) => r.is_you);
+    const keep = new Set<number>();
+    for (let i = 0; i < Math.min(CONSTANTS.BOARD_TOP_ROWS, ranked.length); i++) keep.add(i);
+    if (meIdx >= 0) {
+      for (let i = meIdx - CONSTANTS.BOARD_NEIGHBOURS; i <= meIdx + CONSTANTS.BOARD_NEIGHBOURS; i++) {
+        if (i >= 0 && i < ranked.length) keep.add(i);
+      }
+    }
+    const oracleIdx = ranked.findIndex((r) => r.is_oracle);
+    if (oracleIdx >= 0) keep.add(oracleIdx);
+
+    // `shown`, not `window` -- the latter shadows a global and reads badly.
+    const shown = [...keep].sort((a, b) => a - b).map((i) => ranked[i]!);
+    // Designations are assigned, never chosen -- nothing a user typed is
+    // stored or rendered here, which is what keeps this board free of a
+    // moderation surface. Collisions are resolved where they are visible.
+    const names = disambiguate(
+      shown.map((r) => (r.is_oracle ? ORACLE_DESIGNATION : designation(r.userId!))),
+    );
+    const boardRows = shown.map((r, i) => ({
+      name: names[i]!, points: r.points, rank: r.rank, is_you: r.is_you, is_oracle: r.is_oracle,
+    }));
+
     return c.json({
       date,
       field_size: field.length,
@@ -219,5 +285,6 @@ export const roundRoutes = new Hono<AppContext>()
       your_rank: yourPoints === null ? null : 1 + field.filter((p) => p > yourPoints).length,
       best_points: sorted[0]!,
       median_points: median,
+      rows: boardRows,
     });
   });

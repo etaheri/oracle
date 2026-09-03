@@ -3,6 +3,7 @@ import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { and, eq, ne } from "drizzle-orm";
+import { CONSTANTS } from "@oracle/core";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -148,6 +149,7 @@ interface Board {
   your_rank: number | null;
   best_points: number | null;
   median_points: number | null;
+  rows: Array<{ name: string; points: number; rank: number; is_you: boolean; is_oracle: boolean }>;
 }
 
 async function boardFixture(points: number[][]) {
@@ -298,7 +300,124 @@ describe("GET /v1/round/:date/board", () => {
     const res = await players[2]!.get("/v1/round/2026-08-20/board");
     const raw = await res.text();
     const body = JSON.parse(raw) as Board;
-    expect(Object.keys(body).sort()).toEqual(["best_points", "date", "field_size", "median_points", "your_points", "your_rank"]);
+    expect(Object.keys(body).sort()).toEqual(["best_points", "date", "field_size", "median_points", "rows", "your_points", "your_rank"]);
     for (const p of players) expect(raw).not.toContain(p.userId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The board's rows (design 2026-09-03 §4): a ranked LIST of machine-assigned
+// designations, THE ORACLE standing in it as a row.
+// ---------------------------------------------------------------------------
+
+describe("the board's rows", () => {
+  const DATE = "2026-09-03";
+  let db: Awaited<ReturnType<typeof makeTestDb>>["db"];
+  let app: ReturnType<typeof createApp>;
+  let seventhPlayer: Awaited<ReturnType<typeof newPlayer>>;
+  let topPlayer: Awaited<ReturnType<typeof newPlayer>>;
+  let soloPlayer: Awaited<ReturnType<typeof newPlayer>>;
+
+  // EXPECTED_ORACLE_TOTAL, by hand, using oracleQuestionPoints on the Oracle's
+  // seeded forecast (pYes = 0.6 on every question) against outcome "yes":
+  //   brier = (0.6 - 1)^2 = 0.16
+  //   base  = POINTS_SCALE * (POINTS_BASELINE - brier) = 200 * (0.25 - 0.16) = 200 * 0.09 = 18
+  //   slots 1-4 (not the big one, mult x1): 18 each -> 4 * 18 = 72
+  //   slot 5   (the big one,     mult x2): 2 * 18 = 36
+  //   total = 72 + 36 = 108
+  const EXPECTED_ORACLE_TOTAL = 108;
+
+  // Nine players, distinct raw totals 20 apart so the summit reads 1, 2, 3 and
+  // the 7th of 9 is exact: 180 160 140 120 100 80 60 40 20 -> 7th place is 60.
+  const TOTALS = [180, 160, 140, 120, 100, 80, 60, 40, 20];
+
+  const boardAs = (p: Awaited<ReturnType<typeof newPlayer>>, date: string) => p.get(`/v1/round/${date}/board`);
+
+  beforeEach(async () => {
+    ({ db } = await makeTestDb());
+    app = createApp({ db, env });
+
+    // 2026-09-03: the main round -- 9 complete players + the Oracle's forecast.
+    const qs = await seedRound(db, { date: DATE, opensAt: new Date("2026-09-02T16:00:00Z"), locksAt: new Date("2026-09-03T16:00:00Z") });
+    for (const total of TOTALS) {
+      const p = await newPlayer(app);
+      await seal(db, p.userId, qs, Array(5).fill(total / 5));
+      if (total === 60) seventhPlayer = p;
+      if (total === 180) topPlayer = p;
+    }
+    for (const q of qs) {
+      await db.update(schema.questions).set({ oracleProbYes: "0.6" }).where(eq(schema.questions.id, q.id));
+    }
+    await db.update(schema.questions).set(RESOLVED_ALL).where(eq(schema.questions.roundDate, DATE));
+
+    // 2026-09-04: below the field floor -- only 2 complete players.
+    const qs4 = await seedRound(db, { date: "2026-09-04", opensAt: new Date("2026-09-03T16:00:00Z"), locksAt: new Date("2026-09-04T16:00:00Z") });
+    soloPlayer = await newPlayer(app);
+    await seal(db, soloPlayer.userId, qs4, [10, 10, 10, 10, 10]);
+    const other4 = await newPlayer(app);
+    await seal(db, other4.userId, qs4, [8, 8, 8, 8, 8]);
+    await db.update(schema.questions).set(RESOLVED_ALL).where(eq(schema.questions.roundDate, "2026-09-04"));
+
+    // 2026-09-05: one question left unresolved.
+    const qs5 = await seedRound(db, { date: "2026-09-05", opensAt: new Date("2026-09-04T16:00:00Z"), locksAt: new Date("2026-09-05T16:00:00Z") });
+    await db.update(schema.questions).set(RESOLVED_ALL).where(and(eq(schema.questions.roundDate, "2026-09-05"), ne(schema.questions.slot, 5)));
+  });
+
+  it("returns the summit, the caller's neighbourhood, and the Oracle", async () => {
+    // Seed 9 complete players with distinct totals and a forecast on every
+    // question, then read the board as the 7th-placed player.
+    const res = await boardAs(seventhPlayer, "2026-09-03");
+    const body = (await res.json()) as Board;
+    expect(res.status).toBe(200);
+    const ranks = body.rows.map((r) => r.rank);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b)); // non-decreasing
+    // NOT asserted unique: rows rank against the PLAYER field, so the Oracle
+    // may legitimately share a rank with the player it tied. Seed distinct
+    // player totals if you want the summit rows to read 1, 2, 3.
+    expect(ranks[0]).toBe(1);
+    expect(body.rows.find((r) => r.is_you)!.rank).toBe(body.your_rank);
+    expect(body.rows.filter((r) => r.is_oracle)).toHaveLength(1);
+  });
+
+  it("pins the Oracle into the window even when it ranks outside it", async () => {
+    // Oracle forecasts poorly; it lands mid-field, outside both the summit
+    // and the caller's neighbourhood. It must still appear, at its true rank.
+    const body = (await (await boardAs(topPlayer, "2026-09-03")).json()) as Board;
+    const oracle = body.rows.find((r) => r.is_oracle);
+    expect(oracle).toBeDefined();
+    expect(oracle!.rank).toBeGreaterThan(CONSTANTS.BOARD_TOP_ROWS);
+  });
+
+  it("names players by designation and never by anything they typed", async () => {
+    const body = (await (await boardAs(seventhPlayer, "2026-09-03")).json()) as Board;
+    for (const row of body.rows) {
+      expect(row.name).toBe(row.name.toUpperCase());
+      expect(row.name.startsWith("THE ")).toBe(true);
+    }
+  });
+
+  it("disambiguates a collision inside the rendered window", async () => {
+    const body = (await (await boardAs(seventhPlayer, "2026-09-03")).json()) as Board;
+    const names = body.rows.map((r) => r.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("returns no rows below the field floor", async () => {
+    const body = (await (await boardAs(soloPlayer, "2026-09-04")).json()) as Board; // 2 complete
+    expect(body.rows).toEqual([]);
+    expect(body.your_rank).toBeNull();
+  });
+
+  it("still 409s until every question carries an outcome", async () => {
+    const res = await boardAs(seventhPlayer, "2026-09-05"); // one unresolved
+    expect(res.status).toBe(409);
+  });
+
+  it("ranks the Oracle on the same ladder as the rows beside it", async () => {
+    // The big one's double weight is IN; the contrarian bounty is OUT.
+    // Seeded so the Oracle's raw affine-Brier total is known exactly.
+    const body = (await (await boardAs(seventhPlayer, "2026-09-03")).json()) as Board;
+    const oracle = body.rows.find((r) => r.is_oracle);
+    expect(oracle!.points).toBe(EXPECTED_ORACLE_TOTAL);
   });
 });
