@@ -220,6 +220,19 @@ describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, ca
     }
   });
 
+  it("the paywall states the mechanic it charges for", () => {
+    // The whole pool, not just the creed: the Oracle Score clause lives in
+    // paywall.terms-1, and `plus.tsx` renders creed lines while the terms line
+    // is the one that has to stay true about what money cannot buy.
+    const creed = COPY_BANK.filter((l) => l.pool === "paywall").map((l) => l.text).join(" ");
+    expect(CONSTANTS.SHIELD_MIN_STREAK).toBe(3);
+    expect(creed).toContain("THREE DAYS OR MORE");
+    // What the subscription actually grants, in the player's words.
+    expect(creed).toContain("THREE SHIELDS");
+    // The wall that makes the whole economy honest, said at the till.
+    expect(creed).toContain("ORACLE SCORE");
+  });
+
   it("CTA labels are quarantined: caps, no emoji, no exclamation, short enough for a button", () => {
     const labels = Object.values(PAYWALL_CTA_LINES);
     expect(labels.length).toBeGreaterThanOrEqual(3);

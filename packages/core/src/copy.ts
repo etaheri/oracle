@@ -93,11 +93,12 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
   // ── paywall: the shield offer. Protection, never pressure. No CTA verbs here —
   // button labels live in PAYWALL_CTA_LINES by construction. ──
-  { id: "paywall.creed-1", pool: "paywall", text: "THE VIGIL IS FRAGILE. THE SHIELD IS NOT." },
-  { id: "paywall.creed-2", pool: "paywall", text: "A MISSED NOON NEED NOT END THE RECORD." },
-  { id: "paywall.creed-3", pool: "paywall", text: "THE ORACLE FORGIVES ONCE A MONTH. PLUS FORGIVES MORE." },
+  { id: "paywall.creed-1", pool: "paywall", text: "A SHIELD HOLDS A VIGIL OF THREE DAYS OR MORE THROUGH ONE MISSED NOON." },
+  { id: "paywall.creed-2", pool: "paywall", text: "THE ORACLE GRANTS ONE EACH MONTH. PLUS ADDS THREE SHIELDS A PERIOD, TO A RESERVE OF FIVE." },
+  { id: "paywall.creed-3", pool: "paywall", text: "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." },
+  { id: "paywall.creed-4", pool: "paywall", text: "THE VIGIL IS FRAGILE. THE SHIELD IS NOT." },
   { id: "paywall.rescue-1", pool: "paywall", text: "YOUR VIGIL ENDS AT NOON. ONE SHIELD WOULD HOLD IT.", requires: ["streak"] },
-  { id: "paywall.terms-1", pool: "paywall", text: "PAYING NEVER IMPROVES A PROPHECY. ONLY PROTECTS ITS RECORD." },
+  { id: "paywall.terms-1", pool: "paywall", text: "PAYING DEFENDS A VIGIL. IT NEVER IMPROVES A PROPHECY, AND NEVER TOUCHES YOUR ORACLE SCORE." },
 ] as const;
 
 // Purchase-button labels. Deliberately OUTSIDE the bank: the no-CTA-verb law
