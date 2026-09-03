@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { api } from "./client";
+import { api, setUnauthorizedRecovery } from "./client";
 
 export interface TokenStore {
   get(k: string): Promise<string | null>;
@@ -65,3 +65,39 @@ export async function clearDeviceToken(deps: { store?: TokenStore } = {}): Promi
   const store = deps.store ?? (await secureStore());
   await store.delete(KEY);
 }
+
+// The same "401 forever" the note above describes, arrived at WITHOUT a strike:
+// the server no longer knows this device (its row was lost, or the database it
+// lived in was reset). Nothing in the app could recover from that, and a
+// reinstall could not either — SecureStore is the iOS Keychain, which outlives
+// app deletion — so the install was simply dead, showing THE ORACLE SLEEPS on
+// a working server.
+//
+// Discard the dead token and mint a new one. That does start a blank record,
+// which is a real loss, but the alternative is an app that can never do
+// anything again; and a player who had a record can still bring it back with
+// RESTORE, which is exactly what Sign in with Apple is for.
+//
+// Guarded against a burst: first launch fires several queries at once, so many
+// can 401 together. Whoever gets here first clears and mints (getDeviceToken's
+// own inflightMint collapses the mints); everyone after that finds a token
+// that is no longer the stale one and simply takes it, instead of deleting a
+// freshly-minted token and starting a second user.
+export async function recoverFromUnauthorized(
+  staleToken: string,
+  deps: { fetchFn?: typeof fetch; store?: TokenStore } = {},
+): Promise<string | null> {
+  const store = deps.store ?? (await secureStore());
+  const current = await store.get(KEY);
+  if (current && current !== staleToken) return current;
+  await store.delete(KEY);
+  try {
+    return await getDeviceToken(deps);
+  } catch {
+    // The mint itself failed (offline, server down). Let the original 401
+    // stand rather than reporting a mint error in its place.
+    return null;
+  }
+}
+
+setUnauthorizedRecovery((staleToken) => recoverFromUnauthorized(staleToken));

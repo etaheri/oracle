@@ -148,11 +148,28 @@ export function pointsWithheld(d: Reveal): boolean {
   return anyPending || d.vigil_mult === null;
 }
 
-// Said once, for the day, never per question -- the per-row points still
-// match the payoff the card promised at seal time, and they must, or the
-// promise was a lie.
-export function vigilWeightLine(d: Reveal): string | null {
-  if (d.vigil_mult === null || d.vigil_mult <= 1) return null;
-  const weight = String(Number(d.vigil_mult.toFixed(2)));
-  return `THE VIGIL WEIGHS THIS DAY ×${weight}`;
+// Trailing zeros are noise on a multiplier: 1.10 reads as more precision than
+// 1.1 carries, and 1.50 as more than 1.5.
+const weight = (m: number) => String(Number(m.toFixed(2)));
+
+// The first hour's weight, read off the constant so tuning it can never leave
+// this line lying. Written as a WEIGHT, never a bonus -- "+10%" promised a
+// gift, and since 2026-09-03 the multiplier is symmetric, so it is a stake.
+const FIRST_HOUR_WEIGHT = weight(1 + CONSTANTS.FIRST_HOUR_BONUS);
+
+// What weighed this day, said ONCE for the day and never per question -- the
+// per-row points still match the payoff the card promised at seal time, and
+// they must, or the promise was a lie.
+//
+// One line, not two. These used to be two full sentences stacked ("THE FIRST
+// HOUR WEIGHS THIS DAY ×1.1" / "THE VIGIL WEIGHS THIS DAY ×1.15"), which put
+// two thirds of a sentence-shaped clause on screen twice and pushed the
+// headline block to seven centred lines under the number. The brief's rule for
+// this app is to protect the silence; a weight is a fact, and facts take the
+// machine's terse register, not prose.
+export function weightLine(d: Reveal): string | null {
+  const parts: string[] = [];
+  if (d.first_hour) parts.push(`FIRST HOUR ×${FIRST_HOUR_WEIGHT}`);
+  if (d.vigil_mult !== null && d.vigil_mult > 1) parts.push(`VIGIL ×${weight(d.vigil_mult)}`);
+  return parts.length === 0 ? null : `WEIGHED: ${parts.join(" · ")}`;
 }

@@ -20,7 +20,7 @@ describe("boardLines", () => {
   });
 
   it("reads the rank against the shape of the field", () => {
-    expect(boardLines(board())).toEqual(["RANK 31 OF 214", "BEST 268 · MEDIAN 44"]);
+    expect(boardLines(board())).toEqual(["RANK 31 OF 214 · BEST 268 · MEDIAN 44"]);
   });
 
   it("holds its tongue while the field is smaller than the floor", () => {
@@ -43,7 +43,7 @@ describe("boardLines", () => {
 
   it("writes a losing field with a true minus, never a hyphen", () => {
     const lines = boardLines(board({ your_points: -100, your_rank: 5, best_points: -20, median_points: -60 }));
-    expect(lines).toEqual(["RANK 5 OF 214", "BEST −20 · MEDIAN −60"]);
+    expect(lines).toEqual(["RANK 5 OF 214 · BEST −20 · MEDIAN −60"]);
     expect(lines.join("")).not.toContain("-");
   });
 

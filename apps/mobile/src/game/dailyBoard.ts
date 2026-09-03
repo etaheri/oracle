@@ -21,7 +21,12 @@ export const UNRATED_LINE = "THE DAY RATED ONLY THOSE WHO SEALED ALL FIVE";
 // The reveal reserves this block's height for this many lines, so the board
 // ARRIVES when its query resolves instead of shoving the page down under the
 // day's number. Every state below must fit it -- the test holds that.
-export const BOARD_MAX_LINES = 2;
+//
+// One. The rank and the field's shape used to be two stacked lines, in a
+// headline block that had already grown to seven of them; on device that read
+// as a wall rather than a result. They are one fact about one day, so they are
+// one line.
+export const BOARD_MAX_LINES = 1;
 
 // A true minus sign, never the ASCII hyphen -- these are levels rather than
 // deltas, so a winning field is written bare and only a losing one is signed.
@@ -39,5 +44,5 @@ export function boardLines(b: RoundBoard | undefined): string[] {
     ? null
     : `BEST ${level(b.best_points)} · MEDIAN ${level(b.median_points)}`;
   const rank = `RANK ${b.your_rank} OF ${b.field_size}`;
-  return shape === null ? [rank] : [rank, shape];
+  return [shape === null ? rank : `${rank} · ${shape}`];
 }

@@ -140,7 +140,13 @@ export default function Ledger() {
   }
 
   return (
-    <Screen>
+    // Scrolls, because this column is taller than the glass whenever the claim
+    // row is offered — which is every unclaimed player, i.e. every new
+    // install. Centred inside a fixed box, that overflow pushed the title up
+    // over ‹ RETURN and dropped STRIKE THE RECORD off the bottom. Screen's
+    // scroll variant keeps the centring for a short record and grows for a
+    // long one; see its own note for why flexGrow is the load-bearing part.
+    <Screen scroll>
       <TopBar />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>

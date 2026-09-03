@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from
 import { useLocalSearchParams } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Canvas, Fill, LinearGradient, useCanvasRef, vec } from "@shopify/react-native-skia";
-import { Screen } from "../../ui/Screen";
+import { Screen, useScreenInset } from "../../ui/Screen";
 import { Serif, Mono, Ritual, Eyebrow } from "../../ui/Text";
 import { GoldButton } from "../../ui/Button";
 import { GoldFrame } from "../../ui/GoldFrame";
@@ -16,10 +16,10 @@ import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCa
 import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
-import { CONSTANTS, payoff } from "@oracle/core";
+import { payoff } from "@oracle/core";
 import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
-import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, vigilWeightLine, TOO_FEW_LINE } from "../../game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { boardLines, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
@@ -51,11 +51,6 @@ const POINTS_SLOT_H = 84;
 const BOARD_LINE_H = 15;
 const BOARD_SLOT_H = BOARD_MAX_LINES * BOARD_LINE_H + space(1);
 
-// The first hour weighs the day, and it weighs a losing day exactly as hard.
-// Read off the constant so tuning it can never leave this line lying, and
-// written as a WEIGHT rather than a bonus — "+10%" was a promise of a gift,
-// and the multiplier is a stake. Twin of revealRows.vigilWeightLine.
-const FIRST_HOUR_WEIGHT = String(Number((1 + CONSTANTS.FIRST_HOUR_BONUS).toFixed(2)));
 
 // One golden surge through the Big One frame when the player beat the tide.
 const TideFlash = new Keyframe({
@@ -68,6 +63,7 @@ export default function RevealScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const reveal = useReveal(date ?? null);
   const reducedMotion = useReducedMotion();
+  const inset = useScreenInset();
   const canvasRef = useCanvasRef();
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -193,18 +189,28 @@ export default function RevealScreen() {
   }
 
   return (
-    <Screen>
-      <TopBar />
+    // Bleed, and pay the margin on the content. Inside Screen's padded box the
+    // scroller ended a gutter above the glass, so the page finished on a band
+    // of dead ground over the home indicator — a screen cut off rather than a
+    // screen running out — and the fold fade marked that false edge instead of
+    // the real one. Now the ledger travels the full height and comes to rest
+    // clear of the indicator on its own.
+    <Screen bleed>
+      <View style={{ paddingTop: inset.top, paddingLeft: inset.left, paddingRight: inset.right }}>
+        <TopBar />
+      </View>
       <ScrollView
-        contentContainerStyle={{ gap: space(4), paddingBottom: space(6) }}
-        // No indicator. This scroller sits inside Screen's padded container,
-        // so iOS drew the bar at the SCROLLER's right edge — a gutter's width
-        // in from the screen, floating in the margin and striking through the
-        // right-hand outcome column on every row. It could be pushed out to
-        // the true edge by bleeding the scroller and padding its content
-        // instead, but the app's other two scrollers (the rites, the crowd
-        // finale) both hide theirs, and this screen already has the fold fade
-        // below to say there is more — a grey system bar over the museum
+        contentContainerStyle={{
+          gap: space(4),
+          paddingLeft: inset.left,
+          paddingRight: inset.right,
+          paddingBottom: inset.bottom + space(6),
+        }}
+        // No indicator. The scroller now bleeds to the glass, so iOS would
+        // draw the bar at the true right edge rather than floating a gutter
+        // in — but the app's other scrollers (the rites, the crowd finale,
+        // the ledger) all hide theirs, and this screen has the fold fade
+        // below to say there is more. A grey system rail over the museum
         // ground was the least in-voice thing on the page.
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
@@ -257,15 +263,13 @@ export default function RevealScreen() {
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
-              {/* Not gated on a winning day any more. The bonus is symmetric
-                  now (design 2026-09-03 §2), so gating it on day_points > 0
-                  hid it on exactly the days it cost the player something —
-                  which is the one direction it must never be silent in. */}
-              {d.first_hour && (
-                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{`THE FIRST HOUR WEIGHS THIS DAY ×${FIRST_HOUR_WEIGHT}`}</Mono>
-              )}
-              {vigilWeightLine(d) && (
-                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{vigilWeightLine(d)}</Mono>
+              {/* Both weights on one line. The first hour is not gated on a
+                  winning day any more — the bonus is symmetric (design
+                  2026-09-03 §2), so gating it on day_points > 0 hid it on
+                  exactly the days it cost the player something, which is the
+                  one direction it must never be silent in. */}
+              {weightLine(d) && (
+                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{weightLine(d)}</Mono>
               )}
             </>
           ))}
@@ -287,9 +291,16 @@ export default function RevealScreen() {
               ))}
             </View>
           )}
-          {ledgerLines(d.ledger).map((line, i) => (
-            <Mono key={i} size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
-          ))}
+          {/* Your standing, which is NOT this day's news — the vigil's count
+              and the score are true before the page loads and stay true after
+              it. They were gold, which put four gold lines under one number
+              and made the block read as four headlines instead of one. Muted
+              and set apart, they subordinate to the day without leaving it. */}
+          <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
+            {ledgerLines(d.ledger).map((line, i) => (
+              <Mono key={i} size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
+            ))}
+          </View>
         </Animated.View>
         {/* The day's four ordinary calls, in the card's vocabulary rather
             than a settings list (refinement spec §2): the slot numeral is
