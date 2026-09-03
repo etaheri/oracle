@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { asc, and, countDistinct, eq, inArray } from "drizzle-orm";
-import { dayPoints, weighDay } from "@oracle/core";
+import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
+import { CONSTANTS, dayPoints, weighDay } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -154,5 +154,70 @@ export const roundRoutes = new Hono<AppContext>()
         calls_rated: user?.callsResolved ?? 0,
         oracle_score: user?.oracleScore ?? null,
       },
+    });
+  })
+  // The daily board (design 2026-09-03 §4): where the caller's day stood among
+  // everyone who played it. The day, not the record -- it works with one day's
+  // play on install day, where the Oracle Score's fifty-call floor cannot.
+  // Anonymous aggregates and the caller's own row; no names, ever.
+  .get("/:date/board", async (c) => {
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const date = c.req.param("date");
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
+    if (qs.length === 0) return c.json({ error: "unknown round" }, 404);
+    // Readable exactly when points exist -- every question carrying an outcome
+    // (resolved OR void). While one is unread the day has no total, and a
+    // provisional rank is the same broken promise as a provisional score.
+    // Same 409 posture /:date/reveal takes on a day that has not locked.
+    if (qs.some((q) => q.outcome === null)) return c.json({ error: "not resolved" }, 409);
+
+    // RANKED ON RAW PER-QUESTION POINTS -- the single most important line in
+    // this route. SUM(predictions.points) is questionPoints output: the big-one
+    // multiplier and the contrarian bonus are in it (both earned by the call
+    // itself), and the first-hour bonus and the vigil multiplier are NOT (one
+    // is a timing edge, the other is defended by a shield that can be BOUGHT).
+    // Ranking on day_points would let a purchase buy a longer vigil, a larger
+    // multiplier and a higher rank, which is exactly what SCORE_GLOSS promises
+    // cannot happen. Money must not buy the board.
+    const rows = await db
+      .select({ userId: schema.predictions.userId, answered: count(), points: sum(schema.predictions.points) })
+      .from(schema.predictions)
+      .where(inArray(schema.predictions.questionId, qs.map((q) => q.id)))
+      .groupBy(schema.predictions.userId);
+
+    // Complete rounds only, the same rule /v1/me/ledger and completeRoundBriers
+    // enforce: answered every question the round asked. It stops a single easy
+    // question being cherry-picked onto the board, and the app already says
+    // THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED.
+    const field = rows.filter((r) => Number(r.answered) === qs.length).map((r) => Number(r.points ?? 0));
+    const mine = rows.find((r) => r.userId === userId);
+    const yourPoints = mine && Number(mine.answered) === qs.length ? Number(mine.points ?? 0) : null;
+
+    // Below the floor the board reports the field's size and nothing else.
+    if (field.length < CONSTANTS.BOARD_MIN_FIELD) {
+      return c.json({ date, field_size: field.length, your_points: yourPoints, your_rank: null, best_points: null, median_points: null });
+    }
+
+    const sorted = [...field].sort((a, b) => b - a);
+    const mid = sorted.length >> 1;
+    // Even fields average the two middles. Rounded by MAGNITUDE, so a field of
+    // losing days is never quoted cheaper than the winning field of the same
+    // size -- the same symmetry weighDay keeps.
+    const median = sorted.length % 2 === 1
+      ? sorted[mid]!
+      : (() => {
+          const m = (sorted[mid - 1]! + sorted[mid]!) / 2;
+          return Math.sign(m) * Math.round(Math.abs(m));
+        })();
+
+    return c.json({
+      date,
+      field_size: field.length,
+      your_points: yourPoints,
+      // Ties share the better rank: one plus the number of strictly better days.
+      your_rank: yourPoints === null ? null : 1 + field.filter((p) => p > yourPoints).length,
+      best_points: sorted[0]!,
+      median_points: median,
     });
   });

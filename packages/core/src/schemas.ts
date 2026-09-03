@@ -106,6 +106,24 @@ export const RevealSchema = z.object({
 });
 export type Reveal = z.infer<typeof RevealSchema>;
 
+// One day's field, ranked. The day, not the record: no cold start, one round,
+// exact (it is a result, not an estimate), and nothing purchasable in it.
+// Every number here is RAW per-question points -- see the route for why.
+export const RoundBoardSchema = z.object({
+  date: z.string(),
+  // Players who completed the round -- answered every question it asked.
+  field_size: z.number().int(),
+  // The caller's own raw day. Null when they did not complete the round.
+  your_points: z.number().int().nullable(),
+  // 1-based; a tie shares the better (numerically lower) rank. Null when the
+  // caller is unrated, and null for everyone while the field is below
+  // BOARD_MIN_FIELD -- as are the two comparisons below it.
+  your_rank: z.number().int().nullable(),
+  best_points: z.number().int().nullable(),
+  median_points: z.number().int().nullable(),
+});
+export type RoundBoard = z.infer<typeof RoundBoardSchema>;
+
 export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean() });
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
 

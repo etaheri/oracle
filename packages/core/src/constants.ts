@@ -31,6 +31,11 @@ export const CONSTANTS = {
   ORACLE_SCORE_WINDOW: 100,
   ORACLE_SCORE_MIN_CALLS: 50,
   PERCENTILE_MIN_COHORT: 20,  // a percentile over eleven people is mostly the reader
+  // The daily board says nothing comparative under this many complete rounds
+  // -- a rank over three people is mostly the reader, the same posture the
+  // crowd's own verdict floor takes. Below it the board still reports the
+  // field's size; it just stops claiming a placing inside it.
+  BOARD_MIN_FIELD: 5,
   FORECAST_WEIGHT_PIVOT: 750,
   FORECAST_WEIGHT_SCALE: 60,
   FORECAST_EXTREMIZE_D: 1.5,

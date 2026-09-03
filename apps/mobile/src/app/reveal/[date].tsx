@@ -16,10 +16,11 @@ import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCa
 import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
-import { payoff } from "@oracle/core";
-import { useReveal } from "../../api/hooks";
+import { CONSTANTS, payoff } from "@oracle/core";
+import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, vigilWeightLine, TOO_FEW_LINE } from "../../game/revealRows";
+import { boardLines, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
@@ -43,6 +44,19 @@ const FOLD_H = 32;
 // the day's own news, the way the plaque's claim row is.
 const POINTS_SLOT_H = 84;
 
+// The board's own reserved height: BOARD_MAX_LINES of machine voice at a 15pt
+// line box, plus the gap between them. The board arrives on a SECOND query,
+// later than the reveal, and directly under the day's number — unreserved, the
+// whole page would shove down at the exact moment the ceremony lands.
+const BOARD_LINE_H = 15;
+const BOARD_SLOT_H = BOARD_MAX_LINES * BOARD_LINE_H + space(1);
+
+// The first hour weighs the day, and it weighs a losing day exactly as hard.
+// Read off the constant so tuning it can never leave this line lying, and
+// written as a WEIGHT rather than a bonus — "+10%" was a promise of a gift,
+// and the multiplier is a stake. Twin of revealRows.vigilWeightLine.
+const FIRST_HOUR_WEIGHT = String(Number((1 + CONSTANTS.FIRST_HOUR_BONUS).toFixed(2)));
+
 // One golden surge through the Big One frame when the player beat the tide.
 const TideFlash = new Keyframe({
   0: { opacity: 0 },
@@ -61,7 +75,10 @@ export default function RevealScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await qc.invalidateQueries({ queryKey: ["reveal", date] });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["reveal", date] }),
+      qc.invalidateQueries({ queryKey: ["board", date] }),
+    ]);
     setRefreshing(false);
   }, [qc, date]);
   // The Big One and the share button live below the fold on smaller devices —
@@ -79,6 +96,10 @@ export default function RevealScreen() {
   // focus refetches), so the resolved-outcomes effect below can re-run for
   // the same date many times — the guard fires the capture once per date.
   const viewedFor = useRef<string | null>(null);
+  // The board exists only once every row carries an outcome — the endpoint
+  // 409s before that, for the same reason the day's number is withheld.
+  const dayRead = !!reveal.data && !("pending" in reveal.data) && reveal.data.questions.every((q) => q.outcome !== null);
+  const board = useRoundBoard(date ?? null, dayRead);
 
   // The day-points landing is the ceremony's beat — the number finishes its
   // roll, THEN the haptic lands. A contrarian big-one win gets a double
@@ -236,14 +257,36 @@ export default function RevealScreen() {
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
-              {d.first_hour && d.day_points > 0 && (
-                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
+              {/* Not gated on a winning day any more. The bonus is symmetric
+                  now (design 2026-09-03 §2), so gating it on day_points > 0
+                  hid it on exactly the days it cost the player something —
+                  which is the one direction it must never be silent in. */}
+              {d.first_hour && (
+                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{`THE FIRST HOUR WEIGHS THIS DAY ×${FIRST_HOUR_WEIGHT}`}</Mono>
               )}
               {vigilWeightLine(d) && (
                 <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{vigilWeightLine(d)}</Mono>
               )}
             </>
           ))}
+          {/* Where the day stood among everyone who played it (design §4).
+              Held open at a fixed height because it arrives on its own query,
+              after the reveal has already drawn. */}
+          {!allSpectator && (
+            <View style={{ minHeight: BOARD_SLOT_H, alignItems: "center", justifyContent: "center", gap: space(1) }}>
+              {boardLines(board.data ?? undefined).map((line, i) => (
+                <Mono
+                  key={i}
+                  size={10}
+                  color={i === 0 && board.data?.your_rank != null ? colors.goldText : colors.mutedInk}
+                  letterSpacing={3}
+                  style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}
+                >
+                  {line}
+                </Mono>
+              ))}
+            </View>
+          )}
           {ledgerLines(d.ledger).map((line, i) => (
             <Mono key={i} size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
           ))}

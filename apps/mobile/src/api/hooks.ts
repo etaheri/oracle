@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RoundNextSchema, RevealSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -70,6 +70,26 @@ export function useReveal(date: string | null) {
         return await api(`/v1/round/${date}/reveal`, RevealSchema, { token });
       } catch (e) {
         if (e instanceof ApiError && (e.status === 409 || e.status === 404)) return { pending: true } as const;
+        throw e;
+      }
+    },
+  });
+}
+
+// The day's board, read beside the reveal it belongs to. 409 (the day is not
+// fully read) and 404 (no such round) both mean "there is no board here yet",
+// which the reveal renders as an empty reserved slot rather than an error --
+// the reveal itself is already saying what state the day is in.
+export function useRoundBoard(date: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["board", date],
+    enabled: date !== null && enabled,
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      try {
+        return await api(`/v1/round/${date}/board`, RoundBoardSchema, { token });
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 409 || e.status === 404)) return null;
         throw e;
       }
     },
