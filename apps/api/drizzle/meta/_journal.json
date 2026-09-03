@@ -43,6 +43,13 @@
       "when": 1788441018770,
       "tag": "0005_the_vigil_weighs",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788449794442,
+      "tag": "0006_the_author_states_a_number",
+      "breakpoints": true
     }
   ]
 }

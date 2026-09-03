@@ -110,6 +110,11 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
       sourceName: q.source_name,
       sourceUrl: q.source_url,
       marketProb: q.market_prob == null ? null : String(q.market_prob),
+      // The author's own claim, kept. It was validated into the 0.3-0.7 band
+      // and then dropped on the floor, so nothing could ever score it
+      // against what happened and nothing measured whether the questions
+      // were contested (design 2026-09-03 §6).
+      authorProb: String(q.author_probability),
       opensAt,
       locksAt,
       resolveBy,

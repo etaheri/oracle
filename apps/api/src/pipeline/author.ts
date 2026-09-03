@@ -8,6 +8,7 @@ import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LO
 import { upsertDraft } from "./draft";
 import { addDays, noonET } from "./clock";
 import { fetchMarketSignals, type MarketSignal } from "./feeds";
+import { loadQualityRows, qualityReport, questionQuality } from "./quality";
 
 const CATEGORIES = ["markets", "sports", "weather", "culture", "news"] as const;
 
@@ -76,7 +77,7 @@ ${lines.join("\n")}
 - A question adapted from a listed market MUST set resolves_at to that market's own close: the price is public and converges on the answer, so answers have to close with it.`;
 }
 
-function authorSystemPrompt(date: string, recent: string, signals: MarketSignal[]): string {
+function authorSystemPrompt(date: string, recent: string, signals: MarketSignal[], scorecard: string): string {
   const lockDay = addDays(date, 1);
   return `You author the daily round for ORACLE, a prediction game. Produce exactly 5 yes/no questions for the round dated ${date} (ET). The round opens at noon ET on ${date} and closes at noon ET on ${lockDay}. Rules:
 - Slots 1-4: four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the day's most contested story from any category.
@@ -87,6 +88,8 @@ function authorSystemPrompt(date: string, recent: string, signals: MarketSignal[
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
 - WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
+- Here is your own record in aggregate. It is the standard you are held to; the seven days below are only the anecdotes.
+${scorecard}
 - Here is how your last seven days landed. Do not repeat them, and read the outcomes and crowd splits as feedback on your own question-writing: ${recent}${marketSignalsBlock(signals)}
 Search the web for today's actual news before writing. When your draft is final, call the draft_round tool exactly once.`;
 }
@@ -131,7 +134,8 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
   // Market feeds are advisory: any failure logs inside fetchMarketSignals and
   // authoring proceeds market-blind on an empty list.
   const { signals } = await fetchMarketSignals(deps.marketFetch ?? fetch, deps.now());
-  const system = authorSystemPrompt(date, recent, signals);
+  const scorecard = qualityReport(questionQuality(await loadQualityRows(deps.db, date))).join("\n  ");
+  const system = authorSystemPrompt(date, recent, signals, scorecard);
   const baseUser = `Produce today's ORACLE round for ${date}.`;
 
   const first = await claude.structured({
@@ -262,6 +266,9 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
       sourceUrl: q.source_url,
       category: q.category,
       marketProb: q.market_prob == null ? null : String(q.market_prob),
+      // A rerolled slot is a new claim; the old slot's probability must not
+      // survive it into the scorecard.
+      authorProb: String(q.author_probability),
       locksAt,
     })
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));

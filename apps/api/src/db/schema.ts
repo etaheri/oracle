@@ -62,6 +62,13 @@ export const questions = pgTable("questions", {
   // floor (CONTRARIAN_MIN_CROWD) is judged against this, never re-derived.
   crowdCount: integer("crowd_count"),
   marketProb: numeric("market_prob"),
+  // The author's own P(YES) at draft time — validated 0.3-0.7 and, until
+  // 0006, thrown away. Without it nothing could ever score the author's
+  // claimed uncertainty against what actually happened, so nothing measured
+  // whether the questions were contested (design 2026-09-03 §6). Nullable:
+  // every question asked before 0006 predates the column and must stay
+  // unscored rather than be imputed a 0.5 nobody stated.
+  authorProb: numeric("author_prob"),
   // The Oracle's own forecast (skill-weighted aggregate), stamped at lock.
   oracleProbYes: numeric("oracle_p_yes"),
 }, (t) => [index("questions_round_date_idx").on(t.roundDate)]);

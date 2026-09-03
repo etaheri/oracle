@@ -25,6 +25,22 @@ describe("schema + harness", () => {
     expect(idx).toEqual(expect.arrayContaining(["predictions_user_idx", "questions_round_date_idx", "users_oracle_score_idx", "devices_ip_hash_idx"]));
   });
 
+  it("0006: author_prob is on questions and nullable — every row asked before it predates it", async () => {
+    const { db, pg } = await makeTestDb();
+    const col = (await pg.query<{ is_nullable: string; data_type: string }>(
+      `select is_nullable, data_type from information_schema.columns where table_name = 'questions' and column_name = 'author_prob'`,
+    )).rows;
+    expect(col).toHaveLength(1);
+    expect(col[0]!.is_nullable).toBe("YES");
+    expect(col[0]!.data_type).toBe("numeric");
+
+    // seedRound writes no probability, exactly as the pre-0006 rows carry none.
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const rows = await db.query.questions.findMany();
+    expect(rows).toHaveLength(qs.length);
+    expect(rows.every((r) => r.authorProb === null)).toBe(true);
+  });
+
   it("stores apple_sub uniquely and webhook event markers", async () => {
     const { db } = await makeTestDb();
     const [u1] = await db.insert(schema.users).values({ appleSub: "sub-1" }).returning();
