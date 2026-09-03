@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crowdDrift, lateEdge, earlyLockRate, leakReport, loadLeakRows, type SealRow } from "../src/pipeline/leak";
+import { crowdDrift, lateEdge, earlyLockRate, leakReport, loadLeakRows, pooledLeak, type SealRow } from "../src/pipeline/leak";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 
@@ -175,5 +175,47 @@ describe("loadLeakRows", () => {
     });
     const rows = await loadLeakRows(db, qs[0]!.id);
     expect(rows[0]!.brier).toBeNull();
+  });
+});
+
+describe("pooledLeak", () => {
+  // Build one question's worth of seals: `n` rows marching forward in time,
+  // with `lateYes` of the last half answering YES and briers supplied.
+  const q = (specs: Array<{ answer: boolean; brier: number | null }>): SealRow[] =>
+    specs.map((s, i) => ({ createdAt: new Date(2026, 0, 1, 12, i), answer: s.answer, brier: s.brier }));
+
+  const flat = (n: number) => q(Array.from({ length: n }, () => ({ answer: true, brier: 0.2 })));
+
+  it("returns nulls and counts nothing when every question is under the seal floor", () => {
+    const out = pooledLeak([flat(3), flat(4)]);
+    expect(out.drift).toBeNull();
+    expect(out.edge).toBeNull();
+    expect(out.questions).toBe(0);
+    expect(out.seals).toBe(7);
+  });
+
+  it("pools per-question metrics rather than concatenating rows", () => {
+    // Two questions, each internally drifting from NO to YES. Concatenated by
+    // wall clock they would interleave and cancel; pooled per question they
+    // agree.
+    const drifting = q([
+      { answer: false, brier: 0.4 }, { answer: false, brier: 0.4 },
+      { answer: false, brier: 0.4 }, { answer: false, brier: 0.4 },
+      { answer: true, brier: 0.1 }, { answer: true, brier: 0.1 },
+      { answer: true, brier: 0.1 }, { answer: true, brier: 0.1 },
+    ]);
+    const out = pooledLeak([drifting, drifting]);
+    expect(out.questions).toBe(2);
+    expect(out.drift).toBe(100);
+    // Earlier half brier 0.4, later half 0.1 → +0.3, late sealers scored better.
+    expect(out.edge).toBeCloseTo(0.3, 6);
+  });
+
+  it("counts a question toward drift but not edge when it has no rated rows", () => {
+    const unrated = q(Array.from({ length: 8 }, (_, i) => ({ answer: i >= 4, brier: null })));
+    const out = pooledLeak([unrated]);
+    expect(out.drift).toBe(100);
+    expect(out.edge).toBeNull();
+    expect(out.rated).toBe(0);
   });
 });

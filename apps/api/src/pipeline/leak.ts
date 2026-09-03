@@ -105,3 +105,53 @@ export async function loadLeakRows(db: Db, questionId: string): Promise<SealRow[
   };
   return rows.map((p) => ({ createdAt: p.createdAt, answer: p.answer, brier: toBrier(p.brier) }));
 }
+
+export interface PooledLeak {
+  drift: number | null;
+  edge: number | null;
+  seals: number;
+  questions: number;
+  rated: number;
+}
+
+/**
+ * The same two metrics, across many questions.
+ *
+ * Each question is measured on its own timeline FIRST and only then averaged.
+ * Concatenating raw rows would order seals by wall clock across questions that
+ * opened at different times, which destroys the early-vs-late split both
+ * metrics are built on — the pooled number would measure nothing.
+ *
+ * Read it with the same caution as the per-question figures (see this file's
+ * header): honest information arrival drifts a crowd too, and the first-hour
+ * bonus biases `edge` negative by selecting engaged players into the early
+ * half. A quiet pooled report is the absence of a symptom, not an all-clear.
+ */
+export function pooledLeak(perQuestion: SealRow[][]): PooledLeak {
+  const drifts: number[] = [];
+  const edges: number[] = [];
+  let seals = 0;
+  let rated = 0;
+  let questions = 0;
+
+  for (const rows of perQuestion) {
+    seals += rows.length;
+    rated += rows.filter((r) => r.brier !== null).length;
+    const d = crowdDrift(rows);
+    const e = lateEdge(rows);
+    if (d === null && e === null) continue;
+    questions++;
+    if (d !== null) drifts.push(d);
+    if (e !== null) edges.push(e);
+  }
+
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const d = mean(drifts);
+  return {
+    drift: d === null ? null : Math.round(d),
+    edge: mean(edges),
+    seals,
+    questions,
+    rated,
+  };
+}
