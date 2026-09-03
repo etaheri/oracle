@@ -938,7 +938,9 @@ Add `forecast: string;` to `PipelineDeps["models"]`. Add the import `import { st
           break;
 ```
 
-In `apps/api/src/worker.ts`, thread `PIPELINE_FORECAST_MODEL` into `models.forecast` exactly as `PIPELINE_AUTHOR_MODEL` and `PIPELINE_RESOLVE_MODEL` are threaded. Add the var to the `AppEnv` type alongside them.
+In `apps/api/src/worker.ts`, thread `PIPELINE_FORECAST_MODEL` into `models.forecast` exactly as `PIPELINE_AUTHOR_MODEL` and `PIPELINE_RESOLVE_MODEL` are threaded (lines 16-17 and 33-35). Add the var to the `AppEnv` type alongside them.
+
+**Default: `claude-sonnet-5`**, matching `resolve`. Forecasting is a judgement call over live search results, the same shape as resolution — not the long-form editorial writing `author` uses opus for. Write it as `forecast: env.PIPELINE_FORECAST_MODEL ?? "claude-sonnet-5",` so it is tunable without a deploy.
 
 - [ ] **Step 11: Run the whole API suite**
 
