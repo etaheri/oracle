@@ -91,7 +91,7 @@ describe("the rites", () => {
     // Early locks are the norm now: a player who finds a card already closed
     // must have been told this could happen.
     expect(all).toContain("BEFORE NOON");
-    expect(RITES_LINES.length).toBe(14);
+    expect(RITES_LINES.length).toBe(15);
   });
   it("name the goal, and define every noun the rest of the app leans on", () => {
     // The app said "THE DAY DOES NOT RATE", "YOUR VIGIL", "A BOUNTY" and
@@ -123,6 +123,21 @@ describe("the rites", () => {
     // scale as the five questions every other surface talks about. Five a day
     // is why fifty is ten days.
     expect(all).toContain("FIVE A DAY");
+    // The vigil's stake, pinned to the engine that pays it. A player is told
+    // the day is weighed in BOTH directions -- if that ever stops being true
+    // in scoring.ts, this line becomes a lie and this assertion the alarm.
+    expect(CONSTANTS.VIGIL_MULT_MAX_DAYS).toBe(10);
+    expect(all).toContain("TEN DAYS");
+    expect(all).toContain("IN BOTH DIRECTIONS");
+  });
+  it("teaches the shield before it is ever sold", () => {
+    // The shield is a real-money purchase surfaced on Home and a permanent
+    // plaque row. A player who reads only the opening must still meet it.
+    const opening = OPENING_RITES_LINES.join(" ");
+    expect(opening).toContain("SHIELD");
+    expect(opening).toContain("THREE DAYS OR MORE");
+    // ...and the stake the shield exists to defend.
+    expect(opening).toContain("WEIGHS");
   });
   it("open with a subset of the same numbered canon, not a second copy of it", () => {
     // The two screens must never drift: the opening is literally the head of
@@ -137,7 +152,12 @@ describe("the rites", () => {
       expect(opening, word).toContain(word);
     }
     // ...and defer what is only met later in play.
-    for (const word of ["FIRST HOUR", "SHIELD", "BIG ONE"]) expect(opening, word).not.toContain(word);
+    // SHIELD was deferred here on 2026-09-02, when a shield defended a vigil
+    // that did nothing. It is now a real-money purchase offered on Home and a
+    // permanent plaque row, defending a vigil that weighs every day played --
+    // the one deferred rule a player can be CHARGED for before meeting it.
+    // The bounty and the first hour stay deferred: they cost nothing to miss.
+    for (const word of ["FIRST HOUR", "BIG ONE"]) expect(opening, word).not.toContain(word);
   });
   it("scale every cumulative number against the daily one", () => {
     // "0 OF 50" on a screen whose every other surface says five is the honest
