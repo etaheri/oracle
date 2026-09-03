@@ -87,7 +87,12 @@ describe("the rites", () => {
     const all = RITES_LINES.join(" ");
     expect(all).not.toContain("PAYS TWICE");
     expect(all).toContain("NEW YORK");
-    expect(all).toContain("ALL FIVE");
+    // Bound to the rite it guards, not the joined canon: "ALL FIVE" also
+    // appears in the partial-day rule, so a canon-wide toContain stays green
+    // with the first-hour rite deleted -- an alarm that cannot ring.
+    const firstHour = RITES_LINES.find((l) => l.includes("WITHIN THE FIRST HOUR"));
+    expect(firstHour, "the rite naming the first-hour bonus is missing").toBeDefined();
+    expect(firstHour!).toContain("ALL FIVE");
     // Early locks are the norm now: a player who finds a card already closed
     // must have been told this could happen.
     expect(all).toContain("BEFORE NOON");
