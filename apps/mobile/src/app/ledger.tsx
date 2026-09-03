@@ -122,25 +122,11 @@ export default function Ledger() {
     })();
   };
 
-  if (!ledger.data) return (
-    <Screen>
-      <TopBar />
-      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
-        <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
-        {/* The frame holds while the record is fetched. It used to vanish and
-            return, which read as a flash rather than a fill (spec §7). */}
-        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H, alignItems: "center", justifyContent: "center" }}>
-          <AsciiDust />
-          <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
-        </View>
-      </View>
-    </Screen>
-  );
-
-  const d = ledger.data;
+  const d = ledger.data ?? null;
   const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
 
   async function handleShare() {
+    if (!d) return;
     setSharing(true);
     setShareError(null);
     try {
@@ -157,56 +143,73 @@ export default function Ledger() {
       <TopBar />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
-        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H }}>
-          <Eyebrow>Epithet of the last 28 days</Eyebrow>
-          <View style={{ alignItems: "center", gap: space(2) }}>
-            <Ritual bold size={24} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
-            <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{d.epithet.receipt}</Mono>
-          </View>
-          <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
-          <View style={{ gap: space(2) }}>
-            <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
-            {/* The score is the premise of the whole app — the ledger naming
-                who can actually see — and it used to sit here as a bare label
-                over a progress string that never said what fifty was fifty OF
-                (audit 2026-09-02 §1.1). One line, in the row's own register:
-                how it is earned while it is unwritten, what it measures once
-                it is. The second half is also the legal wall, stated to the
-                player rather than only to the spec. */}
-            <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 15 }}>
-              {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
-            </Mono>
-            <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
-            <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
-            <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />
-            <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
-            <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
-            <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
-            <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
-            {calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered) && (
-              <DecodeLine
-                text={calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered)!}
-                delayMs={300} durationMs={600}
-                size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}
-              />
-            )}
-          </View>
-          {d.claimed ? (
-            <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}>
-              THE RECORD IS CLAIMED
-            </Mono>
-          ) : appleAvailable ? (
-            <View style={{ alignItems: "center", gap: space(2), marginTop: space(2) }}>
-              <Eyebrow>Claim your record</Eyebrow>
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                cornerRadius={0}
-                style={{ width: 230, height: 44 }}
-                onPress={handleClaim}
-              />
-            </View>
-          ) : null}
+        {/* One column in both states. The frame used to be the only thing
+            held steady while the six children below it did not exist yet —
+            so the plaque itself stayed the right size and still jumped
+            ~115pt upward, because a centred column half the height centres
+            differently. The furniture below is static; only the plaque's
+            interior depends on the record. */}
+        <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H, ...(d ? null : { alignItems: "center", justifyContent: "center" }) }}>
+          {d ? (
+            <>
+              <Eyebrow>Epithet of the last 28 days</Eyebrow>
+              <View style={{ alignItems: "center", gap: space(2) }}>
+                <Ritual bold size={24} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
+                <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{d.epithet.receipt}</Mono>
+              </View>
+              <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
+              <View style={{ gap: space(2) }}>
+                <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+                {/* The score is the premise of the whole app — the ledger naming
+                    who can actually see — and it used to sit here as a bare label
+                    over a progress string that never said what fifty was fifty OF
+                    (audit 2026-09-02 §1.1). One line, in the row's own register:
+                    how it is earned while it is unwritten, what it measures once
+                    it is. The second half is also the legal wall, stated to the
+                    player rather than only to the spec. */}
+                <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 15 }}>
+                  {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
+                </Mono>
+                <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
+                <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
+                <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />
+                <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
+                <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
+                <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
+                <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
+                {calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered) && (
+                  <DecodeLine
+                    text={calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered)!}
+                    delayMs={300} durationMs={600}
+                    size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}
+                  />
+                )}
+              </View>
+              <View style={{ minHeight: 78, justifyContent: "center", marginTop: space(2) }}>
+                {d.claimed ? (
+                  <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
+                    THE RECORD IS CLAIMED
+                  </Mono>
+                ) : appleAvailable ? (
+                  <View style={{ alignItems: "center", gap: space(2) }}>
+                    <Eyebrow>Claim your record</Eyebrow>
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                      cornerRadius={0}
+                      style={{ width: 230, height: 44 }}
+                      onPress={handleClaim}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <>
+              <AsciiDust />
+              <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+            </>
+          )}
         </View>
         {!plusActive && <QuietLink title="Oracle plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
@@ -214,12 +217,12 @@ export default function Ledger() {
             <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
-        <GoldButton title={sharing ? "PREPARING…" : "DECLARE YOURSELF"} onPress={handleShare} />
+        <GoldButton title={sharing ? "PREPARING…" : "DECLARE YOURSELF"} onPress={handleShare} disabled={!d} />
         {shareError && (
           <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
         )}
         <QuietLink title="Strike the record" onPress={() => setRite("strike")} />
-        <PlaqueShareCanvas canvasRef={canvasRef} data={d} />
+        {d && <PlaqueShareCanvas canvasRef={canvasRef} data={d} />}
       </View>
       <RiteConfirm
         visible={rite === "collision"}
