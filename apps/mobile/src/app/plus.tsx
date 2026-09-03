@@ -30,7 +30,7 @@ export default function Plus() {
   };
 
   return (
-    <Screen>
+    <Screen scroll>
       <TopBar />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         <Eyebrow>Oracle plus</Eyebrow>

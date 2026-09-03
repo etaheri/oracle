@@ -1,6 +1,6 @@
 import { ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Screen } from "../ui/Screen";
+import { Screen, useScreenInset } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
 import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
@@ -21,6 +21,13 @@ import { useChromeScale } from "../ui/useChromeScale";
 // almost none of it survived the walk (audit 2026-09-02 §1.2); the rules that
 // were cut are the ones the game teaches at the moment they apply — the way
 // the floor rite already teaches the conviction floor.
+
+// One line box for both columns of a rite. A numeral left to its own font
+// metrics sits higher than the rite beside it: the mono line carries an
+// explicit 18pt box and wears the extra leading, the Cinzel numeral had none
+// and hung from the top of the row. Sharing the box puts them on a baseline.
+const RITE_LINE_H = 18;
+
 export default function Rites() {
   const router = useRouter();
   // `?all=1` from the standing link; the first-timer gate arrives bare.
@@ -32,9 +39,17 @@ export default function Rites() {
   // ~34pt — so the slot is 40 at 1x and grows from there. It was 26, which
   // wrapped VIII onto a second line and knocked its rite out of alignment.
   const gutter = Math.ceil(40 * useChromeScale());
+  const inset = useScreenInset();
   return (
-    <Screen>
-      <TopBar showReturn={!opening} />
+    // Bleed, so the canon runs to the glass instead of stopping a gutter above
+    // it. The bottom inset belongs to whichever element is actually LAST: the
+    // opening gate pins BEGIN under the scroller, so the button carries it and
+    // the rules can travel right up to the button; the standing rail has
+    // nothing after the scroller, so the scroller carries it.
+    <Screen bleed>
+      <View style={{ paddingTop: inset.top, paddingLeft: inset.left, paddingRight: inset.right }}>
+        <TopBar showReturn={!opening} />
+      </View>
       {/* The full canon does not fit a phone. The screen used to centre it in a
           fixed box and rely on the count never growing — it was already at
           602pt of content in a 619pt box before the numerals arrived, and the
@@ -47,7 +62,14 @@ export default function Rites() {
         // No centring: the full canon always exceeds a phone, and centring
         // content taller than its container pushes the head of the list out
         // of the scrollable area — the eyebrow and rule I became unreachable.
-        contentContainerStyle={{ flexGrow: 1, paddingVertical: space(4), gap: space(4) }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: space(4),
+          paddingLeft: inset.left,
+          paddingRight: inset.right,
+          paddingBottom: opening ? space(4) : inset.bottom + space(4),
+          gap: space(4),
+        }}
         showsVerticalScrollIndicator={false}
       >
         <Eyebrow>{opening ? "The first rites" : "The rites"}</Eyebrow>
@@ -63,7 +85,7 @@ export default function Rites() {
         <View style={{ gap: space(3), paddingRight: gutter + space(3) }}>
           {lines.map((line, i) => (
             <View key={line} style={{ flexDirection: "row", gap: space(3), alignItems: "flex-start" }}>
-              <Ritual size={13} color={colors.goldText} letterSpacing={1} style={{ width: gutter, textAlign: "right" }}>
+              <Ritual size={13} color={colors.goldText} letterSpacing={1} style={{ width: gutter, textAlign: "right", lineHeight: RITE_LINE_H }}>
                 {numeral(i + 1)}
               </Ritual>
               <DecodeLine
@@ -73,7 +95,7 @@ export default function Rites() {
                 size={11}
                 color={colors.ink}
                 letterSpacing={2}
-                style={{ flex: 1, lineHeight: 18 }}
+                style={{ flex: 1, lineHeight: RITE_LINE_H }}
               />
             </View>
           ))}
@@ -100,7 +122,7 @@ export default function Rites() {
           scroller and never leaves — a second, louder exit made the most
           emphatic element on the rulebook the way out of it. */}
       {opening && (
-        <View style={{ paddingTop: space(3), paddingBottom: space(2) }}>
+        <View style={{ paddingTop: space(3), paddingBottom: inset.bottom, paddingLeft: inset.left, paddingRight: inset.right }}>
           <GoldButton
             title="BEGIN"
             onPress={() => { void markRitesSeen(); router.replace("/round"); }}
