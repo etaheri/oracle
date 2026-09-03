@@ -1220,7 +1220,11 @@ In `apps/api/src/routes/me.ts`, before the final `c.json({...})`:
         if (q.outcome !== "yes" && q.outcome !== "no") continue;
         if (oracleCallRight(Number(q.oracleProbYes), q.outcome) === true) machine += 1;
       }
-      for (const p of resolved) {
+      // Iterate `preds`, NOT `resolved`. The `Row` objects in `resolved`
+      // carry a precomputed `correct` flag and no `questionId` or `answer`,
+      // so they cannot be matched back to a question. `preds` is the raw
+      // prediction rows and is already in scope above.
+      for (const p of preds) {
         const q = byId.get(p.questionId);
         if (!q || (q.outcome !== "yes" && q.outcome !== "no")) continue;
         if ((p.answer ? "yes" : "no") === q.outcome) you += 1;
@@ -1241,7 +1245,9 @@ Add to the response object:
       },
 ```
 
-Extend the `@oracle/core` import with `oracleBrierOf, oracleCallRight, oracleScore`. If `resolved` rows do not carry `questionId` and `answer`, widen that existing select minimally rather than adding a second query.
+Extend the `@oracle/core` import with `oracleBrierOf, oracleCallRight, oracleScore`.
+
+**Verified against the real file, so do not re-derive these:** `preds` (raw prediction rows, with `questionId` and `answer`), `qById` (question id → question), `byDate` (roundDate → how many of that round the caller answered) and `sizeOf` (roundDate → the round's true question count) are all already in scope at the insertion point. `resolved` is a list of `Row` objects — `{correct, confidence, sidePct, crowdCount, inWindow}` — with no `questionId`; do not try to loop it here and do not widen it.
 
 - [ ] **Step 4: Run to verify it passes**
 
