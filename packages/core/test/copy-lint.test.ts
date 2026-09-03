@@ -126,9 +126,17 @@ describe("the rites", () => {
     // The vigil's stake, pinned to the engine that pays it. A player is told
     // the day is weighed in BOTH directions -- if that ever stops being true
     // in scoring.ts, this line becomes a lie and this assertion the alarm.
+    // Bound to the ONE line that makes each claim, never to the joined canon:
+    // "TEN DAYS" also appears in the Oracle Score rite and "IN BOTH DIRECTIONS"
+    // in the Big One rite, so a canon-wide toContain passes even with both
+    // vigil rites deleted -- an alarm that cannot ring.
+    const vigilStake = RITES_LINES.find((l) => l.includes("A VIGIL IS A RUN OF UNBROKEN NOONS"));
+    const vigilCeiling = RITES_LINES.find((l) => l.includes("THE VIGIL'S WEIGHT RISES"));
+    expect(vigilStake, "the rite naming the vigil's stake is missing").toBeDefined();
+    expect(vigilCeiling, "the rite naming the vigil's ceiling is missing").toBeDefined();
+    expect(vigilStake!).toContain("IN BOTH DIRECTIONS");
     expect(CONSTANTS.VIGIL_MULT_MAX_DAYS).toBe(10);
-    expect(all).toContain("TEN DAYS");
-    expect(all).toContain("IN BOTH DIRECTIONS");
+    expect(vigilCeiling!).toContain("TEN DAYS");
   });
   it("teaches the shield before it is ever sold", () => {
     // The shield is a real-money purchase surfaced on Home and a permanent
