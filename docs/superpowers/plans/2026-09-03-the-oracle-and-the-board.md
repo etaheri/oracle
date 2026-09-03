@@ -981,9 +981,11 @@ describe("the board's rows", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     const ranks = body.rows.map((r: { rank: number }) => r.rank);
-    expect(ranks.slice(0, 3)).toEqual([1, 2, 3]);          // BOARD_TOP_ROWS
-    expect(ranks).toEqual([...ranks].sort((a, b) => a - b)); // ordered, no repeats
-    expect(new Set(ranks).size).toBe(ranks.length);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b)); // non-decreasing
+    // NOT asserted unique: rows rank against the PLAYER field, so the Oracle
+    // may legitimately share a rank with the player it tied. Seed distinct
+    // player totals if you want the summit rows to read 1, 2, 3.
+    expect(ranks[0]).toBe(1);
     expect(body.rows.find((r: { is_you: boolean }) => r.is_you).rank).toBe(body.your_rank);
     expect(body.rows.filter((r: { is_oracle: boolean }) => r.is_oracle)).toHaveLength(1);
   });
@@ -1062,8 +1064,18 @@ In `apps/api/src/routes/round.ts`, extend the `/:date/board` handler. Leave the 
         )
       : null;
 
-    // One ranked list of everyone, players and machine together, so a rank is
-    // a rank. Ties share the better rank, exactly as your_rank does.
+    // EVERY ROW IS RANKED AGAINST THE PLAYER FIELD, the machine included.
+    //
+    // Not against the combined list. `field_size` and `your_rank` are shipped
+    // numbers about the human field -- the app already renders RANK 7 OF 9 --
+    // and ranking rows against players-plus-machine would silently make a
+    // player's row rank disagree with the your_rank printed beside it the
+    // moment the Oracle outscored them. So the Oracle's row carries its
+    // placing AMONG THE HUMANS: how many players beat it, plus one. A player
+    // and the Oracle can therefore share a rank, which is the honest reading
+    // of "the machine placed third among you".
+    const rankIn = (points: number) => 1 + field.filter((p) => p > points).length;
+
     const entries: Array<{ userId: string | null; points: number }> = rows
       .filter((r) => Number(r.answered) === qs.length)
       .map((r) => ({ userId: r.userId, points: Number(r.points ?? 0) }));
@@ -1071,7 +1083,7 @@ In `apps/api/src/routes/round.ts`, extend the `/:date/board` handler. Leave the 
     entries.sort((a, b) => b.points - a.points);
     const ranked = entries.map((e) => ({
       ...e,
-      rank: 1 + entries.filter((o) => o.points > e.points).length,
+      rank: rankIn(e.points),
       is_you: e.userId === userId,
       is_oracle: e.userId === null,
     }));
@@ -1091,14 +1103,15 @@ In `apps/api/src/routes/round.ts`, extend the `/:date/board` handler. Leave the 
     const oracleIdx = ranked.findIndex((r) => r.is_oracle);
     if (oracleIdx >= 0) keep.add(oracleIdx);
 
-    const window = [...keep].sort((a, b) => a - b).map((i) => ranked[i]!);
+    // `shown`, not `window` -- the latter shadows a global and reads badly.
+    const shown = [...keep].sort((a, b) => a - b).map((i) => ranked[i]!);
     // Designations are assigned, never chosen -- nothing a user typed is
     // stored or rendered here, which is what keeps this board free of a
     // moderation surface. Collisions are resolved where they are visible.
     const names = disambiguate(
-      window.map((r) => (r.is_oracle ? ORACLE_DESIGNATION : designation(r.userId!))),
+      shown.map((r) => (r.is_oracle ? ORACLE_DESIGNATION : designation(r.userId!))),
     );
-    const boardRows = window.map((r, i) => ({
+    const boardRows = shown.map((r, i) => ({
       name: names[i]!, points: r.points, rank: r.rank, is_you: r.is_you, is_oracle: r.is_oracle,
     }));
 ```
@@ -1372,7 +1385,7 @@ In `apps/mobile/src/app/reveal/[date].tsx`:
 ```
 
 4. Replace the `boardLines(...)` render at `:281-286` with: `boardLines(...)` for the summary line, then, when `board.data?.rows?.length`, the `boardRowLines(board.data.rows)` list beneath it — `<Mono size={10}>`, `colors.goldText` for the row where `is_you`, `colors.ink` for `is_oracle`, `colors.mutedInk` otherwise.
-5. **Raise the reserved height.** `BOARD_MAX_LINES` is 1 and the reveal reserves its block against it (see the comment at `:47-48`). The rows arrive on the same query, so raise the reservation to `1 + CONSTANTS.BOARD_TOP_ROWS + 2 * CONSTANTS.BOARD_NEIGHBOURS + 1` lines. Getting this wrong reintroduces the shove-the-page-down bug the reserved slot exists to prevent.
+5. **Raise the reserved height — without touching `BOARD_MAX_LINES`.** That constant is 1 and means "lines `boardLines` can return"; an existing test asserts every `boardLines` state fits it, and overloading it would make that test assert nothing. Track A exports `CONSTANTS.BOARD_ROWS_MAX` (8) for the row list instead. The reveal reserves its block against `BOARD_MAX_LINES + CONSTANTS.BOARD_ROWS_MAX` lines (see the comment at `:47-48`). Getting this wrong reintroduces the shove-the-page-down bug the reserved slot exists to prevent.
 
 - [ ] **Step 6: Verify on the simulator**
 
