@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, countDistinct, eq, inArray } from "drizzle-orm";
-import { dayPoints, vigilPoints } from "@oracle/core";
+import { dayPoints } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
