@@ -623,7 +623,7 @@ EOF
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `packages/core/test/scoring-day.test.ts` (add `vigilMultiplier`, `vigilPoints`, `payoff` to its imports from `../src/scoring`, and `CONSTANTS` from `../src/constants`):
+Append to `packages/core/test/scoring-day.test.ts` (add `vigilMultiplier`, `vigilPoints` to its imports from `../src/scoring`, and `CONSTANTS` from `../src/constants`):
 
 ```ts
 describe("vigilMultiplier", () => {
@@ -659,32 +659,49 @@ describe("vigilPoints", () => {
 describe("the vigil multiplier keeps the scoring rule proper", () => {
   const GRID = [55, 60, 65, 70, 75, 80, 85, 90, 95];
 
-  // Expected points of reporting `c` when the honest belief is `p`, on a
-  // one-question day, at a given vigil.
-  const ev = (p: number, c: number, streak: number, weigh: (total: number, s: number) => number) => {
-    const { win, loss } = payoff(c, false);
-    return p * weigh(win, streak) + (1 - p) * weigh(loss, streak);
+  // The claim is about the EXACT expectation: E[M·S] = M·E[S], so a positive
+  // constant fixed before the outcomes cannot move the argmax.
+  //
+  // It is deliberately NOT written against `payoff()`. questionPoints rounds to
+  // whole points for display, and on a one-question day that rounding alone
+  // already ties adjacent grid points (at p=0.60, reporting 55 and 60 both
+  // score exactly 2) — verified numerically before this test was written. A
+  // properness test built on the rounded ladder therefore fails at streak 0,
+  // where the multiplier is exactly 1.0, and would have sent an implementer
+  // hunting a bug in the scoring engine that is really a display artefact.
+  const exactEv = (p: number, c: number, m: number) => {
+    const q = c / 100;
+    const expectedBrier = p * (q - 1) ** 2 + (1 - p) * q ** 2;
+    return m * CONSTANTS.POINTS_SCALE * (CONSTANTS.POINTS_BASELINE - expectedBrier);
   };
 
-  const argmax = (p: number, streak: number, weigh: (total: number, s: number) => number) =>
-    GRID.reduce((best, c) => (ev(p, c, streak, weigh) > ev(p, best, streak, weigh) ? c : best), GRID[0]!);
+  const argmax = (p: number, m: number, f: (p: number, c: number, m: number) => number) =>
+    GRID.reduce((best, c) => (f(p, c, m) > f(p, best, m) ? c : best), GRID[0]!);
 
   it("leaves the honest report optimal at every vigil length", () => {
     for (const streak of [0, 1, 3, 7, 10, 11, 30, 400]) {
+      const m = vigilMultiplier(streak);
       for (const c of GRID) {
-        expect(argmax(c / 100, streak, vigilPoints), `p=${c} streak=${streak}`).toBe(c);
+        expect(argmax(c / 100, m, exactEv), `p=${c} streak=${streak}`).toBe(c);
       }
     }
   });
 
-  it("proves the test has teeth: a wins-only multiplier is NOT proper", () => {
-    // The intuitive "reward the streak" reading, kept here as a negative
-    // control. If this ever starts passing, the property test above has gone
-    // blind and the real implementation is no longer protected by it.
-    const winsOnly = (total: number, streak: number) =>
-      total > 0 ? Math.round(total * vigilMultiplier(streak)) : total;
-    const dishonest = GRID.some((c) => argmax(c / 100, CONSTANTS.VIGIL_MULT_MAX_DAYS, winsOnly) !== c);
-    expect(dishonest).toBe(true);
+  it("proves the test has teeth: a wins-only multiplier pays for overconfidence", () => {
+    // The intuitive "reward the streak" reading, kept as a negative control. It
+    // is convex at zero, and a convex transform of a proper score rewards
+    // variance: every honest belief is beaten by a louder one (55 wants 65,
+    // 90 wants 95). If this ever stops failing, the test above has gone blind.
+    const winsOnly = (p: number, c: number, m: number) => {
+      const q = c / 100;
+      const win = CONSTANTS.POINTS_SCALE * (CONSTANTS.POINTS_BASELINE - (q - 1) ** 2);
+      const loss = CONSTANTS.POINTS_SCALE * (CONSTANTS.POINTS_BASELINE - q ** 2);
+      return p * (win > 0 ? m * win : win) + (1 - p) * (loss > 0 ? m * loss : loss);
+    };
+    const m = vigilMultiplier(CONSTANTS.VIGIL_MULT_MAX_DAYS);
+    for (const c of GRID.slice(0, -1)) {
+      expect(argmax(c / 100, m, winsOnly), `p=${c}`).toBeGreaterThan(c);
+    }
   });
 });
 ```
@@ -744,7 +761,7 @@ Expected: PASS, including the negative control.
 - [ ] **Step 6: Full suite + typecheck**
 
 Run: `cd packages/core && pnpm test && pnpm typecheck`
-Expected: 87 passing (82 + 5), typecheck clean.
+Expected: the new tests pass, nothing previously green goes red, typecheck clean.
 
 - [ ] **Step 7: Commit**
 
