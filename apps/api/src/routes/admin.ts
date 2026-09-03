@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, asc, gte } from "drizzle-orm";
 import type { AppContext } from "../app";
 import { resolveQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";
@@ -9,6 +9,7 @@ import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft } from "../pipeline/draft
 import { publish } from "../pipeline/actions";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
+import { pooledLeak, loadLeakRows, type SealRow } from "../pipeline/leak";
 
 const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
 
@@ -139,5 +140,39 @@ export const adminRoutes = new Hono<AppContext>()
     return c.json({
       available: rows.filter((r) => r.usedOn === null).length,
       drafts: rows.map((r) => ({ id: r.id, created_at: r.createdAt.toISOString(), used_on: r.usedOn })),
+    });
+  })
+  // The window's leak, across every round rather than one at a time. The
+  // settle-time LEAK WATCH answers "did this question leak"; this answers
+  // "does the window leak", which is the one that decides whether a standing
+  // ranks foresight or patience.
+  .get("/analytics/leak", async (c) => {
+    const db = c.get("deps").db;
+    const since = c.req.query("since");
+    const rounds = await db.query.rounds.findMany({
+      where: since ? gte(schema.rounds.date, since) : undefined,
+      orderBy: [asc(schema.rounds.date)],
+    });
+
+    const perRound: Array<{ date: string; drift: number | null; edge: number | null; seals: number; questions: number }> = [];
+    const everyQuestion: SealRow[][] = [];
+
+    for (const r of rounds) {
+      const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, r.date) });
+      const rowsPerQuestion = await Promise.all(qs.map((q) => loadLeakRows(db, q.id)));
+      everyQuestion.push(...rowsPerQuestion);
+      const p = pooledLeak(rowsPerQuestion);
+      perRound.push({ date: r.date, drift: p.drift, edge: p.edge, seals: p.seals, questions: p.questions });
+    }
+
+    return c.json({
+      pooled: pooledLeak(everyQuestion),
+      rounds: perRound,
+      // Stated in the payload, not only in leak.ts's header, so whoever reads
+      // this JSON gets it without reading the source.
+      caveat:
+        "DRIFT AND EDGE MEASURE DRIFT, NOT PROVEN LEAKAGE. HONEST NEWS CONVERGES A CROWD TOO, " +
+        "AND THE FIRST-HOUR BONUS SELECTS ENGAGED PLAYERS INTO THE EARLY HALF, BIASING EDGE NEGATIVE. " +
+        "A QUIET REPORT IS THE ABSENCE OF A SYMPTOM, NOT AN ALL-CLEAR.",
     });
   });

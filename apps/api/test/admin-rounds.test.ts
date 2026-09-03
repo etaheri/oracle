@@ -223,3 +223,35 @@ describe("GET /admin/bank", () => {
     expect(body.drafts[0]!.used_on).toBeNull();
   });
 });
+
+describe("GET /admin/analytics/leak", () => {
+  it("requires the admin secret", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await app.request("/admin/analytics/leak");
+    expect(res.status).toBe(401);
+  });
+
+  it("pools every resolved round and carries the caveat", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const res = await app.request("/admin/analytics/leak", { headers: { "x-admin-secret": "admin" } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pooled: { seals: number; questions: number }; rounds: unknown[]; caveat: string };
+    expect(body.pooled.seals).toBe(0);
+    expect(body.pooled.questions).toBe(0);
+    expect(Array.isArray(body.rounds)).toBe(true);
+    expect(body.caveat.length).toBeGreaterThan(0);
+  });
+
+  it("honours ?since", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    await seedRound(db, { date: "2026-08-25", opensAt: new Date("2026-08-25T16:00:00Z"), locksAt: new Date("2026-08-26T16:00:00Z") });
+    const res = await app.request("/admin/analytics/leak?since=2026-08-25", { headers: { "x-admin-secret": "admin" } });
+    const body = (await res.json()) as { rounds: Array<{ date: string }> };
+    expect(body.rounds.every((r) => r.date >= "2026-08-25")).toBe(true);
+  });
+});
