@@ -36,8 +36,4 @@ export const CONSTANTS = {
   // crowd's own verdict floor takes. Below it the board still reports the
   // field's size; it just stops claiming a placing inside it.
   BOARD_MIN_FIELD: 5,
-  FORECAST_WEIGHT_PIVOT: 750,
-  FORECAST_WEIGHT_SCALE: 60,
-  FORECAST_EXTREMIZE_D: 1.5,
-  FORECAST_MIN_RATED: 500,
 } as const;
