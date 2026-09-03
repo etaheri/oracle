@@ -166,6 +166,10 @@ export default function Ledger() {
               <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
               <View style={{ gap: space(2) }}>
                 <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+                {/* The machine's own plaque row, on the same fifty-call floor
+                    the player meets -- so for its first ten days it too reads
+                    UNWRITTEN beside them (schema comment, MeLedgerSchema.oracle). */}
+                <LeadStat label="THE ORACLE" value={scoreValue(d.oracle.score, d.oracle.calls_rated)} />
                 {/* The score is the premise of the whole app — the ledger naming
                     who can actually see — and it used to sit here as a bare label
                     over a progress string that never said what fifty was fifty OF
@@ -179,6 +183,11 @@ export default function Ledger() {
                 {standingLine(d.percentile, d.cohort_size) && (
                   <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ lineHeight: 15 }}>
                     {standingLine(d.percentile, d.cohort_size)}
+                  </Mono>
+                )}
+                {d.oracle.days_compared > 0 && (
+                  <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>
+                    {`YOU HAVE OUTSEEN THE ORACLE ON ${d.oracle.days_outseen} OF ${d.oracle.days_compared} DAYS`}
                   </Mono>
                 )}
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />

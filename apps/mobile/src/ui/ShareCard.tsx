@@ -28,6 +28,11 @@ export interface ShareCardData {
   bigOneCrowdPct: number | null;
   bigOneMarketPct: number | null;
   results: ReadonlyArray<QuestionResult>;
+  // The machine's own count against the day (design's Oracle-record beat).
+  // Omitted entirely -- rather than passed as null -- by a caller with no
+  // forecast for the day, so the line below simply does not render. The
+  // canvas renders this prop; it must never derive it from `results`.
+  oracleDayCounts?: { you: number; oracle: number };
 }
 
 export async function shareSnapshot(ref: RefObject<any>, filename: string, dialogTitle: string): Promise<void> {
@@ -94,6 +99,12 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const crowdLine = data.bigOneCrowdPct !== null ? `THE BIG ONE · CROWD SAID ${data.bigOneCrowdPct}% YES` : null;
   // Phase 2 market display: only when the question was adapted from a live market.
   const marketLine = data.bigOneMarketPct !== null ? `THE MARKET SAID ${data.bigOneMarketPct}% YES` : null;
+  // The machine's own count against the day (design's Oracle-record beat).
+  // Omitted by the caller -- not merely null -- on a day it never forecast,
+  // so there is nothing to check for beyond the prop's own presence.
+  const oracleLine = data.oracleDayCounts
+    ? `THE ORACLE ${data.oracleDayCounts.oracle} · YOU ${data.oracleDayCounts.you}`
+    : null;
 
   return (
     <Canvas ref={canvasRef} style={{ position: "absolute", left: -9999, top: 0, width: CARD_W, height: CARD_H }}>
@@ -143,6 +154,20 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={802} color={colors.museumWhite} />}
       {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
       {monoSmall && marketLine && <SkText font={monoSmall} text={marketLine} x={centered(monoSmall, marketLine)} y={866} color={NIGHT_DIM} />}
+      {/* Below the crowd line, in the same register the market line uses --
+          the market line (added since this row was specced) already sits at
+          the crowd-line-plus-26 slot this was to occupy, so this holds the
+          next one down, still clear of the divider. Gold only when the
+          player actually outdid the machine today. */}
+      {monoSmall && oracleLine && (
+        <SkText
+          font={monoSmall}
+          text={oracleLine}
+          x={centered(monoSmall, oracleLine)}
+          y={892}
+          color={data.oracleDayCounts!.you > data.oracleDayCounts!.oracle ? colors.warmCenter : NIGHT_DIM}
+        />
+      )}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
       {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={938} color={colors.agedGold} />}
       {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centered(monoSmall, LITURGY_LINES[0])} y={968} color={NIGHT_DIM} />}
