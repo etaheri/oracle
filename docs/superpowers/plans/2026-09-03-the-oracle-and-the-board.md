@@ -965,7 +965,7 @@ git commit -m "feat(api): the Oracle answers first, and never sees who answered 
 - Modify: `apps/api/test/round.test.ts`
 
 **Interfaces:**
-- Consumes: `designation`, `disambiguate`, `ORACLE_DESIGNATION`, `oracleQuestionPoints`, `CONSTANTS.BOARD_TOP_ROWS`, `CONSTANTS.BOARD_NEIGHBOURS` from `@oracle/core` (Track A).
+- Consumes: `designation`, `disambiguate`, `ORACLE_DESIGNATION`, `oracleDayTotal`, `CONSTANTS.BOARD_TOP_ROWS`, `CONSTANTS.BOARD_NEIGHBOURS` from `@oracle/core` (Track A). **Sum the Oracle's day through `oracleDayTotal`, never with an inline reduce** — that function is the single named path core's spec-§7 tripwire is bound to, and an inline sum at the call site would sit where core cannot guard it.
 - Produces: `rows` on the board payload, matching `RoundBoardSchema`.
 
 - [ ] **Step 1: Write the failing route tests**
@@ -1052,15 +1052,12 @@ In `apps/api/src/routes/round.ts`, extend the `/:date/board` handler. Leave the 
     // clock and a purchasable shield confer those). oracleQuestionPoints takes
     // no crowd argument at all, so there is no path by which one could reach it.
     const oracleTotal = qs.every((q) => q.oracleProbYes !== null)
-      ? qs.reduce(
-          (sum, q) =>
-            sum +
-            oracleQuestionPoints({
-              pYes: Number(q.oracleProbYes),
-              outcome: q.outcome as "yes" | "no" | "void",
-              isBigOne: q.isBigOne,
-            }),
-          0,
+      ? oracleDayTotal(
+          qs.map((q) => ({
+            pYes: Number(q.oracleProbYes),
+            outcome: q.outcome as "yes" | "no" | "void",
+            isBigOne: q.isBigOne,
+          })),
         )
       : null;
 
@@ -1119,7 +1116,7 @@ In `apps/api/src/routes/round.ts`, extend the `/:date/board` handler. Leave the 
 Add `rows: boardRows` to the final `c.json({...})`, and `rows: []` to the below-the-floor early return. Extend the top-of-file import to:
 
 ```ts
-import { CONSTANTS, dayPoints, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleQuestionPoints } from "@oracle/core";
+import { CONSTANTS, dayPoints, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
 ```
 
 - [ ] **Step 4: Run to verify it passes**
