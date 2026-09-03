@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CONSTANTS, type RoundBoard } from "@oracle/core";
-import { boardLines, BOARD_MAX_LINES, FIELD_GATHERING_LINE, UNRATED_LINE } from "../src/game/dailyBoard";
+import { boardLines, BOARD_MAX_LINES, FIELD_GATHERING_LINE, UNRATED_LINE, oracleDayLine, boardRowLines } from "../src/game/dailyBoard";
 
 function board(overrides: Partial<RoundBoard> = {}): RoundBoard {
   return {
@@ -8,6 +8,7 @@ function board(overrides: Partial<RoundBoard> = {}): RoundBoard {
     field_size: 214,
     your_points: 137,
     your_rank: 31,
+    rows: [],
     best_points: 268,
     median_points: 44,
     ...overrides,
@@ -72,5 +73,47 @@ describe("boardLines", () => {
       expect(line).not.toContain("!");
       for (const b of BANNED) expect(line).not.toContain(b);
     }
+  });
+});
+
+describe("oracleDayLine", () => {
+  const q = (outcome: "yes" | "no" | "void" | null, oracle: number | null, mine: boolean | null) =>
+    ({ outcome, oracle_p_yes: oracle, my: mine === null ? null : { answer: mine } });
+
+  it("names both counts, the player first", () => {
+    // oracle_p_yes 0.9 on an outcome of "no" is an Oracle miss (see
+    // packages/core/test/oracleRecord.test.ts's identical fixture, which
+    // labels this exact case "oracle wrong") -- the brief's expected count
+    // here was THE ORACLE 2; the correct count against dayCallCounts is 1.
+    expect(oracleDayLine([q("yes", 0.8, true), q("no", 0.9, false), q("yes", 0.2, true)]))
+      .toBe("YOU 3 · THE ORACLE 1");
+  });
+  it("says nothing when the machine never forecast the day", () => {
+    expect(oracleDayLine([q("yes", null, true), q("no", null, false)])).toBeNull();
+  });
+  it("says nothing on a day with no outcomes yet", () => {
+    expect(oracleDayLine([q(null, 0.8, true)])).toBeNull();
+  });
+  it("still speaks for a spectator who sealed nothing", () => {
+    expect(oracleDayLine([q("yes", 0.8, null), q("no", 0.9, null)])).toBe("YOU 0 · THE ORACLE 1");
+  });
+});
+
+describe("boardRowLines", () => {
+  const rows = [
+    { name: "THE COLD WITNESS", points: 268, rank: 1, is_you: false, is_oracle: false },
+    { name: "THE ORACLE", points: 184, rank: 3, is_you: false, is_oracle: true },
+    { name: "THE PATIENT SCRIBE", points: 96, rank: 7, is_you: true, is_oracle: false },
+  ];
+  it("writes rank, name and a signed level", () => {
+    expect(boardRowLines(rows)[0]).toBe("1 · THE COLD WITNESS · 268");
+  });
+  it("signs a losing level with a true minus, never a hyphen", () => {
+    const line = boardRowLines([{ ...rows[0]!, points: -40 }])[0]!;
+    expect(line).toContain("−40");
+    expect(line).not.toContain("-40");
+  });
+  it("returns nothing for an empty field", () => {
+    expect(boardRowLines([])).toEqual([]);
   });
 });

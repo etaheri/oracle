@@ -16,11 +16,11 @@ import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCa
 import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
-import { payoff } from "@oracle/core";
+import { payoff, oracleCallRight, dayCallCounts, CONSTANTS } from "@oracle/core";
 import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
-import { boardLines, BOARD_MAX_LINES } from "../../game/dailyBoard";
+import { boardLines, boardRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
@@ -49,7 +49,11 @@ const POINTS_SLOT_H = 84;
 // later than the reveal, and directly under the day's number — unreserved, the
 // whole page would shove down at the exact moment the ceremony lands.
 const BOARD_LINE_H = 15;
-const BOARD_SLOT_H = BOARD_MAX_LINES * BOARD_LINE_H + space(1);
+// The row list can add up to CONSTANTS.BOARD_ROWS_MAX lines under the
+// summary line BOARD_MAX_LINES already reserves for -- both must fit inside
+// the same arrival, or the row list shoves the page exactly as the summary
+// line used to.
+const BOARD_SLOT_H = (BOARD_MAX_LINES + CONSTANTS.BOARD_ROWS_MAX) * BOARD_LINE_H + space(1);
 
 
 // One golden surge through the Big One frame when the player beat the tide.
@@ -165,6 +169,11 @@ export default function RevealScreen() {
     const st = rowState(q);
     return st === "win" ? "win" : st === "loss" ? "loss" : st === "void" ? "void" : "none"; // pending, spectator → none
   });
+  // The machine's own count against the day -- null (and so omitted below)
+  // until it actually forecast a scored question. Computed once here rather
+  // than at each of its two call sites (the closing line, the night card).
+  const oracleLine = oracleDayLine(d.questions);
+  const oracleCounts = oracleLine !== null ? dayCallCounts(d.questions) : null;
   const cardData: ShareCardData = {
     date: d.date,
     dayPoints: d.day_points,
@@ -172,6 +181,7 @@ export default function RevealScreen() {
     bigOneCrowdPct: big?.crowd_yes_pct ?? null,
     bigOneMarketPct: big?.market_prob != null ? Math.round(big.market_prob * 100) : null,
     results,
+    ...(oracleCounts ? { oracleDayCounts: oracleCounts } : null),
   };
 
   async function onShare() {
@@ -289,6 +299,20 @@ export default function RevealScreen() {
                   {line}
                 </Mono>
               ))}
+              {/* The field as a room, not only a rank (design §4) — who else
+                  is standing near the reader, and where the machine itself
+                  landed among them. */}
+              {!!board.data?.rows?.length && boardRowLines(board.data.rows).map((line, i) => (
+                <Mono
+                  key={`row-${i}`}
+                  size={10}
+                  color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk}
+                  letterSpacing={2}
+                  style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}
+                >
+                  {line}
+                </Mono>
+              ))}
             </View>
           )}
           {/* Your standing, which is NOT this day's news — the vigil's count
@@ -385,8 +409,15 @@ export default function RevealScreen() {
                   {big.market_prob != null && (
                     <Mono size={10} color={colors.mutedInk}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
                   )}
-                  {big.oracle_p_yes != null && (
-                    <Mono size={10} color={colors.mutedInk}>THE ORACLE FORESAW {Math.round(big.oracle_p_yes * 100)}% YES</Mono>
+                  {big.oracle_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
+                    <Mono size={10} color={colors.mutedInk}>
+                      THE ORACLE FORESAW {Math.round(big.oracle_p_yes * 100)}% YES{" "}
+                      {oracleCallRight(big.oracle_p_yes, big.outcome) === null
+                        ? ""
+                        : oracleCallRight(big.oracle_p_yes, big.outcome)
+                          ? "✓"
+                          : "✗"}
+                    </Mono>
                   )}
                   <Mono size={10} color={colors.mutedInk} numberOfLines={2}>{receiptLine(big)}</Mono>
                   {contrarianWin && (
@@ -399,6 +430,22 @@ export default function RevealScreen() {
               )}
             </View>
           </GoldFrame>
+          </Animated.View>
+        )}
+        {/* The machine's own count against the day, once it forecast enough
+            of it to have one (design's Oracle-record beat). Gold only when
+            the reader actually outdid it today -- a tie or a loss stays in
+            the register the standing lines already use. */}
+        {oracleLine !== null && (
+          <Animated.View entering={FadeInDown.delay(BIG_ONE_DELAY + 260).duration(400).easing(easeOut)}>
+            <Mono
+              size={11}
+              letterSpacing={2}
+              color={oracleCounts!.you > oracleCounts!.oracle ? colors.goldText : colors.mutedInk}
+              style={{ textAlign: "center" }}
+            >
+              {oracleLine}
+            </Mono>
           </Animated.View>
         )}
         {/* A half-read day must not leave the app: the card carries the same

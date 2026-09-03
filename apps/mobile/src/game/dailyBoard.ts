@@ -1,4 +1,4 @@
-import type { RoundBoard } from "@oracle/core";
+import { dayCallCounts, type RoundBoard } from "@oracle/core";
 
 // Where the day stood. The reveal's answer to the one question the plaque
 // cannot answer on install day -- the Oracle Score needs fifty rated calls,
@@ -45,4 +45,30 @@ export function boardLines(b: RoundBoard | undefined): string[] {
     : `BEST ${level(b.best_points)} · MEDIAN ${level(b.median_points)}`;
   const rank = `RANK ${b.your_rank} OF ${b.field_size}`;
   return [shape === null ? rank : `${rank} · ${shape}`];
+}
+
+/**
+ * The day's closing sting. Two bare counts and no denominator, because the
+ * denominators genuinely differ -- the machine may abstain, the player may
+ * not have sealed -- and one shared denominator would be a lie about one of
+ * them. Null when the machine never forecast the day, or nothing resolved.
+ */
+export function oracleDayLine(
+  questions: Array<{
+    outcome: "yes" | "no" | "void" | null;
+    oracle_p_yes: number | null;
+    my: { answer: boolean } | null;
+  }>,
+): string | null {
+  const scored = questions.filter((q) => q.outcome === "yes" || q.outcome === "no");
+  if (scored.length === 0) return null;
+  if (scored.every((q) => q.oracle_p_yes === null)) return null;
+  const { you, oracle } = dayCallCounts(questions);
+  return `YOU ${you} · THE ORACLE ${oracle}`;
+}
+
+export function boardRowLines(
+  rows: Array<{ name: string; points: number; rank: number; is_you: boolean; is_oracle: boolean }>,
+): string[] {
+  return rows.map((r) => `${r.rank} · ${r.name} · ${level(r.points)}`);
 }
