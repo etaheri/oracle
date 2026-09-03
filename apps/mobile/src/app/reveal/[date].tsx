@@ -19,7 +19,7 @@ import type { QuestionResult } from "../../game/sharePattern";
 import { payoff } from "@oracle/core";
 import { useReveal } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
-import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, TOO_FEW_LINE } from "../../game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, vigilWeightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
@@ -227,7 +227,7 @@ export default function RevealScreen() {
               on the next refresh. In an app whose liturgy is "NOTHING IS
               REVISED", a provisional score is the wrong trade: the slot says
               how much has been read instead, and the number arrives once. */}
-          {!allSpectator && (anyPending ? (
+          {!allSpectator && (pointsWithheld(d) ? (
             <>
               <Ritual bold size={24} color={colors.mutedInk} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{readingLine(d.questions)}</Ritual>
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS WITHHELD</Mono>
@@ -238,6 +238,9 @@ export default function RevealScreen() {
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
               {d.first_hour && d.day_points > 0 && (
                 <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>FIRST HOUR +10%</Mono>
+              )}
+              {vigilWeightLine(d) && (
+                <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{vigilWeightLine(d)}</Mono>
               )}
             </>
           ))}
@@ -346,7 +349,7 @@ export default function RevealScreen() {
         )}
         {/* A half-read day must not leave the app: the card carries the same
             provisional score the slot above is withholding. */}
-        {!anyPending && results.some((r) => r !== "none") && (
+        {!pointsWithheld(d) && results.some((r) => r !== "none") && (
           <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 300).duration(400).easing(easeOut)}>
             <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />
           </Animated.View>

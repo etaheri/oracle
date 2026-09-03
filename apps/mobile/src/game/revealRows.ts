@@ -138,3 +138,21 @@ export function readingLine(questions: ReadonlyArray<Question>): string {
   // the one count the ceremony can actually open on would print "0 OF V".
   return `${read === 0 ? "NONE" : numeral(read)} OF ${numeral(questions.length)} READ`;
 }
+
+// The day's number is released only when it is both fully read AND weighed.
+// The first condition was already enforced by the ceremony; the second is
+// new, and it is the same principle: a total that changes after it has been
+// shown is the revision the liturgy promises never happens.
+export function pointsWithheld(d: Reveal): boolean {
+  const anyPending = d.questions.some((q) => q.outcome === null);
+  return anyPending || d.vigil_mult === null;
+}
+
+// Said once, for the day, never per question -- the per-row points still
+// match the payoff the card promised at seal time, and they must, or the
+// promise was a lie.
+export function vigilWeightLine(d: Reveal): string | null {
+  if (d.vigil_mult === null || d.vigil_mult <= 1) return null;
+  const weight = String(Number(d.vigil_mult.toFixed(2)));
+  return `THE VIGIL WEIGHS THIS DAY ×${weight}`;
+}

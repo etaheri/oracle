@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CONSTANTS, type Reveal } from "@oracle/core";
-import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine } from "../src/game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, vigilWeightLine } from "../src/game/revealRows";
 
 type Question = Reveal["questions"][number];
 
@@ -20,6 +20,17 @@ function question(overrides: Partial<Question> = {}): Question {
     void_reason: null,
     oracle_p_yes: 0.7,
     ...overrides,
+  };
+}
+
+function reveal({ vigil_mult, outcomes }: { vigil_mult: number | null; outcomes: Array<"yes" | "no" | null> }): Reveal {
+  return {
+    date: "2026-08-20",
+    day_points: 120,
+    first_hour: false,
+    vigil_mult,
+    questions: outcomes.map((outcome, i) => question({ slot: i + 1, outcome })),
+    ledger: { settled: true, streak: 3, calls_rated: 12, oracle_score: null },
   };
 }
 
@@ -218,5 +229,42 @@ describe("readingLine (audit 2026-09-02 §3.2)", () => {
     expect(readingLine(day(["yes", "yes", null, null, null]))).toBe("II OF V READ");
     expect(readingLine(day([null, null, null, null, null]))).toBe("NONE OF V READ");
     expect(readingLine(day(["yes", "yes", "yes", "yes", "yes"]))).toBe("V OF V READ");
+  });
+});
+
+describe("pointsWithheld", () => {
+  it("withholds while any row is unread", () => {
+    const d = reveal({ vigil_mult: 1.2, outcomes: ["yes", null] });
+    expect(pointsWithheld(d)).toBe(true);
+  });
+
+  it("withholds a fully-read day that has not been weighed yet", () => {
+    // Every row resolved but settlement has not stamped the vigil. Printing
+    // the raw total here is the provisional-number bug in a new costume.
+    const d = reveal({ vigil_mult: null, outcomes: ["yes", "no"] });
+    expect(pointsWithheld(d)).toBe(true);
+  });
+
+  it("releases the number once the day is both read and weighed", () => {
+    const d = reveal({ vigil_mult: 1.0, outcomes: ["yes", "no"] });
+    expect(pointsWithheld(d)).toBe(false);
+  });
+});
+
+describe("vigilWeightLine", () => {
+  it("says nothing at a weight of one", () => {
+    expect(vigilWeightLine(reveal({ vigil_mult: 1, outcomes: ["yes"] }))).toBeNull();
+  });
+
+  it("says nothing before the day is weighed", () => {
+    expect(vigilWeightLine(reveal({ vigil_mult: null, outcomes: ["yes"] }))).toBeNull();
+  });
+
+  it("names the weight when the vigil earned one", () => {
+    expect(vigilWeightLine(reveal({ vigil_mult: 1.35, outcomes: ["yes"] }))).toBe("THE VIGIL WEIGHS THIS DAY ×1.35");
+  });
+
+  it("trims a trailing zero rather than printing 1.50", () => {
+    expect(vigilWeightLine(reveal({ vigil_mult: 1.5, outcomes: ["yes"] }))).toBe("THE VIGIL WEIGHS THIS DAY ×1.5");
   });
 });
