@@ -1,5 +1,5 @@
 import { count, eq, gt, inArray, sql } from "drizzle-orm";
-import { oracleScore, settleStreak } from "@oracle/core";
+import { oracleScore, settleStreak, vigilMultiplier } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 // Round settlement (backend spec L73/L79/L119): streak + shield settlement for
@@ -32,6 +32,16 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
   for (const u of audience.values()) {
     if (u.streakSettledThrough !== null && u.streakSettledThrough >= date) continue; // ISO dates compare lexicographically
     const played = (byUser.get(u.id) ?? 0) > 0;
+    // Stamp the vigil that weighed this day BEFORE settleStreak advances it.
+    // `u.streakCurrent` here is the vigil carried INTO the round -- fixed
+    // before any of today's outcomes existed, which is exactly why weighing
+    // by it leaves the scoring rule proper (spec §A.3). Do-nothing on
+    // conflict: a crash-retry or a resettle must never revise a stamped day.
+    if (played) {
+      await db.insert(schema.userRounds)
+        .values({ userId: u.id, date, vigilMult: String(vigilMultiplier(u.streakCurrent)) })
+        .onConflictDoNothing();
+    }
     const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, u.id) });
     const result = settleStreak(
       { streakCurrent: u.streakCurrent, streakBest: u.streakBest, freeShieldUsedAt: u.freeShieldUsedAt, paidShieldsRemaining: ent?.shieldsRemaining ?? 0 },
