@@ -15,12 +15,15 @@
 - **TDD, always.** Failing test → run it → see it fail → minimal implementation → run it → see it pass → commit. Never write implementation before a failing test.
 - **Baselines, measured on this branch 2026-09-03 (the plan's first draft had these wrong):**
   core **87 passed**, api **273 passed / 1 failed (274)**, mobile **261 passed**; `pnpm typecheck` clean in all three.
-- **⚠ ONE api test is ALREADY RED on `main`, before any work in this plan:**
+- **⚠ **ONE api test is FLAKY on `main`, before any work in this plan:**
   `apps/api/test/compose.test.ts > composeHingePushes > never claims the ledger read a player whose every call voided`
-  — `AssertionError: expected [] to include 'results'`. It is **not yours**, it is **out of scope for this plan**, and you must **not** fix it. Expect exactly this one failure in every api run.
+  — `AssertionError: expected [] to include 'results'`. It passes or fails depending on a random UUID: `compose.ts:89` seeds line selection with
+  `${u.id}:${date}`, and `u.id` is `defaultRandom()`, so a different copy line is drawn every run
+  and the assertion only holds for some draws. **It is not yours, it is out of scope, and you must
+  not fix it or 'stabilise' it.** Ignore it whether it is red or green in your run.
 - **The binding rule is no regression, not an absolute count.** Individual steps quote expected
   totals; treat those as indicative. What actually gates a task: every test that passed before
-  your change still passes after it, the one failure above is the only red, your new tests pass,
+  your change still passes after it, the compose.test.ts flake above is the only red (and it may be green), your new tests pass,
   and `pnpm typecheck` is clean.
 - **API tests run on ONE vitest worker** (PGlite/WASM contention). Do not change `apps/api/vitest.config.ts` concurrency.
 - **Mobile vitest only runs `test/**/*.test.ts`** — pure TS, no React Native renderer. Components (`.tsx`) are verified by `tsc --noEmit` and on device, never by unit test. **Any logic worth testing must be extracted into `src/game/*.ts` first.**
