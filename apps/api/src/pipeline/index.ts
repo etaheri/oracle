@@ -8,7 +8,7 @@ import type { Db } from "../db/client";
 import { etNow } from "./clock";
 import { decideActions, loadPipelineState } from "./state";
 import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
-import { authorRound } from "./author";
+import { authorBankEntry, authorRound } from "./author";
 import { resolveWithClaude } from "./resolve";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
@@ -72,6 +72,14 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
         case "author":
           await authorRound(deps, action.date);
           done.push(`author:${action.date}`);
+          break;
+
+        case "author-bank":
+          // One entry a night while the bank is thin. A failure here is
+          // narrated by the catch below and retried tomorrow — the buffer is
+          // what buys the time, so nothing about today depends on this.
+          await authorBankEntry(deps);
+          done.push("author-bank");
           break;
 
         case "resolve":

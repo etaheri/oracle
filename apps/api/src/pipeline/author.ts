@@ -1,10 +1,10 @@
 // Hermes authoring (spec §5): Claude drafts the daily round, we validate it
 // with one retry, persist it as `scheduled` rows, and narrate the draft to
 // Telegram. Also carries the operator's single-slot reroll flow.
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, count, eq, gte, isNull, lt } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import type { PipelineDeps } from "./index";
-import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, type Draft } from "./draft";
+import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, type Draft } from "./draft";
 import { upsertDraft } from "./draft";
 import { addDays, noonET } from "./clock";
 import { fetchMarketSignals, type MarketSignal } from "./feeds";
@@ -306,4 +306,96 @@ export function draftMessage(
     return [`${q.slot} [${q.category}] ${star}${q.text}${pct}${locks}`, `  ↳ ${q.resolution_criteria}`];
   });
   return [`HERMES · DRAFT ${date}`, ...lines, `publishes at noon · /reroll <slot> [guidance] · /status`].join("\n");
+}
+
+// ── The evergreen bank (spec §5) ───────────────────────────────────────────
+//
+// publishFromBank burns one entry per use and POST /admin/bank was the only
+// writer, so "the drop must never depend on the agent being alive" held
+// exactly as long as the buffer lasted. This is the writer that refills it.
+//
+// A bank entry is authored against a date that does not exist yet: it may sit
+// unused for months and then publish on whatever day nobody authored. That one
+// fact drives every difference from authorRound — no date in the prompt, no
+// web search (a question grounded in tonight's news is dated by construction),
+// and every question locked to "after-lock".
+
+function bankSystemPrompt(): string {
+  return `You author an evergreen entry for ORACLE's draft bank — a spare round held in reserve and published automatically on a day nobody authored one. Produce exactly 5 yes/no questions. Rules:
+- YOU DO NOT KNOW WHAT DATE THIS WILL PUBLISH ON. It may sit in the bank for months. Nothing in a question, its resolution criteria or its source may name a date, a season, a scheduled event, a named fixture, or say "today", "tomorrow" or "this week". A question that only makes sense this month is not an evergreen question.
+- Anchor every question to the round's own window instead. The round opens at noon ET and closes at noon ET the next day: write "while this round is open", "in the 24 hours before this round closes", "on the round's closing day".
+- resolves_at must be the literal string "after-lock" for ALL FIVE questions — nothing about the outcome may be determinable before the round closes. There are no exceptions and no absolute instants in a bank entry: an instant authored now is already stale by the time this publishes.
+- Therefore NEVER weather. A forecast is always partly knowable, so weather can never be "after-lock". Use exactly the four remaining categories — markets, sports, culture, news — one each in slots 1 to 4.
+- Slot 5 is THE BIG ONE: the widest and most contested of the five, from any of those four categories.
+- Each question must be binary YES/NO in plain English, resolvable from ONE named public source that will still exist and still publish the same measurement a year from now.
+- resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically, on any date.
+- Genuinely contested: your own probability for YES must be between 0.30 and 0.70, and it must be that on a typical day rather than on one particular one. No gimmes.
+- Set market_prob to null: there is no live market to adapt from.
+- FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
+When your draft is final, call the draft_round tool exactly once.`;
+}
+
+type BankCheck = { ok: true; draft: Draft } | { ok: false; issues: string };
+
+// DraftSchema plus the one extra rule POST /admin/bank already enforces at
+// ingest. Checked here as a validation failure the retry can read, so the bank
+// cannot be poisoned by its own author — publishFromBank's poison-skip stays
+// the last line of defence rather than the first.
+function checkBankDraft(value: unknown): BankCheck {
+  const parsed = DraftSchema.safeParse(value);
+  if (!parsed.success) return { ok: false, issues: formatIssues(parsed.error.issues) };
+  const dated = parsed.data.questions.filter((q) => q.resolves_at !== RESOLVES_AFTER_LOCK);
+  if (dated.length > 0) {
+    return {
+      ok: false,
+      issues: `slot${dated.length > 1 ? "s" : ""} ${dated.map((q) => q.slot).join(", ")}: a bank entry must set resolves_at to "after-lock"`,
+    };
+  }
+  return { ok: true, draft: parsed.data };
+}
+
+function bankMessage(available: number, draft: Draft): string {
+  const lines = [...draft.questions]
+    .sort((a, b) => a.slot - b.slot)
+    .flatMap((q) => [
+      `${q.slot} [${q.category}] ${q.is_big_one ? "★ " : ""}${q.text} (${Math.round(q.author_probability * 100)}%)`,
+      `  ↳ ${q.resolution_criteria}`,
+    ]);
+  return [
+    `HERMES · BANKED AN EVERGREEN ROUND (${available} in the bank)`,
+    ...lines,
+    `holds until a day goes unauthored · GET /admin/bank`,
+  ].join("\n");
+}
+
+export async function authorBankEntry(deps: PipelineDeps): Promise<void> {
+  if (!deps.claude) throw new Error("pipeline: no claude client");
+  const claude = deps.claude;
+
+  const system = bankSystemPrompt();
+  const baseUser = "Produce one evergreen ORACLE round for the draft bank.";
+  const ask = (user: string) =>
+    claude.structured({
+      model: deps.models.author,
+      system,
+      user,
+      schemaName: "draft_round",
+      schema: draftRoundJsonSchema,
+    });
+
+  let checked = checkBankDraft(await ask(baseUser));
+  if (!checked.ok) {
+    const retryUser = `${baseUser}\n\nYour previous draft failed validation: ${checked.issues}. Produce a corrected draft.`;
+    checked = checkBankDraft(await ask(retryUser));
+    if (!checked.ok) {
+      throw new Error(`author-bank: draft failed validation twice: ${checked.issues}`);
+    }
+  }
+
+  await deps.db.insert(schema.draftBank).values({ draft: checked.draft });
+  const [row] = await deps.db
+    .select({ n: count() })
+    .from(schema.draftBank)
+    .where(isNull(schema.draftBank.usedOn));
+  await deps.telegram.send(bankMessage(Number(row?.n ?? 0), checked.draft));
 }

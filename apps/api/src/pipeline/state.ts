@@ -6,6 +6,12 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import { addDays, type ETNow } from "./clock";
 
+// How deep the evergreen buffer has to be before the pipeline stops topping it
+// up. An ops threshold, not a game rule — it belongs here and not in
+// @oracle/core, whose header says "Scoring/game tunables". Five entries is
+// five days of drops with no author alive at all.
+export const BANK_LOW_WATER = 5;
+
 export type Action =
   | { kind: "lock"; date: string }
   | { kind: "publish"; date: string }
@@ -14,6 +20,7 @@ export type Action =
   | { kind: "void"; date: string; questionIds: string[] }
   | { kind: "settle"; date: string }
   | { kind: "author"; date: string }
+  | { kind: "author-bank" }
   | { kind: "alert"; level: "warn" | "critical"; message: string };
 
 export interface PipelineState {
@@ -118,8 +125,17 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     actions.push({ kind: "author", date: tomorrow });
   }
 
+  // REFILL THE BANK — one entry per firing, at 03:00 only: off-peak, at most
+  // once a day, and well clear of both the 17:00 authoring window and the noon
+  // drop. The bank refills over days, which is the point of a low-water mark:
+  // the buffer is what absorbs the wait.
+  if (state.bankCount < BANK_LOW_WATER && hour === 3 && minute < 10) {
+    actions.push({ kind: "author-bank" });
+  }
+
   // ALERTS — each throttled to one tick per hour by minute window
-  if (hour >= 23 && minute < 10 && !state.scheduledDates.includes(tomorrow)) {
+  const tomorrowUnauthored = !state.scheduledDates.includes(tomorrow);
+  if (hour >= 23 && minute < 10 && tomorrowUnauthored) {
     actions.push(
       state.bankCount > 0
         ? {
@@ -133,6 +149,23 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
             message: `no draft for tomorrow — seed manually: POST /admin/rounds/${tomorrow}`,
           },
     );
+  }
+
+  // The buffer behind tomorrow, which is a different fact from tomorrow
+  // itself: the drop can be covered tonight and the bank still be two nights
+  // from empty. Suppressed only when the empty-bank critical above already
+  // said the same thing in stronger words.
+  if (
+    hour >= 23 &&
+    minute < 10 &&
+    state.bankCount < BANK_LOW_WATER &&
+    !(state.bankCount === 0 && tomorrowUnauthored)
+  ) {
+    actions.push({
+      kind: "alert",
+      level: "warn",
+      message: `the evergreen bank is low — ${state.bankCount} of ${BANK_LOW_WATER}, refilling one a night at 03:00`,
+    });
   }
 
   if (
