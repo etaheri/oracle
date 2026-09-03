@@ -5,7 +5,7 @@ import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import type { ETNow } from "../src/pipeline/clock";
 
-const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 0 };
+const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 0, claudeAvailable: true };
 const at = (hour: number, minute = 0) => ({ date: "2026-08-27", hour, minute });
 
 describe("decideActions", () => {
@@ -17,11 +17,11 @@ describe("decideActions", () => {
     expect(acts[0]).toEqual({ kind: "lock", date: "2026-08-26" });
   });
   it("locks then publishes in one noon tick", () => {
-    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0 });
+    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
     expect(acts.map((a) => a.kind)).toEqual(["lock", "publish"]);
   });
   it("never publishes while another round is open and not yet lockable", () => {
-    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0 });
+    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
     expect(acts.some((a) => a.kind === "publish")).toBe(false);
   });
   it("does not publish before noon", () => {
@@ -94,10 +94,12 @@ describe("loadPipelineState", () => {
   it("classifies open/locked/scheduled rounds and unresolved questions", async () => {
     const { db } = await makeTestDb();
     await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
-    const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"));
+    const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"), true);
     expect(st.openRound).toEqual({ date: "2026-08-26", lockPassed: true, needsForecast: true });
-    const st2 = await loadPipelineState(db, new Date("2026-08-27T15:00:00Z"));
+    expect(st.claudeAvailable).toBe(true);
+    const st2 = await loadPipelineState(db, new Date("2026-08-27T15:00:00Z"), false);
     expect(st2.openRound).toEqual({ date: "2026-08-26", lockPassed: false, needsForecast: true });
+    expect(st2.claudeAvailable).toBe(false);
   });
 
   it("picks the oldest locked round when more than one is locked", async () => {
@@ -111,7 +113,7 @@ describe("loadPipelineState", () => {
     await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-25"));
     await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
 
-    const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"));
+    const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"), true);
     expect(st.lockedRound?.date).toBe("2026-08-25");
   });
 });
@@ -119,7 +121,7 @@ describe("loadPipelineState", () => {
 describe("the forecast action", () => {
   const openNeeding = {
     openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true },
-    lockedRound: null, scheduledDates: [], bankCount: 5,
+    lockedRound: null, scheduledDates: [], bankCount: 5, claudeAvailable: true,
   };
   it("is decided while the open round has unforecast questions", () => {
     const actions = decideActions(
@@ -147,5 +149,29 @@ describe("the forecast action", () => {
       { ...openNeeding, openRound: { ...openNeeding.openRound, lockPassed: true } },
     );
     expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  });
+  it("is never decided with no Claude client — it would only throw", () => {
+    const actions = decideActions(
+      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
+      { ...openNeeding, claudeAvailable: false },
+    );
+    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  });
+  it("warns once daily, in the 23:00 window, when the round still needs a forecast and there is no Claude client", () => {
+    const blocked = { ...openNeeding, claudeAvailable: false };
+    const midday = decideActions({ date: "2026-09-03", hour: 13, minute: 5 } as ETNow, blocked);
+    expect(midday.some((a) => a.kind === "alert")).toBe(false);
+    const nightly = decideActions({ date: "2026-09-03", hour: 23, minute: 5 } as ETNow, blocked);
+    expect(nightly).toContainEqual({
+      kind: "alert",
+      level: "warn",
+      message: "the Oracle cannot take its position on 2026-09-03 — no Claude client configured",
+    });
+    // Throttled: outside the 23:00 window on minute<10, nothing.
+    const laterSameHour = decideActions({ date: "2026-09-03", hour: 23, minute: 35 } as ETNow, blocked);
+    expect(laterSameHour.some((a) => a.kind === "alert" && a.message.includes("Claude client"))).toBe(false);
+    // Never fires once claude is available again.
+    const recovered = decideActions({ date: "2026-09-03", hour: 23, minute: 5 } as ETNow, openNeeding);
+    expect(recovered.some((a) => a.kind === "alert" && a.message.includes("Claude client"))).toBe(false);
   });
 });

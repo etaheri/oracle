@@ -13,7 +13,7 @@ import { runTick, type PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
 
-const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 0 };
+const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 0, claudeAvailable: true };
 const at = (hour: number, minute = 0) => ({ date: "2026-08-27", hour, minute });
 const alerts = (acts: ReturnType<typeof decideActions>) => acts.filter((a) => a.kind === "alert");
 

@@ -77,7 +77,7 @@ export const telegramRoutes = new Hono<AppContext>().post("/:secret", async (c) 
         break;
 
       case "status": {
-        const state = await loadPipelineState(pipeline.db, pipeline.now());
+        const state = await loadPipelineState(pipeline.db, pipeline.now(), pipeline.claude !== null);
         const lines = [
           state.openRound
             ? `open: ${state.openRound.date} (lock ${state.openRound.lockPassed ? "passed" : "pending"})`
@@ -93,7 +93,7 @@ export const telegramRoutes = new Hono<AppContext>().post("/:secret", async (c) 
       }
 
       case "reroll": {
-        const state = await loadPipelineState(pipeline.db, pipeline.now());
+        const state = await loadPipelineState(pipeline.db, pipeline.now(), pipeline.claude !== null);
         const date = [...state.scheduledDates].sort()[0];
         if (!date) {
           await send("no draft standing");
@@ -105,7 +105,7 @@ export const telegramRoutes = new Hono<AppContext>().post("/:secret", async (c) 
       }
 
       case "flip": {
-        const state = await loadPipelineState(pipeline.db, pipeline.now());
+        const state = await loadPipelineState(pipeline.db, pipeline.now(), pipeline.claude !== null);
         const date = state.lockedRound?.date
           ?? (await pipeline.db.query.rounds.findFirst({ where: eq(schema.rounds.status, "resolved"), orderBy: (r, { desc }) => [desc(r.date)] }))?.date;
         if (!date) { await send("no round to flip"); break; }

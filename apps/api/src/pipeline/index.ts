@@ -36,7 +36,7 @@ function errorMessage(err: unknown): string {
 
 export async function runTick(deps: PipelineDeps): Promise<string[]> {
   const now = deps.now();
-  const state = await loadPipelineState(deps.db, now);
+  const state = await loadPipelineState(deps.db, now, deps.claude !== null);
   const actions = decideActions(etNow(now), state);
   const done: string[] = [];
 

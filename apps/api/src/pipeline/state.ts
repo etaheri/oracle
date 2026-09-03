@@ -29,9 +29,14 @@ export interface PipelineState {
   lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
   scheduledDates: string[]; // rounds with status='scheduled'
   bankCount: number; // unused evergreen drafts (draft_bank.used_on IS NULL)
+  // Whether runTick has a Claude client at all (deps.claude !== null). Not
+  // derived from the DB — passed in from the caller, because decideActions
+  // stays pure over (ETNow, PipelineState) with no I/O of its own (spec §9),
+  // and this is exactly the same kind of external fact bankCount already is.
+  claudeAvailable: boolean;
 }
 
-export async function loadPipelineState(db: Db, now: Date): Promise<PipelineState> {
+export async function loadPipelineState(db: Db, now: Date, claudeAvailable: boolean): Promise<PipelineState> {
   const [openRoundRow, lockedRoundRow, scheduledRounds, bankRow] = await Promise.all([
     db.query.rounds.findFirst({ where: eq(schema.rounds.status, "open") }),
     db.query.rounds.findFirst({
@@ -77,6 +82,7 @@ export async function loadPipelineState(db: Db, now: Date): Promise<PipelineStat
     lockedRound,
     scheduledDates: scheduledRounds.map((r) => r.date),
     bankCount: Number(bankRow[0]?.n ?? 0),
+    claudeAvailable,
   };
 }
 
@@ -94,7 +100,16 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
   // before the answers exist. Hourly throttle (minute<10) like authoring:
   // the call makes chained web searches and a failure simply retries.
   // Never past the lock: at that point a forecast would be a look-up.
-  if (state.openRound && !state.openRound.lockPassed && state.openRound.needsForecast && minute < 10) {
+  // Gated on claudeAvailable: with no client the call would only throw, and
+  // it would throw every ten minutes for up to 24h straight (spec amendment,
+  // 2026-09-03 review) — the once-daily ALERT below narrates this instead.
+  if (
+    state.openRound &&
+    !state.openRound.lockPassed &&
+    state.openRound.needsForecast &&
+    state.claudeAvailable &&
+    minute < 10
+  ) {
     actions.push({ kind: "forecast", date: state.openRound.date });
   }
 
@@ -209,6 +224,26 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
       kind: "alert",
       level: "warn",
       message: `round ${state.lockedRound.date} still has unresolved questions — retrying hourly, voids at noon ${addDays(state.lockedRound.date, 2)}`,
+    });
+  }
+
+  // Once a day, not hourly: the FORECAST action above is gated off entirely
+  // while claudeAvailable is false, so without this the missing-key state
+  // would go completely unnarrated for the whole open window. Shares the
+  // 23:00 window with the no-draft-for-tomorrow alert — same "end of day,
+  // still not right" posture.
+  if (
+    state.openRound &&
+    !state.openRound.lockPassed &&
+    state.openRound.needsForecast &&
+    !state.claudeAvailable &&
+    hour === 23 &&
+    minute < 10
+  ) {
+    actions.push({
+      kind: "alert",
+      level: "warn",
+      message: `the Oracle cannot take its position on ${state.openRound.date} — no Claude client configured`,
     });
   }
 
