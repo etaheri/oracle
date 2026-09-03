@@ -66,6 +66,10 @@ export const RevealSchema = z.object({
   date: z.string(),
   day_points: z.number().int(),
   first_hour: z.boolean(),
+  // How heavily the vigil weighed this day, stamped at settlement. Null means
+  // the day has not been weighed yet -- the client must withhold the number
+  // rather than print a total that will change (see revealRows.pointsWithheld).
+  vigil_mult: z.number().nullable(),
   questions: z.array(
     z.object({
       id: z.string().uuid(),

@@ -212,3 +212,40 @@ describe("reveal ledger and evidence", () => {
     expect(read.questions.find((q) => q.slot === 2)!.crowd_count).toBe(0); // nobody answered this one
   });
 });
+
+describe("the reveal serves the weighed day", () => {
+  it("returns a null multiplier and the raw total before settlement stamps it", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await playerOn(app);
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 85, idempotency_key: "k" }) });
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+
+    const res = await a("/v1/round/2026-08-20/reveal");
+    const body = (await res.json()) as { vigil_mult: number | null; day_points: number };
+    expect(body.vigil_mult).toBeNull();
+    expect(body.day_points).toBeGreaterThan(0);
+  });
+
+  it("weighs the day once the vigil is stamped", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await playerOn(app);
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 85, idempotency_key: "k" }) });
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+
+    const before = (await (await a("/v1/round/2026-08-20/reveal")).json()) as { day_points: number };
+    const raw = before.day_points;
+
+    const [u] = await db.query.users.findMany();
+    await db.insert(schema.userRounds).values({ userId: u!.id, date: "2026-08-20", vigilMult: "1.5" });
+
+    const after = (await (await a("/v1/round/2026-08-20/reveal")).json()) as { vigil_mult: number | null; day_points: number };
+    expect(after.vigil_mult).toBeCloseTo(1.5, 10);
+    expect(after.day_points).toBe(Math.round(raw * 1.5));
+  });
+});

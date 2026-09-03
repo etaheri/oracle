@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, countDistinct, eq, inArray } from "drizzle-orm";
-import { dayPoints } from "@oracle/core";
+import { dayPoints, vigilPoints } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -111,10 +111,19 @@ export const roundRoutes = new Hono<AppContext>()
     const byQ = new Map(mine.map((p) => [p.questionId, p]));
     const perQuestionPoints = mine.map((p) => p.points ?? 0);
     const allFirstHour = mine.length === qs.length && mine.every((p) => p.firstHour);
+    const raw = dayPoints(perQuestionPoints, allFirstHour);
+    // The vigil that weighed this day, stamped at settlement. Absent means
+    // unweighed, not weightless: the client withholds the number entirely
+    // rather than print one that would climb on the next refresh.
+    const stamped = await db.query.userRounds.findFirst({
+      where: and(eq(schema.userRounds.userId, userId), eq(schema.userRounds.date, date)),
+    });
+    const vigilMult = stamped ? Number(stamped.vigilMult) : null;
 
     return c.json({
       date,
-      day_points: dayPoints(perQuestionPoints, allFirstHour),
+      day_points: vigilMult === null ? raw : Math.round(raw * vigilMult),
+      vigil_mult: vigilMult,
       first_hour: allFirstHour,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);

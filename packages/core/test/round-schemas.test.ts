@@ -31,6 +31,7 @@ describe("round schemas", () => {
       date: "2026-08-20",
       day_points: 224,
       first_hour: true,
+      vigil_mult: null,
       questions: [
         {
           id: "44444444-4444-4444-8444-444444444444",
