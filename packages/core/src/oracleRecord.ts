@@ -1,5 +1,4 @@
 import { CONSTANTS as C } from "./constants";
-import { dayPoints, weighDay, vigilMultiplier } from "./scoring";
 
 // THE ORACLE's own record. It forecasts every question before the round
 // opens, crowd-blind, and is read on the same rule as the players -- with
