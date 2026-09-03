@@ -47,29 +47,46 @@ export function Screen({
   children,
   scroll = false,
   bleed = false,
+  header,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
+  // Pinned above a `scroll` page, outside the scroller and inside the top
+  // inset. A TopBar put in with the children scrolls away with them and ends
+  // up sitting on the status bar's own clock -- so the one control that leaves
+  // the screen is the one that scrolls off it.
+  header?: React.ReactNode;
   // No margin at all: the screen spends `useScreenInset()` on its own content.
   // For a screen whose scroller is too specialised to hand over.
   bleed?: boolean;
 }) {
   const i = useScreenInset();
-  const inset = bleed
-    ? null
-    : { paddingTop: i.top, paddingBottom: i.bottom, paddingLeft: i.left, paddingRight: i.right };
+  const pad = { paddingTop: i.top, paddingBottom: i.bottom, paddingLeft: i.left, paddingRight: i.right };
+  const inset = bleed ? null : pad;
+  const contentInset = pad;
   return (
     <View style={{ flex: 1, backgroundColor: colors.museumWhite }}>
       {scroll ? (
+        <>
+        {header ? (
+          <View style={{ paddingTop: i.top, paddingLeft: i.left, paddingRight: i.right }}>{header}</View>
+        ) : null}
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1, ...inset }}
+          // The inset is paid HERE, on the content, not on the container.
+          // iOS does not add it for us: contentInsetAdjustmentBehavior only
+          // adjusts under a navigation controller, and a bled ScrollView with
+          // no bottom padding scrolls its last line clean under the home
+          // indicator (verified on device -- the rites' closing liturgy ended
+          // up with the indicator drawn through it).
+          contentContainerStyle={{ ...contentInset, flexGrow: 1, paddingTop: header ? 0 : i.top }}
           // Every other scroller in the app hides its bar; a grey system rail
           // over the museum ground is the least in-voice thing on a page.
           showsVerticalScrollIndicator={false}
         >
           {children}
         </ScrollView>
+        </>
       ) : (
         <View style={{ flex: 1, ...inset }}>{children}</View>
       )}

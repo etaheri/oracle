@@ -28,6 +28,16 @@ import { useChromeScale } from "../ui/useChromeScale";
 // and hung from the top of the row. Sharing the box puts them on a baseline.
 const RITE_LINE_H = 18;
 
+// The numeral is set to the rite's own size, because that is what makes their
+// CAPS match -- and the cap is what the eye reads as alignment.
+//
+// Measured on device at 3x: Cinzel and IBM Plex Mono both render almost
+// exactly 2px of cap per point, so a numeral at 13 stood 26px tall against 22px
+// of 11pt text and sat four to five pixels proud of every line it numbered.
+// The baselines had agreed all along; it was never a font-metric difference,
+// just a larger glyph. At 11 the caps measure 22px against 22px.
+const RITE_NUMERAL_SIZE = 11;
+
 export default function Rites() {
   const router = useRouter();
   // `?all=1` from the standing link; the first-timer gate arrives bare.
@@ -67,7 +77,7 @@ export default function Rites() {
           paddingTop: space(4),
           paddingLeft: inset.left,
           paddingRight: inset.right,
-          paddingBottom: opening ? space(4) : inset.bottom + space(4),
+          paddingBottom: opening ? space(4) : inset.bottom,
           gap: space(4),
         }}
         showsVerticalScrollIndicator={false}
@@ -84,8 +94,11 @@ export default function Rites() {
             the numerals sit in the margin, the way a printed liturgy sets. */}
         <View style={{ gap: space(3), paddingRight: gutter + space(3) }}>
           {lines.map((line, i) => (
-            <View key={line} style={{ flexDirection: "row", gap: space(3), alignItems: "flex-start" }}>
-              <Ritual size={13} color={colors.goldText} letterSpacing={1} style={{ width: gutter, textAlign: "right", lineHeight: RITE_LINE_H }}>
+            // Baseline, not box-top. With both children on the same explicit
+            // line box this is currently equivalent to flex-start -- it is what
+            // keeps them locked if either size is ever changed again.
+            <View key={line} style={{ flexDirection: "row", gap: space(3), alignItems: "baseline" }}>
+              <Ritual size={RITE_NUMERAL_SIZE} color={colors.goldText} letterSpacing={1} style={{ width: gutter, textAlign: "right", lineHeight: RITE_LINE_H }}>
                 {numeral(i + 1)}
               </Ritual>
               <DecodeLine

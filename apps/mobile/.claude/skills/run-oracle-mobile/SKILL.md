@@ -127,6 +127,10 @@ clipped screen, a seven-line block) passed the full suite.
 - **neon's `sql` export throws when called as a plain function.** Use
   `sql.query(text, params)`; the tagged-template form is not usable from
   generated code.
+- **`seed` is additive, not idempotent.** It rebuilds the round and the
+  caller's own day each time, but every run inserts another 26 scored users, so
+  the plaque's cohort grows (27 → 53 → 79 …). Harmless for looking at screens;
+  do not read the cohort number as meaningful after repeated seeding.
 - **The dev-tools gear button overlaps the top-right of every screen.** It is
   part of the dev client, not the app — ignore it in screenshots.
 
