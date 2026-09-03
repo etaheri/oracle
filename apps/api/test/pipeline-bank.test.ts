@@ -34,7 +34,7 @@ function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso = 
   const deps: PipelineDeps = {
     db,
     claude,
-    models: { author: "m-a", resolve: "m-r" },
+    models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
     marketFetch: (async () => { throw new Error("no market feeds in tests"); }) as unknown as typeof fetch,

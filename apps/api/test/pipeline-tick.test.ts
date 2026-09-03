@@ -24,7 +24,7 @@ afterEach(() => vi.useRealTimers());
 function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
-    db, claude: null, models: { author: "m-a", resolve: "m-r" },
+    db, claude: null, models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
   };
@@ -44,12 +44,11 @@ describe("runTick", () => {
     expect(qs.every((q) => q.status === "locked")).toBe(true);
   });
 
-  it("lock stamps the oracle's forecast: the plain mean of p_yes under the rated-player floor", async () => {
+  it("lock no longer stamps a forecast from the crowd — that is now a separate, crowd-blind action", async () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env: authEnv });
     const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
     const [a, b, c] = [await player(app), await player(app), await player(app)];
-    // slot 1: YES@75, YES@55, NO@65 → pYes mean(0.75, 0.55, 0.35) = 0.55
     vi.useFakeTimers({ now: new Date("2026-08-26T16:30:00Z"), toFake: ["Date"] });
     await a("/v1/predictions", { method: "POST", body: body(qs[0]!.id, true, 75) });
     await b("/v1/predictions", { method: "POST", body: body(qs[0]!.id, true, 55) });
@@ -62,8 +61,8 @@ describe("runTick", () => {
       where: eq(schema.questions.roundDate, "2026-08-26"),
       orderBy: (q, { asc }) => [asc(q.slot)],
     });
-    expect(Number(questions[0]!.oracleProbYes)).toBeCloseTo(0.55, 6);
-    expect(questions[1]!.oracleProbYes).toBeNull();
+    // The crowd predicted; lock must never let that leak into oracleProbYes.
+    expect(questions.every((q) => q.oracleProbYes === null)).toBe(true);
   });
 
   it("publishes a scheduled draft at noon and stamps noon open/lock times", async () => {
@@ -101,6 +100,9 @@ describe("runTick", () => {
     const { db } = await makeTestDb();
     // open round whose lock is NOT passed (hand-seeded anomaly)
     await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-29T16:00:00Z") });
+    // Already forecast, so this tick's decision is about publish alone, not
+    // muddied by a forecast retry (claude is null in this file's fakeDeps).
+    await db.update(schema.questions).set({ oracleProbYes: "0.5" }).where(eq(schema.questions.roundDate, "2026-08-26"));
     await db.insert(schema.rounds).values({ date: "2026-08-27", status: "scheduled" });
     const { deps, sent } = fakeDeps(db, "2026-08-27T16:01:00Z");
     const done = await runTick(deps);
@@ -341,7 +343,7 @@ describe("buildPipelineDeps", () => {
 
   it("defaults models to the standard author/resolve constants", () => {
     const deps = buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "true" }));
-    expect(deps!.models).toEqual({ author: "claude-opus-5", resolve: "claude-sonnet-5" });
+    expect(deps!.models).toEqual({ author: "claude-opus-5", resolve: "claude-sonnet-5", forecast: "claude-sonnet-5" });
   });
 
   it("honors PIPELINE_AUTHOR_MODEL / PIPELINE_RESOLVE_MODEL overrides", () => {
@@ -352,7 +354,7 @@ describe("buildPipelineDeps", () => {
         PIPELINE_RESOLVE_MODEL: "claude-sonnet-custom",
       }),
     );
-    expect(deps!.models).toEqual({ author: "claude-opus-custom", resolve: "claude-sonnet-custom" });
+    expect(deps!.models).toEqual({ author: "claude-opus-custom", resolve: "claude-sonnet-custom", forecast: "claude-sonnet-5" });
   });
 
   it("telegram client is present (no-op) even without bot token/chat id", () => {

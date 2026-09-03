@@ -10,6 +10,7 @@ import { decideActions, loadPipelineState } from "./state";
 import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
 import { authorBankEntry, authorRound } from "./author";
 import { resolveWithClaude } from "./resolve";
+import { stampOracleForecast } from "./forecast";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
 import type { PushEnv } from "../push/onesignal";
@@ -18,7 +19,7 @@ export interface PipelineDeps {
   db: Db;
   telegram: TelegramClient;
   claude: ClaudeClient | null;
-  models: { author: string; resolve: string };
+  models: { author: string; resolve: string; forecast: string };
   now(): Date;
   // OneSignal credentials for the hinge push at settle. Absent (or absent
   // keys) → sendPushes no-ops cleanly and the settle report says so, which is
@@ -72,6 +73,11 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
         case "author":
           await authorRound(deps, action.date);
           done.push(`author:${action.date}`);
+          break;
+
+        case "forecast":
+          await stampOracleForecast(deps, action.date);
+          done.push(`forecast:${action.date}`);
           break;
 
         case "author-bank":

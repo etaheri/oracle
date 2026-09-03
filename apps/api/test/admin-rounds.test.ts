@@ -18,7 +18,7 @@ function admin(app: ReturnType<typeof createApp>) {
 
 function fakePipeline(db: PipelineDeps["db"], nowIso: string): PipelineDeps {
   return {
-    db, claude: null, models: { author: "m-a", resolve: "m-r" },
+    db, claude: null, models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
     telegram: { send: async () => {} },
     now: () => new Date(nowIso),
   };

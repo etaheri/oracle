@@ -15,6 +15,7 @@ export interface WorkerEnv {
   PIPELINE_ENABLED?: string;
   PIPELINE_AUTHOR_MODEL?: string;
   PIPELINE_RESOLVE_MODEL?: string;
+  PIPELINE_FORECAST_MODEL?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   APPLE_BUNDLE_ID?: string;
   ONESIGNAL_APP_ID?: string;
@@ -33,6 +34,7 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
     models: {
       author: env.PIPELINE_AUTHOR_MODEL ?? "claude-opus-5",
       resolve: env.PIPELINE_RESOLVE_MODEL ?? "claude-sonnet-5",
+      forecast: env.PIPELINE_FORECAST_MODEL ?? "claude-sonnet-5",
     },
     now: () => new Date(),
     push: { ONESIGNAL_APP_ID: env.ONESIGNAL_APP_ID, ONESIGNAL_API_KEY: env.ONESIGNAL_API_KEY },
