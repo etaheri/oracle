@@ -54,10 +54,14 @@ Call the oracle_forecast tool exactly once, with one entry per slot.`;
 export async function stampOracleForecast(deps: PipelineDeps, date: string): Promise<void> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
 
-  // Questions only. No join to predictions, and author_prob is not selected.
+  // Questions only. No join to predictions, and author_prob is not selected:
+  // the explicit `columns` allowlist below is what makes that structural
+  // rather than merely a property of what the prompt template happens to
+  // interpolate -- author_prob is not in the list, so it cannot reach here.
   const rows = await deps.db.query.questions.findMany({
     where: eq(schema.questions.roundDate, date),
     orderBy: (q, { asc }) => [asc(q.slot)],
+    columns: { id: true, slot: true, isBigOne: true, text: true, resolutionCriteria: true, sourceName: true },
   });
   if (rows.length === 0) throw new Error(`no round for ${date}`);
 
