@@ -52,8 +52,12 @@ const BOARD_LINE_H = 15;
 // The row list can add up to CONSTANTS.BOARD_ROWS_MAX lines under the
 // summary line BOARD_MAX_LINES already reserves for -- both must fit inside
 // the same arrival, or the row list shoves the page exactly as the summary
-// line used to.
-const BOARD_SLOT_H = (BOARD_MAX_LINES + CONSTANTS.BOARD_ROWS_MAX) * BOARD_LINE_H + space(1);
+// line used to. The container's own `gap: space(1)` sits BETWEEN every child,
+// so the reservation must cover the lines' boxes AND the (lines - 1) gaps
+// between them, not just one trailing unit of slack -- that undercounts from
+// 9 children on and is short by a full gap's width at the 10-child max.
+const BOARD_LINES_MAX = BOARD_MAX_LINES + CONSTANTS.BOARD_ROWS_MAX;
+const BOARD_SLOT_H = BOARD_LINES_MAX * BOARD_LINE_H + (BOARD_LINES_MAX - 1) * space(1);
 
 
 // One golden surge through the Big One frame when the player beat the tide.
