@@ -3,24 +3,25 @@ import { eq } from "drizzle-orm";
 import { decideActions, loadPipelineState, type PipelineState } from "../src/pipeline/state";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
+import type { ETNow } from "../src/pipeline/clock";
 
 const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 0 };
 const at = (hour: number, minute = 0) => ({ date: "2026-08-27", hour, minute });
 
 describe("decideActions", () => {
   it("does nothing on a quiet mid-morning tick", () => {
-    expect(decideActions(at(9), { ...empty, openRound: { date: "2026-08-26", lockPassed: false } })).toEqual([]);
+    expect(decideActions(at(9), { ...empty, openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false } })).toEqual([]);
   });
   it("locks a round past its lock time", () => {
-    const acts = decideActions(at(12), { ...empty, openRound: { date: "2026-08-26", lockPassed: true } });
+    const acts = decideActions(at(12), { ...empty, openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false } });
     expect(acts[0]).toEqual({ kind: "lock", date: "2026-08-26" });
   });
   it("locks then publishes in one noon tick", () => {
-    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0 });
+    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0 });
     expect(acts.map((a) => a.kind)).toEqual(["lock", "publish"]);
   });
   it("never publishes while another round is open and not yet lockable", () => {
-    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0 });
+    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0 });
     expect(acts.some((a) => a.kind === "publish")).toBe(false);
   });
   it("does not publish before noon", () => {
@@ -59,7 +60,7 @@ describe("decideActions", () => {
   it("criticals at 12:10 with nothing published or publishable", () => {
     const acts = decideActions(at(12, 10), empty);
     expect(acts.some((a) => a.kind === "alert" && a.level === "critical")).toBe(true);
-    expect(decideActions(at(12, 10), { ...empty, openRound: { date: "2026-08-27", lockPassed: false } })).toEqual([]);
+    expect(decideActions(at(12, 10), { ...empty, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false } })).toEqual([]);
   });
   it("no alert at 13:30 once a locked round has nothing left unresolved (settles instead)", () => {
     const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [] } });
@@ -69,7 +70,7 @@ describe("decideActions", () => {
   it("falls through to the bank at noon when nothing is scheduled for today", () => {
     expect(decideActions(at(12), { ...empty, bankCount: 2 })).toEqual([{ kind: "publish-bank", date: "2026-08-27" }]);
     expect(decideActions(at(12), { ...empty, bankCount: 2, scheduledDates: ["2026-08-27"] }).map((a) => a.kind)).toEqual(["publish"]);
-    expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false } })).toEqual([]);
+    expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false } })).toEqual([]);
     expect(decideActions(at(11, 50), { ...empty, bankCount: 2 })).toEqual([]);
   });
   it("never falls through to the bank when today already has a locked round (all-five-early-locks tail)", () => {
@@ -94,9 +95,9 @@ describe("loadPipelineState", () => {
     const { db } = await makeTestDb();
     await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
     const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"));
-    expect(st.openRound).toEqual({ date: "2026-08-26", lockPassed: true });
+    expect(st.openRound).toEqual({ date: "2026-08-26", lockPassed: true, needsForecast: true });
     const st2 = await loadPipelineState(db, new Date("2026-08-27T15:00:00Z"));
-    expect(st2.openRound).toEqual({ date: "2026-08-26", lockPassed: false });
+    expect(st2.openRound).toEqual({ date: "2026-08-26", lockPassed: false, needsForecast: true });
   });
 
   it("picks the oldest locked round when more than one is locked", async () => {
@@ -112,5 +113,39 @@ describe("loadPipelineState", () => {
 
     const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"));
     expect(st.lockedRound?.date).toBe("2026-08-25");
+  });
+});
+
+describe("the forecast action", () => {
+  const openNeeding = {
+    openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true },
+    lockedRound: null, scheduledDates: [], bankCount: 5,
+  };
+  it("is decided while the open round has unforecast questions", () => {
+    const actions = decideActions(
+      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow, openNeeding,
+    );
+    expect(actions).toContainEqual({ kind: "forecast", date: "2026-09-03" });
+  });
+  it("is throttled to once an hour, like authoring", () => {
+    const actions = decideActions(
+      { date: "2026-09-03", hour: 13, minute: 35 } as ETNow, openNeeding,
+    );
+    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  });
+  it("stops once every question carries a forecast", () => {
+    const actions = decideActions(
+      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
+      { ...openNeeding, openRound: { ...openNeeding.openRound, needsForecast: false } },
+    );
+    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  });
+  it("is never decided for a round that has already passed its lock", () => {
+    // Past lock the answers exist; a forecast then would be a look-up.
+    const actions = decideActions(
+      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
+      { ...openNeeding, openRound: { ...openNeeding.openRound, lockPassed: true } },
+    );
+    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
   });
 });

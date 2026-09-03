@@ -21,10 +21,11 @@ export type Action =
   | { kind: "settle"; date: string }
   | { kind: "author"; date: string }
   | { kind: "author-bank" }
+  | { kind: "forecast"; date: string }
   | { kind: "alert"; level: "warn" | "critical"; message: string };
 
 export interface PipelineState {
-  openRound: { date: string; lockPassed: boolean } | null; // status='open'; lockPassed = now >= questions' locksAt
+  openRound: { date: string; lockPassed: boolean; needsForecast: boolean } | null; // status='open'; lockPassed = now >= questions' locksAt
   lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
   scheduledDates: string[]; // rounds with status='scheduled'
   bankCount: number; // unused evergreen drafts (draft_bank.used_on IS NULL)
@@ -50,7 +51,13 @@ export async function loadPipelineState(db: Db, now: Date): Promise<PipelineStat
       (max, q) => (q.locksAt.getTime() > max ? q.locksAt.getTime() : max),
       0,
     );
-    openRound = { date: openRoundRow.date, lockPassed: now.getTime() >= maxLocksAt };
+    openRound = {
+      date: openRoundRow.date,
+      lockPassed: now.getTime() >= maxLocksAt,
+      // The Oracle owes this round a position on every question. Recomputed
+      // from the rows each tick, so a partial stamp simply retries.
+      needsForecast: questions.some((q) => q.oracleProbYes === null),
+    };
   }
 
   let lockedRound: PipelineState["lockedRound"] = null;
@@ -81,6 +88,14 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
   // LOCK
   if (state.openRound?.lockPassed) {
     actions.push({ kind: "lock", date: state.openRound.date });
+  }
+
+  // FORECAST — the Oracle owes the open round a position, and takes it
+  // before the answers exist. Hourly throttle (minute<10) like authoring:
+  // the call makes chained web searches and a failure simply retries.
+  // Never past the lock: at that point a forecast would be a look-up.
+  if (state.openRound && !state.openRound.lockPassed && state.openRound.needsForecast && minute < 10) {
+    actions.push({ kind: "forecast", date: state.openRound.date });
   }
 
   // PUBLISH — noon or later, today has a draft, and no still-open round blocking it
