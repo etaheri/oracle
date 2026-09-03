@@ -1421,11 +1421,15 @@ In `apps/mobile/src/app/ledger.tsx`, beside the existing `<LeadStat label="ORACL
 </Mono>
 ```
 
-**Read the layout comment at `ledger.tsx:146-152` before touching this screen.** The column's `justifyContent: "center"` clips once the content is taller than the viewport — that is a known pre-existing bug and two more rows may trigger it. If it does, report it rather than changing `justifyContent`; that fix needs its own decision.
+**Read the layout notes at `ledger.tsx:142-158` before touching this screen.** The clipping bug that used to live here — a centred column overflowing a fixed box, pushing the title over `‹ RETURN` and dropping the bottom row off-screen — is ALREADY FIXED: the screen now renders `<Screen scroll header={<TopBar />}>`, whose scroll variant keeps the centring for a short record and grows for a long one. So two more rows are safe. Do NOT change `justifyContent` or remove `scroll`; both are deliberately tuned and the comments explain what each is load-bearing for. If your rows somehow do reintroduce clipping, report it rather than re-tuning the layout yourself.
+
+`LeadStat` is `function LeadStat({ label, value }: { label: string; value: string })` at `ledger.tsx:55`, and `scoreValue(score, callsRated)` is imported from `../game/scoreProgress` at `:22` — reuse both rather than writing a parallel row.
 
 - [ ] **Step 2: Add the night-card line**
 
-In `apps/mobile/src/ui/ShareCard.tsx`, add one `SkText` line beneath the crowd line at `y={868}` reading `` `THE ORACLE ${oracleCount} · YOU ${youCount}` ``, in `mono`, `colors.warmCenter` when the player is ahead and `NIGHT_DIM` otherwise. Pass the two counts in through the existing `data` prop object rather than computing them inside the canvas.
+In `apps/mobile/src/ui/ShareCard.tsx`, add one `SkText` line beneath the crowd line at `y={868}` reading `` `THE ORACLE ${oracleCount} · YOU ${youCount}` ``, in `mono`, `colors.warmCenter` when the player is ahead and `NIGHT_DIM` otherwise.
+
+Pass the two counts in through the existing `ShareCardData` interface (`ShareCard.tsx:24`, currently `{ date, dayPoints, bigOneText, bigOneCrowdPct, bigOneMarketPct, results }`) rather than computing them inside the canvas — add one optional field so a caller that has no forecast for the day simply omits it and the line does not render. Update the reveal's call site to supply it from `dayCallCounts`.
 
 **ASCII only.** No `✓`, `✗` or `·`-adjacent decoration beyond the middot already proven to render in this file — Skia has no font fallback and a missing glyph renders as tofu.
 
