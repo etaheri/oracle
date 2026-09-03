@@ -80,8 +80,20 @@ There is no prod database yet (verified Sept 3), so nothing else is affected.
 Every question already carries `oracle_p_yes` and `outcome`. The Oracle's Brier, its resolved-call count and its Oracle Score are a pure aggregate over `questions` — computed on read, exactly as `/v1/me/ledger` computes the player's.
 
 - It meets the same `ORACLE_SCORE_MIN_CALLS: 50` floor. **For the first ten days the Oracle is `UNWRITTEN` too**, and it is named in the same week the player is. That symmetry is the week-one hook and it is free.
-- Scored on plain affine-Brier: **no contrarian bonus, no vigil multiplier, no first-hour weight.** None of the three is meaningful for a machine, and letting any of them touch the Oracle would tilt the comparison in the machine's favour and break the one promise `SCORE_GLOSS` makes.
 - No table, no settlement hook, no `resettleRound` hazard.
+
+**Two numbers, and they are scored differently.** The record (§4.2, the plaque) is the Oracle's Brier and Oracle Score. The day total (§5.2, the board row) is the sum of `questionPoints` over the day, because that is exactly what the board ranks players on.
+
+For the day total, the Oracle receives:
+
+| | |
+|---|---|
+| The `BIG_ONE_MULT` double weight | **yes** — the board already ranks players on raw `questionPoints`, which includes it; excluding it would put the Oracle on a different ladder than the rows beside it |
+| `CONTRARIAN_BONUS` | **no** — the Oracle has no relationship to a crowd it never saw |
+| The vigil multiplier | **no** — it is defended by a purchasable shield |
+| `FIRST_HOUR_BONUS` | **no** — the Oracle answers before the round opens; "early" is meaningless for it |
+
+The rule is not *strip every modifier*: it is that the Oracle keeps exactly what a call itself earns and nothing that timing, a crowd, or a purchase confers. That is the same line the board's own ranking already draws.
 
 **Call-counting rule**, so the edges are honest:
 
@@ -138,7 +150,7 @@ Every player gets a **stable pseudonym derived deterministically from their user
 
 ### 5.2 The Oracle stands in the list
 
-The machine takes a row, by name, ranked among the players on its day points as defined in §3. Some days the player is above it. Most days, early on, they are not.
+The machine takes a row, by name, ranked among the players on its day total as defined in §3. Some days the player is above it. Most days, early on, they are not.
 
 The Oracle's row is **pinned into the window even when its rank falls outside it**, showing its true rank — the player should never have to scroll to find out where the machine placed.
 
@@ -146,7 +158,7 @@ The Oracle's row is **pinned into the window even when its rank falls outside it
 
 The route keeps its existing aggregates and gains `rows`.
 
-- **Window:** the top few, then the caller's own neighbourhood with the caller marked in place, so a mid-field player sees the summit *and* the people immediately around them. Capped at roughly ten rows plus the pinned Oracle.
+- **Window:** `BOARD_TOP_ROWS` (3) from the summit, then the caller's own neighbourhood — the caller plus `BOARD_NEIGHBOURS` (2) either side — so a mid-field player sees the summit *and* the people immediately around them. Both are named constants in `@oracle/core`, not literals at the call site. Overlapping windows merge rather than repeat a row; the result is at most 8 rows plus the pinned Oracle.
 - A caller who did not complete the round has no row; the top rows still render.
 - **Unchanged and non-negotiable:** `BOARD_MIN_FIELD: 5` still gates it; complete rounds only; still 409 until every question carries an outcome; still ranked on raw `SUM(predictions.points)` so that the first-hour bonus and the shield-defended vigil multiplier stay out and **money cannot buy a place on the board**.
 
