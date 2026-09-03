@@ -12,6 +12,15 @@ export const CONSTANTS = {
   SHIELD_MIN_STREAK: 3,      // shields (free or paid) only defend a vigil this long
   VERDICT_MIN_CALLS: 20,     // calibration verdict / gap epithets need this many resolved calls
   FIRST_HOUR_BONUS: 0.10,   // +10% of the day's positive total
+  // The vigil weighs the day. ⚙ tunable.
+  // SYMMETRIC BY LAW: applied to losing days exactly as to winning ones. The
+  // multiplier is fixed by the streak carried INTO the day, so it is a
+  // positive constant with respect to today's reports and E[M·S] = M·E[S] --
+  // the honest report stays optimal. A wins-only variant puts a convex kink
+  // at zero and rewards overconfidence; see scoring-day.test.ts's negative
+  // control, which exists to keep that variant from ever passing.
+  VIGIL_MULT_PER_DAY: 0.05,
+  VIGIL_MULT_MAX_DAYS: 10,
   ORACLE_SCORE_WINDOW: 100,
   ORACLE_SCORE_MIN_CALLS: 50,
   FORECAST_WEIGHT_PIVOT: 750,

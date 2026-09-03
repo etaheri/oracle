@@ -54,3 +54,23 @@ export function oracleScore(briers: number[]): number | null {
   const result = 1000 * (1 - mean);
   return Math.round(Math.round(result * 1e10) / 1e10);
 }
+
+/**
+ * How heavily the ledger weighs a day, given the vigil carried into it.
+ * 1.00 with no vigil, rising to 1.50 at VIGIL_MULT_MAX_DAYS and holding.
+ */
+export function vigilMultiplier(streak: number): number {
+  const days = Math.min(Math.max(streak, 0), C.VIGIL_MULT_MAX_DAYS);
+  return 1 + C.VIGIL_MULT_PER_DAY * days;
+}
+
+/**
+ * The weighed day. Applied to the day's TOTAL, after the first-hour bonus,
+ * and to negative totals exactly as to positive ones -- a long vigil
+ * amplifies a bad day as much as a good one. That symmetry is what keeps the
+ * rule proper (see vigilMultiplier's note in constants.ts); it is also the
+ * stake that makes a vigil worth defending.
+ */
+export function vigilPoints(dayTotal: number, streak: number): number {
+  return Math.round(dayTotal * vigilMultiplier(streak));
+}
