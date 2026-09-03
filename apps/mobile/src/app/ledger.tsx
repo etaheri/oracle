@@ -20,6 +20,7 @@ import { colors, space } from "../theme";
 import { LITURGY_LINES, SCORE_GLOSS, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
+import { standingLine, vigilStat } from "../game/standing";
 
 // The plaque's floor, shared by the frame that waits for it. The loading
 // frame exists so the plaque fills rather than flashes, and it only earns
@@ -170,9 +171,14 @@ export default function Ledger() {
                 <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 15 }}>
                   {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
                 </Mono>
+                {standingLine(d.percentile, d.cohort_size) && (
+                  <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ lineHeight: 15 }}>
+                    {standingLine(d.percentile, d.cohort_size)}
+                  </Mono>
+                )}
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
                 <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
-                <Stat label="CURRENT VIGIL" value={`${d.streak} DAYS`} />
+                <Stat label="CURRENT VIGIL" value={vigilStat(d.streak)} />
                 <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
                 <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
                 <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
