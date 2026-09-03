@@ -18,7 +18,7 @@ defects diagnosed to the line.
 |---|---|---|---|
 | **A** | The vigil weighs the day | core + api + mobile + migration 0005 | scoring, settlement, reveal, copy |
 | **B** | Your standing among sealed records | api + mobile | `/v1/me/ledger`, plaque |
-| **C** | The window's leak, measured | core + api + doc | new admin analytics, no migration |
+| **C** | The window's leak, pooled and readable | api only | extends existing `pipeline/leak.ts`, no migration |
 | **D** | The ledger's first-load jump | mobile | `ledger.tsx` |
 | **E** | The rites' two returns | mobile | `rites.tsx` |
 
@@ -265,31 +265,47 @@ that no telemetry on leak exists at all.
 The magnitude decides everything downstream. If late seals beat early seals materially,
 then B's percentile — and any future board — ranks patience, not foresight.
 
-### C.2 Shape
+### C.2 CORRECTION — most of this already exists
 
-No migration. Everything needed exists: `predictions.created_at`, `questions.locks_at`, and
-the round's `opens_at` via `noonET(date)`.
+**Written before checking the repo; the 2026-09-01 window-integrity pass already built it.**
+`apps/api/src/pipeline/leak.ts` (shipped Sept 1, tested in `apps/api/test/pipeline-leak.test.ts`)
+already provides:
 
-New pure module `packages/core/src/leak.ts`:
+- `crowdDrift(rows)` — YES% among the first quartile of sealers vs the last, in points.
+- `lateEdge(rows)` — mean Brier of the earlier half minus the later half. **Positive means
+  late sealers scored better** — exactly the metric this section set out to build.
+- `earlyLockRate(qs, defaultLocksAt)`, `leakReport(...)`, `loadLeakRows(db, questionId)`.
 
-```ts
-sealPosition(sealedAt, opensAt, locksAt): number   // 0…1 through the question's own window
-leakReport(rows): { deciles: {n, meanBrier}[], spread: number, n: number }
-```
+It is wired into `settle` (`actions.ts:14,195,206`) and prints a `LEAK WATCH` block in the
+Telegram round report. Its header comment also already records the self-selection caveat
+this spec was going to add — in a sharper form, noting the first-hour bonus biases
+`lateEdge` *negative*.
 
-Pure and fully TDD-able; the API layer only supplies rows.
+**Nothing here needs rebuilding.** Do not create `packages/core/src/leak.ts`.
 
-New `GET /admin/analytics/leak` behind the existing admin auth, returning the report over
-all resolved predictions, with an optional `?since=` bound.
+### C.3 What is actually missing
 
-### C.3 The caveat, recorded in the output
+Three real gaps remain, and they are small:
 
-The number is **confounded by self-selection**: players who habitually seal late may differ
-in skill from those who seal early, so a spread is a signal, not a proof of leak. The
-endpoint's response and the written finding must both say so. Erik should not act on a
-single decile spread without also checking it holds within a fixed cohort.
+1. **It is per-question, per-round, at settle.** The report answers "did *this* question
+   leak", never "does the window leak across every round so far" — which is the question
+   that decides whether B's percentile ranks foresight or patience.
+2. **It is only readable in Telegram,** one day at a time, with no history.
+3. **`MIN_SEALS = 8` per question** means at launch scale nearly every question reports
+   `null`. Pooling across rounds is what makes the metric computable at all right now.
 
-Deliverable: the endpoint, plus a short finding doc once it has been run against real data.
+So C reduces to: **pool the existing metrics across all resolved rounds, and expose them
+where Erik can read them.**
+
+- New pure `pooledLeak(rows: SealRow[][]): { drift, edge, n, questions }` in the **existing**
+  `apps/api/src/pipeline/leak.ts`, reusing `crowdDrift` / `lateEdge` semantics over a
+  pooled row set rather than a single question's.
+- New `GET /admin/analytics/leak` behind the existing admin auth, with optional `?since=`,
+  returning the pooled figures plus per-round rows.
+- The response carries the same caveat `leak.ts`'s header already states, so a reader of the
+  JSON gets it without reading the source.
+
+No migration. No new package. No change to the settle-time report.
 
 ### C.4 Explicitly not in scope
 
