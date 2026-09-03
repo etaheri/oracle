@@ -6,12 +6,53 @@ describe("dayPoints", () => {
   it("sums per-question points", () => {
     expect(dayPoints([50, -15, 10, 0, 90], false)).toBe(135);
   });
-  it("adds 10% first-hour bonus on positive totals only", () => {
+  it("weighs the whole first-hour day, won or lost", () => {
+    // The first hour is a stake, not a gift. It used to pay only on positive
+    // totals -- a wins-only multiplier, convex at zero, which is exactly the
+    // shape the vigil's negative control below exists to forbid.
     expect(dayPoints([50, 50], true)).toBe(110);
-    expect(dayPoints([-50, 10], true)).toBe(-40); // negative day: no bonus
+    expect(dayPoints([-50, -50], true)).toBe(-110);
+    expect(dayPoints([-50, 10], true)).toBe(-44);
+    expect(dayPoints([-50, 50], true)).toBe(0);
   });
-  it("rounds the bonus", () => {
-    expect(dayPoints([10, 15], true)).toBe(28); // 25 + round(2.5) = 28
+  it("rounds the magnitude, so the losing first hour is never cheaper than its mirror", () => {
+    // 27.5 is exactly where Math.round's toward-+infinity tie-breaking shows.
+    expect(dayPoints([10, 15], true)).toBe(28);
+    expect(dayPoints([-10, -15], true)).toBe(-28);
+  });
+  it("is exactly the first-hour multiplier, nothing else", () => {
+    // The bond between the sweep below (which models the bonus as a plain
+    // multiplier on the day's total) and the shipped function.
+    for (let total = -400; total <= 400; total++) {
+      expect(dayPoints([total], true), `total=${total}`).toBe(weighDay(total, 1 + CONSTANTS.FIRST_HOUR_BONUS));
+      expect(dayPoints([total], false), `total=${total}`).toBe(total);
+    }
+  });
+  // A day worth nothing is worth nothing either way round. JS has two zeros
+  // and Object.is is the only thing that disagrees, so normalise -0 rather
+  // than let the sweeps below assert IEEE-754 instead of symmetry.
+  const zeroless = (n: number) => n + 0;
+
+  it("is exactly odd under the first-hour flag, as vigilPoints is", () => {
+    for (let total = -400; total <= 400; total++) {
+      const xs = [total, -13, 7];
+      expect(zeroless(dayPoints(xs.map((x) => -x), true)), `total=${total}`).toBe(zeroless(-dayPoints(xs, true)));
+    }
+  });
+  it("composes with the vigil and stays odd across both multipliers", () => {
+    // Two independently-rounded multipliers stack on every first-hour day the
+    // reveal shows. Odd ∘ odd is odd -- but only if neither rounding step
+    // breaks it, and double rounding is precisely where that would go
+    // unnoticed.
+    for (const m of [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5]) {
+      for (let total = -400; total <= 400; total++) {
+        const xs = [total, -13, 7];
+        const mirrored = xs.map((x) => -x);
+        expect(zeroless(weighDay(dayPoints(mirrored, true), m)), `total=${total} m=${m}`).toBe(
+          zeroless(-weighDay(dayPoints(xs, true), m)),
+        );
+      }
+    }
   });
 });
 
@@ -140,6 +181,71 @@ describe("the vigil multiplier keeps the scoring rule proper", () => {
     const m = vigilMultiplier(CONSTANTS.VIGIL_MULT_MAX_DAYS);
     for (const c of GRID.slice(0, -1)) {
       expect(argmax(c / 100, m, winsOnly), `p=${c}`).toBeGreaterThan(c);
+    }
+  });
+});
+
+describe("the first-hour bonus keeps the scoring rule proper", () => {
+  const GRID = [55, 60, 65, 70, 75, 80, 85, 90, 95];
+
+  // Same discipline as the vigil sweep above: the claim is about the EXACT
+  // expectation, so this is written against exact EV and never against the
+  // rounded `payoff()` ladder, which ties adjacent grid points on its own.
+  //
+  // The bonus is a PARAMETER here, not CONSTANTS.FIRST_HOUR_BONUS. That is the
+  // whole point of the change: properness used to survive only because the
+  // 5-point confidence grid was coarser than the distortion, and it broke at
+  // 0.11. Routed through weighDay the bonus is a positive constant fixed
+  // before any of today's outcomes exist, so E[(1+b)·S] = (1+b)·E[S] and the
+  // argmax cannot move at ANY value. Sweeping values far past the shipped one
+  // is what asserts the tuning ceiling is gone.
+  const BONUSES = [0.1, 0.25, 0.5];
+
+  const win = (c: number, m: number) => m * CONSTANTS.POINTS_SCALE * (CONSTANTS.POINTS_BASELINE - (c / 100 - 1) ** 2);
+  const loss = (c: number, m: number) => m * CONSTANTS.POINTS_SCALE * (CONSTANTS.POINTS_BASELINE - (c / 100) ** 2);
+
+  // The day's fifth question, decided against a day already carrying `others`.
+  const exactEv = (p: number, c: number, m: number, b: number, others: number) =>
+    (1 + b) * (p * (others + win(c, m)) + (1 - p) * (others + loss(c, m)));
+
+  const argmax = (
+    p: number,
+    m: number,
+    b: number,
+    others: number,
+    f: (p: number, c: number, m: number, b: number, others: number) => number,
+  ) => GRID.reduce((best, c) => (f(p, c, m, b, others) > f(p, best, m, b, others) ? c : best), GRID[0]!);
+
+  it("leaves the honest report optimal at every bonus, every slot, and every other-four total", () => {
+    for (const b of BONUSES) {
+      for (const m of [1, CONSTANTS.BIG_ONE_MULT]) {
+        for (let others = -400; others <= 400; others += 5) {
+          for (const c of GRID) {
+            expect(argmax(c / 100, m, b, others, exactEv), `p=${c} bonus=${b} mult=${m} others=${others}`).toBe(c);
+          }
+        }
+      }
+    }
+  });
+
+  it("proves the sweep has teeth: the wins-only first hour pays for overconfidence", () => {
+    // The shipped shape before this change, kept as a negative control. It
+    // multiplies only positive day totals, so it is convex at zero -- and a
+    // convex transform of a proper score rewards variance. The kink sits at
+    // the DAY's total, not the question's, so it bites when the other four
+    // leave the day straddling zero: exactly the case measured in the spec
+    // (§1.1), where at 0.11 a p=55 believer is paid to report 60. If this
+    // ever stops failing, the sweep above has gone blind.
+    const winsOnly = (p: number, c: number, m: number, b: number, others: number) => {
+      const weigh = (t: number) => (t > 0 ? t * (1 + b) : t);
+      return p * weigh(others + win(c, m)) + (1 - p) * weigh(others + loss(c, m));
+    };
+    for (const c of GRID.slice(0, -1)) {
+      const bought = [];
+      for (let others = -400; others <= 400; others++) {
+        if (argmax(c / 100, 1, 0.5, others, winsOnly) > c) bought.push(others);
+      }
+      expect(bought.length, `p=${c}: no other-four total made a louder report pay`).toBeGreaterThan(0);
     }
   });
 });

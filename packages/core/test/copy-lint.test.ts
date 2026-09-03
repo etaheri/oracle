@@ -143,6 +143,23 @@ describe("the rites", () => {
     expect(CONSTANTS.VIGIL_MULT_MAX_DAYS).toBe(10);
     expect(vigilCeiling!).toContain("TEN DAYS");
   });
+  it("names the first hour's stake at the rate the engine actually pays", () => {
+    // The first hour is no longer a gift on winning days: dayPoints routes it
+    // through weighDay, so it amplifies a lost day just as hard. The rite has
+    // to say so, and it has to say the rate scoring.ts actually applies --
+    // tuning FIRST_HOUR_BONUS must fail here rather than quietly leave a rite
+    // promising ten percent while the engine pays something else.
+    // Bound to the one rite that makes the claim, never to the joined canon:
+    // "IN BOTH DIRECTIONS" also appears in the vigil and big-one rites, so a
+    // canon-wide toContain stays green with this rite deleted.
+    const firstHour = RITES_LINES.find((l) => l.includes("WITHIN THE FIRST HOUR"));
+    expect(firstHour, "the rite naming the first-hour bonus is missing").toBeDefined();
+    expect(CONSTANTS.FIRST_HOUR_BONUS).toBe(0.1);
+    expect(firstHour!).toContain("TEN PERCENT");
+    expect(firstHour!).toContain("IN BOTH DIRECTIONS");
+    // ...and never the wins-only promise it replaced.
+    expect(firstHour!).not.toContain("PAYS TEN PERCENT MORE");
+  });
   it("teaches the shield before it is ever sold", () => {
     // The shield is a real-money purchase surfaced on Home and a permanent
     // plaque row. A player who reads only the opening must still meet it.

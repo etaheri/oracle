@@ -11,7 +11,14 @@ export const CONSTANTS = {
   CONTRARIAN_CROWD_PCT: 40,  // your side's final crowd % must be strictly below this
   SHIELD_MIN_STREAK: 3,      // shields (free or paid) only defend a vigil this long
   VERDICT_MIN_CALLS: 20,     // calibration verdict / gap epithets need this many resolved calls
-  FIRST_HOUR_BONUS: 0.10,   // +10% of the day's positive total
+  // The first hour weighs the day. ⚙ tunable.
+  // SYMMETRIC BY LAW, on the vigil's terms: applied to losing days exactly as
+  // to winning ones, through the same weighDay. It is fixed before any of
+  // today's outcomes exist, so E[M·S] = M·E[S] and the honest report stays
+  // optimal at every value -- there is no tuning ceiling. The wins-only shape
+  // this replaced was convex at zero and broke properness at 0.11; see
+  // scoring-day.test.ts's negative control, which keeps it from returning.
+  FIRST_HOUR_BONUS: 0.10,
   // The vigil weighs the day. ⚙ tunable.
   // SYMMETRIC BY LAW: applied to losing days exactly as to winning ones. The
   // multiplier is fixed by the streak carried INTO the day, so it is a

@@ -41,10 +41,20 @@ export function payoff(confidence: number, isBigOne: boolean): { win: number; lo
   };
 }
 
+/**
+ * The day's total, weighed by the first hour if all five were sealed inside it.
+ *
+ * Routed through `weighDay` for the same reason the vigil is: applied to a
+ * losing day exactly as to a winning one. A wins-only bonus is convex at zero
+ * and pays for overconfidence -- it survived at 0.10 only because the 5-point
+ * confidence grid is coarser than the distortion, and broke at 0.11. As a
+ * plain multiplier fixed before any of today's outcomes exist, E[M·S] = M·E[S]
+ * and the honest report stays optimal at ANY value of FIRST_HOUR_BONUS.
+ */
 export function dayPoints(perQuestion: number[], firstHour: boolean): number {
   const sum = perQuestion.reduce((a, b) => a + b, 0);
-  if (!firstHour || sum <= 0) return sum;
-  return sum + Math.round(C.FIRST_HOUR_BONUS * sum);
+  if (!firstHour) return sum;
+  return weighDay(sum, 1 + C.FIRST_HOUR_BONUS);
 }
 
 export function oracleScore(briers: number[]): number | null {
