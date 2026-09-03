@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { count, eq, inArray } from "drizzle-orm";
-import { assignEpithet, contrarianApplies } from "@oracle/core";
+import { count, eq, inArray, isNotNull, lt, and } from "drizzle-orm";
+import { assignEpithet, contrarianApplies, CONSTANTS } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -81,8 +81,28 @@ export const meRoutes = new Hono<AppContext>()
       resolvedCalls: resolved.filter((r) => r.inWindow).length,
     });
 
+    // Standing is read against the Oracle Score and nothing else. Day points
+    // now carry the vigil's weight, which a shield can be bought to defend --
+    // the score is the only number no purchase can reach, which is exactly
+    // what makes it the honest thing to rank.
+    const score = user?.oracleScore ?? null;
+    const cohortSize = Number((await db
+      .select({ n: count() })
+      .from(schema.users)
+      .where(isNotNull(schema.users.oracleScore)))[0]!.n);
+    let percentile: number | null = null;
+    if (score !== null && cohortSize >= CONSTANTS.PERCENTILE_MIN_COHORT) {
+      const below = Number((await db
+        .select({ n: count() })
+        .from(schema.users)
+        .where(and(isNotNull(schema.users.oracleScore), lt(schema.users.oracleScore, score))))[0]!.n);
+      percentile = Math.round((100 * below) / cohortSize);
+    }
+
     return c.json({
       oracle_score: user?.oracleScore ?? null,
+      percentile,
+      cohort_size: cohortSize,
       calls_rated: user?.callsResolved ?? 0,
       calls_answered: resolved.length,
       days_consulted: byDate.size,

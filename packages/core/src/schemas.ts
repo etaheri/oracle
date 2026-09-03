@@ -111,6 +111,10 @@ export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
 export const MeLedgerSchema = z.object({
   oracle_score: z.number().int().nullable(),
+  // Where this record stands among every written Oracle Score. Null until the
+  // caller's own score exists AND the cohort is worth comparing against.
+  percentile: z.number().int().nullable(),
+  cohort_size: z.number().int(),
   calls_rated: z.number().int(),
   calls_answered: z.number().int(),
   days_consulted: z.number().int(),

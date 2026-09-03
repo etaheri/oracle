@@ -125,3 +125,54 @@ describe("GET /v1/me/ledger", () => {
     expect(spent).toMatchObject({ free_shield_available: false, paid_shields: 2, shield_used_on: "2026-08-19" });
   });
 });
+
+describe("standing", () => {
+  const withScore = async (db: Awaited<ReturnType<typeof makeTestDb>>["db"], score: number | null) =>
+    (await db.insert(schema.users).values({ oracleScore: score, callsResolved: score === null ? 0 : 50 }).returning())[0]!;
+
+  it("is null for a player whose score is unwritten", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const res = await a("/v1/me/ledger");
+    const body = (await res.json()) as { percentile: number | null };
+    expect(body.percentile).toBeNull();
+  });
+
+  it("is null while the cohort is too small to mean anything", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const [me] = await db.query.users.findMany();
+    await db.update(schema.users).set({ oracleScore: 700, callsResolved: 50 }).where(eq(schema.users.id, me!.id));
+    for (let i = 0; i < 5; i++) await withScore(db, 600);
+    const body = (await (await a("/v1/me/ledger")).json()) as { percentile: number | null; cohort_size: number };
+    expect(body.cohort_size).toBe(6);
+    expect(body.percentile).toBeNull();
+  });
+
+  it("reports the share of the cohort standing below, once the cohort is large enough", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const [me] = await db.query.users.findMany();
+    await db.update(schema.users).set({ oracleScore: 900, callsResolved: 50 }).where(eq(schema.users.id, me!.id));
+    // 19 others, all below → 19 of 20 below → 95th.
+    for (let i = 0; i < 19; i++) await withScore(db, 500);
+    const body = (await (await a("/v1/me/ledger")).json()) as { percentile: number | null; cohort_size: number };
+    expect(body.cohort_size).toBe(20);
+    expect(body.percentile).toBe(95);
+  });
+
+  it("does not count unwritten scores in the cohort", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const [me] = await db.query.users.findMany();
+    await db.update(schema.users).set({ oracleScore: 900, callsResolved: 50 }).where(eq(schema.users.id, me!.id));
+    for (let i = 0; i < 19; i++) await withScore(db, 500);
+    for (let i = 0; i < 30; i++) await withScore(db, null);
+    const body = (await (await a("/v1/me/ledger")).json()) as { cohort_size: number };
+    expect(body.cohort_size).toBe(20);
+  });
+});
