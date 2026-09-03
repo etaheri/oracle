@@ -294,6 +294,23 @@ async function voidHeavyPlayer() {
   return p;
 }
 
+/**
+ * One complete round, sealed by both the player and the Oracle -- but not
+ * one question has resolved yet. Forecasting now happens at PUBLISH, so this
+ * is reachable the instant a player seals today's round: it must not count
+ * as compared until resolution actually lands.
+ */
+async function sealedButUnresolvedPlayer() {
+  const { db } = await makeTestDb();
+  const app = createApp({ db, env });
+  const p = await freshPlayer(app);
+  const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+  for (const q of qs) await db.update(schema.questions).set({ oracleProbYes: "0.8" }).where(eq(schema.questions.id, q.id));
+  for (const q of qs) await db.insert(schema.predictions).values({ questionId: q.id, userId: p.userId, answer: true, confidence: 75 });
+  // Deliberately no resolveQuestion() calls -- outcome stays null throughout.
+  return p;
+}
+
 async function ledgerFor(setup: () => Promise<Awaited<ReturnType<typeof freshPlayer>>>) {
   const p = await setup();
   return (await p.get("/v1/me/ledger")).json();
@@ -329,5 +346,10 @@ describe("the ledger's rival", () => {
   it("excludes voids and the machine's abstentions from both sides", async () => {
     const body = (await ledgerFor(voidHeavyPlayer)) as LedgerBody;
     expect(body.oracle.days_compared).toBe(1);
+  });
+  it("does not count a round as compared until it resolves, even when both sides have already committed", async () => {
+    const body = (await ledgerFor(sealedButUnresolvedPlayer)) as LedgerBody;
+    expect(body.oracle.days_compared).toBe(0);
+    expect(body.oracle.days_outseen).toBe(0);
   });
 });

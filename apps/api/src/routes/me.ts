@@ -124,6 +124,11 @@ export const meRoutes = new Hono<AppContext>()
     for (const [date, n] of byDate.entries()) {
       const dayQs = forecastByDate.get(date);
       if (!dayQs || n !== sizeOf.get(date) || dayQs.length !== sizeOf.get(date)) continue;
+      // A round is only "compared" once every one of its questions has
+      // resolved. Forecasting now happens at PUBLISH (not lock), so a round
+      // can be fully answered and fully forecast while still open -- without
+      // this gate, that still-open round would count today, a day early.
+      if (dayQs.some((q) => q.outcome === null)) continue;
       const byId = new Map(dayQs.map((q) => [q.id, q]));
       let you = 0;
       let machine = 0;
