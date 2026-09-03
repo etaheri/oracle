@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { designation, disambiguate, ORACLE_DESIGNATION } from "../src/designation";
+import { CONSTANTS } from "../src/constants";
 
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 
@@ -41,5 +42,17 @@ describe("disambiguate", () => {
   it("numbers repeats in the order they appear", () => {
     expect(disambiguate(["THE COLD WITNESS", "THE COLD WITNESS", "THE COLD WITNESS"]))
       .toEqual(["THE COLD WITNESS", "THE COLD WITNESS II", "THE COLD WITNESS III"]);
+  });
+});
+
+describe("board window", () => {
+  it("reserves room for every row the board's window can produce", () => {
+    const { BOARD_TOP_ROWS, BOARD_NEIGHBOURS, BOARD_ROWS_MAX } = CONSTANTS;
+    // The route keeps: the top rows, the caller's own window (the caller plus
+    // BOARD_NEIGHBOURS either side), and the Oracle pinned in from outside
+    // both. Disjoint in the worst case, which is the case the reveal must
+    // reserve height for.
+    const worstCase = BOARD_TOP_ROWS + (1 + 2 * BOARD_NEIGHBOURS) + 1;
+    expect(BOARD_ROWS_MAX).toBeGreaterThanOrEqual(worstCase);
   });
 });

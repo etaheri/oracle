@@ -40,5 +40,9 @@ export const CONSTANTS = {
   // because the reveal reserves height against them.
   BOARD_TOP_ROWS: 3,      // rows from the summit
   BOARD_NEIGHBOURS: 2,    // rows either side of the caller
-  BOARD_ROWS_MAX: 8,      // 1 summary line + BOARD_TOP_ROWS + 2*BOARD_NEIGHBOURS + the pinned Oracle
+  // Rows only -- the summary line is BOARD_MAX_LINES' job, and the reveal
+  // reserves against the sum of the two. Worst case is the top rows, plus the
+  // caller's own window (themselves and BOARD_NEIGHBOURS either side), plus
+  // the Oracle pinned in from outside both.
+  BOARD_ROWS_MAX: 9,      // BOARD_TOP_ROWS + (1 + 2*BOARD_NEIGHBOURS) + the pinned Oracle
 } as const;
