@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { oracleCall, oracleCallRight, oracleQuestionPoints, oracleBrierOf, dayCallCounts } from "../src/oracleRecord";
+import { oracleCall, oracleCallRight, oracleQuestionPoints, oracleBrierOf, dayCallCounts, oracleDayTotal } from "../src/oracleRecord";
 import { CONSTANTS as C } from "../src/constants";
+import { dayPoints, vigilMultiplier, weighDay } from "../src/scoring";
 
 describe("oracleCall", () => {
   it("reads a side from the probability", () => {
@@ -86,5 +87,22 @@ describe("dayCallCounts", () => {
       q("yes", 0.9, null),   // player never sealed, oracle right
     ]);
     expect(counts).toEqual({ you: 1, oracle: 1 });
+  });
+});
+
+describe("oracleDayTotal", () => {
+  it("takes neither the vigil's weight nor the first hour, on a day where both would show", () => {
+    const day = [
+      { pYes: 0.83, outcome: "yes" as const, isBigOne: false },
+      { pYes: 0.70, outcome: "yes" as const, isBigOne: false },
+      { pYes: 0.60, outcome: "no" as const, isBigOne: true },
+    ];
+    const perQ = day.map(oracleQuestionPoints);
+    const plain = perQ.reduce((a, b) => a + b, 0);
+    // Both forbidden transforms must MOVE this day -- otherwise the assertions
+    // below would hold no matter what oracleDayTotal did.
+    expect(weighDay(plain, vigilMultiplier(10))).not.toBe(plain);
+    expect(dayPoints(perQ, true)).not.toBe(plain);
+    expect(oracleDayTotal(day)).toBe(plain);
   });
 });

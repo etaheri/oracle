@@ -1,4 +1,5 @@
 import { CONSTANTS as C } from "./constants";
+import { dayPoints, weighDay, vigilMultiplier } from "./scoring";
 
 // THE ORACLE's own record. It forecasts every question before the round
 // opens, crowd-blind, and is read on the same rule as the players -- with
@@ -74,4 +75,20 @@ export function dayCallCounts(
     if (oracleCallRight(q.oracle_p_yes, q.outcome) === true) oracle += 1;
   }
   return { you, oracle };
+}
+
+/**
+ * The Oracle's day. A PLAIN SUM, and the absence here is the point: no vigil
+ * multiplier (it is defended by a purchasable shield), no first-hour weight
+ * (the Oracle answers before the round opens, so "early" is meaningless for
+ * it), no contrarian bounty (it never saw the crowd). It keeps what its calls
+ * earned and nothing that timing, a crowd, or a purchase confers.
+ *
+ * This function exists so that rule has ONE named path to guard -- summing
+ * inline at the call site would put it somewhere core could not test.
+ */
+export function oracleDayTotal(
+  questions: Array<{ pYes: number; outcome: "yes" | "no" | "void"; isBigOne: boolean }>,
+): number {
+  return questions.reduce((sum, q) => sum + oracleQuestionPoints(q), 0);
 }

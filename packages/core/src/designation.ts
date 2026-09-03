@@ -28,7 +28,7 @@ const ROLES = [
 /** The machine's own row on the board. Never assigned to a player. */
 export const ORACLE_DESIGNATION = "THE ORACLE";
 
-// Deterministic 32-bit string hash. Same char-walk shape epigraph.ts uses;
+// Deterministic 32-bit string hash. Same char-walk shape as terminalPrint.ts;
 // it needs to spread, not to be cryptographic.
 function hash(s: string): number {
   let h = 0;
@@ -47,6 +47,7 @@ export function designation(userId: string): string {
   return `THE ${modifier} ${role}`;
 }
 
+// Eight suffixes to handle collisions in the board's 8-row window (BOARD_ROWS_MAX).
 const SUFFIXES = ["", " II", " III", " IV", " V", " VI", " VII", " VIII"];
 
 /**
