@@ -72,5 +72,9 @@ export function vigilMultiplier(streak: number): number {
  * stake that makes a vigil worth defending.
  */
 export function vigilPoints(dayTotal: number, streak: number): number {
-  return Math.round(dayTotal * vigilMultiplier(streak));
+  // Round the MAGNITUDE, not the signed value: Math.round breaks .5 ties
+  // toward +infinity, which would make a losing day one point cheaper than
+  // the winning day of the same size. Symmetry is the whole property here.
+  const weighed = dayTotal * vigilMultiplier(streak);
+  return Math.sign(weighed) * Math.round(Math.abs(weighed));
 }

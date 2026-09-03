@@ -61,6 +61,16 @@ describe("vigilPoints", () => {
     expect(vigilPoints(83, 0)).toBe(83);
     expect(vigilPoints(-83, 0)).toBe(-83);
   });
+
+  it("is exactly odd — a losing day is never cheaper than the winning day of the same size", () => {
+    // The single hardcoded ±150 case above passes even when rounding breaks
+    // symmetry at half-integers; this sweep is what actually holds the line.
+    for (let streak = 0; streak <= 12; streak++) {
+      for (let total = -400; total <= 400; total++) {
+        expect(vigilPoints(-total, streak), `total=${total} streak=${streak}`).toBe(-vigilPoints(total, streak));
+      }
+    }
+  });
 });
 
 describe("the vigil multiplier keeps the scoring rule proper", () => {
