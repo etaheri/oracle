@@ -10,3 +10,6 @@ dist/
 
 # Local venv for design/scripts (Pillow asset generation)
 design/.venv/
+
+# Screenshots and service logs from the run-oracle-mobile driver
+.oracle-run/
