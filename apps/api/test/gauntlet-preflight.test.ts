@@ -4,6 +4,7 @@ import { preflight } from "../src/pipeline/gauntlet/preflight";
 import type { Judged } from "../src/pipeline/gauntlet/critic";
 import type { Candidate } from "../src/pipeline/candidate";
 import type { PipelineDeps } from "../src/pipeline";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const cand = (text: string, key: string): Candidate => ({
   category: "news", text, resolution_criteria: "per the page",
@@ -17,6 +18,7 @@ const judged = (text: string, key: string): Judged => ({ candidate: cand(text, k
 // per-candidate fixtures below must branch on `call.system`, not `call.user`.
 function deps(db: PipelineDeps["db"], reply: (system: string) => unknown): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     telegram: { send: async () => {} },
     claude: { structured: async (call) => reply(call.system) },

@@ -5,7 +5,21 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "triggers": { "crons": ["*/10 * * * *"] },
-  "vars": { "PIPELINE_AUTHOR_MODEL": "claude-opus-5", "PIPELINE_RESOLVE_MODEL": "claude-sonnet-5" }
+  "workflows": [
+    { "name": "oracle-authoring", "binding": "AUTHORING_WORKFLOW", "class_name": "AuthoringWorkflow" },
+    { "name": "oracle-resolution", "binding": "RESOLUTION_WORKFLOW", "class_name": "ResolutionWorkflow" },
+    { "name": "oracle-probe", "binding": "PROBE_WORKFLOW", "class_name": "ProbeWorkflow" }
+  ],
+  "vars": {
+    "PIPELINE_AUTHOR_MODEL": "claude-opus-5",
+    "PIPELINE_RESOLVE_MODEL": "claude-sonnet-5",
+    "PIPELINE_RESOLVE_MODEL_B": "claude-opus-5",
+    "PIPELINE_FORECAST_MODEL": "claude-sonnet-5",
+    "PIPELINE_CRITIC_MODEL": "claude-opus-5",
+    "PIPELINE_PREFLIGHT_MODEL": "claude-sonnet-5",
+    "PIPELINE_PROBE_MODEL": "claude-sonnet-5",
+    "PIPELINE_TASTE_MODEL": "claude-haiku-4-5-20251001"
+  }
   // secrets (wrangler secret put) — this list is WorkerEnv in src/worker.ts;
   // keep the two in step.
   //
@@ -23,6 +37,9 @@
   //     PIPELINE_ENABLED        "true" to arm the cron pipeline
   //     ANTHROPIC_API_KEY
   //     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET
+  //     (PIPELINE_RESOLVE_MODEL_B is a DIFFERENT model from PIPELINE_RESOLVE_MODEL
+  //      on purpose — see design 2026-09-04 §6.2. Setting both to the same model
+  //      silently removes the error independence the second read exists to buy.)
   //
   //   PUSH — absent, the hinge push at settle no-ops and the settle report
   //   says "push: 0 sent". Nothing else changes.

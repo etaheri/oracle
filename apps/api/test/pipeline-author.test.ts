@@ -7,6 +7,7 @@ import { upsertDraft } from "../src/pipeline/draft";
 import type { PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 function fakeClaude(responses: unknown[]) {
   const calls: StructuredCall[] = [];
@@ -23,6 +24,7 @@ function fakeClaude(responses: unknown[]) {
 function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
+    workflows: inlineStarter(),
     db,
     claude,
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },

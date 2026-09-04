@@ -3,6 +3,7 @@ import { makeTestDb } from "./helpers/db";
 import { criticize, CONTESTED_MAX_DELTA, PROB_DISAGREEMENT_MAX } from "../src/pipeline/gauntlet/critic";
 import type { Candidate } from "../src/pipeline/candidate";
 import type { PipelineDeps } from "../src/pipeline";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const cand = (o: Partial<Candidate> = {}): Candidate => ({
   category: "news", text: "Will it happen?", resolution_criteria: "per the page",
@@ -17,6 +18,7 @@ const verdict = (index: number, o: Record<string, unknown> = {}) => ({
 
 function deps(db: PipelineDeps["db"], reply: unknown, seen: { user?: string } = {}): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     telegram: { send: async () => {} },
     claude: { structured: async (call) => { seen.user = call.user; return reply; } },

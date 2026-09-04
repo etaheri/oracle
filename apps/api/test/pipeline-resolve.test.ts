@@ -8,6 +8,7 @@ import { voidQuestions } from "../src/pipeline/actions";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -26,6 +27,7 @@ function fakeClaude(responses: unknown[]) {
 function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso = "2026-08-27T16:05:00Z") {
   const sent: string[] = [];
   const deps: PipelineDeps = {
+    workflows: inlineStarter(),
     db,
     claude,
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
@@ -87,6 +89,7 @@ async function seedOneLockedQuestion(
 // so a test can answer differently per model.
 function depsWith(db: PipelineDeps["db"], structured: (call: StructuredCall) => Promise<unknown>): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     claude: { structured },
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },

@@ -5,6 +5,7 @@ import * as schema from "../src/db/schema";
 import { probeQuestion, runProbe } from "../src/pipeline/probe";
 import { publish } from "../src/pipeline/actions";
 import type { PipelineDeps } from "../src/pipeline";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const OPENS = new Date("2026-09-04T16:00:00Z");
 const LOCKS = new Date("2026-09-05T16:00:00Z");
@@ -23,6 +24,7 @@ async function seedOpen(db: PipelineDeps["db"], locksAt = LOCKS) {
 
 function deps(db: PipelineDeps["db"], reply: unknown, nowIso = "2026-09-04T20:00:00Z", sent: string[] = []): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     telegram: { send: async (t) => void sent.push(t) },
     claude: { structured: async () => reply },

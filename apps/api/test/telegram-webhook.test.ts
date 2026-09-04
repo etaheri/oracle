@@ -10,6 +10,7 @@ import { settleRound } from "../src/settlement";
 import type { PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const env = {
   DEVICE_TOKEN_SECRET: "test-secret",
@@ -37,6 +38,7 @@ function fakeClaude(responses: unknown[]) {
 function fakePipeline(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso: string) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
+    workflows: inlineStarter(),
     db,
     claude,
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },

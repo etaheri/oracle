@@ -12,6 +12,7 @@ import { authorBankEntry } from "../src/pipeline/author";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const empty: PipelineState = { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 0, claudeAvailable: true };
 const at = (hour: number, minute = 0) => ({ date: "2026-08-27", hour, minute });
@@ -32,6 +33,7 @@ function fakeClaude(responses: unknown[]) {
 function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso = "2026-08-27T07:00:00Z") {
   const sent: string[] = [];
   const deps: PipelineDeps = {
+    workflows: inlineStarter(),
     db,
     claude,
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },

@@ -3,6 +3,7 @@ import { makeTestDb } from "./helpers/db";
 import { tasteCheck } from "../src/pipeline/gauntlet/taste";
 import type { Judged } from "../src/pipeline/gauntlet/critic";
 import type { PipelineDeps } from "../src/pipeline";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const judged = (text: string, key: string): Judged => ({
   candidate: {
@@ -15,6 +16,7 @@ const judged = (text: string, key: string): Judged => ({
 
 function deps(db: PipelineDeps["db"], structured: PipelineDeps["claude"]): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     telegram: { send: async () => {} },
     claude: structured,

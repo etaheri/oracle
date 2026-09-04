@@ -11,6 +11,7 @@ import type { Db } from "../src/db/client";
 import { makeTestDb } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const row = (o: Partial<QualityRow>): QualityRow => ({
   outcome: null,
@@ -33,6 +34,7 @@ const UNCONTESTED = 85;
 function fakeDeps(db: Db, responses: unknown[]) {
   const calls: StructuredCall[] = [];
   const deps: PipelineDeps = {
+    workflows: inlineStarter(),
     db,
     claude: {
       async structured(call) {

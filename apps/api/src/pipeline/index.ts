@@ -8,10 +8,10 @@ import type { Db } from "../db/client";
 import { etNow } from "./clock";
 import { decideActions, loadPipelineState } from "./state";
 import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
-import { authorBankEntry, authorRound } from "./author";
-import { runResolution } from "./resolve";
+import { authorBankEntry } from "./author";
 import { stampOracleForecast } from "./forecast";
-import { runProbe } from "./probe";
+import { hourBucket, type WorkflowStarter } from "./workflows";
+import { BudgetExhausted, meterClaude, PIPELINE_DAILY_CALL_BUDGET } from "./spend";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
 import type { PushEnv } from "../push/onesignal";
@@ -31,6 +31,11 @@ export interface PipelineDeps {
     taste: string;     // Haiku 4.5, no search — classification only
   };
   now(): Date;
+  // How long work is launched. In production this is bindingStarter over the
+  // three Workflow bindings; in tests and wherever the bindings are absent it
+  // is inlineStarter, which awaits the runner in-process — so behaviour and the
+  // executed-action labels are identical either way.
+  workflows: WorkflowStarter;
   // OneSignal credentials for the hinge push at settle. Absent (or absent
   // keys) → sendPushes no-ops cleanly and the settle report says so, which is
   // the state until the account exists.
@@ -49,8 +54,21 @@ function errorMessage(err: unknown): string {
 
 export async function runTick(deps: PipelineDeps): Promise<string[]> {
   const now = deps.now();
+  const et = etNow(now);
+  const bucket = hourBucket(et);
+
+  // THE CEILING, APPLIED IN ONE PLACE. Every model call in this pipeline goes
+  // through deps.claude, and no deterministic action touches it — which is
+  // exactly why lock, publish, void and settle can never be blocked by the
+  // budget. Everything downstream, including the inline starter's runners,
+  // receives this metered copy.
+  const metered: PipelineDeps = {
+    ...deps,
+    claude: deps.claude ? meterClaude(deps.db, deps.claude, et.date) : null,
+  };
+
   const state = await loadPipelineState(deps.db, now, deps.claude !== null);
-  const actions = decideActions(etNow(now), state);
+  const actions = decideActions(et, state);
   const done: string[] = [];
 
   for (const action of actions) {
@@ -84,12 +102,12 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           break;
 
         case "author":
-          await authorRound(deps, action.date);
+          await deps.workflows.start(metered, "author", `author-${action.date}-${bucket}`, { date: action.date });
           done.push(`author:${action.date}`);
           break;
 
         case "forecast":
-          await stampOracleForecast(deps, action.date);
+          await stampOracleForecast(metered, action.date);
           done.push(`forecast:${action.date}`);
           break;
 
@@ -97,21 +115,27 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           // One entry a night while the bank is thin. A failure here is
           // narrated by the catch below and retried tomorrow — the buffer is
           // what buys the time, so nothing about today depends on this.
-          await authorBankEntry(deps);
+          await authorBankEntry(metered);
           done.push("author-bank");
           break;
 
         case "resolve":
-          // "resolve:<date>" means the tick ATTEMPTED resolution for every
+          // "resolve:<date>" means the tick DISPATCHED resolution for every
           // still-locked question in this round — not that all of them
           // resolved. Unresolved questions stay locked and are retried
           // hourly; they void at noon ET two days after the round date.
-          await runResolution(deps, action.date, action.questionIds);
+          await deps.workflows.start(metered, "resolve", `resolve-${action.date}-${bucket}`, {
+            date: action.date,
+            questionIds: action.questionIds,
+          });
           done.push(`resolve:${action.date}`);
           break;
 
         case "probe":
-          await runProbe(deps, action.date, action.questionIds);
+          await deps.workflows.start(metered, "probe", `probe-${action.date}-${bucket}`, {
+            date: action.date,
+            questionIds: action.questionIds,
+          });
           done.push(`probe:${action.date}`);
           break;
 
@@ -122,7 +146,15 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
         }
       }
     } catch (err) {
-      await deps.telegram.send(`⚠ ${action.kind} failed: ${errorMessage(err)}`);
+      // The budget's own alert, raised exactly once — on the call that crossed
+      // the line, because BudgetExhausted.first is true only there.
+      if (err instanceof BudgetExhausted && err.first) {
+        await deps.telegram.send(
+          `‼️ the daily model-call budget of ${PIPELINE_DAILY_CALL_BUDGET} is spent — no further model calls today; the bank covers noon`,
+        );
+      } else {
+        await deps.telegram.send(`⚠ ${action.kind} failed: ${errorMessage(err)}`);
+      }
     }
   }
 

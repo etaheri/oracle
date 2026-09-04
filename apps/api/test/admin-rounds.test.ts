@@ -6,6 +6,7 @@ import { validDraft } from "./helpers/draft";
 import { upsertDraft } from "../src/pipeline/draft";
 import type { PipelineDeps } from "../src/pipeline";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -18,6 +19,7 @@ function admin(app: ReturnType<typeof createApp>) {
 
 function fakePipeline(db: PipelineDeps["db"], nowIso: string): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async () => {} },
     now: () => new Date(nowIso),

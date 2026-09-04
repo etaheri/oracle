@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { makeTestDb } from "./helpers/db";
 import { askResolver, settled, allowedDomainsFor, type ResolverVerdict } from "../src/pipeline/resolver";
 import type { PipelineDeps } from "../src/pipeline";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 function deps(db: PipelineDeps["db"], reply: unknown, seen: { call?: Record<string, unknown> } = {}): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     telegram: { send: async () => {} },
     claude: { structured: async (call) => { seen.call = call as unknown as Record<string, unknown>; return reply; } },

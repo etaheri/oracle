@@ -5,6 +5,7 @@ import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import type { PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient } from "../src/pipeline/claude";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 type TestDb = Awaited<ReturnType<typeof makeTestDb>>["db"];
 
@@ -16,6 +17,7 @@ function makeDeps(
   opts: { claude: { structured: ClaudeClient["structured"] } | null },
 ): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     claude: opts.claude,
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },

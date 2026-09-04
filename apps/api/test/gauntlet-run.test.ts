@@ -4,6 +4,7 @@ import { makeTestDb } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { runAuthoringGauntlet } from "../src/pipeline/gauntlet";
 import type { PipelineDeps } from "../src/pipeline";
+import { inlineStarter } from "../src/pipeline/workflows";
 
 // One fake Claude that answers each schemaName in turn. Every tier's contract
 // is exercised through the real orchestration; nothing is stubbed past it.
@@ -38,6 +39,7 @@ function fakeClaude(over: Partial<Record<string, unknown>> = {}) {
 
 function deps(db: PipelineDeps["db"], claude: PipelineDeps["claude"], sent: string[] = []): PipelineDeps {
   return {
+    workflows: inlineStarter(),
     db,
     telegram: { send: async (t) => void sent.push(t) },
     claude,

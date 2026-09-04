@@ -6,6 +6,8 @@ import { runTick, type PipelineDeps } from "../src/pipeline";
 import { voidQuestions, publishFromBank } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
 import * as schema from "../src/db/schema";
+import { inlineStarter } from "../src/pipeline/workflows";
+import { PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
 import { buildPipelineDeps, type WorkerEnv } from "../src/worker";
 import { createApp } from "../src/app";
 
@@ -27,6 +29,13 @@ function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
     db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
+    workflows: inlineStarter(),
+    // Nothing in this file may reach the network. runTick now dispatches
+    // `author` through the inline starter, so runAuthoringGauntlet runs here —
+    // and it calls fetchMarketSignals and tier 1's checkSources, both of which
+    // fall back to global fetch when these are absent.
+    marketFetch: (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch,
+    sourceFetch: (async () => new Response("", { status: 200 })) as unknown as typeof fetch,
   };
   return { deps, sent };
 }
@@ -379,5 +388,68 @@ describe("buildPipelineDeps", () => {
     const deps = buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "true" }));
     expect(deps!.telegram).toBeDefined();
     expect(typeof deps!.telegram.send).toBe("function");
+  });
+});
+
+describe("runTick dispatches long work instead of awaiting it (design 2026-09-04 §2)", () => {
+  it("starts the authoring workflow with an hour-bucketed instance id", async () => {
+    const { db } = await makeTestDb();
+    const started: Array<{ kind: string; id: string }> = [];
+    const { deps } = fakeDeps(db, "2026-09-04T21:05:00Z"); // 17:05 ET
+    deps.claude = { structured: async () => ({}) };
+    deps.workflows = { start: async (_d, kind, id) => void started.push({ kind, id }) };
+    const done = await runTick(deps);
+    expect(done).toContain("author:2026-09-05");
+    expect(started).toEqual([{ kind: "author", id: "author-2026-09-05-2026090417" }]);
+  });
+
+  it("uses the same instance id twice inside one hour, so the second start collides", async () => {
+    const { db } = await makeTestDb();
+    const ids: string[] = [];
+    for (const iso of ["2026-09-04T21:01:00Z", "2026-09-04T21:08:00Z"]) {
+      const { deps } = fakeDeps(db, iso);
+      deps.claude = { structured: async () => ({}) };
+      deps.workflows = { start: async (_d, _k, id) => void ids.push(id) };
+      await runTick(deps);
+    }
+    // Two separate ticks, two starts, ONE id — which is the collision the
+    // hour bucket exists to cause.
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it("keeps lock, publish, void and settle inline — they are short DB writes", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    const started: string[] = [];
+    const { deps } = fakeDeps(db, "2026-08-27T16:01:00Z");
+    deps.workflows = { start: async (_d, kind) => void started.push(kind) };
+    const done = await runTick(deps);
+    expect(done).toContain("lock:2026-08-26");
+    expect(started).toHaveLength(0);
+  });
+});
+
+describe("the spend ceiling in the tick (design 2026-09-04 §9.1)", () => {
+  it("blocks a model call past the ceiling and raises one critical", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.pipelineSpend).values({ date: "2026-09-04", calls: PIPELINE_DAILY_CALL_BUDGET });
+    const { deps, sent } = fakeDeps(db, "2026-09-04T21:05:00Z");
+    let reached = false;
+    deps.claude = { structured: async () => { reached = true; return {}; } };
+    // The inline starter runs the runner in-process, so the metered client is
+    // exercised end to end.
+    await runTick(deps);
+    expect(reached).toBe(false);
+    expect(sent.join("\n")).toContain("budget");
+  });
+
+  it("never blocks lock, publish, void or settle", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.pipelineSpend).values({ date: "2026-08-27", calls: PIPELINE_DAILY_CALL_BUDGET + 50 });
+    await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    const { deps } = fakeDeps(db, "2026-08-27T16:01:00Z");
+    const done = await runTick(deps);
+    expect(done).toContain("lock:2026-08-26");
   });
 });
