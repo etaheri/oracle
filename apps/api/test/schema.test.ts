@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 
@@ -69,5 +70,38 @@ describe("user_rounds", () => {
     const after = await db.query.userRounds.findMany();
     expect(after).toHaveLength(1);
     expect(Number(after[0]!.vigilMult)).toBeCloseTo(1.15, 10);
+  });
+});
+
+describe("migration 0007", () => {
+  it("defaults a round's provenance counts to zero, so a pre-0007 round reads as unknown", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-09-04" });
+    const r = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-09-04") });
+    expect(r!.candidatesWritten).toBe(0);
+    expect(r!.candidatesRejected).toBe(0);
+  });
+
+  it("leaves lock_healed_at and topic_key null on an ordinary question", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-09-04" });
+    const [q] = await db.insert(schema.questions).values({
+      roundDate: "2026-09-04", slot: 1, text: "Will it?", category: "news",
+      resolutionCriteria: "per test", sourceName: "SRC",
+      opensAt: new Date("2026-09-04T16:00:00Z"),
+      locksAt: new Date("2026-09-05T16:00:00Z"),
+      resolveBy: new Date("2026-09-05T17:00:00Z"),
+    }).returning();
+    expect(q!.lockHealedAt).toBeNull();
+    expect(q!.topicKey).toBeNull();
+  });
+
+  it("holds a spend row per date", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.pipelineSpend).values({ date: "2026-09-04", calls: 3 });
+    const row = await db.query.pipelineSpend.findFirst({
+      where: eq(schema.pipelineSpend.date, "2026-09-04"),
+    });
+    expect(row!.calls).toBe(3);
   });
 });

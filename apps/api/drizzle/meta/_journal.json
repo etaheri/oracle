@@ -50,6 +50,13 @@
       "when": 1788449794442,
       "tag": "0006_the_author_states_a_number",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788540351362,
+      "tag": "0007_the_machine_shows_its_work",
+      "breakpoints": true
     }
   ]
 }
