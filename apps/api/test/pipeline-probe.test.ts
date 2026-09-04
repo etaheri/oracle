@@ -6,6 +6,7 @@ import { probeQuestion, runProbe } from "../src/pipeline/probe";
 import { publish } from "../src/pipeline/actions";
 import type { PipelineDeps } from "../src/pipeline";
 import { inlineStarter } from "../src/pipeline/workflows";
+import { meterClaude, BudgetExhausted, PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
 
 const OPENS = new Date("2026-09-04T16:00:00Z");
 const LOCKS = new Date("2026-09-05T16:00:00Z");
@@ -151,5 +152,16 @@ describe("runProbe", () => {
     const n = await runProbe(d, "2026-09-04", ["00000000-0000-0000-0000-000000000000", q!.id]);
     expect(n).toBe(1);
     expect(sent.join("\n")).toContain("probe failed");
+  });
+
+  it("rethrows BudgetExhausted instead of narrating it per question — a spent budget stops the DAY", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOpen(db);
+    await db.insert(schema.pipelineSpend).values({ date: "2026-09-04", calls: PIPELINE_DAILY_CALL_BUDGET });
+    const sent: string[] = [];
+    const d = deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent);
+    d.claude = meterClaude(db, d.claude!, "2026-09-04");
+    await expect(runProbe(d, "2026-09-04", [q!.id, q!.id])).rejects.toBeInstanceOf(BudgetExhausted);
+    expect(sent.filter((t) => t.includes("probe failed"))).toHaveLength(0);
   });
 });

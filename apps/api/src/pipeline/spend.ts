@@ -61,3 +61,27 @@ export function meterClaude(db: Db, claude: ClaudeClient, date: string): ClaudeC
     },
   };
 }
+
+// The budget's one critical line, raised from whichever side crosses the
+// ceiling. runTick catches it for the actions it still awaits inline; the
+// Workflow entrypoints catch it for the fan-outs, which run on the far side of
+// create() where the tick's own catch can never see them.
+//
+// Returns whether the error WAS a budget exhaustion, so a caller can skip its
+// generic failure narration — an exhausted budget is a stated, expected end to
+// the day's model calls, not an action that failed.
+export async function reportBudgetExhaustion(
+  telegram: { send(text: string): Promise<void> },
+  err: unknown,
+): Promise<boolean> {
+  if (!(err instanceof BudgetExhausted)) return false;
+  // Only the call that crossed the line narrates. Every later one this day
+  // carries first === false and stays silent, including a Workflow step's
+  // retries, which charge again and therefore can never look like the first.
+  if (err.first) {
+    await telegram.send(
+      `‼️ the daily model-call budget of ${PIPELINE_DAILY_CALL_BUDGET} is spent — no further model calls today; the bank covers noon`,
+    );
+  }
+  return true;
+}

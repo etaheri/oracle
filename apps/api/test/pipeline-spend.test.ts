@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { makeTestDb } from "./helpers/db";
 import * as schema from "../src/db/schema";
-import { chargeCall, meterClaude, BudgetExhausted, PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
+import { chargeCall, meterClaude, reportBudgetExhaustion, BudgetExhausted, PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
 import type { ClaudeClient } from "../src/pipeline/claude";
 
 const okClaude: ClaudeClient = { structured: async () => ({ ok: true }) };
@@ -54,5 +54,36 @@ describe("meterClaude", () => {
     const second = await metered.structured(call).catch((e: unknown) => e as BudgetExhausted);
     expect((first as BudgetExhausted).first).toBe(true);
     expect((second as BudgetExhausted).first).toBe(false);
+  });
+});
+
+describe("reportBudgetExhaustion", () => {
+  const fake = () => {
+    const sent: string[] = [];
+    return { sent, telegram: { send: async (t: string) => void sent.push(t) } };
+  };
+
+  it("narrates the one critical for the call that crossed the line, and says it handled it", async () => {
+    const { sent, telegram } = fake();
+    const handled = await reportBudgetExhaustion(telegram, new BudgetExhausted("2026-09-04", PIPELINE_DAILY_CALL_BUDGET + 1, true));
+    expect(handled).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toBe(
+      `‼️ the daily model-call budget of ${PIPELINE_DAILY_CALL_BUDGET} is spent — no further model calls today; the bank covers noon`,
+    );
+  });
+
+  it("stays silent for every later exhaustion that day, but still says it handled it", async () => {
+    const { sent, telegram } = fake();
+    const handled = await reportBudgetExhaustion(telegram, new BudgetExhausted("2026-09-04", PIPELINE_DAILY_CALL_BUDGET + 9, false));
+    expect(handled).toBe(true);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("does not touch any other error — the caller keeps its own narration", async () => {
+    const { sent, telegram } = fake();
+    expect(await reportBudgetExhaustion(telegram, new Error("the source did not answer"))).toBe(false);
+    expect(await reportBudgetExhaustion(telegram, "not even an error")).toBe(false);
+    expect(sent).toHaveLength(0);
   });
 });

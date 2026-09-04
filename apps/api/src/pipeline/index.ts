@@ -11,7 +11,7 @@ import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions
 import { authorBankEntry } from "./author";
 import { stampOracleForecast } from "./forecast";
 import { hourBucket, type WorkflowStarter } from "./workflows";
-import { BudgetExhausted, meterClaude, PIPELINE_DAILY_CALL_BUDGET } from "./spend";
+import { meterClaude, reportBudgetExhaustion } from "./spend";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
 import type { PushEnv } from "../push/onesignal";
@@ -147,12 +147,10 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
       }
     } catch (err) {
       // The budget's own alert, raised exactly once — on the call that crossed
-      // the line, because BudgetExhausted.first is true only there.
-      if (err instanceof BudgetExhausted && err.first) {
-        await deps.telegram.send(
-          `‼️ the daily model-call budget of ${PIPELINE_DAILY_CALL_BUDGET} is spent — no further model calls today; the bank covers noon`,
-        );
-      } else {
+      // the line. It covers only the actions this tick still AWAITS: a
+      // dispatched Workflow runs on the far side of create(), so its
+      // entrypoint narrates its own exhaustion.
+      if (!(await reportBudgetExhaustion(deps.telegram, err))) {
         await deps.telegram.send(`⚠ ${action.kind} failed: ${errorMessage(err)}`);
       }
     }

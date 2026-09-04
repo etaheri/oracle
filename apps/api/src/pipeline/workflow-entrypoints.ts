@@ -10,7 +10,7 @@
 // a fake Claude client — a Workflow class is not.
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { buildPipelineDeps, type WorkerEnv } from "../worker";
-import { meterClaude } from "./spend";
+import { meterClaude, reportBudgetExhaustion } from "./spend";
 import { etNow } from "./clock";
 import { runAuthoringGauntlet } from "./gauntlet";
 import { runResolution } from "./resolve";
@@ -30,12 +30,29 @@ function metered(env: WorkerEnv): PipelineDeps | null {
   return { ...deps, claude: deps.claude ? meterClaude(deps.db, deps.claude, et.date) : null };
 }
 
+// A Workflow body runs on the FAR SIDE of create(): bindingStarter.start
+// resolves the moment the instance exists, so runTick's own catch can never see
+// what happens in here. Without this wrapper a BudgetExhausted raised by the
+// metered client above would only fail a step — retried, then dead — and the
+// one critical the ceiling exists to send would never be sent.
+//
+// The error is rethrown, not handled: the step must still fail so the instance
+// records it. This is narration, not recovery.
+async function narrating(deps: PipelineDeps, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    await reportBudgetExhaustion(deps.telegram, err);
+    throw err;
+  }
+}
+
 export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
   async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
     await step.do("gauntlet", async () => {
       const deps = metered(this.env);
       if (!deps) return;
-      await runAuthoringGauntlet(deps, event.payload.date);
+      await narrating(deps, () => runAuthoringGauntlet(deps, event.payload.date));
     });
   }
 }
@@ -45,7 +62,7 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
     await step.do("resolve", async () => {
       const deps = metered(this.env);
       if (!deps) return;
-      await runResolution(deps, event.payload.date, event.payload.questionIds ?? []);
+      await narrating(deps, () => runResolution(deps, event.payload.date, event.payload.questionIds ?? []));
     });
   }
 }
@@ -55,7 +72,7 @@ export class ProbeWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
     await step.do("probe", async () => {
       const deps = metered(this.env);
       if (!deps) return;
-      await runProbe(deps, event.payload.date, event.payload.questionIds ?? []);
+      await narrating(deps, () => runProbe(deps, event.payload.date, event.payload.questionIds ?? []));
     });
   }
 }

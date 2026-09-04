@@ -441,7 +441,15 @@ describe("the spend ceiling in the tick (design 2026-09-04 §9.1)", () => {
     // exercised end to end.
     await runTick(deps);
     expect(reached).toBe(false);
-    expect(sent.join("\n")).toContain("budget");
+    // The exact critical line, and EXACTLY ONE of it. Asserting only that some
+    // message contains "budget" would pass against the ordinary
+    // "⚠ author failed: pipeline: daily call budget exhausted…" fallback too,
+    // so it would not detect the `err.first` branch being deleted.
+    const criticals = sent.filter((t) => t.startsWith("‼️"));
+    expect(criticals).toHaveLength(1);
+    expect(criticals[0]).toContain(
+      `the daily model-call budget of ${PIPELINE_DAILY_CALL_BUDGET} is spent — no further model calls today; the bank covers noon`,
+    );
   });
 
   it("never blocks lock, publish, void or settle", async () => {

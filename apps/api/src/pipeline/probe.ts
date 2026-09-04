@@ -15,6 +15,7 @@ import { and, eq } from "drizzle-orm";
 import { schema } from "../db/client";
 import type { PipelineDeps } from "./index";
 import { askResolver, settled } from "./resolver";
+import { BudgetExhausted } from "./spend";
 
 export async function probeQuestion(deps: PipelineDeps, questionId: string): Promise<boolean> {
   const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
@@ -58,6 +59,8 @@ export async function runProbe(deps: PipelineDeps, date: string, questionIds: st
         await deps.telegram.send(`⚠ ${date} slot ${q?.slot}: the answer exists, so the question closed early — "${q?.text}"`);
       }
     } catch (err) {
+      // A spent budget stops the DAY, not this question — see runResolution.
+      if (err instanceof BudgetExhausted) throw err;
       await deps.telegram.send(`⚠ probe failed (${date}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }

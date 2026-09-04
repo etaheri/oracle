@@ -22,6 +22,7 @@ import { schema } from "../db/client";
 import type { PipelineDeps } from "./index";
 import { resolveQuestion } from "../resolution";
 import { askResolver, settled, type ResolverVerdict } from "./resolver";
+import { BudgetExhausted } from "./spend";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -88,6 +89,9 @@ export async function runResolution(deps: PipelineDeps, date: string, questionId
     try {
       await resolveWithClaude(deps, questionId);
     } catch (err) {
+      // A spent budget stops the DAY, not this question. Swallowing it here
+      // turns one critical into five warnings, repeated hourly until void.
+      if (err instanceof BudgetExhausted) throw err;
       await deps.telegram.send(`⚠ resolve failed (${date}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }

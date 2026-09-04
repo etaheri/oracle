@@ -3,12 +3,13 @@ import { eq } from "drizzle-orm";
 import { PIPELINE_LINES } from "@oracle/core";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
-import { resolveWithClaude } from "../src/pipeline/resolve";
+import { resolveWithClaude, runResolution } from "../src/pipeline/resolve";
 import { voidQuestions } from "../src/pipeline/actions";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
 import { inlineStarter } from "../src/pipeline/workflows";
+import { meterClaude, BudgetExhausted, PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -358,5 +359,31 @@ describe("the struck void (design 2026-09-04 §11.3)", () => {
     await voidQuestions(db, { send: async () => {} }, [q.id], "2026-09-06T16:00:00Z");
     const row = await db.query.questions.findFirst({ where: eq(schema.questions.id, q.id) });
     expect((row!.resolutionEvidence as Record<string, unknown>).reason).toBe("unverifiable within 24 hours of lock");
+  });
+});
+
+describe("runResolution and the spend ceiling", () => {
+  it("rethrows BudgetExhausted instead of narrating it per question — a spent budget stops the DAY", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
+    await db.insert(schema.pipelineSpend).values({ date: "2026-08-27", calls: PIPELINE_DAILY_CALL_BUDGET });
+
+    const { deps, sent } = fakeDeps(db, null);
+    deps.claude = meterClaude(db, { structured: async () => ({}) }, "2026-08-27");
+
+    await expect(runResolution(deps, "2026-08-26", [qs[0]!.id, qs[1]!.id])).rejects.toBeInstanceOf(BudgetExhausted);
+    // Not five warnings, not even one: the tick's catch owns this narration.
+    expect(sent.filter((t) => t.includes("resolve failed"))).toHaveLength(0);
+  });
+
+  it("still narrates and continues past an ordinary per-question failure", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
+    const { deps, sent } = fakeDeps(db, null);
+    deps.claude = { structured: async () => { throw new Error("the source did not answer"); } };
+    await expect(runResolution(deps, "2026-08-26", [qs[0]!.id, qs[1]!.id])).resolves.toBeUndefined();
+    expect(sent.filter((t) => t.includes("resolve failed"))).toHaveLength(2);
   });
 });
