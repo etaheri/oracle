@@ -185,6 +185,7 @@ export const RITES_LINES = [
   // ── the rest: met in play, kept on the standing link ──
   "THE VIGIL'S WEIGHT RISES FOR TEN DAYS AND THEN HOLDS. NOTHING BOUGHT CHANGES YOUR ORACLE SCORE.",
   "A QUESTION CLOSES THE MOMENT ITS ANSWER BEGINS TO EXIST. SOME CLOSE BEFORE NOON.",
+  "EVERY QUESTION IS PUT TO THE MACHINE BEFORE IT IS PUT TO YOU. WHAT IT COULD ANSWER, YOU NEVER SEE.",
   "THE BIG ONE COUNTS DOUBLE. IN BOTH DIRECTIONS.",
   "STAND AGAINST THE TIDE AND PREVAIL: THE LEDGER ADDS A BOUNTY. TWENTY MUST HAVE SPOKEN.",
   "SEAL ALL FIVE WITHIN THE FIRST HOUR. THE DAY WEIGHS TEN PERCENT MORE, IN BOTH DIRECTIONS.",
@@ -227,3 +228,21 @@ export const SUMMONS_LINES = [
   "ONCE TO ASK. ONCE TO ANSWER.",
   "IT WILL NOT SPEAK MORE THAN THAT.",
 ] as const;
+
+// The pipeline's own two lines (design 2026-09-04 §11.2, §11.3). Both describe
+// something the machine DID, in the moment it did it — an early lock it pulled
+// forward because the answer appeared, and a question two independent readers
+// could not agree on. Kept here, in the bank's file, so the copy lint governs
+// them; adding either at its call site would be adding it to dodge the lint.
+export const PIPELINE_LINES = Object.freeze({
+  lockHealed: "THE ANSWER EXISTS. THIS ONE IS CLOSED.",
+  voidDisagreement: "THE READERS DID NOT AGREE. THIS ONE IS STRUCK.",
+} as const);
+
+// What the gauntlet cost, in candidates. Null below one written candidate, so
+// a bank drop — and every round authored before migration 0007 — stays silent
+// rather than claiming a gauntlet that never ran.
+export function provenanceLine(written: number, rejected: number): string | null {
+  if (written <= 0) return null;
+  return `${written} WRITTEN · ${rejected} PUT DOWN`;
+}

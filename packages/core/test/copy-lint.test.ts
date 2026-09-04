@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, fillSlots, type CopyLine } from "../src/copy";
+import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, PIPELINE_LINES, provenanceLine, fillSlots, type CopyLine } from "../src/copy";
 import { CONSTANTS } from "../src/constants";
 
 const BANNED = ["CHECK", "TAP", "CLICK", "VISIT", "RESULTS", "DON'T MISS"];
@@ -96,7 +96,7 @@ describe("the rites", () => {
     // Early locks are the norm now: a player who finds a card already closed
     // must have been told this could happen.
     expect(all).toContain("BEFORE NOON");
-    expect(RITES_LINES.length).toBe(15);
+    expect(RITES_LINES.length).toBe(16);
   });
   it("name the goal, and define every noun the rest of the app leans on", () => {
     // The app said "THE DAY DOES NOT RATE", "YOUR VIGIL", "A BOUNTY" and
@@ -284,5 +284,38 @@ describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, ca
       for (const b of BANNED) expect(l, l).not.toContain(b);
       expect(l.length, l).toBeLessThanOrEqual(140);
     }
+  });
+});
+
+describe("the pipeline's own lines (design 2026-09-04 §11)", () => {
+  it("holds the register: caps, no emoji, no exclamation, no CTA verbs, push-length", () => {
+    const lines = [...Object.values(PIPELINE_LINES), provenanceLine(99, 99)!];
+    for (const l of lines) {
+      expect(l, l).toBe(l.toUpperCase());
+      expect(l, l).not.toMatch(EMOJI);
+      expect(l, l).not.toContain("!");
+      for (const b of BANNED) expect(l, l).not.toContain(b);
+      expect(l.length, l).toBeLessThanOrEqual(140);
+    }
+  });
+
+  it("withholds the provenance line when nothing was written, so a bank drop claims no gauntlet", () => {
+    expect(provenanceLine(0, 0)).toBeNull();
+    expect(provenanceLine(0, 5)).toBeNull();
+    expect(provenanceLine(15, 10)).toBe("15 WRITTEN · 10 PUT DOWN");
+  });
+
+  it("names the pre-flight in the canon exactly once", () => {
+    // Bound to the ONE line that makes the claim. An assertion against the
+    // joined canon is vacuous the moment a phrase appears in two rites.
+    const rite = RITES_LINES.find((l) => l.includes("PUT TO THE MACHINE"));
+    expect(rite).toBeDefined();
+    expect(rite).toContain("WHAT IT COULD ANSWER, YOU NEVER SEE.");
+    expect(RITES_LINES.filter((l) => l.includes("PUT TO THE MACHINE"))).toHaveLength(1);
+  });
+
+  it("keeps the new rite out of the opening — a first-timer meets it in play", () => {
+    const rite = RITES_LINES.find((l) => l.includes("PUT TO THE MACHINE"))!;
+    expect(OPENING_RITES_LINES).not.toContain(rite);
   });
 });
