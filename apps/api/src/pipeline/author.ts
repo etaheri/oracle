@@ -105,7 +105,7 @@ function formatIssues(issues: { path: PropertyKey[]; message: string }[]): strin
 // turns it into the only feedback the author ever gets — a question the crowd
 // agreed on at 91% was not contested, whatever probability the model claimed
 // for it (audit 2026-09-01 §2.4).
-async function recentQuestionDigest(db: Db, date: string): Promise<string> {
+export async function recentQuestionDigest(db: Db, date: string): Promise<string> {
   const since = addDays(date, -7);
   const rows = await db.query.questions.findMany({
     where: and(gte(schema.questions.roundDate, since), lt(schema.questions.roundDate, date)),

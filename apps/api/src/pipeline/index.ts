@@ -37,6 +37,9 @@ export interface PipelineDeps {
   // Fetch used for market signal feeds (feeds.ts); defaults to global fetch.
   // Injectable so tests never touch the network.
   marketFetch?: typeof fetch;
+  // Fetch used for tier-1 source reachability (gauntlet/sources.ts); defaults
+  // to global fetch. Injectable so tests never touch the network.
+  sourceFetch?: typeof fetch;
 }
 
 function errorMessage(err: unknown): string {
