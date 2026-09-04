@@ -24,7 +24,7 @@ afterEach(() => vi.useRealTimers());
 function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
-    db, claude: null, models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
+    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
   };
@@ -343,7 +343,16 @@ describe("buildPipelineDeps", () => {
 
   it("defaults models to the standard author/resolve constants", () => {
     const deps = buildPipelineDeps(baseEnv({ PIPELINE_ENABLED: "true" }));
-    expect(deps!.models).toEqual({ author: "claude-opus-5", resolve: "claude-sonnet-5", forecast: "claude-sonnet-5" });
+    expect(deps!.models).toEqual({
+      author: "claude-opus-5",
+      resolve: "claude-sonnet-5",
+      resolveB: "claude-opus-5",
+      forecast: "claude-sonnet-5",
+      critic: "claude-opus-5",
+      preflight: "claude-sonnet-5",
+      probe: "claude-sonnet-5",
+      taste: "claude-haiku-4-5-20251001",
+    });
   });
 
   it("honors PIPELINE_AUTHOR_MODEL / PIPELINE_RESOLVE_MODEL overrides", () => {
@@ -354,7 +363,16 @@ describe("buildPipelineDeps", () => {
         PIPELINE_RESOLVE_MODEL: "claude-sonnet-custom",
       }),
     );
-    expect(deps!.models).toEqual({ author: "claude-opus-custom", resolve: "claude-sonnet-custom", forecast: "claude-sonnet-5" });
+    expect(deps!.models).toEqual({
+      author: "claude-opus-custom",
+      resolve: "claude-sonnet-custom",
+      resolveB: "claude-opus-5",
+      forecast: "claude-sonnet-5",
+      critic: "claude-opus-5",
+      preflight: "claude-sonnet-5",
+      probe: "claude-sonnet-5",
+      taste: "claude-haiku-4-5-20251001",
+    });
   });
 
   it("telegram client is present (no-op) even without bot token/chat id", () => {

@@ -15,7 +15,12 @@ export interface WorkerEnv {
   PIPELINE_ENABLED?: string;
   PIPELINE_AUTHOR_MODEL?: string;
   PIPELINE_RESOLVE_MODEL?: string;
+  PIPELINE_RESOLVE_MODEL_B?: string;
   PIPELINE_FORECAST_MODEL?: string;
+  PIPELINE_CRITIC_MODEL?: string;
+  PIPELINE_PREFLIGHT_MODEL?: string;
+  PIPELINE_PROBE_MODEL?: string;
+  PIPELINE_TASTE_MODEL?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   APPLE_BUNDLE_ID?: string;
   ONESIGNAL_APP_ID?: string;
@@ -34,7 +39,15 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
     models: {
       author: env.PIPELINE_AUTHOR_MODEL ?? "claude-opus-5",
       resolve: env.PIPELINE_RESOLVE_MODEL ?? "claude-sonnet-5",
+      // A DIFFERENT model, not the same one twice: running one model twice
+      // correlates its errors, so agreement would mean nothing. Independent
+      // errors require independent models (design 2026-09-04 §6.2).
+      resolveB: env.PIPELINE_RESOLVE_MODEL_B ?? "claude-opus-5",
       forecast: env.PIPELINE_FORECAST_MODEL ?? "claude-sonnet-5",
+      critic: env.PIPELINE_CRITIC_MODEL ?? "claude-opus-5",
+      preflight: env.PIPELINE_PREFLIGHT_MODEL ?? "claude-sonnet-5",
+      probe: env.PIPELINE_PROBE_MODEL ?? "claude-sonnet-5",
+      taste: env.PIPELINE_TASTE_MODEL ?? "claude-haiku-4-5-20251001",
     },
     now: () => new Date(),
     push: { ONESIGNAL_APP_ID: env.ONESIGNAL_APP_ID, ONESIGNAL_API_KEY: env.ONESIGNAL_API_KEY },

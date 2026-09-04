@@ -41,7 +41,7 @@ function fakeDeps(db: Db, responses: unknown[]) {
         return responses.shift();
       },
     },
-    models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async () => {} },
     now: () => new Date("2026-08-27T12:00:00Z"),
     // Feeds never reach the network in tests; a rejecting fetch makes every

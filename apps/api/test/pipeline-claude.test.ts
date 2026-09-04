@@ -33,7 +33,7 @@ describe("makeClaudeClient", () => {
     expect(body.system).toBe("sys");
     const names = body.tools.map((t: any) => t.name ?? t.type);
     expect(names).toContain("report");
-    const ws = body.tools.find((t: any) => t.type === "web_search_20250305");
+    const ws = body.tools.find((t: any) => t.type === "web_search_20260209");
     expect(ws.allowed_domains).toEqual(["example.com"]);
     expect(ws.max_uses).toBe(3);
   });

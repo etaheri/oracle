@@ -18,7 +18,7 @@ function makeDeps(
   return {
     db,
     claude: opts.claude,
-    models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async () => {} },
     now: () => new Date("2026-09-03T12:00:00Z"),
     // Feeds must never reach the network in tests.

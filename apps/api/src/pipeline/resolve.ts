@@ -6,82 +6,26 @@
 // the next tick to retry hourly, and eventually voided by the pipeline
 // (actions.ts:voidQuestions) at noon ET two days after the round date — i.e.
 // unverifiable within 24 hours of lock — if it never produces one.
-import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { schema, type Db } from "../db/client";
+import { schema } from "../db/client";
 import type { PipelineDeps } from "./index";
 import { resolveQuestion } from "../resolution";
-
-const ResolutionSchema = z.object({
-  outcome: z.enum(["yes", "no", "unverifiable"]),
-  quotes: z.array(z.object({ url: z.string(), quote: z.string() })),
-  reasoning: z.string(),
-});
-
-const resolutionJsonSchema = {
-  type: "object",
-  properties: {
-    outcome: { type: "string", enum: ["yes", "no", "unverifiable"] },
-    quotes: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          url: { type: "string" },
-          quote: { type: "string" },
-        },
-        required: ["url", "quote"],
-        additionalProperties: false,
-      },
-    },
-    reasoning: { type: "string" },
-  },
-  required: ["outcome", "quotes", "reasoning"],
-  additionalProperties: false,
-};
-
-// Hostname of source_url, www.-stripped, when it parses as a URL; otherwise
-// undefined — the web_search tool then runs with no allowed_domains
-// restriction (claude.ts only sets allowed_domains when this is non-empty).
-// The system prompt still names source_name as the only acceptable source
-// either way (spec §6: resolution happens against the promised source).
-function allowedDomainsFor(sourceUrl: string | null): string[] | undefined {
-  if (!sourceUrl) return undefined;
-  try {
-    return [new URL(sourceUrl).hostname.replace(/^www\./, "")];
-  } catch {
-    return undefined;
-  }
-}
-
-function systemPrompt(text: string, resolutionCriteria: string, sourceName: string): string {
-  return `You resolve a prediction question for ORACLE. Question: "${text}". Resolution criteria: "${resolutionCriteria}". Source: ${sourceName}.
-Determine the outcome STRICTLY per the criteria, using only ${sourceName}. Quote the exact evidence.
-If the source does not yet show a definitive outcome, answer "unverifiable" — never guess. Call the resolution tool exactly once.`;
-}
+import { askResolver, settled } from "./resolver";
 
 export async function resolveWithClaude(deps: PipelineDeps, questionId: string): Promise<boolean> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
-  const claude = deps.claude;
 
   const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q) throw new Error(`resolve: question not found: ${questionId}`);
 
-  const response = await claude.structured({
-    model: deps.models.resolve,
-    system: systemPrompt(q.text, q.resolutionCriteria, q.sourceName),
-    user: `Resolve this question now, using only ${q.sourceName}.`,
-    schemaName: "resolution",
-    schema: resolutionJsonSchema,
-    webSearch: { allowedDomains: allowedDomainsFor(q.sourceUrl), maxUses: 5 },
+  const verdict = await askResolver(deps, deps.models.resolve, {
+    text: q.text,
+    resolutionCriteria: q.resolutionCriteria,
+    sourceName: q.sourceName,
+    sourceUrl: q.sourceUrl,
   });
-
-  const parsed = ResolutionSchema.safeParse(response);
-  if (!parsed.success) return false;
-
-  const { outcome, quotes, reasoning } = parsed.data;
-  if (outcome === "unverifiable") return false;
-  if (quotes.length === 0) return false; // yes/no with no receipts — treat as unverifiable
+  const outcome = settled(verdict);
+  if (outcome === null) return false;
 
   // The Claude call above can take minutes across chained web searches, and
   // cron ticks can overlap: another tick may have voided this question (or
@@ -92,8 +36,8 @@ export async function resolveWithClaude(deps: PipelineDeps, questionId: string):
 
   await resolveQuestion(deps.db, questionId, outcome, {
     outcome,
-    quotes,
-    reasoning,
+    quotes: verdict.quotes,
+    reasoning: verdict.reasoning,
     checked_at: deps.now().toISOString(),
     model: deps.models.resolve,
   });

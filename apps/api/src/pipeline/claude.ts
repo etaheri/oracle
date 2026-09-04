@@ -26,7 +26,10 @@ function buildTools(call: StructuredCall): Record<string, unknown>[] {
   ];
   if (call.webSearch) {
     tools.push({
-      type: "web_search_20250305",
+      // web_search_20260209 is the current variant for Opus 5 and Sonnet 5 and
+      // adds dynamic filtering (design 2026-09-04 §14.3). Every search-using
+      // call in this pipeline runs on one of those two models.
+      type: "web_search_20260209",
       name: "web_search",
       max_uses: call.webSearch.maxUses ?? 5,
       ...(call.webSearch.allowedDomains?.length ? { allowed_domains: call.webSearch.allowedDomains } : {}),

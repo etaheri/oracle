@@ -19,7 +19,16 @@ export interface PipelineDeps {
   db: Db;
   telegram: TelegramClient;
   claude: ClaudeClient | null;
-  models: { author: string; resolve: string; forecast: string };
+  models: {
+    author: string;    // Opus 5 + search — writes the candidates
+    resolve: string;   // Sonnet 5 + search — resolver A
+    resolveB: string;  // Opus 5 + search — resolver B, a DIFFERENT model on purpose
+    forecast: string;  // Sonnet 5 + search — the Oracle's own position
+    critic: string;    // Opus 5, no search — prosecutes the candidates
+    preflight: string; // Sonnet 5 + search — the pre-flight resolve
+    probe: string;     // Sonnet 5 + search — the in-window probe
+    taste: string;     // Haiku 4.5, no search — classification only
+  };
   now(): Date;
   // OneSignal credentials for the hinge push at settle. Absent (or absent
   // keys) → sendPushes no-ops cleanly and the settle report says so, which is

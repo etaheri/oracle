@@ -39,7 +39,7 @@ function fakePipeline(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIs
   const deps: PipelineDeps = {
     db,
     claude,
-    models: { author: "m-a", resolve: "m-r", forecast: "m-f" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
   };
