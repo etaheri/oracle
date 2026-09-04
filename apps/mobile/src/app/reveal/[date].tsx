@@ -16,7 +16,7 @@ import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCa
 import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
-import { payoff, oracleCallRight, dayCallCounts, CONSTANTS } from "@oracle/core";
+import { payoff, oracleCallRight, dayCallCounts, CONSTANTS, provenanceLine } from "@oracle/core";
 import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
@@ -328,6 +328,16 @@ export default function RevealScreen() {
             {ledgerLines(d.ledger).map((line, i) => (
               <Mono key={i} size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
             ))}
+            {/* What the night cost, in candidates. It belongs with the standing
+                lines rather than the day's headline: it is a fact about the
+                machine, not about this player's day. Null — and therefore
+                absent — for a bank drop and for every round authored before
+                migration 0007. */}
+            {provenanceLine(d.candidates_written, d.candidates_rejected) && (
+              <Mono size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>
+                {provenanceLine(d.candidates_written, d.candidates_rejected)}
+              </Mono>
+            )}
           </View>
         </Animated.View>
         {/* The day's four ordinary calls, in the card's vocabulary rather

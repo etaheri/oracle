@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CONSTANTS, type Reveal } from "@oracle/core";
+import { CONSTANTS, type Reveal, provenanceLine, PIPELINE_LINES } from "@oracle/core";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine } from "../src/game/revealRows";
 
 type Question = Reveal["questions"][number];
@@ -28,6 +28,8 @@ function reveal({ vigil_mult, outcomes, first_hour = false }: { vigil_mult: numb
     date: "2026-08-20",
     day_points: 120,
     first_hour,
+    candidates_written: 0,
+    candidates_rejected: 0,
     vigil_mult,
     questions: outcomes.map((outcome, i) => question({ slot: i + 1, outcome })),
     ledger: { settled: true, streak: 3, calls_rated: 12, oracle_score: null },
@@ -279,5 +281,20 @@ describe("weightLine", () => {
   it("reads the first hour's rate off the constant", () => {
     const line = weightLine(reveal({ vigil_mult: 1, first_hour: true, outcomes: ["yes"] }))!;
     expect(line).toContain(String(Number((1 + CONSTANTS.FIRST_HOUR_BONUS).toFixed(2))));
+  });
+});
+
+describe("the machine's own lines on the player's screens", () => {
+  it("says what the night cost when a gauntlet ran", () => {
+    expect(provenanceLine(15, 10)).toBe("15 WRITTEN · 10 PUT DOWN");
+  });
+
+  it("says nothing at all for a bank drop", () => {
+    expect(provenanceLine(0, 0)).toBeNull();
+  });
+
+  it("keeps the healed-lock line in the machine's register", () => {
+    expect(PIPELINE_LINES.lockHealed).toBe(PIPELINE_LINES.lockHealed.toUpperCase());
+    expect(PIPELINE_LINES.lockHealed).not.toContain("!");
   });
 });

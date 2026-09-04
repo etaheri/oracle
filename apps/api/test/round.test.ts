@@ -4,6 +4,7 @@ import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { CONSTANTS } from "@oracle/core";
+import { resolveQuestion } from "../src/resolution";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -419,5 +420,84 @@ describe("the board's rows", () => {
     const body = (await (await boardAs(seventhPlayer, "2026-09-03")).json()) as Board;
     const oracle = body.rows.find((r) => r.is_oracle);
     expect(oracle!.points).toBe(EXPECTED_ORACLE_TOTAL);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The two player-facing surfaces onto the gauntlet (design 2026-09-04 §11):
+// what the night's candidates cost, and which locks the probe healed live.
+// ---------------------------------------------------------------------------
+
+async function player(app: ReturnType<typeof createApp>) {
+  const res = await app.request("/v1/auth/device", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ platform: "ios" }),
+  });
+  const { token } = (await res.json()) as { token: string };
+  return (path: string, init: RequestInit = {}) =>
+    app.request(path, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${token}` } });
+}
+
+/** A round whose every question already carries an outcome, so /:date/reveal 409s otherwise. */
+async function seedSettledRound(db: Awaited<ReturnType<typeof makeTestDb>>["db"], date: string) {
+  const qs = await seedRound(db, { date, opensAt: new Date(`${date}T00:00:00Z`), locksAt: new Date(`${date}T12:00:00Z`) });
+  for (const q of qs) await resolveQuestion(db, q.id, "yes");
+  return qs;
+}
+
+/** An open round, live right now under a fixed clock -- reset by this file's afterEach. */
+async function seedOpenRoundNow(db: Awaited<ReturnType<typeof makeTestDb>>["db"]) {
+  vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+  return seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+}
+
+describe("the reveal carries what the gauntlet cost (design 2026-09-04 §11.1)", () => {
+  it("reports both counts", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const call = await player(app);
+    await seedSettledRound(db, "2026-09-02");
+    await db.update(schema.rounds).set({ candidatesWritten: 15, candidatesRejected: 10 }).where(eq(schema.rounds.date, "2026-09-02"));
+    const res = await call("/v1/round/2026-09-02/reveal");
+    const body = (await res.json()) as { candidates_written: number; candidates_rejected: number };
+    expect(body.candidates_written).toBe(15);
+    expect(body.candidates_rejected).toBe(10);
+  });
+
+  it("reports zero for a round that predates the columns, so the client withholds the line", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const call = await player(app);
+    await seedSettledRound(db, "2026-09-02");
+    const body = (await (await call("/v1/round/2026-09-02/reveal")).json()) as { candidates_written: number };
+    expect(body.candidates_written).toBe(0);
+  });
+});
+
+describe("/today says which locks were healed (design 2026-09-04 §11.2)", () => {
+  it("is false for an ordinary question and for an authored early lock", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const call = await player(app);
+    const qs = await seedOpenRoundNow(db);
+    // An authored early lock: locked ahead of the round's own last lock at
+    // authoring time, status flipped to "locked" -- never touched by the
+    // probe, so lockHealedAt stays null. Both an ordinary question elsewhere
+    // in the round and this one must read lock_healed: false; a locksAt-only
+    // check (rather than lockHealedAt) would wrongly call this one healed.
+    await db.update(schema.questions).set({ locksAt: new Date("2026-08-20T18:00:00Z"), status: "locked" }).where(eq(schema.questions.id, qs[0]!.id));
+    const body = (await (await call("/v1/round/today")).json()) as { questions: Array<{ lock_healed: boolean }> };
+    expect(body.questions.every((q) => q.lock_healed === false)).toBe(true);
+  });
+
+  it("is true only for a question the probe closed", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const call = await player(app);
+    const qs = await seedOpenRoundNow(db);
+    await db.update(schema.questions).set({ lockHealedAt: new Date() }).where(eq(schema.questions.id, qs[0]!.id));
+    const body = (await (await call("/v1/round/today")).json()) as { questions: Array<{ id: string; lock_healed: boolean }> };
+    expect(body.questions.filter((q) => q.lock_healed).map((q) => q.id)).toEqual([qs[0]!.id]);
   });
 });

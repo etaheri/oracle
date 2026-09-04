@@ -23,6 +23,7 @@ import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { colors, space } from "../theme";
 import { useChromeScale } from "../ui/useChromeScale";
 import { scaledRow } from "../game/typeScaling";
+import { PIPELINE_LINES } from "@oracle/core";
 
 // The throw UNCOVERS the stack — the next card was already on the table as
 // the deck's top, so the live card enters from exactly that resting pose: a
@@ -140,6 +141,19 @@ export default function Round() {
         )}
       </View>
       {(lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
+      {/* A healed lock is the most dramatic thing this system does, and without
+          this line it happens in silence: the numeral is simply struck, the same
+          as a slot the player let expire. Shown only for a healed question the
+          player never sealed — that is exactly the strike that needs explaining,
+          and a player who sealed in time has nothing to be told. Fixed height so
+          the layout does not jump when a probe lands mid-session. */}
+      <View style={{ height: scaledRow(16, chromeScale), justifyContent: "center" }}>
+        {qs.some((q) => q.lock_healed && !answers[q.id]?.sealed) && (
+          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
+            {PIPELINE_LINES.lockHealed}
+          </Mono>
+        )}
+      </View>
       <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
         {qs.map((q) => {
           const sealed = !!answers[q.id]?.sealed;

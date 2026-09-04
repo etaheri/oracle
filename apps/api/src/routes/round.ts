@@ -46,6 +46,7 @@ export const roundRoutes = new Hono<AppContext>()
         source_name: q.sourceName,
         resolution_criteria: q.resolutionCriteria,
         locks_at: q.locksAt.toISOString(),
+        lock_healed: q.lockHealedAt !== null,
       })),
     });
   })
@@ -125,6 +126,8 @@ export const roundRoutes = new Hono<AppContext>()
       day_points: vigilMult === null ? raw : weighDay(raw, vigilMult),
       vigil_mult: vigilMult,
       first_hour: allFirstHour,
+      candidates_written: round?.candidatesWritten ?? 0,
+      candidates_rejected: round?.candidatesRejected ?? 0,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);
         const ev = evidenceSummary(q.resolutionEvidence);

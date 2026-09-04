@@ -13,7 +13,7 @@ const reveal = (
   my: Reveal["questions"][number]["my"],
   outcome: Reveal["questions"][number]["outcome"] = "yes"
 ): Reveal => ({
-  date: "2026-08-27", day_points: 10, first_hour: false, vigil_mult: null, questions: [q(my, outcome)],
+  date: "2026-08-27", day_points: 10, first_hour: false, candidates_written: 0, candidates_rejected: 0, vigil_mult: null, questions: [q(my, outcome)],
   ledger: { settled: true, streak: 1, calls_rated: 5, oracle_score: null },
 });
 

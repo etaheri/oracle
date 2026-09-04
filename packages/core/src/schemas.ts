@@ -43,6 +43,10 @@ export const RoundTodaySchema = z.object({
       source_name: z.string(),
       resolution_criteria: z.string(),
       locks_at: z.string(),
+      // True only when the in-window probe pulled this lock forward because the
+      // answer appeared. An AUTHORED early lock is false: both produce a lock
+      // before noon, and only this one is the machine catching a leak live.
+      lock_healed: z.boolean(),
     }),
   ),
 });
@@ -66,6 +70,11 @@ export const RevealSchema = z.object({
   date: z.string(),
   day_points: z.number().int(),
   first_hour: z.boolean(),
+  // What the gauntlet cost, in candidates (design 2026-09-04 §11.1). Zero for a
+  // bank drop and for every round authored before migration 0007 — the client
+  // withholds the line entirely at zero rather than claim a perfect night.
+  candidates_written: z.number().int(),
+  candidates_rejected: z.number().int(),
   // How heavily the vigil weighed this day, stamped at settlement. Null means
   // the day has not been weighed yet -- the client must withhold the number
   // rather than print a total that will change (see revealRows.pointsWithheld).

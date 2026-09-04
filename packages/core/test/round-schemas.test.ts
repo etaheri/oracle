@@ -1,25 +1,52 @@
 import { describe, it, expect } from "vitest";
 import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, MeLedgerSchema } from "../src/schemas";
 
+export const validToday = {
+  date: "2026-08-20",
+  locks_at: "2026-08-21T16:00:00.000Z",
+  player_count: 3,
+  questions: [
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      slot: 1,
+      is_big_one: false,
+      text: "Q?",
+      category: "markets",
+      source_name: "S&P",
+      resolution_criteria: "close",
+      locks_at: "2026-08-21T16:00:00.000Z",
+    },
+  ],
+};
+
+export const validReveal = {
+  date: "2026-08-20",
+  day_points: 224,
+  first_hour: true,
+  vigil_mult: null,
+  questions: [
+    {
+      id: "44444444-4444-4444-8444-444444444444",
+      slot: 4,
+      text: "Q?",
+      outcome: "void",
+      crowd_yes_pct: null,
+      crowd_count: null,
+      market_prob: null,
+      my: null,
+      source_name: "NWS",
+      source_url: null,
+      evidence_quote: null,
+      void_reason: "unverifiable by deadline",
+      oracle_p_yes: null,
+    },
+  ],
+  ledger: { settled: true, streak: 4, calls_rated: 35, oracle_score: null },
+};
+
 describe("round schemas", () => {
   it("parses a real /round/today payload", () => {
-    const payload = {
-      date: "2026-08-20",
-      locks_at: "2026-08-21T16:00:00.000Z",
-      player_count: 3,
-      questions: [
-        {
-          id: "11111111-1111-4111-8111-111111111111",
-          slot: 1,
-          is_big_one: false,
-          text: "Q?",
-          category: "markets",
-          source_name: "S&P",
-          resolution_criteria: "close",
-          locks_at: "2026-08-21T16:00:00.000Z",
-        },
-      ],
-    };
+    const payload = { ...validToday, questions: validToday.questions.map((q) => ({ ...q, lock_healed: false })) };
     expect(RoundTodaySchema.parse(payload)).toEqual(payload);
   });
   it("parses /round/next", () => {
@@ -27,30 +54,7 @@ describe("round schemas", () => {
     expect(RoundNextSchema.parse(payload)).toEqual(payload);
   });
   it("parses a real reveal payload incl. void and null my", () => {
-    const payload = {
-      date: "2026-08-20",
-      day_points: 224,
-      first_hour: true,
-      vigil_mult: null,
-      questions: [
-        {
-          id: "44444444-4444-4444-8444-444444444444",
-          slot: 4,
-          text: "Q?",
-          outcome: "void",
-          crowd_yes_pct: null,
-          crowd_count: null,
-          market_prob: null,
-          my: null,
-          source_name: "NWS",
-          source_url: null,
-          evidence_quote: null,
-          void_reason: "unverifiable by deadline",
-          oracle_p_yes: null,
-        },
-      ],
-      ledger: { settled: true, streak: 4, calls_rated: 35, oracle_score: null },
-    };
+    const payload = { ...validReveal, candidates_written: 15, candidates_rejected: 10 };
     expect(RevealSchema.parse(payload)).toEqual(payload);
   });
 });
@@ -109,5 +113,20 @@ describe("the ledger's rivalry block", () => {
       oracle: { score: null, calls_rated: 34, days_outseen: 4, days_compared: 11 },
     });
     expect(parsed.oracle.days_outseen).toBe(4);
+  });
+});
+
+describe("the provenance and healed-lock fields", () => {
+  it("RevealSchema requires both counts", () => {
+    const ok = RevealSchema.safeParse({ ...validReveal, candidates_written: 15, candidates_rejected: 10 });
+    expect(ok.success).toBe(true);
+    const missing = RevealSchema.safeParse(validReveal);
+    expect(missing.success).toBe(false);
+  });
+
+  it("RoundTodaySchema requires lock_healed on every question", () => {
+    const withFlag = { ...validToday, questions: validToday.questions.map((q) => ({ ...q, lock_healed: false })) };
+    expect(RoundTodaySchema.safeParse(withFlag).success).toBe(true);
+    expect(RoundTodaySchema.safeParse(validToday).success).toBe(false);
   });
 });
