@@ -5,6 +5,7 @@ import { validDraft } from "./helpers/draft";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import { voidQuestions, publishFromBank } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
+import { upsertDraft } from "../src/pipeline/draft";
 import * as schema from "../src/db/schema";
 import { inlineStarter } from "../src/pipeline/workflows";
 import { PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
@@ -453,11 +454,48 @@ describe("the spend ceiling in the tick (design 2026-09-04 §9.1)", () => {
   });
 
   it("never blocks lock, publish, void or settle", async () => {
-    const { db } = await makeTestDb();
-    await db.insert(schema.pipelineSpend).values({ date: "2026-08-27", calls: PIPELINE_DAILY_CALL_BUDGET + 50 });
-    await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
-    const { deps } = fakeDeps(db, "2026-08-27T16:01:00Z");
-    const done = await runTick(deps);
-    expect(done).toContain("lock:2026-08-26");
+    // STATE 1: a tick whose actions are lock, publish and settle all at
+    // once — the round that just locked, a scheduled round for today, and a
+    // second locked round with nothing left unresolved. The test's name says
+    // all four actions are unblocked by a spent budget; only asserting
+    // "lock" would ring true even if a future change routed publish or
+    // settle through a metered path.
+    {
+      const { db } = await makeTestDb();
+      await db.insert(schema.pipelineSpend).values({ date: "2026-08-27", calls: PIPELINE_DAILY_CALL_BUDGET + 50 });
+      await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+
+      await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+      await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-20"));
+      await db.update(schema.questions)
+        .set({ status: "resolved", outcome: "yes", resolvedAt: new Date("2026-08-21T16:05:00Z") })
+        .where(eq(schema.questions.roundDate, "2026-08-20"));
+
+      await upsertDraft(db, "2026-08-27", validDraft);
+
+      const { deps } = fakeDeps(db, "2026-08-27T16:01:00Z"); // 12:01 ET
+      const done = await runTick(deps);
+      expect(done).toContain("lock:2026-08-26");
+      expect(done).toContain("publish:2026-08-27");
+      expect(done).toContain("settle:2026-08-20");
+    }
+
+    // STATE 2: void needs its own clock — a locked round past the two-day
+    // grace period — which a lock-and-settle tick can't also produce, so a
+    // second state stands in for it here rather than weakening the
+    // assertion above to skip void.
+    {
+      const { db } = await makeTestDb();
+      await db.insert(schema.pipelineSpend).values({ date: "2026-08-28", calls: PIPELINE_DAILY_CALL_BUDGET + 50 });
+      await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-27T16:00:00Z") });
+      await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-26"));
+      await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
+
+      const { deps } = fakeDeps(db, "2026-08-28T16:05:00Z"); // noon D+2 ET — past the void grace period
+      const done = await runTick(deps);
+      expect(done).toContain("void:2026-08-26");
+      const voided = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
+      expect(voided.every((q) => q.status === "void")).toBe(true);
+    }
   });
 });

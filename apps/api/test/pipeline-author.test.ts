@@ -345,6 +345,33 @@ describe("rerollSlot", () => {
     expect(sent[0]).toContain("locks at noon");
   });
 
+  it("a reroll's topicKey replaces the old slot's, and clears to null when the response carries none", async () => {
+    const { db } = await makeTestDb();
+    const draftWithTopicKey = {
+      questions: validDraft.questions.map((q) => (q.slot === 3 ? { ...q, topic_key: "old-subject" } : q)),
+    };
+    await upsertDraft(db, "2026-08-27", draftWithTopicKey);
+
+    const before = await db.query.questions.findFirst({ where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 3)) });
+    expect(before!.topicKey).toBe("old-subject");
+
+    // A rerolled slot is a new claim about a new subject; the old topicKey
+    // must not survive it, or the dedupe blocks a subject that never ran
+    // and frees the one that did.
+    const { claude: claude1 } = fakeClaude([{ ...replacement("2026-08-27T22:00:00Z"), topic_key: "new-subject" }]);
+    await rerollSlot(fakeDeps(db, claude1).deps, "2026-08-27", 3, "guidance");
+    const afterWithKey = await db.query.questions.findFirst({ where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 3)) });
+    expect(afterWithKey!.topicKey).toBe("new-subject");
+
+    // A reroll response carrying no topic_key (a human /reroll typically
+    // won't set one) must clear the slot's key, not leave the previous
+    // reroll's value sitting there.
+    const { claude: claude2 } = fakeClaude([replacement("2026-08-27T22:00:00Z")]);
+    await rerollSlot(fakeDeps(db, claude2).deps, "2026-08-27", 3, "guidance");
+    const afterNoKey = await db.query.questions.findFirst({ where: and(eq(schema.questions.roundDate, "2026-08-27"), eq(schema.questions.slot, 3)) });
+    expect(afterNoKey!.topicKey).toBeNull();
+  });
+
   it("reroll derives the slot's lock from resolves_at", async () => {
     const { db } = await makeTestDb();
     await upsertDraft(db, "2026-08-27", validDraft);

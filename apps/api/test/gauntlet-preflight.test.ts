@@ -5,6 +5,7 @@ import type { Judged } from "../src/pipeline/gauntlet/critic";
 import type { Candidate } from "../src/pipeline/candidate";
 import type { PipelineDeps } from "../src/pipeline";
 import { inlineStarter } from "../src/pipeline/workflows";
+import { BudgetExhausted } from "../src/pipeline/spend";
 
 const cand = (text: string, key: string): Candidate => ({
   category: "news", text, resolution_criteria: "per the page",
@@ -79,5 +80,26 @@ describe("preflight — tier 3, the inversion", () => {
     d.claude = { structured: async (call) => { model = call.model; return UNVERIFIABLE; } };
     await preflight(d, [judged("Will it?", "k1")]);
     expect(model).toBe("m-p");
+  });
+
+  it("isolates a per-candidate resolver failure — the other candidate still passes and the call does not reject", async () => {
+    const { db } = await makeTestDb();
+    const d = deps(db, (system) => {
+      if (system.includes("A?")) throw new Error("upstream 429");
+      return UNVERIFIABLE;
+    });
+    const r = await preflight(d, [judged("A?", "k1"), judged("B?", "k2")]);
+    expect(r.passed.map((j) => j.candidate.text)).toEqual(["B?"]);
+    expect(r.rejected).toHaveLength(1);
+    expect(r.rejected[0]!.text).toBe("A?");
+    expect(r.rejected[0]!.detail).toContain("upstream 429");
+  });
+
+  it("propagates BudgetExhausted out of preflight rather than converting it into a rejection", async () => {
+    const { db } = await makeTestDb();
+    const d = deps(db, () => {
+      throw new BudgetExhausted("2026-09-04", 150, true);
+    });
+    await expect(preflight(d, [judged("Will it?", "k1")])).rejects.toBeInstanceOf(BudgetExhausted);
   });
 });

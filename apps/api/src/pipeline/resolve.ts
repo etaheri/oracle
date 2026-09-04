@@ -17,7 +17,7 @@
 // honest "we could not read this"; a coin-flip between two disagreeing readings
 // is a lie with a number attached. resettleRound remains available if a human
 // ever corrects one by hand.
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { schema } from "../db/client";
 import type { PipelineDeps } from "./index";
 import { resolveQuestion } from "../resolution";
@@ -57,12 +57,17 @@ export async function resolveWithClaude(deps: PipelineDeps, questionId: string):
   if (sa === null || sb === null || sa !== sb) {
     // WRITTEN DOWN, not merely returned. Disagreement leaves the question
     // locked, so the void happens hours later inside voidQuestions — by which
-    // point the disagreement is gone unless it was recorded. This also makes a
-    // disputed outcome inspectable after the fact (§6.2).
+    // point the disagreement is gone unless it was recorded.
+    //
+    // Guarded on `locked` for the same reason the success path below is: these
+    // calls take minutes and now run inside a Workflow that outlives its tick,
+    // so a void or a resolution can land while they are in flight. Without the
+    // guard this write lands ON TOP of that judgement's evidence and erases
+    // its receipt — the void's reason, or the resolved question's quote.
     await deps.db
       .update(schema.questions)
       .set({ resolutionEvidence: evidenceOf(deps, a, b, sa !== null && sb !== null && sa !== sb) })
-      .where(eq(schema.questions.id, questionId));
+      .where(and(eq(schema.questions.id, questionId), eq(schema.questions.status, "locked")));
     return false;
   }
 

@@ -23,6 +23,9 @@ import type { PipelineDeps } from "../index";
 import type { Rejection } from "../candidate";
 import type { Judged } from "./critic";
 import { askResolver, settled } from "../resolver";
+import { BudgetExhausted } from "../spend";
+
+type Outcome = { ok: true; verdict: Awaited<ReturnType<typeof askResolver>> } | { ok: false; error: unknown };
 
 export async function preflight(
   deps: PipelineDeps,
@@ -32,21 +35,49 @@ export async function preflight(
   const rejected: Rejection[] = [];
 
   // One call per survivor, in parallel: they are independent, and this is the
-  // slowest tier in the gauntlet.
-  const verdicts = await Promise.all(
-    judged.map((j) =>
-      askResolver(deps, deps.models.preflight, {
-        text: j.candidate.text,
-        resolutionCriteria: j.candidate.resolution_criteria,
-        sourceName: j.candidate.source_name,
-        sourceUrl: j.candidate.source_url,
-      }),
-    ),
+  // slowest tier in the gauntlet. Isolated per call, like every neighbouring
+  // gate (checkSources, runProbe, runResolution): one candidate's transient
+  // 429 or 5xx must reject that candidate, not the whole `Promise.all` — and
+  // with it the night, silently, with nothing written and no gauntlet
+  // narration fired. Surplus is what makes throwing one candidate away
+  // affordable.
+  const outcomes: Outcome[] = await Promise.all(
+    judged.map(async (j): Promise<Outcome> => {
+      try {
+        const verdict = await askResolver(deps, deps.models.preflight, {
+          text: j.candidate.text,
+          resolutionCriteria: j.candidate.resolution_criteria,
+          sourceName: j.candidate.source_name,
+          sourceUrl: j.candidate.source_url,
+        });
+        return { ok: true, verdict };
+      } catch (err) {
+        // A spent budget is a day-level stop, not one candidate's problem —
+        // let it propagate and abort the gauntlet the way it already does
+        // everywhere else a model call happens.
+        if (err instanceof BudgetExhausted) throw err;
+        return { ok: false, error: err };
+      }
+    }),
   );
 
-  verdicts.forEach((v, i) => {
+  outcomes.forEach((o, i) => {
     const j = judged[i]!;
-    const answer = settled(v);
+    if (!o.ok) {
+      // "ambiguous" is already the critic's reason for the identical shape —
+      // a model call this gate depends on came back unreadable, so there is
+      // no verdict to judge. It is honest in a way "already-resolvable"
+      // would not be (nothing was found already-resolvable) and in a way
+      // "dead-source" would not be (the candidate's source_url was never
+      // fetched here; the failure is the resolver call itself).
+      rejected.push({
+        text: j.candidate.text,
+        reason: "ambiguous",
+        detail: `preflight resolver call failed: ${o.error instanceof Error ? o.error.message : String(o.error)}`,
+      });
+      return;
+    }
+    const answer = settled(o.verdict);
     if (answer === null) {
       passed.push(j);
       return;

@@ -5,6 +5,7 @@ import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { resolveWithClaude, runResolution } from "../src/pipeline/resolve";
 import { voidQuestions } from "../src/pipeline/actions";
+import { resolveQuestion } from "../src/resolution";
 import { runTick, type PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import * as schema from "../src/db/schema";
@@ -334,6 +335,46 @@ describe("adversarial resolution (design 2026-09-04 §6)", () => {
     expect(await resolveWithClaude(deps, q.id)).toBe(false);
     const row = await db.query.questions.findFirst({ where: eq(schema.questions.id, q.id) });
     expect(row!.outcome).toBeNull();
+  });
+
+  it("does not clobber a void that lands while the disagreement write is in flight", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    // A concurrent tick's void sweep (the 13:00 ET action, or an overlapping
+    // Workflow instance's tail) resolves this question to void while both
+    // resolver calls are still in flight.
+    const deps = depsWith(db, async (call) => {
+      await db.update(schema.questions)
+        .set({ status: "void", outcome: "void", resolutionEvidence: { reason: "voided concurrently" } })
+        .where(eq(schema.questions.id, q.id));
+      return { outcome: call.model.includes("rb") ? "no" : "yes", quotes, reasoning: "r" };
+    });
+    expect(await resolveWithClaude(deps, q.id)).toBe(false);
+    const row = await db.query.questions.findFirst({ where: eq(schema.questions.id, q.id) });
+    expect(row!.status).toBe("void");
+    expect(row!.outcome).toBe("void");
+    // The void's reason must survive — not be overwritten by the disagreement
+    // blob, which carries no top-level `reason`.
+    expect((row!.resolutionEvidence as Record<string, unknown>).reason).toBe("voided concurrently");
+  });
+
+  it("does not clobber an already-resolved question's evidence when the disagreement write races it", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    const winningQuotes = [{ url: "https://example.com/x", quote: "the winning quote" }];
+    // A concurrent tick's own resolve (its two models agreed) resolves this
+    // question while this attempt's calls are still in flight.
+    const deps = depsWith(db, async (call) => {
+      await resolveQuestion(db, q.id, "yes", { outcome: "yes", quotes: winningQuotes, reasoning: "clear", disagreement: false });
+      return { outcome: call.model.includes("rb") ? "no" : "yes", quotes, reasoning: "r" };
+    });
+    expect(await resolveWithClaude(deps, q.id)).toBe(false);
+    const row = await db.query.questions.findFirst({ where: eq(schema.questions.id, q.id) });
+    expect(row!.status).toBe("resolved");
+    expect(row!.outcome).toBe("yes");
+    // The winning quote must survive — not be erased by the disagreement
+    // blob landing on top of it.
+    expect((row!.resolutionEvidence as Record<string, unknown>).quotes).toEqual(winningQuotes);
   });
 });
 

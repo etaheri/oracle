@@ -126,6 +126,20 @@ export async function recentQuestionDigest(db: Db, date: string): Promise<string
     .join("\n");
 }
 
+// NOT ON THE NIGHTLY PATH ANY MORE. runTick's `author` case now dispatches
+// to the gauntlet in pipeline/gauntlet/ (runAuthoringGauntlet), which authors
+// a surplus of candidates and screens them through four gates before this
+// function's single-shot, unverified draft ever would have shipped one.
+//
+// Kept, not deleted: /reroll (rerollSlot below) remains the human override
+// for a live slot, and a manual full-round authoring path may be wanted back
+// some day. Deleting this would also mean deleting the ~14 tests that cover
+// it, as the last act of an 18-commit branch — the worst moment for that.
+//
+// ITS PROMPT IS NOT KEPT IN STEP WITH THE GAUNTLET'S. Two authoring prompts
+// drift the moment nobody is required to update both, and nobody is. Read
+// gauntlet/generate.ts for what the pipeline actually asks Claude to write
+// tonight; this one is history, not current behaviour.
 export async function authorRound(deps: PipelineDeps, date: string): Promise<void> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
   const claude = deps.claude;
@@ -269,6 +283,11 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
       // A rerolled slot is a new claim; the old slot's probability must not
       // survive it into the scorecard.
       authorProb: String(q.author_probability),
+      // Same reasoning as authorProb above: a rerolled slot carries a new
+      // subject. Leaving the old topicKey in place would block that new
+      // subject's dedupe for the days it never ran, and free the old
+      // subject's up to repeat immediately.
+      topicKey: q.topic_key ?? null,
       locksAt,
     })
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
