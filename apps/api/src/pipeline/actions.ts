@@ -5,6 +5,7 @@
 // statement, safe to retry on the next tick if a later step in the same
 // action fails.
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { PIPELINE_LINES } from "@oracle/core";
 import { schema, type Db } from "../db/client";
 import { addDays, noonET } from "./clock";
 import { resolveQuestion } from "../resolution";
@@ -133,10 +134,16 @@ export async function voidQuestions(
   const texts = stillLocked.map((r) => r.text);
 
   for (const row of stillLocked) {
+    // A question two independent readers could not agree on is not the same
+    // event as one nobody could read at all, and the reveal renders void_reason
+    // verbatim. Reading the flag the last resolve attempt wrote is the only way
+    // that distinction survives to void time (design 2026-09-04 §11.3).
+    const ev = row.resolutionEvidence as { disagreement?: unknown } | null;
+    const struck = ev !== null && typeof ev === "object" && ev.disagreement === true;
     await resolveQuestion(db, row.id, "void", {
       unverifiable: true,
       checked_at: nowIso,
-      reason: "unverifiable within 24 hours of lock",
+      reason: struck ? PIPELINE_LINES.voidDisagreement : "unverifiable within 24 hours of lock",
     });
   }
 

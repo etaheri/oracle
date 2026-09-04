@@ -9,7 +9,7 @@ import { etNow } from "./clock";
 import { decideActions, loadPipelineState } from "./state";
 import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
 import { authorBankEntry, authorRound } from "./author";
-import { resolveWithClaude } from "./resolve";
+import { runResolution } from "./resolve";
 import { stampOracleForecast } from "./forecast";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
@@ -101,21 +101,11 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           break;
 
         case "resolve":
-          // Each question resolves independently — spec §6: one Claude call
-          // failing must never stall the other, still-resolvable questions.
-          for (const questionId of action.questionIds) {
-            try {
-              await resolveWithClaude(deps, questionId);
-            } catch (err) {
-              await deps.telegram.send(`⚠ resolve failed: ${errorMessage(err)}`);
-            }
-          }
           // "resolve:<date>" means the tick ATTEMPTED resolution for every
           // still-locked question in this round — not that all of them
-          // resolved. resolveWithClaude returns false (and unresolved
-          // questions stay locked, retried hourly) whenever Claude can't
-          // produce a sourced yes/no — they void at noon ET two days after
-          // the round date (unverifiable within 24 hours of lock).
+          // resolved. Unresolved questions stay locked and are retried
+          // hourly; they void at noon ET two days after the round date.
+          await runResolution(deps, action.date, action.questionIds);
           done.push(`resolve:${action.date}`);
           break;
 
