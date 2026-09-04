@@ -456,19 +456,31 @@ export function provenanceLine(written: number, rejected: number): string | null
 }
 ```
 
-- [ ] **Step 4: Run the core tests**
+- [ ] **Step 4: Update the canon's exact-length assertion**
+
+`packages/core/test/copy-lint.test.ts` already carries `expect(RITES_LINES.length).toBe(15);`
+(inside the test named *"state the current rules: bounty not double, all five
+for the first hour, the city of noon, partial days, staggered locks"*). It is a
+deliberate tripwire against silent canon growth, and it is doing its job — the
+canon really did grow. Change it to `16`, and nothing else in that test.
+
+Leave `apps/mobile/src/app/rites.tsx:127` alone: it computes
+`RITES_LINES.length - OPENING_RITES_LINES.length` and reads correctly at any
+size.
+
+- [ ] **Step 5: Run the core tests**
 
 Run: `pnpm --filter @oracle/core test`
 Expected: PASS.
 
-- [ ] **Step 5: Run the mobile tests and watch the numeral tripwire ring**
+- [ ] **Step 6: Run the mobile tests and watch the numeral tripwire ring**
 
 Run: `pnpm --filter @oracle/mobile test -- numerals`
 Expected: **FAIL** — `NUMERALS.length` is 15 and `RITES_LINES.length` is now 16, so `numeral(16)` returns the string `"16"`.
 
 This failure is the point. It is the guard that exists because the canon once reached fifteen while the table stopped at fourteen and the last rite rendered as arabic `15`. Do not skip past it.
 
-- [ ] **Step 6: Grow the numeral table**
+- [ ] **Step 7: Grow the numeral table**
 
 In `apps/mobile/src/game/numerals.ts`:
 
@@ -482,12 +494,12 @@ In `apps/mobile/src/game/numerals.ts`:
 export const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI"] as const;
 ```
 
-- [ ] **Step 7: Run the mobile tests**
+- [ ] **Step 8: Run the mobile tests**
 
 Run: `pnpm --filter @oracle/mobile test -- numerals`
 Expected: PASS.
 
-- [ ] **Step 8: Full suite, typecheck, commit**
+- [ ] **Step 9: Full suite, typecheck, commit**
 
 Run: `pnpm test && pnpm typecheck`
 
@@ -2314,11 +2326,12 @@ describe("selectRound", () => {
   });
 
   it("prefers spread over contest when both are possible", () => {
-    // Six survivors, four of them markets. The two most contested are both
-    // markets; a naive top-five would produce three categories.
+    // Six survivors, three of them markets. The three most contested are ALL
+    // markets, so a naive top-five would produce three categories; the greedy
+    // one-per-category pass must reach four.
     const pool = [
-      j("markets", 0.50, 1), j("markets", 0.51, 2), j("markets", 0.52, 3), j("markets", 0.53, 4),
-      j("sports", 0.30, 5), j("news", 0.70, 6),
+      j("markets", 0.50, 1), j("markets", 0.51, 2), j("markets", 0.52, 3),
+      j("sports", 0.30, 4), j("news", 0.70, 5), j("culture", 0.72, 6),
     ];
     const s = selectRound(pool)!;
     expect(s.relaxed).toBe(false);
@@ -3154,6 +3167,28 @@ In `apps/api/src/pipeline/actions.ts`, import `PIPELINE_LINES` from `@oracle/cor
   }
 ```
 
+- [ ] **Step 4b: Collapse `runTick`'s inline resolve loop into `runResolution`**
+
+`runTick`'s `resolve` case in `apps/api/src/pipeline/index.ts` currently owns
+its own `for (const questionId of action.questionIds)` loop with its own
+try/catch and telegram narration. `runResolution` is that loop. Leaving both
+in place is verbatim duplication of a logic block, and a reviewer would be
+right to flag it. Replace the case body:
+
+```ts
+        case "resolve":
+          // "resolve:<date>" means the tick ATTEMPTED resolution for every
+          // still-locked question in this round — not that all of them
+          // resolved. Unresolved questions stay locked and are retried
+          // hourly; they void at noon ET two days after the round date.
+          await runResolution(deps, action.date, action.questionIds);
+          done.push(`resolve:${action.date}`);
+          break;
+```
+
+and delete the old loop. Task 14 turns this call into a Workflow dispatch;
+until then it behaves exactly as before.
+
 - [ ] **Step 5: Run the tests**
 
 Run: `pnpm --filter @oracle/api test -- pipeline-resolve pipeline-tick resolve-reveal`
@@ -3518,6 +3553,22 @@ In `decideActions`, directly after the FORECAST block:
 
 Then fix every existing construction of `openRound` in the test files the typechecker flags — each needs a `probeIds: []`.
 
+- [ ] **Step 5b: Wire the probe executor into `runTick`**
+
+`decideActions` now emits a `probe` action that nothing executes: the tick
+would decide it every four hours and silently drop it. Add the case to
+`runTick`'s switch in `apps/api/src/pipeline/index.ts`, beside `resolve`:
+
+```ts
+        case "probe":
+          await runProbe(deps, action.date, action.questionIds);
+          done.push(`probe:${action.date}`);
+          break;
+```
+
+with `import { runProbe } from "./probe";` at the top. Task 14 turns this call
+into a Workflow dispatch; until then it behaves exactly as written.
+
 - [ ] **Step 6: Add the DST test**
 
 `resolves_at` is a UTC instant a model derives by reasoning about "noon ET tomorrow". Across a DST boundary that reasoning is a classic failure, and the failure is silent — an hour's worth of leak. `noonET` is already DST-proof; the check is that `lockFromResolvesAt` compares against *it* and never against a model-computed noon.
@@ -3720,7 +3771,30 @@ describe("the spend ceiling in the tick (design 2026-09-04 §9.1)", () => {
 });
 ```
 
-Update `fakeDeps` in that file to supply a default `workflows` — the inline starter, so every existing tick test keeps running its actions in-process and its assertions keep holding.
+**Two fixture obligations that are easy to miss and both matter:**
+
+1. **`workflows` is a REQUIRED field on `PipelineDeps`**, so every existing
+   `PipelineDeps` object literal in the test suite stops compiling. Run
+   `pnpm --filter @oracle/api typecheck` and add `workflows: inlineStarter()`
+   to each one the typechecker names — expect `pipeline-tick`,
+   `pipeline-author`, `pipeline-bank`, `pipeline-resolve`,
+   `pipeline-forecast`, `pipeline-resolver`, `pipeline-probe`,
+   `gauntlet-critic`, `gauntlet-preflight`, `gauntlet-taste`,
+   `gauntlet-run`. Trust the typechecker over that list.
+
+2. **`fakeDeps` must never reach the network.** Once `runTick` dispatches
+   `author` through the inline starter, `runAuthoringGauntlet` runs inside
+   tick tests — and it calls `fetchMarketSignals` (which falls back to global
+   `fetch`) and tier 1's `checkSources` (same). Add both fakes to `fakeDeps`:
+
+   ```ts
+     marketFetch: (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch,
+     sourceFetch: (async () => new Response("", { status: 200 })) as unknown as typeof fetch,
+   ```
+
+   `fetchMarketSignals` isolates per-feed failures and returns `[]` on any
+   throw, so authoring proceeds market-blind either way — but a test that
+   *attempts* a network call still violates Global Constraint 2.
 
 - [ ] **Step 2: Run them and watch them fail**
 
