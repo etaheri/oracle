@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, upsertDraft, type Draft } from "../src/pipeline/draft";
+import { noonET } from "../src/pipeline/clock";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import * as schema from "../src/db/schema";
@@ -180,5 +181,38 @@ describe("upsertDraft derives the lock", () => {
     expect(qs.every((q) => q.status === "scheduled")).toBe(true);
     // Original text survived — the bad re-post never touched anything.
     expect(qs.find((q) => q.slot === 1)!.text).toBe(validDraft.questions[0]!.text);
+  });
+});
+
+describe("lockFromResolvesAt across a DST boundary (design 2026-09-04 §10)", () => {
+  // 2026-11-01 is the US fall-back: noon ET on 2026-10-31 is 16:00Z (EDT) and
+  // noon ET on 2026-11-01 is 17:00Z (EST). A model that reasons "noon ET
+  // tomorrow is 16:00Z" is an hour early, and the leak is silent.
+  const opensAt = noonET("2026-10-31");
+  const locksAtDefault = noonET("2026-11-01");
+
+  it("takes the default lock from noonET, which is 17:00Z on the fall-back day", () => {
+    expect(opensAt.toISOString()).toBe("2026-10-31T16:00:00.000Z");
+    expect(locksAtDefault.toISOString()).toBe("2026-11-01T17:00:00.000Z");
+  });
+
+  it("clamps a resolves_at in the extra hour to the real noon, never to a model's guess at it", () => {
+    // 16:30Z on 2026-11-01 is 11:30 EST — still before noon ET, and inside the
+    // hour that only exists because the clocks went back.
+    const locks = lockFromResolvesAt("2026-11-01T16:30:00Z", opensAt, locksAtDefault);
+    expect(locks.toISOString()).toBe("2026-11-01T16:30:00.000Z");
+    expect(locks.getTime()).toBeLessThan(locksAtDefault.getTime());
+  });
+
+  it("clamps anything past the real noon back to it", () => {
+    expect(lockFromResolvesAt("2026-11-01T20:00:00Z", opensAt, locksAtDefault).toISOString()).toBe(locksAtDefault.toISOString());
+  });
+
+  it("does the same across the spring-forward boundary", () => {
+    const springOpens = noonET("2026-03-07");
+    const springLocks = noonET("2026-03-08");
+    expect(springOpens.toISOString()).toBe("2026-03-07T17:00:00.000Z");
+    expect(springLocks.toISOString()).toBe("2026-03-08T16:00:00.000Z");
+    expect(lockFromResolvesAt("2026-03-08T20:00:00Z", springOpens, springLocks).toISOString()).toBe(springLocks.toISOString());
   });
 });

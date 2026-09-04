@@ -12,6 +12,12 @@ import { addDays, type ETNow } from "./clock";
 // five days of drops with no author alive at all.
 export const BANK_LOW_WATER = 5;
 
+// How often the open window is swept for questions whose answers have already
+// appeared. Four hours gives roughly five probes per question across a 24-hour
+// window; the spend ceiling in spend.ts is what bounds the cost. An ops
+// threshold, like BANK_LOW_WATER — not a game rule.
+export const PROBE_INTERVAL_HOURS = 4;
+
 export type Action =
   | { kind: "lock"; date: string }
   | { kind: "publish"; date: string }
@@ -22,10 +28,19 @@ export type Action =
   | { kind: "author"; date: string }
   | { kind: "author-bank" }
   | { kind: "forecast"; date: string }
+  | { kind: "probe"; date: string; questionIds: string[] }
   | { kind: "alert"; level: "warn" | "critical"; message: string };
 
 export interface PipelineState {
-  openRound: { date: string; lockPassed: boolean; needsForecast: boolean } | null; // status='open'; lockPassed = now >= questions' locksAt
+  openRound: {
+    date: string;
+    lockPassed: boolean;
+    needsForecast: boolean;
+    // Questions still open AND still ahead of their own lock — the only ones a
+    // probe could teach anything. A question already past its lock is the
+    // lock action's business, not the probe's.
+    probeIds: string[];
+  } | null; // status='open'; lockPassed = now >= questions' locksAt
   lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
   scheduledDates: string[]; // rounds with status='scheduled'
   bankCount: number; // unused evergreen drafts (draft_bank.used_on IS NULL)
@@ -62,6 +77,10 @@ export async function loadPipelineState(db: Db, now: Date, claudeAvailable: bool
       // The Oracle owes this round a position on every question. Recomputed
       // from the rows each tick, so a partial stamp simply retries.
       needsForecast: questions.some((q) => q.oracleProbYes === null),
+      probeIds: questions
+        .filter((q) => q.status === "open" && q.locksAt.getTime() > now.getTime())
+        .sort((a, b) => a.slot - b.slot)
+        .map((q) => q.id),
     };
   }
 
@@ -114,6 +133,24 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     minute < 10
   ) {
     actions.push({ kind: "forecast", date: state.openRound.date });
+  }
+
+  // PROBE (design 2026-09-04 §5) — sweep the open window for questions whose
+  // answers have already appeared, and pull their locks forward.
+  //
+  // Its throttle is NOT the hourly one the other actions use: it fires on the
+  // interval, so a 4-hour cadence is expressed once, here, rather than as a
+  // counter somewhere with state. Gated on claudeAvailable exactly as FORECAST
+  // is, and never past the lock — at that point a probe would be a lookup.
+  if (
+    state.openRound &&
+    !state.openRound.lockPassed &&
+    state.openRound.probeIds.length > 0 &&
+    state.claudeAvailable &&
+    hour % PROBE_INTERVAL_HOURS === 0 &&
+    minute < 10
+  ) {
+    actions.push({ kind: "probe", date: state.openRound.date, questionIds: state.openRound.probeIds });
   }
 
   // PUBLISH — noon or later, today has a draft, and no still-open round blocking it

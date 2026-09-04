@@ -11,6 +11,7 @@ import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions
 import { authorBankEntry, authorRound } from "./author";
 import { runResolution } from "./resolve";
 import { stampOracleForecast } from "./forecast";
+import { runProbe } from "./probe";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
 import type { PushEnv } from "../push/onesignal";
@@ -107,6 +108,11 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           // hourly; they void at noon ET two days after the round date.
           await runResolution(deps, action.date, action.questionIds);
           done.push(`resolve:${action.date}`);
+          break;
+
+        case "probe":
+          await runProbe(deps, action.date, action.questionIds);
+          done.push(`probe:${action.date}`);
           break;
 
         case "alert": {
