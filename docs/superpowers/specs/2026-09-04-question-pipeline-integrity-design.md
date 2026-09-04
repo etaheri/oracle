@@ -60,7 +60,8 @@ What changes: `runTick` **starts a Workflow** for long work instead of awaiting 
 |---|---|---|
 | `author` | `await authorRound(deps, date)` inline | start `AuthoringWorkflow`, instance `author-{date}-{YYYYMMDDHH}` |
 | `resolve` | 5 sequential resolves inline | start `ResolutionWorkflow`, instance `resolve-{date}-{YYYYMMDDHH}` |
-| `forecast`, `lock`, `publish`, `void`, `settle` | inline | unchanged — all are short DB writes |
+| `lock`, `publish`, `void`, `settle` | inline | unchanged — all are short DB writes |
+| `forecast` | inline | unchanged, but note it is **not** a short write: it is one model call with web search, minutes long. It stays inline because a *single* call fits the 15-minute cap comfortably; it is the fan-outs that do not. If the noon tick ever grows a second long inline call, this is the one to move next. |
 
 **Instance IDs carry an hour bucket**, which makes idempotency fall out of the existing throttles: `decideActions` already fires `author` and `resolve` at most once an hour (`minute < 10`), so a duplicate `create` inside the same hour collides on the ID and is skipped. A new hour gets a fresh instance, which is exactly the hourly-retry semantics the state machine already specifies. **The database stays the source of truth** for what is resolved or scheduled; a duplicate instance that does start simply finds nothing to do.
 
@@ -75,6 +76,8 @@ What changes: `runTick` **starts a Workflow** for long work instead of awaiting 
 Authoring produces **12–15 candidates**, not 5. A gauntlet that cannot afford to reject is not a gauntlet, and generating exactly the number needed makes every rejection a serial re-authoring round-trip against a six-hour window.
 
 Candidates are not slotted at generation. Slot, big-one and the ≥4-distinct-category rule are **selection constraints applied to survivors** (§4), not authoring constraints — otherwise a rejection in one category forces a re-author rather than a substitution.
+
+This needs a **`CandidateSchema` distinct from `DraftQuestionSchema`**: identical except that `slot` and `is_big_one` are absent, and `topic_key` is present. Selection (§4) assigns slot and the big-one flag to survivors and produces a `Draft`, which `upsertDraft` then consumes unchanged. `DraftQuestionSchema` and everything downstream of it keep their current shape, so `/reroll`, the bank, and the admin API are untouched.
 
 ### 3.2 The four tiers, cheapest first
 
@@ -136,7 +139,7 @@ locks_at := min(locks_at, now)
 
 The question closes immediately, regardless of what `resolves_at` claimed. This makes the stated invariant — *"the lock always moves to the information"* (`draft.ts`) — enforced rather than asserted.
 
-**Cadence: `PROBE_INTERVAL_HOURS` = 4**, giving roughly five probes per question across a 24-hour window. Probes stop once a question locks. Cost is bounded by §9's ceiling. The probe runs as a step inside a Workflow started by a new `{kind: "probe", date}` action, decided on the same `minute < 10` throttle and gated on `claudeAvailable` exactly as `forecast` is.
+**Cadence: `PROBE_INTERVAL_HOURS` = 4**, giving roughly five probes per question across a 24-hour window. Probes stop once a question locks. Cost is bounded by §9's ceiling. The probe runs as a step inside a Workflow started by a new `{kind: "probe", date}` action. Its throttle is **not** the hourly one the other actions use — it fires on `hour % PROBE_INTERVAL_HOURS === 0 && minute < 10`, and is gated on `claudeAvailable` exactly as `forecast` is. All still-open questions for the round are probed in parallel steps inside one instance, keyed `probe-{date}-{YYYYMMDDHH}`.
 
 **Early-locked questions stay early-locked.** A probe never moves a lock later, only earlier. `Math.min` is the whole rule.
 
@@ -207,7 +210,7 @@ Ordering: taste runs **last**, on the small set that survived everything else, s
 
 A fully unattended loop with hourly retries has no upper bound on model calls today. A pathological night — authoring failing validation, probes retrying — spends until the window closes.
 
-`PIPELINE_DAILY_CALL_BUDGET` (150) caps model calls per ET day, counted in a `pipeline_spend` row keyed by date and incremented before each call. On exhaustion: no further model calls that day, one `critical` alert, and the bank covers noon. Deterministic actions — lock, publish, settle, void — are never blocked by the ceiling, because they cost nothing and the game must still turn.
+`PIPELINE_DAILY_CALL_BUDGET` (150) caps model calls per ET day, counted in a `pipeline_spend` row keyed by date and incremented before each call. A nominal night spends about 52 — authoring 1, critic 1, pre-flight ~12, taste 1, forecast 1, resolution 5×2, probes 5×5 — so 150 is roughly three times nominal: high enough that a normal night never approaches it, low enough that a retry storm is capped within hours rather than days. On exhaustion: no further model calls that day, one `critical` alert, and the bank covers noon. Deterministic actions — lock, publish, settle, void — are never blocked by the ceiling, because they cost nothing and the game must still turn.
 
 The budget is an ops threshold, so it lives in `pipeline/state.ts` beside `BANK_LOW_WATER`, not in `@oracle/core`.
 
@@ -258,6 +261,21 @@ rejected: 4 already-resolvable · 3 ambiguous · 2 uncontested · 1 dead source 
 ## 13. Open, and Erik's
 
 1. **Thresholds are guesses.** `CONTESTED_MAX_DELTA` 0.25, `PROB_DISAGREEMENT_MAX` 0.30, `TOPIC_KEY_DAYS` 7, `PROBE_INTERVAL_HOURS` 4, `PIPELINE_DAILY_CALL_BUDGET` 150, candidate count 12–15. Every one is a first guess and should be read as such until §9.2's counts show what the gauntlet actually rejects. Expect to tune them in the first live week.
-2. **Cost.** Roughly $1.15 a night at these settings (~$35/month), before the Batch API's 50% on the nightly half and prompt caching on the stable prompt prefix, which together should bring it to $20–25. Worth measuring rather than assuming.
+2. **Cost — and this is higher than the figure quoted before §5 and §6 were added.** Estimated at these settings:
+
+   | Step | Model | Est./night |
+   |---|---|---|
+   | Authoring | Opus 5 + search | $0.38 |
+   | Critic | Opus 5 | $0.09 |
+   | Pre-flight ×12 | Sonnet 5 + search | $0.60 |
+   | Taste | Haiku 4.5 | $0.01 |
+   | Forecast | Sonnet 5 + search | $0.05 |
+   | Resolution ×5, two models | Sonnet 5 + Opus 5, both + search | $0.88 |
+   | In-window probes ×~25 | Sonnet 5 + search | $1.25 |
+   | | | **~$3.21** |
+
+   **≈ $96/month**, not the ~$35 estimated before the probes and the second resolver existed. The Batch API's 50% applies only to the nightly half (authoring, critic, pre-flight, taste — none are latency-sensitive inside a six-hour window); probes and resolution are time-bound and cannot batch. That brings it to roughly **$2.67/night, ~$80/month**.
+
+   The two dials, in order of effect: **probe cadence** (§5) is the largest single line — 6-hourly instead of 4-hourly removes about $0.40/night, and probing only questions whose `resolves_at` is `"after-lock"` (the claim most likely to be false) would cut it further; and the **second resolver's model** (§6) — Opus 5 buys genuine error independence, and dropping it to a second Sonnet call would save $0.50/night while correlating the errors it exists to decorrelate, which defeats the point. Measure before tuning either.
 3. **`claude.ts` declares `web_search_20250305`.** The current variant for Opus 5 and Sonnet 5 is `web_search_20260209`, which adds dynamic filtering — directly useful here. Worth changing regardless of this spec.
 4. **The pre-flight's domain restriction** (§3 tier 3) is a deliberate scope choice, not an oversight. If leak telemetry later shows questions arriving pre-answered from elsewhere, widening the pre-flight's search is the lever.
