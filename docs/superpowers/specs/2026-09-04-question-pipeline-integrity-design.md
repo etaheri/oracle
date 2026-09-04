@@ -10,7 +10,7 @@
 
 The pipeline that authors, publishes and resolves the daily round becomes **fully autonomous** — no human gate anywhere in the daily loop. Erik is informed, never asked. `/reroll` survives as an override he rarely uses.
 
-Six changes, in one spec because they share a thesis: **today the pipeline validates the shape of a question and takes its substance on trust.**
+Seven changes, in one spec because they share a thesis: **today the pipeline validates the shape of a question and takes its substance on trust.**
 
 1. **An execution substrate that can hold the work** — cron decides, a Workflow executes.
 2. **A gauntlet** that checks substance, not just shape, and is free to reject because authoring produces surplus.
@@ -18,6 +18,7 @@ Six changes, in one spec because they share a thesis: **today the pipeline valid
 4. **A contestedness gate** — the pipeline can currently guarantee a *correct* round and still produce a *boring* one.
 5. **A fail-closed taste gate** — the one check that must never fail open.
 6. **A spend ceiling and honest narration** — an unattended loop with retries needs an upper bound and a record.
+7. **The machine shows its work** (§11) — every gate above is invisible to the player, and the system's premise is a machine held to receipts. Surfacing it is copy plus two columns.
 
 Nothing here depends on the Hermes agent. Hermes reads the day report and posts about it; the pipeline is Worker code and model calls, end to end.
 
@@ -235,7 +236,68 @@ rejected: 4 already-resolvable · 3 ambiguous · 2 uncontested · 1 dead source 
 
 ---
 
-## 11. Deliberately not in this spec
+## 11. The machine shows its work
+
+Every gate in this spec is invisible. Fifteen questions get written, ten get put down, one gets slammed shut mid-window because its answer appeared — and the player sees five cards indistinguishable from five unguarded ones. For a correctness project that is a virtue. For a system whose premise is an all-knowing machine held to receipts, it is the whole point going unwitnessed.
+
+The machinery is already being built. Surfacing it is copy plus two columns.
+
+### 11.1 The round says what it cost
+
+Migration **0007** adds `rounds.candidates_written` and `rounds.candidates_rejected` (integers, defaulting to 0 so every historical round reads as unknown rather than as a perfect night). Selection (§4) writes both.
+
+One line, on the reveal beside the day's other receipts:
+
+```
+15 WRITTEN · 10 PUT DOWN
+```
+
+Rendered only when `candidates_written > 0`, so pre-0007 rounds and bank drops stay silent rather than claiming a gauntlet that never ran.
+
+### 11.2 The early lock is an event, not a silence
+
+Migration **0007** adds `questions.lock_healed_at` (nullable timestamp), written **only** by §5's probe. This is why a boolean derived from `locks_at` will not do: an authored early lock and a healed one both produce `locks_at < noon`, and only the second is the machine catching a leak in real time.
+
+The round screen renders a healed slot with its own line rather than the generic closed-slot treatment:
+
+```
+THE ANSWER EXISTS. THIS ONE IS CLOSED.
+```
+
+This is the most dramatic thing the system does and today it would happen in silence.
+
+### 11.3 A struck question reads differently from an unread one
+
+§6's disagreement path writes a distinct void reason rather than the generic `UNVERIFIABLE`. The reveal already renders `void_reason`, so this needs no new surface — only an honest string:
+
+```
+THE READERS DID NOT AGREE. THIS ONE IS STRUCK.
+```
+
+A void stops being a shrug and becomes evidence of rigor, which is the correct reading: two independent models declined to agree, so the ledger declines to score it.
+
+### 11.4 The pre-flight belongs in the canon, not on the card
+
+Every published question passed the pre-flight by construction, so a per-question line would be constant and therefore say nothing. It is not a fact about a card; it is a rule of the game, and it belongs with the other rules:
+
+```
+EVERY QUESTION IS PUT TO THE MACHINE BEFORE IT IS PUT TO YOU.
+WHAT IT COULD ANSWER, YOU NEVER SEE.
+```
+
+### 11.5 Two traps this section walks into
+
+**Every string here is governed by the copy lint** — caps, no emoji, no `!`, no CTA verbs, ≤140 characters after slot expansion. Write them into `packages/core/src/copy.ts` and let the lint judge them; do not add them at the call site to avoid it.
+
+**Adding a rite grows the canon, and the numeral table must grow with it.** This has already bitten once: the canon reached fifteen while the numeral table stopped at XIV, and rite XV rendered as arabic `15`. The guard now lives in `apps/mobile/test/numerals.test.ts`. Any copy-lint tripwire added here must bind to the ONE line that makes its claim via `RITES_LINES.find(...)` — an assertion against the joined canon is vacuous whenever a phrase appears in more than one rite — and must be proven to ring by deleting the rite it guards.
+
+### 11.6 Push is deliberately out of scope
+
+An early lock is the best push notification this app will ever have. It is not specced here: `apps/api/src/push/compose.ts` carries four binding obligations recorded in its own header (once-per-lapse anti-nag, lapsed-only-after-resolution, per-user results state, bounded audience query) and is intentionally uncalled. Engaging those is its own piece of work. The in-app surfaces above stand on their own.
+
+---
+
+## 12. Deliberately not in this spec
 
 - **A stored rejection table.** §9.2's counts first; the table when directional tuning stops being enough.
 - **A bank drill** — deliberately exercising `publish-bank` on a schedule so a stale parachute is found on a normal day. A real gap, operational hygiene rather than integrity.
@@ -245,7 +307,7 @@ rejected: 4 already-resolvable · 3 ambiguous · 2 uncontested · 1 dead source 
 
 ---
 
-## 12. Test obligations
+## 13. Test obligations
 
 - **`decideActions` stays pure** over `(ETNow, PipelineState)`. The new `probe` action gets the same treatment `forecast` did: throttle, `claudeAvailable` gate, and proof it cannot fire past the lock.
 - **The pre-flight's inversion is the tripwire of §3** — a candidate the resolver can answer must be rejected. Bind the test to that path and prove it rings by making the fake resolver return `yes`.
@@ -254,11 +316,14 @@ rejected: 4 already-resolvable · 3 ambiguous · 2 uncontested · 1 dead source 
 - **Lock healing never moves a lock later.** Property test over random `locks_at` and probe times.
 - **The spend ceiling blocks model calls and does not block `lock`/`publish`/`settle`/`void`.**
 - **DST**: `lockFromResolvesAt` at a transition date.
+- **§11's copy** goes through the copy lint like everything else, and the numeral table is asserted to cover the grown canon.
+- **`lock_healed_at` is written only by the probe** — an authored early lock must leave it null. This is the field's entire reason for existing, so a test that only checks it is set is not testing it.
+- **The provenance line is withheld when `candidates_written` is 0**, so a bank drop never claims a gauntlet it did not run.
 - All model calls injected through `PipelineDeps`; fixtures only; no test touches the network.
 
 ---
 
-## 13. Open, and Erik's
+## 14. Open, and Erik's
 
 1. **Thresholds are guesses.** `CONTESTED_MAX_DELTA` 0.25, `PROB_DISAGREEMENT_MAX` 0.30, `TOPIC_KEY_DAYS` 7, `PROBE_INTERVAL_HOURS` 4, `PIPELINE_DAILY_CALL_BUDGET` 150, candidate count 12–15. Every one is a first guess and should be read as such until §9.2's counts show what the gauntlet actually rejects. Expect to tune them in the first live week.
 2. **Cost — and this is higher than the figure quoted before §5 and §6 were added.** Estimated at these settings:
