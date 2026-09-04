@@ -35,13 +35,17 @@ export async function probeQuestion(deps: PipelineDeps, questionId: string): Pro
   // lock_healed_at would claim a heal that did not happen.
   if (healed.getTime() >= q.locksAt.getTime()) return false;
 
-  await deps.db
+  const updated = await deps.db
     .update(schema.questions)
     .set({ locksAt: healed, lockHealedAt: now })
     // Guarded on `open`: the probe call takes minutes, and a tick that locked
     // the round while it was in flight must not have its lock rewritten.
-    .where(and(eq(schema.questions.id, questionId), eq(schema.questions.status, "open")));
-  return true;
+    .where(and(eq(schema.questions.id, questionId), eq(schema.questions.status, "open")))
+    .returning({ id: schema.questions.id });
+  // The guard above can block the write entirely, and a probe that healed
+  // nothing must not be counted or narrated as one — the row count is the only
+  // thing that knows which happened.
+  return updated.length > 0;
 }
 
 export async function runProbe(deps: PipelineDeps, date: string, questionIds: string[]): Promise<number> {

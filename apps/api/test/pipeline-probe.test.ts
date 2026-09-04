@@ -109,6 +109,26 @@ describe("probeQuestion — the lock moves to the information", () => {
     expect(row!.locksAt.toISOString()).toBe("2026-09-04T22:00:00.000Z"); // early, as authored
     expect(row!.lockHealedAt).toBeNull();                                 // and NOT healed
   });
+
+  it("reports no heal when the round locked while the probe was in flight", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOpen(db);
+    const sent: string[] = [];
+    const d = deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent);
+    // The lock lands mid-call: the read saw "open", the write will see "locked".
+    d.claude = {
+      structured: async () => {
+        await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.id, q!.id));
+        return ANSWERED;
+      },
+    };
+    expect(await probeQuestion(d, q!.id)).toBe(false);
+    const row = await db.query.questions.findFirst({ where: eq(schema.questions.id, q!.id) });
+    expect(row!.locksAt.getTime()).toBe(LOCKS.getTime());
+    expect(row!.lockHealedAt).toBeNull();
+    expect(await runProbe(d, "2026-09-04", [q!.id])).toBe(0);
+    expect(sent.join("\n")).not.toContain("closed early");
+  });
 });
 
 describe("runProbe", () => {
