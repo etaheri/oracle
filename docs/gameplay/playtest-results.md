@@ -64,3 +64,9 @@ Added a fixed fictional home-win reveal after a practice seal. Results reuse liv
 Verified on iPhone 17 Pro / iOS 26.5 with local synthetic API: hold-button YES at 55% → reveal +10; retry NO at 55% → reveal −10 and previous YES/+10 comparison. Pinned Return and retry controls remained visible. ASCII result decode retained. Higher-confidence payoff cases covered by tests; sustained hold and horizontal pull were not revalidated in this pass.
 
 Validation: 317 mobile tests, mobile TypeScript check, and iOS export passed.
+
+## Duel visual language — September 6, 2026
+
+Completed current-rules duels now reuse the existing creation-hands-orb still: marble/player left, painted/Oracle right. Confidence points and right-answer counts sit under their corresponding hands, before the highlighted question. The exported share card repeats this pairing and states the winner/tie. Existing Home motion, question typography, and ASCII decode are unchanged; unavailable, pending, and legacy result handling remains intact.
+
+Native verification with synthetic data: inspected the iOS result (player 127, Oracle −40, both 4/5 right), generated and inspected the share PNG, and dismissed sharing without sending it. Preview: `ios-verification/duel-share.png`. Mobile tests: 317 passed. TypeScript check passed. No new animation or downloaded asset was added.

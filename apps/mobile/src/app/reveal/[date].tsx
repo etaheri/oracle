@@ -214,6 +214,7 @@ export default function RevealScreen() {
     bigOneCrowdPct: big?.crowd_yes_pct ?? null,
     bigOneMarketPct: big?.market_prob != null ? Math.round(big.market_prob * 100) : null,
     results,
+    ...(d.rules_version >= 2 && duel.status === "complete" ? { duelScores: { you: duel.youPoints, oracle: duel.oraclePoints } } : {}),
     ...(d.rules_version >= 2 ? { duelText: duelLine(duel) ?? undefined } : oracleCounts ? { oracleDayCounts: oracleCounts } : null),
   };
 

@@ -6,6 +6,7 @@ import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { shareMessage, type QuestionResult } from "../game/sharePattern";
 import { capture } from "../analytics/analytics";
+import { DUEL_ART } from "./DuelPortrait";
 import { LITURGY_LINES } from "@oracle/core";
 
 // Offscreen Skia surface (design spec §7) shaped as a literal oracle card
@@ -23,6 +24,7 @@ const NIGHT_LOSS = "#D9705A"; // text-tier vermilion for the midnight ground (5.
 
 export interface ShareCardData {
   duelText?: string;
+  duelScores?: { you: number; oracle: number };
   date: string;
   dayPoints: number;
   bigOneText: string | null;
@@ -84,6 +86,7 @@ export function RegisterMarks() {
 }
 
 export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typeof useCanvasRef>; data: ShareCardData }) {
+  const portrait = useImage(DUEL_ART);
   const orb = useImage(require("../../assets/art/orb.png"));
   const ritual = useFont(require("../../assets/fonts/Cinzel-SemiBold.ttf"), 52);
   const numeralFont = useFont(require("../../assets/fonts/Cinzel-SemiBold.ttf"), 22);
@@ -95,7 +98,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const points = data.dayPoints >= 0 ? `+${data.dayPoints}` : String(data.dayPoints);
   const wins = data.results.filter((r) => r === "win").length;
   const answered = data.results.filter((r) => r !== "none").length;
-  const scoreLine = `${wins}/${answered} · ${points}`;
+  const scoreLine = data.duelScores ? "CONFIDENCE POINTS" : `${wins}/${answered} · ${points}`;
   const bigOne = data.bigOneText ? ellipsize(data.bigOneText, display, CARD_W - 130) : null;
   // No "✶" here: Skia text has no font fallback and Plex Mono lacks the glyph.
   const crowdLine = data.bigOneCrowdPct !== null ? `THE BIG ONE · CROWD SAID ${data.bigOneCrowdPct}% YES` : null;
@@ -104,7 +107,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   // The machine's own count against the day (design's Oracle-record beat).
   // Omitted by the caller -- not merely null -- on a day it never forecast,
   // so there is nothing to check for beyond the prop's own presence.
-  const oracleLine = data.duelText ?? (data.oracleDayCounts
+  const oracleLine = data.duelScores ? (data.duelScores.you > data.duelScores.oracle ? "YOU OUTSAW THE ORACLE" : data.duelScores.you < data.duelScores.oracle ? "THE ORACLE SAW FURTHER" : "YOU AND THE ORACLE STAND LEVEL") : data.duelText ?? (data.oracleDayCounts
     ? `THE ORACLE ${data.oracleDayCounts.oracle} · YOU ${data.oracleDayCounts.you}`
     : null);
 
@@ -117,6 +120,13 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       {ritual && <SkText font={ritual} text="ORACLE" x={centered(ritual, "ORACLE")} y={152} color={colors.museumWhite} />}
       {mono && <SkText font={mono} text={`DAY ${data.date}`} x={centered(mono, `DAY ${data.date}`)} y={192} color={colors.agedGold} />}
       <Line p1={vec(INSET + 40, 218)} p2={vec(CARD_W - INSET - 40, 218)} color={NIGHT_LINE} strokeWidth={1} />
+      {data.duelScores && portrait ? <>
+        <SkImage image={portrait} x={INSET + 1} y={246} width={CARD_W - 2 * INSET - 2} height={316} fit="contain" />
+        {mono && ["YOU", "THE ORACLE"].map((label, index) => <SkText key={label} font={mono} text={label}
+          x={(index === 0 ? 180 : 460) - mono.measureText(label).width / 2} y={582} color={colors.agedGold} />)}
+        {score && [data.duelScores.you, data.duelScores.oracle].map((value, index) => <SkText key={index} font={score} text={String(value)}
+          x={(index === 0 ? 180 : 460) - score.measureText(String(value)).width / 2} y={626} color={colors.museumWhite} />)}
+      </> : <>
       <Circle cx={CARD_W / 2} cy={432} r={280}>
         <RadialGradient c={vec(CARD_W / 2, 432)} r={280} colors={["rgba(247,246,242,0.28)", "rgba(183,169,228,0.12)", "rgba(18,26,43,0)"]} />
       </Circle>
@@ -135,6 +145,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
         seed={[...data.date].reduce((a, c) => a + c.charCodeAt(0), 0) % 97}
       />
       {orb && <SkImage image={orb} x={CARD_W / 2 - 180} y={252} width={360} height={360} fit="contain" />}
+      </>}
       {/* The pattern row: numerals colored by result (gold win / warm loss / dim
           void+unanswered). Color-only here — Cinzel has no ✓/✗ and Skia has no
           font fallback; the share message string carries the exact marks. */}
@@ -147,12 +158,12 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
         return nums.map((n, i) => {
           const r = data.results[i] ?? "none";
           const color = r === "win" ? colors.agedGold : r === "loss" ? NIGHT_LOSS : NIGHT_DIM;
-          const el = <SkText key={n} font={numeralFont} text={n} x={x} y={672} color={color} />;
+          const el = <SkText key={n} font={numeralFont} text={n} x={x} y={data.duelScores ? 724 : 672} color={color} />;
           x += widths[i] + gap;
           return el;
         });
       })()}
-      {score && <SkText font={score} text={scoreLine} x={centered(score, scoreLine)} y={724} color={colors.warmCenter} />}
+      {(data.duelScores ? mono : score) && <SkText font={(data.duelScores ? mono : score)!} text={scoreLine} x={centered(data.duelScores ? mono : score, scoreLine)} y={data.duelScores ? 660 : 724} color={colors.warmCenter} />}
       {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={802} color={colors.museumWhite} />}
       {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
       {monoSmall && marketLine && <SkText font={monoSmall} text={marketLine} x={centered(monoSmall, marketLine)} y={866} color={NIGHT_DIM} />}
