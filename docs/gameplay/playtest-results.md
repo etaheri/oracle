@@ -56,3 +56,11 @@ Participants: 0. Sessions: 0. Real candidate reviews: 0. No retention, engagemen
 The additive `0008_stormy_misty_knight.sql` migration is generated locally and has not been applied to a real database. Deploy the migration before the coordinated API/mobile release. New automated drafts use version 2; existing rows default to version 1. Recheck scheduled content and fallback-bank questions against the full-window promise before launch. No production publication, deployment, payment changes or subscription grants were performed.
 
 The earlier purchase retry and annual shield allowance findings remain separate follow-up work, consistent with the gameplay-focused scope.
+
+## Practice reveal — September 6, 2026
+
+Added a fixed fictional home-win reveal after a practice seal. Results reuse live payoff scoring, explain confidence and the opposite outcome, and retain the previous attempt for comparison on retry. Practice completion now fires when the result is opened. No prediction submission or score/streak mutation is introduced.
+
+Verified on iPhone 17 Pro / iOS 26.5 with local synthetic API: hold-button YES at 55% → reveal +10; retry NO at 55% → reveal −10 and previous YES/+10 comparison. Pinned Return and retry controls remained visible. ASCII result decode retained. Higher-confidence payoff cases covered by tests; sustained hold and horizontal pull were not revalidated in this pass.
+
+Validation: 317 mobile tests, mobile TypeScript check, and iOS export passed.
