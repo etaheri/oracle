@@ -33,6 +33,7 @@ export const devices = pgTable("devices", {
 export const rounds = pgTable("rounds", {
   date: date("date").primaryKey(),
   status: roundStatus("status").notNull().default("scheduled"),
+  rulesVersion: integer("rules_version").notNull().default(1),
   playerCount: integer("player_count").notNull().default(0),
   // What the gauntlet cost, in candidates (design 2026-09-04 §11.1). Default
   // 0 so every round authored before 0007 reads as "unknown" rather than as a
@@ -48,6 +49,7 @@ export const questions = pgTable("questions", {
   isBigOne: boolean("is_big_one").notNull().default(false),
   text: text("text").notNull(),
   category: category("category").notNull(),
+  context: jsonb("context").$type<{ text: string; asOf: string; sourceUrl: string }>(),
   resolutionCriteria: text("resolution_criteria").notNull(),
   sourceName: text("source_name").notNull(),
   sourceUrl: text("source_url"),

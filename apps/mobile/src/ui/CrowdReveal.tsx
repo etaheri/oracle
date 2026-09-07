@@ -48,12 +48,12 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
   const crowd = useCrowdSoFar(true);
   const answers = useRoundStore((s) => s.answers);
   const byId = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
-  const sealed = round.questions.filter((q) => answers[q.id]?.sealed && byId.has(q.id));
-  const playerCount = Math.max(0, ...sealed.map((q) => byId.get(q.id)!.player_count));
+  const sealed = round.questions.filter((q) => answers[q.id]?.sealed);
+  const playerCount = Math.max(0, ...sealed.map((q) => (byId.get(q.id)?.player_count ?? 0)));
 
   return (
     <View style={{ flex: 1, gap: space(4) }}>
-      <Eyebrow>The crowd is revealed</Eyebrow>
+      <Eyebrow>Your sealed calls</Eyebrow>
       {/* The round's second artifact (refinement spec §5). It followed a
           gilded card and arrived as an unframed list; the gold-leaf frame
           says this is the same document, now countersigned by the crowd. */}
@@ -68,10 +68,10 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               replaces did. */}
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: space(4) }} showsVerticalScrollIndicator={false}>
             {sealed.map((q) => {
-              const c = byId.get(q.id)!;
+              const c = byId.get(q.id);
               const mine = answers[q.id]!;
-              const mySidePct = mine.answer ? c.crowd_yes_pct : 100 - c.crowd_yes_pct;
-              const against = contrarianApplies(mySidePct, c.player_count);
+              const mySidePct = mine.answer ? (c?.crowd_yes_pct ?? 50) : 100 - (c?.crowd_yes_pct ?? 50);
+              const against = contrarianApplies(mySidePct, c?.player_count ?? 0);
               // Under the floor the percentage is mostly the player: at one
               // sealed answer this frame printed a full gauge and "100% SAY
               // YES" directly above a footer reading "1 ORACLE HAS SPOKEN".
@@ -79,17 +79,15 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               // (crowdVerdict); the finale now holds it from the same floor
               // and the same string. The player's own call still prints —
               // it is the one thing that is true at any crowd size.
-              const gathering = c.player_count < VERDICT_MIN_PLAYERS;
+              const gathering = !c || c.player_count < VERDICT_MIN_PLAYERS;
               return (
                 <View key={q.id} style={{ gap: space(1.5) }}>
                   <Serif size={15} color={colors.ink} numberOfLines={2}>{q.text}</Serif>
-                  {gathering ? (
-                    <Mono size={10} color={colors.mutedInk} letterSpacing={1}>{GATHERING_LINE}</Mono>
-                  ) : (
+                  {!gathering && c && (
                     <CrowdBar pct={c.crowd_yes_pct} />
                   )}
                   <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
-                    {!gathering && <Mono size={10} color={colors.goldText}>{c.crowd_yes_pct}% SAY YES</Mono>}
+                    {!gathering && <Mono size={10} color={colors.goldText}>{c!.crowd_yes_pct}% SAY YES</Mono>}
                     <Mono size={10} color={against ? colors.goldText : colors.mutedInk}>
                       {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>
@@ -101,16 +99,16 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(1) }}>
             <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
-              {playerCount === 1 ? "1 ORACLE HAS SPOKEN" : `${playerCount} ORACLES HAVE SPOKEN`}
+              {playerCount < VERDICT_MIN_PLAYERS ? GATHERING_LINE : `${playerCount} ORACLES HAVE SPOKEN`}
             </Mono>
             <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={1}>
-              THE LEDGER IS READ TOMORROW AT NOON
+              THE LEDGER IS READ AFTER THE QUESTIONS CLOSE
             </Mono>
           </View>
         </View>
       </GoldFrame>
       <View style={{ paddingBottom: space(2) }}>
-        <GoldButton title="RETURN AT NOON" onPress={() => router.dismissTo("/")} />
+        <GoldButton title="RETURN" onPress={() => router.dismissTo("/")} />
       </View>
     </View>
   );

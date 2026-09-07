@@ -7,7 +7,7 @@ import { TopBar } from "../ui/TopBar";
 import { OracleCard } from "../ui/OracleCard";
 import { UndealtCard, STACK_TOP_Y, STACK_TOP_ROTATE } from "../ui/UndealtCard";
 import { ConvictionColumn } from "../ui/ConvictionColumn";
-import { confidenceReading } from "../game/confidence";
+import { confidenceMeaning } from "../game/confidence";
 import { crowdVerdict } from "../game/crowdVerdict";
 import { payoffLine } from "../game/payoffLine";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
@@ -148,9 +148,9 @@ export default function Round() {
           and a player who sealed in time has nothing to be told. Fixed height so
           the layout does not jump when a probe lands mid-session. */}
       <View style={{ height: scaledRow(16, chromeScale), justifyContent: "center" }}>
-        {qs.some((q) => q.lock_healed && !answers[q.id]?.sealed) && (
+        {qs.some((q) => q.lock_healed && ((today.data?.rules_version ?? 1) >= 2 || !answers[q.id]?.sealed)) && (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
-            {PIPELINE_LINES.lockHealed}
+            {today.data.rules_version >= 2 ? "EARLY ANSWER · VOID FOR EVERYONE" : PIPELINE_LINES.lockHealed}
           </Mono>
         )}
       </View>
@@ -183,7 +183,7 @@ export default function Round() {
           // conviction pays if right, costs if wrong.
           <View style={{ alignItems: "center", gap: 2 }}>
             <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>
-              {floorSeen ? confidenceReading(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
+              {floorSeen ? confidenceMeaning(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
             </Mono>
             <Mono size={10} color={colors.mutedInk} letterSpacing={1}>
               {payoffLine(lean.conf, current?.is_big_one ?? false)}

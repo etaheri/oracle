@@ -6,7 +6,6 @@ import { numeral } from "./numerals";
 
 const RISK_MS = 3 * 3_600_000;
 const RISK = COPY_BANK.filter((l) => l.id.startsWith("streak.risk"));
-const LAPSE = COPY_BANK.filter((l) => l.id.startsWith("streak.lapse"));
 
 // A partial day is silently un-rated otherwise (audit §3.1): name the count
 // and the rule together, and only while the day is actually partial.
@@ -47,5 +46,5 @@ export function lapseNotice(
   seedKey: string
 ): string | null {
   if (daysConsulted <= 0 || streak !== 0 || playedYesterday !== false) return null;
-  return selectLine(LAPSE, seedKey, [])?.text ?? null;
+  return "THE VIGIL BEGINS AGAIN. YOUR RECORD REMAINS.";
 }

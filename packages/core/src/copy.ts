@@ -246,3 +246,22 @@ export function provenanceLine(written: number, rejected: number): string | null
   if (written <= 0) return null;
   return `${written} WRITTEN · ${rejected} PUT DOWN`;
 }
+
+// Introduction is intentionally separate from the reference rulebook.
+export const INTRO_LINES = [
+  "FIVE QUESTIONS ABOUT TOMORROW.",
+  "CHOOSE YOUR ANSWER AND HOW SURE YOU ARE.",
+  "RETURN TO SEE WHETHER YOU BEAT THE ORACLE.",
+] as const;
+
+// Archived rounds retain their original canon. New rounds use recognition-only attendance.
+export const RITES_V2_LINES = RITES_LINES.map(line => {
+  if (line.startsWith("A DAY'S CALLS RATE")) return "EVERY NON-VOID QUESTION MUST BE SEALED. AT LEAST THREE MUST BE READ FOR A DAY TO RATE.";
+  if (line.startsWith("A VIGIL IS")) return "A VIGIL IS A RUN OF UNBROKEN NOONS. IT RECORDS YOUR RETURN, NEVER MULTIPLIES YOUR POINTS.";
+  if (line.startsWith("THE VIGIL'S WEIGHT")) return "A SHIELD PRESERVES CONTINUITY. NOTHING BOUGHT CHANGES YOUR POINTS OR ORACLE SCORE.";
+  if (line.includes("WITHIN THE FIRST HOUR")) return "ALL FIVE WITHIN THE FIRST HOUR EARN AN EARLY MARK. THE POINTS DO NOT CHANGE.";
+  if (line.startsWith("A QUESTION CLOSES")) return "IF AN ANSWER APPEARS BEFORE NOON, THE QUESTION CLOSES AND IS VOID FOR EVERYONE.";
+  if (line.startsWith("THE LEDGER IS READ AT NOON")) return "THE LEDGER IS READ AFTER THE QUESTIONS CLOSE. UNREAD QUESTIONS ARE NEVER LOSSES.";
+  if (line.startsWith("STAND AGAINST THE TIDE")) return "A TIDE BOUNTY IS SEPARATE FROM THE DUEL AND BOARD. TWENTY MUST HAVE SPOKEN.";
+  return line;
+});

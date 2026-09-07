@@ -1,3 +1,4 @@
+import { resolveQuestion } from "../resolution";
 // In-window lock healing (design 2026-09-04 §5).
 //
 // resolves_at is a claim about the FUTURE, made the night before. The gauntlet's
@@ -20,6 +21,10 @@ import { BudgetExhausted } from "./spend";
 export async function probeQuestion(deps: PipelineDeps, questionId: string): Promise<boolean> {
   const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q) throw new Error(`probe: question not found: ${questionId}`);
+  const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
+  const voidHealed = async () => resolveQuestion(deps.db, questionId, "void", { reason: "THE ANSWER APPEARED EARLY. THIS QUESTION IS VOID FOR EVERYONE." }, { force: true });
+  // Repair a crash after the lock write but before all prediction scores were cleared.
+  if ((round?.rulesVersion ?? 1) >= 2 && q.lockHealedAt) { await voidHealed(); return false; }
   if (q.status !== "open") return false;
 
   const verdict = await askResolver(deps, deps.models.probe, {
@@ -46,6 +51,7 @@ export async function probeQuestion(deps: PipelineDeps, questionId: string): Pro
   // The guard above can block the write entirely, and a probe that healed
   // nothing must not be counted or narrated as one — the row count is the only
   // thing that knows which happened.
+  if (updated.length > 0 && (round?.rulesVersion ?? 1) >= 2) await voidHealed();
   return updated.length > 0;
 }
 

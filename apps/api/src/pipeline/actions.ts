@@ -42,6 +42,9 @@ export async function publish(db: Db, telegram: TelegramClient, date: string): P
   const scheduled = await db.query.questions.findMany({
     where: and(eq(schema.questions.roundDate, date), eq(schema.questions.status, "scheduled")),
   });
+  const publishingRound = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+  if ((publishingRound?.rulesVersion ?? 1) >= 2 && scheduled.some(q => q.locksAt.getTime() < locksAtDefault.getTime())) throw new Error("new rounds require the full common answering window");
+  if (scheduled.some(q => q.context && Date.parse(q.context.asOf) > opensAt.getTime())) throw new Error("context must predate publication");
   for (const q of scheduled) {
     // Keep an authored early lock; anything else (incl. epoch-seeded test
     // rows) gets the default noon D+1 lock.
@@ -99,7 +102,7 @@ export async function publishFromBank(db: Db, telegram: TelegramClient, date: st
     // purpose is that the drop never fails. Poisoned is poisoned however it
     // is discovered: burn the row and try the next one.
     try {
-      await upsertDraft(db, date, parsed.data);
+      await upsertDraft(db, date, parsed.data, 2);
     } catch (err) {
       await db.update(schema.draftBank).set({ usedOn: date }).where(eq(schema.draftBank.id, entry.id));
       await telegram.send(`⚠ bank draft ${entry.id} could not be scheduled and was skipped: ${err instanceof Error ? err.message : String(err)}`);

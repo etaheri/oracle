@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { count, eq, inArray, isNotNull, lt, and } from "drizzle-orm";
-import { assignEpithet, contrarianApplies, CONSTANTS, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
+import { calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -66,9 +66,18 @@ export const meRoutes = new Hono<AppContext>()
       ? await db.select({ roundDate: schema.questions.roundDate, n: count() }).from(schema.questions).where(inArray(schema.questions.roundDate, roundDates)).groupBy(schema.questions.roundDate)
       : [];
     const sizeOf = new Map(sizes.map((s) => [s.roundDate, Number(s.n)]));
+    const playedRounds = roundDates.length ? await db.query.rounds.findMany({ where: inArray(schema.rounds.date, roundDates) }) : [];
+    const playedQuestions = roundDates.length ? await db.query.questions.findMany({ where: inArray(schema.questions.roundDate, roundDates) }) : [];
+    const answeredIds = new Set(preds.map(p => p.questionId));
+    const completeDates = new Set(playedRounds.filter(r => {
+      const day = playedQuestions.filter(q => q.roundDate === r.date);
+      return day.some(q => q.outcome === null)
+        ? day.length > 0 && (r.rulesVersion < 2 ? day.every(q => answeredIds.has(q.id)) : day.filter(q => q.outcome !== "void").length >= 3 && day.every(q => q.outcome === "void" || answeredIds.has(q.id)))
+        : ratingEligible(r.rulesVersion, day, answeredIds);
+    }).map(r => r.date));
     const completeRounds = [...byDate.entries()].filter(([date, n]) => {
       const anyQ = qs.find((q) => q.roundDate === date);
-      return n === sizeOf.get(date) && anyQ !== undefined && anyQ.locksAt.getTime() >= windowStart;
+      return completeDates.has(date) && anyQ !== undefined && anyQ.locksAt.getTime() >= windowStart;
     }).length;
 
     const epithet = assignEpithet({
@@ -107,12 +116,16 @@ export const meRoutes = new Hono<AppContext>()
       where: isNotNull(schema.questions.oracleProbYes),
       orderBy: (q, { asc }) => [asc(q.roundDate), asc(q.slot)],
     });
-    // p === 0.5 is the Oracle declining to call the question (same rule as
-    // oracleCall/oracleCallRight/dayCallCounts, spec §3) -- it must leave the
-    // denominator, not enter scored as a brier of 0.25 and consume one of the
-    // fifty calls the Oracle needs before its score is written.
+    const forecastRounds = await db.query.rounds.findMany({ columns: { date: true, rulesVersion: true } });
+    const forecastVersions = new Map(forecastRounds.map(r => [r.date, r.rulesVersion]));
+    const forecastQuestions = forecastRounds.length ? await db.query.questions.findMany({ where: inArray(schema.questions.roundDate, forecastRounds.map(r => r.date)) }) : [];
+    const eligibleForecastDates = new Set(forecastRounds.filter(r => r.rulesVersion >= 2 && ratingEligible(2,
+      forecastQuestions.filter(q => q.roundDate === r.date),
+      new Set(forecast.filter(q => q.roundDate === r.date).map(q => q.id)),
+    )).map(r => r.date));
+    // A neutral probability is valid under the new confidence rules.
     const oracleBriers = forecast
-      .filter((q) => (q.outcome === "yes" || q.outcome === "no") && Number(q.oracleProbYes) !== 0.5)
+      .filter((q) => (q.outcome === "yes" || q.outcome === "no") && ((forecastVersions.get(q.roundDate) ?? 1) >= 2 ? eligibleForecastDates.has(q.roundDate) : Number(q.oracleProbYes) !== 0.5))
       .map((q) => oracleBrierOf(Number(q.oracleProbYes), q.outcome as "yes" | "no"));
 
     // Days outseen: complete rounds only, the same rule every other rated
@@ -127,6 +140,16 @@ export const meRoutes = new Hono<AppContext>()
     let daysOutseen = 0;
     for (const [date, n] of byDate.entries()) {
       const dayQs = forecastByDate.get(date);
+      const version = playedRounds.find(r => r.date === date)?.rulesVersion ?? 1;
+      if (version >= 2) {
+        const duel = calculateDuel(playedQuestions.filter(q => q.roundDate === date).map(q => ({
+          id: q.id, slot: q.slot, is_big_one: q.isBigOne, outcome: q.outcome,
+          oracle_p_yes: q.oracleProbYes === null ? null : Number(q.oracleProbYes),
+          my: preds.find(p => p.questionId === q.id) ?? null,
+        })), version);
+        if (duel.status === "complete") { daysCompared++; if (duel.winner === "you") daysOutseen++; }
+        continue;
+      }
       if (!dayQs || n !== sizeOf.get(date) || dayQs.length !== sizeOf.get(date)) continue;
       // A round is only "compared" once every one of its questions has
       // resolved. Forecasting now happens at PUBLISH (not lock), so a round
@@ -154,6 +177,9 @@ export const meRoutes = new Hono<AppContext>()
     }
 
     return c.json({
+      milestones: earnedMilestones({ completedRounds: completeDates.size,
+        resolvedCompletedRounds: playedRounds.filter(r => r.status === "resolved" && completeDates.has(r.date)).length,
+        oracleWins: daysOutseen }),
       oracle_score: user?.oracleScore ?? null,
       percentile,
       cohort_size: cohortSize,

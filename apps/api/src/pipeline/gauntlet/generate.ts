@@ -79,12 +79,12 @@ Rules for every candidate:
 - Binary YES/NO in plain English, resolvable from ONE named public source.
 - ONE CLAUSE. Never join two conditions with "and" or "or" — a compound question is the classic way for two careful readers to reach different answers, and it will be thrown out.
 - THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. Set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. A resolver will be run against your named source TONIGHT, and any candidate it can already answer is rejected. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
-- Prefer questions whose resolves_at lands inside the round's own window and comfortably before noon ET on ${lockDay}, so the named source has actually published before the ledger is read at 12:10 ET on ${lockDay}.
+- Every question must remain unknowable until noon ET on ${lockDay}. Prefer events just after that lock, with results in the next 24 hours. Never use early-closing events just to deliver a noon result.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. An independent reader will state its own probability without seeing yours, and a candidate the two of you read very differently is rejected as ambiguous.
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
 - source_url must be a real, reachable page. Every URL is fetched before the round is chosen, and one that does not answer is rejected.
 - topic_key is the SUBJECT, not the wording. A key used in the last seven days is rejected, so do not re-ask last week's question with a new number.
-- WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay}. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
+- WEATHER: the measurement period must begin after noon ET on ${lockDay} and end within the following 24 hours. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine. A separate screen refuses these, and a refusal there costs the whole night.
 - Here is your own record in aggregate. It is the standard you are held to.
 ${scorecard}

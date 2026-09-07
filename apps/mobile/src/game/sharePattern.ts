@@ -14,10 +14,10 @@ export function patternLine(results: ReadonlyArray<QuestionResult>): string {
 }
 
 export function shareMessage(
-  d: { date: string; dayPoints: number; results: ReadonlyArray<QuestionResult> },
+  d: { date: string; dayPoints: number; results: ReadonlyArray<QuestionResult>; duelText?: string },
   url: string | null = SHARE_URL,
 ): string {
   const points = d.dayPoints >= 0 ? `+${d.dayPoints}` : String(d.dayPoints);
-  const body = `🔮 ORACLE ${d.date} — ${patternLine(d.results)} · ${points} · can you outsee me?`;
+  const body = `🔮 ORACLE ${d.date} — ${patternLine(d.results)} · ${points}${d.duelText ? ` · ${d.duelText}` : ""} · can you outsee me?`;
   return url ? `${body} ${url}` : body;
 }

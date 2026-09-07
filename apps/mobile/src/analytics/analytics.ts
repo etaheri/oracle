@@ -6,6 +6,12 @@ import { KEYS } from "../config/keys";
 // the ledger job) — the PostHog dashboard reads both from reveal views
 // instead. Every other event below has a real client-side call site.
 export type AnalyticsEvent =
+  | "practice_started"
+  | "practice_completed"
+  | "practice_skipped"
+  | "first_live_seal"
+  | "reveal_summary_viewed"
+  | "share_sheet_opened"
   | "round_opened"
   | "question_answered"
   | "round_locked"

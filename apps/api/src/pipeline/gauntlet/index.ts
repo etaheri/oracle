@@ -1,3 +1,4 @@
+import { assessEditorial } from "../editorial";
 // The gauntlet, end to end (design 2026-09-04 §3, §4, §9.2).
 //
 // ORDER IS LOAD-BEARING, cheapest first:
@@ -61,7 +62,7 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
   const locksAtDefault = noonET(addDays(date, 1));
 
   // Tier 0 — free.
-  const tier0 = screenCandidates(raw, { opensAt, locksAtDefault, recentTopicKeys: await recentTopicKeys(deps.db, date) });
+  const tier0 = screenCandidates(raw, { rulesVersion: 2, opensAt, locksAtDefault, recentTopicKeys: await recentTopicKeys(deps.db, date) });
   count(tier0.rejected);
 
   // Tier 1 — one GET each.
@@ -80,8 +81,10 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
   const tier4 = await tasteCheck(deps, tier3.passed);
   count(tier4.rejected);
 
+  const editorial = await assessEditorial(deps, tier4.passed, opensAt);
+  tally.editorial += tier4.passed.length - editorial.length;
   const rejected = Object.values(tally).reduce((a, b) => a + b, 0);
-  const selection = selectRound(tier4.passed);
+  const selection = selectRound(editorial);
 
   if (!selection) {
     // No round. `publish-bank` already covers noon, and the noon alert already
@@ -92,7 +95,7 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
     return { written, rejected, tally, published: false, relaxed: false };
   }
 
-  await upsertDraft(deps.db, date, selection.draft);
+  await upsertDraft(deps.db, date, selection.draft, 2);
   await deps.db
     .update(schema.rounds)
     .set({ candidatesWritten: written, candidatesRejected: rejected })

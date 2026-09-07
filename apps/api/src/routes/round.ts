@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
-import { CONSTANTS, dayPoints, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
+import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -35,6 +35,7 @@ export const roundRoutes = new Hono<AppContext>()
       : [{ n: 0 }];
     return c.json({
       date: round.date,
+      rules_version: round.rulesVersion,
       locks_at: lastLock.toISOString(),
       player_count: Number(players?.n ?? 0),
       questions: qs.map((q) => ({
@@ -45,6 +46,7 @@ export const roundRoutes = new Hono<AppContext>()
         category: q.category,
         source_name: q.sourceName,
         resolution_criteria: q.resolutionCriteria,
+        context: q.context,
         locks_at: q.locksAt.toISOString(),
         lock_healed: q.lockHealedAt !== null,
       })),
@@ -112,7 +114,11 @@ export const roundRoutes = new Hono<AppContext>()
     const byQ = new Map(mine.map((p) => [p.questionId, p]));
     const perQuestionPoints = mine.map((p) => p.points ?? 0);
     const allFirstHour = mine.length === qs.length && mine.every((p) => p.firstHour);
-    const raw = dayPoints(perQuestionPoints, allFirstHour);
+    const base = mine.reduce((total, p) => {
+      const q = qs.find(q => q.id === p.questionId)!;
+      return total + (q.outcome === null ? 0 : oracleQuestionPoints({ pYes: p.answer ? p.confidence / 100 : 1 - p.confidence / 100, outcome: q.outcome, isBigOne: q.isBigOne }));
+    }, 0);
+    const raw = round && round.rulesVersion >= 2 ? base : dayPoints(perQuestionPoints, allFirstHour);
     // The vigil that weighed this day, stamped at settlement. Absent means
     // unweighed, not weightless: the client withholds the number entirely
     // rather than print one that would climb on the next refresh.
@@ -123,6 +129,8 @@ export const roundRoutes = new Hono<AppContext>()
 
     return c.json({
       date,
+      rules_version: round?.rulesVersion ?? 1,
+      bonus_points: round && round.rulesVersion >= 2 ? perQuestionPoints.reduce((a, b) => a + b, 0) - base : 0,
       day_points: vigilMult === null ? raw : weighDay(raw, vigilMult),
       vigil_mult: vigilMult,
       first_hour: allFirstHour,
@@ -183,11 +191,25 @@ export const roundRoutes = new Hono<AppContext>()
     // Ranking on day_points would let a purchase buy a longer vigil, a larger
     // multiplier and a higher rank, which is exactly what SCORE_GLOSS promises
     // cannot happen. Money must not buy the board.
-    const rows = await db
+    let rows = await db
       .select({ userId: schema.predictions.userId, answered: count(), points: sum(schema.predictions.points) })
       .from(schema.predictions)
       .where(inArray(schema.predictions.questionId, qs.map((q) => q.id)))
       .groupBy(schema.predictions.userId);
+
+    const boardRound = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+    if ((boardRound?.rulesVersion ?? 1) >= 2) {
+      const predictions = await db.query.predictions.findMany({ where: inArray(schema.predictions.questionId, qs.map(q => q.id)) });
+      rows = rows.flatMap(row => {
+        const played = predictions.filter(p => p.userId === row.userId);
+        if (!ratingEligible(2, qs, new Set(played.map(p => p.questionId)))) return [];
+        const points = played.reduce((sum, p) => {
+          const q = qs.find(q => q.id === p.questionId)!;
+          return sum + oracleQuestionPoints({ pYes: p.answer ? p.confidence / 100 : 1 - p.confidence / 100, outcome: q.outcome!, isBigOne: q.isBigOne });
+        }, 0);
+        return [{ ...row, answered: qs.length, points: String(points) }];
+      });
+    }
 
     // Complete rounds only, the same rule /v1/me/ledger and completeRoundBriers
     // enforce: answered every question the round asked. It stops a single easy
@@ -219,7 +241,7 @@ export const roundRoutes = new Hono<AppContext>()
     // the contrarian bounty, the first hour and the vigil are OUT (a crowd, a
     // clock and a purchasable shield confer those). oracleQuestionPoints takes
     // no crowd argument at all, so there is no path by which one could reach it.
-    const oracleTotal = qs.every((q) => q.oracleProbYes !== null)
+    const oracleTotal = qs.every((q) => q.oracleProbYes !== null || ((boardRound?.rulesVersion ?? 1) >= 2 && q.outcome === "void"))
       ? oracleDayTotal(
           qs.map((q) => ({
             pYes: Number(q.oracleProbYes),

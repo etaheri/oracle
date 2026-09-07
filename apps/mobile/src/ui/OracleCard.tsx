@@ -1,5 +1,7 @@
+import { claimFirstLiveSeal } from "../api/flags";
+import { capture as captureGameplay } from "../analytics/analytics";
 import { useEffect, useRef, useState } from "react";
-import { View, Pressable, StyleSheet, Dimensions } from "react-native";
+import { View, Pressable, StyleSheet, Dimensions, Linking } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useQueryClient } from "@tanstack/react-query";
@@ -91,6 +93,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   const [dragActive, setDragActive] = useState(false);
   useEffect(() => { onLean?.(liveConf, liveSide, dragActive); }, [liveConf, liveSide, dragActive, onLean]);
   const screenReader = useScreenReader();
+  const [showContext, setShowContext] = useState(false);
   const sealed = !!entry?.sealed;
   // The status field ticks at the countdown's cadence — but ONLY while the
   // card is still open. Once it is sealed the string is the constant "ST:
@@ -271,6 +274,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
     }
     try {
       await submit.mutateAsync({ question_id: q.id, answer, confidence, idempotency_key: key });
+      if (await claimFirstLiveSeal()) captureGameplay("first_live_seal");
       await flight;
       if (reducedMotion) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       finishSeal();
@@ -325,6 +329,11 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
           <GestureDetector gesture={pan}>
             <Animated.View style={[{ flex: 1, justifyContent: "center" }, questionStyle]}>
               <QuestionFace text={q.text} seed={q.id} />
+              {q.context && <View style={{ gap: space(1) }}>
+                <Pressable accessibilityRole="button" onPress={() => setShowContext(!showContext)} style={{ minHeight: 44, justifyContent: "center" }}><Mono size={11}>{showContext ? "CLOSE CONTEXT" : "CONTEXT"}</Mono></Pressable>
+                {showContext && <><Mono size={11}>{q.context.text}</Mono><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(q.context!.sourceUrl); }} style={{ minHeight: 44 }}><Mono size={9}>SOURCE · AS OF {new Date(q.context.asOf).toLocaleString()}</Mono></Pressable></>}
+              </View>}
+              {q.is_big_one && <Mono size={10} style={{ textAlign: "center" }}>DOUBLE POINTS · RIGHT OR WRONG</Mono>}
             </Animated.View>
           </GestureDetector>
           <View style={{ gap: space(3) }}>

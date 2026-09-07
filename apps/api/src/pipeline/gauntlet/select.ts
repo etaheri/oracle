@@ -49,8 +49,10 @@ function toDraft(chosen: Judged[]): Draft {
   // Slot 5 is the most contested of the five; slots 1-4 take the rest in
   // contest order, which puts the day's sharpest questions earliest.
   const ranked = [...chosen].sort(byContest);
-  const big = ranked[0]!;
-  const rest = ranked.slice(1);
+  const nominated = ranked.filter(j => j.editorial?.bigOne);
+  const big = nominated.length ? [...nominated].sort((a, b) => b.editorial!.interest - a.editorial!.interest || b.editorial!.reasonability - a.editorial!.reasonability)[0]! : ranked[0]!;
+  const rest = ranked.filter(j => j !== big);
+  if (rest.some(j => j.editorial)) rest.sort((a, b) => Number(!!b.editorial?.opener) - Number(!!a.editorial?.opener) || (b.editorial?.understandability ?? 0) - (a.editorial?.understandability ?? 0) || (b.editorial?.interest ?? 0) - (a.editorial?.interest ?? 0));
   const question = (j: Judged, slot: number) => ({
     slot,
     category: j.candidate.category,
@@ -63,12 +65,13 @@ function toDraft(chosen: Judged[]): Draft {
     market_prob: j.candidate.market_prob,
     resolves_at: j.candidate.resolves_at,
     topic_key: j.candidate.topic_key,
+    ...(j.candidate.context ? { context: j.candidate.context } : {}),
   });
   return { questions: [...rest.map((j, i) => question(j, i + 1)), question(big, ROUND_SIZE)] };
 }
 
 export function selectRound(judged: Judged[]): Selection | null {
-  const ranked = [...judged].sort(byContest);
+  const ranked = [...judged].filter(j => !j.editorial || (j.editorial.understandability > 0 && j.editorial.reasonability > 0 && j.editorial.interest > 0)).sort((a, b) => (b.editorial?.interest ?? 0) - (a.editorial?.interest ?? 0) || byContest(a, b));
   const chosen = pickFive(ranked);
   if (!chosen) return null;
 

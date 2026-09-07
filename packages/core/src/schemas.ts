@@ -29,7 +29,10 @@ export const CrowdSoFarSchema = z.object({
 });
 export type CrowdSoFar = z.infer<typeof CrowdSoFarSchema>;
 
+export const QuestionContextSchema = z.object({ text: z.string().min(1).max(240), asOf: z.iso.datetime({ offset: true }), sourceUrl: z.string().url() });
+
 export const RoundTodaySchema = z.object({
+  rules_version: z.number().int().min(1).max(2).default(1),
   date: z.string(),
   locks_at: z.string().nullable(),
   player_count: z.number().int(),
@@ -42,6 +45,7 @@ export const RoundTodaySchema = z.object({
       category: z.string(),
       source_name: z.string(),
       resolution_criteria: z.string(),
+      context: QuestionContextSchema.nullable().optional(),
       locks_at: z.string(),
       // True only when the in-window probe pulled this lock forward because the
       // answer appeared. An AUTHORED early lock is false: both produce a lock
@@ -67,6 +71,8 @@ export const MineTodaySchema = z.object({
 export type MineToday = z.infer<typeof MineTodaySchema>;
 
 export const RevealSchema = z.object({
+  rules_version: z.number().int().min(1).max(2).default(1),
+  bonus_points: z.number().int().default(0),
   date: z.string(),
   day_points: z.number().int(),
   first_hour: z.boolean(),
@@ -151,6 +157,7 @@ export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.b
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
 export const MeLedgerSchema = z.object({
+  milestones: z.array(z.enum(["first_round", "first_result", "first_oracle_win", "three_rounds", "seven_rounds"])).default([]),
   oracle_score: z.number().int().nullable(),
   // Where this record stands among every written Oracle Score. Null until the
   // caller's own score exists AND the cohort is worth comparing against.

@@ -1,5 +1,10 @@
+import { RevealSummary } from "../../ui/RevealSummary";
+import { calculateDuel, duelLine, MILESTONE_COPY, type MilestoneId } from "@oracle/core";
+import { getSeenMilestones, markMilestoneSeen } from "../../api/flags";
+import { useMeLedger } from "../../api/hooks";
+import { QuietLink } from "../../ui/Button";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
+import { View, ScrollView, StyleSheet, RefreshControl, Linking } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
@@ -25,10 +30,10 @@ import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
 const easeOut = Easing.out(Easing.poly(4));
-const ROW_DELAY = 200;
-const ROW_STAGGER = 90;
-const POINTS_DELAY = ROW_DELAY + 4 * ROW_STAGGER + 200;
-const BIG_ONE_DELAY = POINTS_DELAY + 350;
+const ROW_DELAY = 0;
+const ROW_STAGGER = 0;
+const POINTS_DELAY = 0;
+const BIG_ONE_DELAY = 0;
 
 // The fold: how tall the fade at the bottom of the reveal is. Deep enough to
 // read as the page dissolving rather than as a band lying on top of it — this
@@ -73,6 +78,21 @@ export default function RevealScreen() {
   const reducedMotion = useReducedMotion();
   const inset = useScreenInset();
   const canvasRef = useCanvasRef();
+  const [details, setDetails] = useState(false);
+  const [milestone, setMilestone] = useState<MilestoneId | null>(null);
+  const milestonePicked = useRef(false);
+  const history = useMeLedger();
+  useEffect(() => {
+    let active = true;
+    if (milestonePicked.current || !history.data?.milestones.length || !reveal.data || "pending" in reveal.data || !reveal.data.ledger.settled) return;
+    void getSeenMilestones().then(seen => {
+      if (!active || milestonePicked.current) return;
+      milestonePicked.current = true;
+      const earned = history.data!.milestones.find(id => !seen.includes(id));
+      if (earned) { setMilestone(earned); void markMilestoneSeen(earned); }
+    });
+    return () => { active = false; };
+  }, [history.data, reveal.data]);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -117,9 +137,17 @@ export default function RevealScreen() {
     // pending ledger — the flag must survive so the gold CTA and the real
     // ceremony still happen once every row has resolved.
     if (d2.questions.some((q) => q.outcome === null)) return;
+    if (d2.rules_version >= 2 && viewedFor.current === d2.date) return;
     if (viewedFor.current !== d2.date) {
       viewedFor.current = d2.date;
       capture("reveal_viewed", { date: d2.date });
+      capture("reveal_summary_viewed", { date: d2.date, rules_version: d2.rules_version });
+    }
+    if (d2.rules_version >= 2) {
+      void markRevealSeen(d2.date);
+      const result = calculateDuel(d2.questions.map(q => ({ ...q, is_big_one: q.slot === 5 })), d2.rules_version);
+      if (result.status === "complete" && result.winner === "you") void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      return;
     }
     const spectator = d2.questions.every((q) => q.my === null);
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -176,7 +204,8 @@ export default function RevealScreen() {
   // The machine's own count against the day -- null (and so omitted below)
   // until it actually forecast a scored question. Computed once here rather
   // than at each of its two call sites (the closing line, the night card).
-  const oracleLine = oracleDayLine(d.questions);
+  const duel = calculateDuel(d.questions.map(q => ({ ...q, is_big_one: q.slot === 5 })), d.rules_version);
+  const oracleLine = d.rules_version >= 2 ? duelLine(duel) : oracleDayLine(d.questions);
   const oracleCounts = oracleLine !== null ? dayCallCounts(d.questions) : null;
   const cardData: ShareCardData = {
     date: d.date,
@@ -185,7 +214,7 @@ export default function RevealScreen() {
     bigOneCrowdPct: big?.crowd_yes_pct ?? null,
     bigOneMarketPct: big?.market_prob != null ? Math.round(big.market_prob * 100) : null,
     results,
-    ...(oracleCounts ? { oracleDayCounts: oracleCounts } : null),
+    ...(d.rules_version >= 2 ? { duelText: duelLine(duel) ?? undefined } : oracleCounts ? { oracleDayCounts: oracleCounts } : null),
   };
 
   async function onShare() {
@@ -248,6 +277,11 @@ export default function RevealScreen() {
               ? `Day ${d.date}`
               : `Day ${d.date} · the ledger is read`}
         </Eyebrow>
+        <RevealSummary data={d} milestone={milestone ? MILESTONE_COPY[milestone] : null} />
+        {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />}
+        {shareError && <Mono color={colors.vermilion}>{shareError}</Mono>}
+        <QuietLink title={details ? "CLOSE THE DETAILS" : "ALL CALLS AND THE BOARD"} onPress={() => setDetails(!details)} />
+        {details && <>
         {allSpectator && !anyPending && (
           <DecodeLine text={lapsedLine(d.date)} size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
         )}
@@ -277,6 +311,7 @@ export default function RevealScreen() {
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
+              {d.rules_version >= 2 && d.bonus_points !== 0 && <Mono size={10}>CROWD BONUS {d.bonus_points} · EXCLUDED FROM DUEL AND RANK</Mono>}
               {/* Both weights on one line. The first hour is not gated on a
                   winning day any more — the bonus is symmetric (design
                   2026-09-03 §2), so gating it on day_points > 0 hid it on
@@ -325,7 +360,7 @@ export default function RevealScreen() {
               and made the block read as four headlines instead of one. Muted
               and set apart, they subordinate to the day without leaving it. */}
           <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
-            {ledgerLines(d.ledger).map((line, i) => (
+            {ledgerLines(d.ledger, d.rules_version).map((line, i) => (
               <Mono key={i} size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
             ))}
             {/* What the night cost, in candidates. It belongs with the standing
@@ -369,6 +404,7 @@ export default function RevealScreen() {
                   {call ? (
                     <Mono size={10} color={colors.mutedInk} style={{ lineHeight: 15 }}>{call}</Mono>
                   ) : null}
+                  {q.source_url && <QuietLink title="READ SOURCE" onPress={() => { void Linking.openURL(q.source_url!); }} />}
                   {receipt ? (
                     <Mono size={10} color={colors.mutedInk} numberOfLines={2} style={{ lineHeight: 15 }}>{receipt}</Mono>
                   ) : null}
@@ -450,7 +486,7 @@ export default function RevealScreen() {
             of it to have one (design's Oracle-record beat). Gold only when
             the reader actually outdid it today -- a tie or a loss stays in
             the register the standing lines already use. */}
-        {oracleLine !== null && (
+        {d.rules_version < 2 && oracleLine !== null && (
           <Animated.View entering={FadeInDown.delay(BIG_ONE_DELAY + 260).duration(400).easing(easeOut)}>
             <Mono
               size={11}
@@ -462,16 +498,7 @@ export default function RevealScreen() {
             </Mono>
           </Animated.View>
         )}
-        {/* A half-read day must not leave the app: the card carries the same
-            provisional score the slot above is withholding. */}
-        {!pointsWithheld(d) && results.some((r) => r !== "none") && (
-          <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 300).duration(400).easing(easeOut)}>
-            <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />
-          </Animated.View>
-        )}
-        {shareError && (
-          <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
-        )}
+        </>}
       </ScrollView>
       {overflows && !atBottom && (
         // The Big One and the share button live below the fold on smaller

@@ -1,3 +1,4 @@
+import { QuestionContextSchema } from "@oracle/core";
 // Draft round schema + upsert (Hermes pipeline, spec §4-5). A "draft" is the
 // human/Claude-authored shape of a round before it becomes DB rows: five
 // questions, slots 1..5, exactly one big-one at slot 5, at least 4 distinct
@@ -43,6 +44,7 @@ export const DraftQuestionSchema = z
     // would stamp an explicit null onto every draft's parsed shape, even
     // ones that never carried the key, and break structural equality
     // against fixtures/DB rows that predate it.
+    context: QuestionContextSchema.optional(),
     topic_key: z.string().min(3).max(64).nullable().optional(),
   })
   .superRefine((q, ctx) => {
@@ -89,7 +91,7 @@ export function lockFromResolvesAt(resolvesAt: string, opensAt: Date, defaultLoc
   return t.getTime() < defaultLocksAt.getTime() ? t : defaultLocksAt;
 }
 
-export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<void> {
+export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersion = 1): Promise<void> {
   const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (existing && existing.status !== "scheduled") throw new Error("round not editable");
 
@@ -105,10 +107,13 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
   // before the bad value is ever caught.
   const rows = draft.questions.map((q) => {
     const locksAt = lockFromResolvesAt(q.resolves_at, opensAt, locksAtDefault);
-    if (q.category === "weather" && locksAt.getTime() >= locksAtDefault.getTime()) {
+    if (rulesVersion < 2 && q.category === "weather" && locksAt.getTime() >= locksAtDefault.getTime()) {
       throw new Error("weather must lock before noon");
     }
+    if (rulesVersion >= 2 && locksAt.getTime() < locksAtDefault.getTime()) throw new Error("new rounds require the full common answering window");
+    if (q.context && Date.parse(q.context.asOf) > opensAt.getTime()) throw new Error("context must predate publication");
     return {
+      context: q.context ?? null,
       roundDate: date,
       slot: q.slot,
       isBigOne: q.is_big_one,
@@ -137,6 +142,6 @@ export async function upsertDraft(db: Db, date: string, draft: Draft): Promise<v
     await db.delete(schema.rounds).where(eq(schema.rounds.date, date));
   }
 
-  await db.insert(schema.rounds).values({ date, status: "scheduled" });
+  await db.insert(schema.rounds).values({ date, status: "scheduled", rulesVersion });
   await db.insert(schema.questions).values(rows);
 }

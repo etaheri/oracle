@@ -1,3 +1,4 @@
+import { roundAvailability } from "../game/roundAvailability";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View, Pressable } from "react-native";
 import { Screen } from "../ui/Screen";
@@ -78,9 +79,11 @@ export default function Index() {
   const noticeRowH = scaledRow(ROW_H.meta, chromeScale);
 
   const round = today.data;
-  const allSealed = !!round && round.questions.length > 0 && round.questions.every((q) => answers[q.id]?.sealed);
+  const availabilityNow = useNow(1000);
+  const availability = round ? roundAvailability(round.questions, new Set(round.questions.filter(q => answers[q.id]?.sealed).map(q => q.id)), availabilityNow, round.rules_version) : null;
+  const allSealed = !!round && round.questions.some(q => answers[q.id]?.sealed) && round.questions.every((q) => answers[q.id]?.sealed || (round.rules_version >= 2 && q.lock_healed));
   const sealedCount = round ? round.questions.filter((q) => answers[q.id]?.sealed).length : 0;
-  const partial = round ? partialLine(sealedCount, round.questions.length) : null;
+  const partial = round ? round.rules_version >= 2 && sealedCount > 0 && !allSealed ? "EVERY NON-VOID QUESTION COUNTS TOWARD THE DAY" : partialLine(sealedCount, round.questions.length) : null;
   // Fires once per day's round, the moment it first renders live (still
   // open) here — not on every 30s re-render from the risk-line clock below.
   const openedFor = useRef<string | null>(null);
@@ -240,15 +243,16 @@ export default function Index() {
               <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
                 <DecodeLine
                   active={booted}
-                  text={partial ?? spokenLine(round.player_count)}
+                  text={availability && !availability.completeStillPossible ? `${availability.openCount} STILL OPEN · THIS DAY CANNOT RATE` : partial ?? spokenLine(round.player_count)}
                   {...(showLedgerCta ? role.meta : role.line)}
                   color={showLedgerCta ? colors.mutedInk : colors.goldText}
                 />
               </View>
+              {availability?.earliestOpenLock && <Mono size={10} style={{ textAlign: "center" }}>NEXT CLOSE · {new Date(availability.earliestOpenLock).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</Mono>}
               {showLedgerCta ? (
-                <QuietLink title="Enter today's round" onPress={enterRound} />
+                <QuietLink title="PLAY TODAY" onPress={enterRound} />
               ) : (
-                <GoldButton title="ENTER" onPress={enterRound} />
+                <GoldButton title="PLAY TODAY" onPress={enterRound} />
               )}
             </>
           )}

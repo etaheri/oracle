@@ -1,5 +1,5 @@
 import { count, eq, gt, inArray, sql } from "drizzle-orm";
-import { oracleScore, settleStreak, vigilMultiplier } from "@oracle/core";
+import { oracleScore, settleStreak, vigilMultiplier, ratingEligible } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 // Round settlement (backend spec L73/L79/L119): streak + shield settlement for
@@ -39,7 +39,7 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
     // conflict: a crash-retry or a resettle must never revise a stamped day.
     if (played) {
       await db.insert(schema.userRounds)
-        .values({ userId: u.id, date, vigilMult: String(vigilMultiplier(u.streakCurrent)) })
+        .values({ userId: u.id, date, vigilMult: String(round.rulesVersion >= 2 ? 1 : vigilMultiplier(u.streakCurrent)) })
         .onConflictDoNothing();
     }
     const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, u.id) });
@@ -55,7 +55,7 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
       streakSettledThrough: date,
     };
     // Complete-rounds rule: every question of the round answered → the round rates.
-    if (byUser.get(u.id) === qs.length) {
+    if (ratingEligible(round.rulesVersion, qs, new Set(preds.filter(p => p.userId === u.id).map(p => p.questionId)))) {
       const briers = await completeRoundBriers(db, u.id, date);
       patch.callsResolved = briers.length;
       patch.oracleScore = oracleScore(briers);
@@ -92,22 +92,20 @@ export async function completeRoundBriers(db: Db, userId: string, settlingDate: 
   if (settlingDate) eligibleDates.add(settlingDate);
 
   const mine = await db
-    .select({ brier: schema.predictions.brier, roundDate: schema.questions.roundDate, locksAt: schema.questions.locksAt, slot: schema.questions.slot })
+    .select({ questionId: schema.predictions.questionId, brier: schema.predictions.brier, roundDate: schema.questions.roundDate, locksAt: schema.questions.locksAt, slot: schema.questions.slot })
     .from(schema.predictions)
     .innerJoin(schema.questions, eq(schema.predictions.questionId, schema.questions.id))
     .where(eq(schema.predictions.userId, userId));
-  const answeredPerRound = new Map<string, number>();
-  for (const r of mine) answeredPerRound.set(r.roundDate, (answeredPerRound.get(r.roundDate) ?? 0) + 1);
-
-  // One definition of "complete": answered every question that round asked.
-  const dates = [...answeredPerRound.keys()];
-  const sizes = dates.length
-    ? await db.select({ roundDate: schema.questions.roundDate, n: count() }).from(schema.questions).where(inArray(schema.questions.roundDate, dates)).groupBy(schema.questions.roundDate)
-    : [];
-  const questionsPerRound = new Map(sizes.map((s) => [s.roundDate, Number(s.n)]));
+  const dates = [...new Set(mine.map(r => r.roundDate))];
+  const allQuestions = dates.length ? await db.query.questions.findMany({ where: inArray(schema.questions.roundDate, dates) }) : [];
+  const allRounds = dates.length ? await db.query.rounds.findMany({ where: inArray(schema.rounds.date, dates) }) : [];
+  const complete = new Set(allRounds.filter(round => ratingEligible(round.rulesVersion,
+    allQuestions.filter(q => q.roundDate === round.date).map(q => round.rulesVersion === 1 && round.date === settlingDate ? { ...q, outcome: q.outcome ?? "void" as const } : q),
+    new Set(mine.filter(p => p.roundDate === round.date).map(p => p.questionId)),
+  )).map(r => r.date));
 
   return mine
-    .filter((r) => r.brier !== null && eligibleDates.has(r.roundDate) && answeredPerRound.get(r.roundDate) === questionsPerRound.get(r.roundDate))
+    .filter((r) => r.brier !== null && eligibleDates.has(r.roundDate) && complete.has(r.roundDate))
     .sort((x, y) => x.locksAt.getTime() - y.locksAt.getTime() || x.slot - y.slot)
     .map((r) => Number(r.brier));
 }

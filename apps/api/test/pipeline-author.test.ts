@@ -114,24 +114,13 @@ describe("authorRound", () => {
     expect(sent).toHaveLength(0);
   });
 
-  it("renders resolves_at through the derived lock, not the raw field", async () => {
+  it("refuses early-closing questions in new rounds", async () => {
     const { db } = await makeTestDb();
-    const early = "2026-08-27T22:00:00Z";
-    const draft = {
-      questions: validDraft.questions.map((q) => (q.slot === 1 ? { ...q, resolves_at: early } : q)),
-    };
+    const draft = { questions: validDraft.questions.map(q => q.slot === 1 ? { ...q, resolves_at: "2026-08-27T22:00:00Z" } : q) };
     const { claude } = fakeClaude([draft]);
-    const { deps, sent } = fakeDeps(db, claude);
-
-    await authorRound(deps, "2026-08-27");
-
-    // Slot 1 authored an early resolves_at: shown as the derived instant.
-    expect(sent[0]).toContain(`· locks ${new Date(early).toISOString()}`);
-    // Every other slot is "after-lock" (the default noon lock): rendering the
-    // raw literal is meaningless to an operator — it must show as noon, the
-    // same branch a clamped-down late instant already uses.
-    expect(sent[0]).not.toContain("locks after-lock");
-    expect(sent[0]).toContain("locks at noon");
+    const { deps } = fakeDeps(db, claude);
+    await expect(authorRound(deps, "2026-08-27")).rejects.toThrow("full common answering window");
+    expect(await db.query.rounds.findFirst()).toBeUndefined();
   });
 
   it("includes the last 7 days of question texts as dedup context", async () => {
@@ -550,13 +539,13 @@ describe("the authoring contract", () => {
 
   it("tells the model weather's resolves_at must land before the round's own close, matching upsertDraft's hard enforcement", async () => {
     const system = await systemPromptFor("2026-08-27");
-    expect(system.toLowerCase()).toContain("must fall before noon et on 2026-08-28");
+    expect(system.toLowerCase()).toContain("measurement must begin after noon et on 2026-08-28");
   });
 
-  it("prefers resolves_at comfortably before noon so the named source has actually published by the 12:10 read", async () => {
+  it("prefers a full answering window over an instant noon result", async () => {
     const system = await systemPromptFor("2026-08-27");
-    expect(system).toContain("comfortably before noon ET on 2026-08-28");
-    expect(system).toContain("12:10 ET on 2026-08-28");
+    expect(system).toContain("cannot become known before noon ET on 2026-08-28");
+    expect(system).toContain("Results may arrive after noon");
   });
 
   it("the reroll prompt's resolution_criteria bullet no longer names a separate deadline than resolves_at", async () => {

@@ -1,3 +1,4 @@
+import { QuestionContextSchema } from "@oracle/core";
 // The candidate — what the author produces now, in surplus, before anything
 // has decided which five will run (design 2026-09-04 §3).
 //
@@ -27,6 +28,7 @@ export const CandidateSchema = z
     resolves_at: z.union([z.iso.datetime({ offset: true }), z.literal(RESOLVES_AFTER_LOCK)]),
     // A NORMALIZED SUBJECT, not the question text: "btc-close-above-threshold",
     // never "Will BTC close above $70,000 on Friday?".
+    context: QuestionContextSchema.optional(),
     topic_key: z.string().min(3).max(64).regex(/^[a-z0-9-]+$/),
   })
   .strict()
@@ -47,6 +49,7 @@ export const REJECT_REASONS = [
   "uncontested",
   "already-resolvable",
   "taste",
+  "editorial",
 ] as const;
 export type RejectReason = (typeof REJECT_REASONS)[number];
 
@@ -73,7 +76,7 @@ function textOf(raw: unknown): string {
 
 export function screenCandidates(
   raw: unknown[],
-  opts: { opensAt: Date; locksAtDefault: Date; recentTopicKeys: ReadonlySet<string> },
+  opts: { opensAt: Date; locksAtDefault: Date; rulesVersion?: number; recentTopicKeys: ReadonlySet<string> },
 ): Screened {
   const passed: Candidate[] = [];
   const rejected: Rejection[] = [];
@@ -99,10 +102,14 @@ export function screenCandidates(
         rejected.push({ text: c.text, reason: "structural", detail: "resolves_at is at or before the round opens" });
         continue;
       }
-      if (t.getTime() > opts.locksAtDefault.getTime()) {
+      if ((opts.rulesVersion ?? 1) < 2 && t.getTime() > opts.locksAtDefault.getTime()) {
         rejected.push({ text: c.text, reason: "structural", detail: "resolves_at runs past the round's own close" });
         continue;
       }
+    }
+
+    if ((opts.rulesVersion ?? 1) >= 2 && c.resolves_at !== RESOLVES_AFTER_LOCK && new Date(c.resolves_at).getTime() < opts.locksAtDefault.getTime()) {
+      rejected.push({ text: c.text, reason: "structural", detail: "the common answering window must stay open" }); continue;
     }
 
     if (seen.has(c.topic_key)) {

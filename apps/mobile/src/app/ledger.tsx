@@ -1,3 +1,4 @@
+import { MILESTONE_COPY } from "@oracle/core";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
@@ -165,6 +166,7 @@ export default function Ledger() {
               </View>
               <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
               <View style={{ gap: space(2) }}>
+                {d.milestones.map(id => <Mono key={id} size={11} style={{ textAlign: "center" }}>{MILESTONE_COPY[id]}</Mono>)}
                 <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
                 {/* The machine's own plaque row, on the same fifty-call floor
                     the player meets -- so for its first ten days it too reads
@@ -178,7 +180,7 @@ export default function Ledger() {
                     it is. The second half is also the legal wall, stated to the
                     player rather than only to the spec. */}
                 <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 15 }}>
-                  {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
+                  {d.oracle_score === null ? "FIFTY RATED CALLS WRITE YOUR SCORE. COMPLETE EVERY NON-VOID QUESTION; AT LEAST THREE MUST RESOLVE. OLDER ROUNDS REQUIRED ALL FIVE." : SCORE_GLOSS.written}
                 </Mono>
                 {standingLine(d.percentile, d.cohort_size) && (
                   <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ lineHeight: 15 }}>

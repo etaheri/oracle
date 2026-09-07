@@ -74,3 +74,24 @@ export async function getOrbGreeted(): Promise<string | null> {
 export async function markOrbGreeted(date: string): Promise<void> {
   try { await (await store()).setItemAsync(ORB_GREETED_KEY, date); } catch {}
 }
+
+const PRACTICE_SEEN_KEY = "oracle.practice_seen";
+export async function getPracticeSeen(): Promise<boolean> {
+  try { return (await (await store()).getItemAsync(PRACTICE_SEEN_KEY)) === "1"; } catch { return true; }
+}
+export async function markPracticeSeen(): Promise<void> {
+  try { await (await store()).setItemAsync(PRACTICE_SEEN_KEY, "1"); } catch {}
+}
+export async function claimFirstLiveSeal(): Promise<boolean> {
+  try {
+    const storage = await store();
+    if (await storage.getItemAsync("oracle.first_live_seal")) return false;
+    await storage.setItemAsync("oracle.first_live_seal", "1"); return true;
+  } catch { return false; }
+}
+export async function getSeenMilestones(): Promise<string[]> {
+  try { const value: unknown = JSON.parse(await (await store()).getItemAsync("oracle.milestones_seen") ?? "[]"); return Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []; } catch { return []; }
+}
+export async function markMilestoneSeen(id: string): Promise<void> {
+  try { const ids = await getSeenMilestones(); await (await store()).setItemAsync("oracle.milestones_seen", JSON.stringify([...new Set([...ids, id])])); } catch {}
+}

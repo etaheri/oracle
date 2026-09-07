@@ -6,3 +6,7 @@ export * from "./designation";
 export * from "./streak";
 export * from "./copy";
 export * from "./epithet";
+
+export * from "./duel";
+export * from "./roundRules";
+export * from "./milestones";

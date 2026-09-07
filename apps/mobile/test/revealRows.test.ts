@@ -26,7 +26,7 @@ function question(overrides: Partial<Question> = {}): Question {
 function reveal({ vigil_mult, outcomes, first_hour = false }: { vigil_mult: number | null; outcomes: Array<"yes" | "no" | null>; first_hour?: boolean }): Reveal {
   return {
     date: "2026-08-20",
-    day_points: 120,
+    rules_version: 1, bonus_points: 0, day_points: 120,
     first_hour,
     candidates_written: 0,
     candidates_rejected: 0,
@@ -167,8 +167,8 @@ describe("revealRows", () => {
       expect(pendingLine("2026-08-20", "2026-08-21")).toBe("THE LEDGER IS BEING READ. PATIENCE.");
     });
     it("today or a future date: return-at-noon line", () => {
-      expect(pendingLine("2026-08-21", "2026-08-21")).toBe("RETURN AT NOON.");
-      expect(pendingLine("2026-08-22", "2026-08-21")).toBe("RETURN AT NOON.");
+      expect(pendingLine("2026-08-21", "2026-08-21")).toBe("THE LEDGER IS READ AFTER THE QUESTIONS CLOSE.");
+      expect(pendingLine("2026-08-22", "2026-08-21")).toBe("THE LEDGER IS READ AFTER THE QUESTIONS CLOSE.");
     });
   });
 

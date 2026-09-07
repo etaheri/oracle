@@ -22,6 +22,7 @@ export const NIGHT_DIM = "rgba(247,246,242,0.55)";
 const NIGHT_LOSS = "#D9705A"; // text-tier vermilion for the midnight ground (5.3:1)
 
 export interface ShareCardData {
+  duelText?: string;
   date: string;
   dayPoints: number;
   bigOneText: string | null;
@@ -42,10 +43,11 @@ export async function shareSnapshot(ref: RefObject<any>, filename: string, dialo
   const file = new File(Paths.cache, filename);
   if (file.exists) file.delete();
   file.write(bytes);
-  await Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle });
+  const sharing = Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle });
   // Shared home for both share surfaces (round spread + plaque) — one
   // capture covers both call sites.
-  capture("card_shared", { filename });
+  capture("share_sheet_opened", { filename });
+  await sharing;
 }
 
 export async function shareCard(ref: RefObject<any>, data: ShareCardData): Promise<void> {
@@ -102,9 +104,9 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   // The machine's own count against the day (design's Oracle-record beat).
   // Omitted by the caller -- not merely null -- on a day it never forecast,
   // so there is nothing to check for beyond the prop's own presence.
-  const oracleLine = data.oracleDayCounts
+  const oracleLine = data.duelText ?? (data.oracleDayCounts
     ? `THE ORACLE ${data.oracleDayCounts.oracle} · YOU ${data.oracleDayCounts.you}`
-    : null;
+    : null);
 
   return (
     <Canvas ref={canvasRef} style={{ position: "absolute", left: -9999, top: 0, width: CARD_W, height: CARD_H }}>
@@ -165,7 +167,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
           text={oracleLine}
           x={centered(monoSmall, oracleLine)}
           y={892}
-          color={data.oracleDayCounts!.you > data.oracleDayCounts!.oracle ? colors.warmCenter : NIGHT_DIM}
+          color={data.oracleDayCounts && data.oracleDayCounts.you > data.oracleDayCounts.oracle ? colors.warmCenter : NIGHT_DIM}
         />
       )}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />

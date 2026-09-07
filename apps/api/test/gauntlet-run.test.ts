@@ -17,18 +17,23 @@ function fakeClaude(over: Partial<Record<string, unknown>> = {}) {
     source_url: `https://example.com/${n}`,
     author_probability: 0.5,
     market_prob: null,
-    resolves_at: "2026-09-06T14:00:00Z",
+    resolves_at: "2026-09-06T17:00:00Z",
     topic_key: `topic-${n}`,
   }));
   const defaults: Record<string, unknown> = {
     candidate_round: { candidates },
+    editorial_assessments: { assessments: candidates.map((_, index) => ({ index, understandability: 2, reasonability: 2, interest: 2, opener: index === 0, bigOne: index === 4, context: null, contextVerified: false })) },
     critic_verdicts: { verdicts: candidates.map((_, i) => ({ index: i, readable_two_ways: false, criteria_determine_outcome: true, resolves_at_plausible: true, critic_probability: 0.5 + i * 0.01, reasons: [] })) },
     resolution: { outcome: "unverifiable", quotes: [], reasoning: "not yet" },
     taste_verdicts: { verdicts: candidates.map((_, i) => ({ index: i, allowed: true, reason: "" })) },
   };
   const table = { ...defaults, ...over };
   return {
-    structured: async (call: { schemaName: string }) => {
+    structured: async (call: { schemaName: string; user?: string }) => {
+      if (call.schemaName === "editorial_assessments" && !("editorial_assessments" in over)) {
+        const n = (call.user?.match(/"index":/g) ?? []).length;
+        return { assessments: Array.from({ length: n }, (_, index) => ({ index, understandability: 2, reasonability: 2, interest: 2, opener: index === 0, bigOne: index === n - 1, context: null, contextVerified: false })) };
+      }
       const r = table[call.schemaName];
       if (r === undefined) throw new Error(`unexpected schemaName ${call.schemaName}`);
       if (typeof r === "function") return (r as () => unknown)();

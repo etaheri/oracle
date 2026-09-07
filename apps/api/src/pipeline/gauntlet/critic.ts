@@ -19,7 +19,7 @@ export const CONTESTED_MAX_DELTA = 0.25;
 // sentence is ambiguous, not that one of them is badly calibrated.
 export const PROB_DISAGREEMENT_MAX = 0.3;
 
-export interface Judged { candidate: Candidate; criticProbability: number }
+export interface Judged { candidate: Candidate; criticProbability: number; editorial?: import("../editorial").EditorialAssessment }
 
 const VerdictSchema = z.object({
   index: z.number().int().min(0),

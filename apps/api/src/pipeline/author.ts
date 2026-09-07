@@ -83,10 +83,10 @@ function authorSystemPrompt(date: string, recent: string, signals: MarketSignal[
 - Slots 1-4: four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the day's most contested story from any category.
 - Each question must be binary YES/NO in plain English, resolvable from ONE named public source.
 - THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. For every question, set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. Answers are closed automatically at that instant, so an honest resolves_at costs you nothing and a late one hands the answer to whoever plays last. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
-- Prefer questions whose resolves_at lands inside the round's own window and comfortably before noon ET on ${lockDay}, so the named source has actually published before the ledger is read at 12:10 ET on ${lockDay}: an "after-lock" question will not have an answer by then.
+- Choose questions whose outcome cannot become known before noon ET on ${lockDay}. Every player gets the common answering window. Results may arrive after noon; never solve latency by closing a question early.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
-- WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
+- WEATHER: the measurement period must begin after the round opens and its measurement must begin after noon ET on ${lockDay}, so no part of the outcome exists while players answer. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
 - Here is your own record in aggregate. It is the standard you are held to; the seven days below are only the anecdotes.
 ${scorecard}
@@ -180,7 +180,7 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
   }
 
   const draft: Draft = parsed.data;
-  await upsertDraft(deps.db, date, draft);
+  await upsertDraft(deps.db, date, draft, 2);
 
   const opensAt = noonET(date);
   const locksAtDefault = noonET(addDays(date, 1));
@@ -193,13 +193,14 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
       date,
       draft.questions.map((q) => {
         const locksAt = lockFromResolvesAt(q.resolves_at, opensAt, locksAtDefault);
+
         return { ...q, resolves_at: locksAt.getTime() < locksAtDefault.getTime() ? locksAt.toISOString() : null };
       }),
     ),
   );
 }
 
-function rerollSystemPrompt(date: string, slot: number, othersTexts: string, guidance: string): string {
+function rerollSystemPrompt(date: string, slot: number, othersTexts: string, guidance: string, version = 1): string {
   const isBigOne = slot === 5;
   const lockDay = addDays(date, 1);
   return `You author a single replacement question for the ORACLE round dated ${date} (ET), slot ${slot}${isBigOne ? " (THE BIG ONE)" : ""}. Rules:
@@ -207,7 +208,7 @@ function rerollSystemPrompt(date: string, slot: number, othersTexts: string, gui
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
 - THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. For every question, set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. Answers are closed automatically at that instant, so an honest resolves_at costs you nothing and a late one hands the answer to whoever plays last. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
-- WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
+${version >= 2 ? `- Keep every outcome unknown through noon ET on ${lockDay}. WEATHER: the measurement period must begin after that common lock and end within the following 24 hours. Set resolves_at to its end; never use "after-lock" for weather.` : `- WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".`}
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
 ${isBigOne ? "- This is THE BIG ONE: pick the day's most contested story from any category." : "- Pick a category different from the other four questions below."}
 Do not overlap these existing questions: ${othersTexts}
@@ -234,9 +235,10 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
   const others = questions.filter((q) => q.slot !== slot).sort((a, b) => a.slot - b.slot);
   const othersTexts = others.map((q) => `[${q.category}] ${q.text}`).join("; ");
 
+  const roundRules = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   const response = await claude.structured({
     model: deps.models.author,
-    system: rerollSystemPrompt(date, slot, othersTexts, guidance),
+    system: rerollSystemPrompt(date, slot, othersTexts, guidance, roundRules?.rulesVersion ?? 1),
     user: `Produce the replacement question for slot ${slot} now.`,
     schemaName: "draft_question",
     schema: draftQuestionJsonSchema,
@@ -257,7 +259,8 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
   // No clamping here any more: a bad resolves_at used to fall back to noon
   // D+1, which is the leaky default. The operator gets an error and reruns.
   const locksAt = lockFromResolvesAt(q.resolves_at, opensAt, locksAtDefault);
-  if (q.category === "weather" && locksAt.getTime() >= locksAtDefault.getTime()) {
+  if ((roundRules?.rulesVersion ?? 1) >= 2 && locksAt.getTime() < locksAtDefault.getTime()) throw new Error("new rounds require the full common answering window");
+  if ((roundRules?.rulesVersion ?? 1) < 2 && q.category === "weather" && locksAt.getTime() >= locksAtDefault.getTime()) {
     throw new Error("weather must lock before noon");
   }
 
@@ -275,6 +278,7 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
     .update(schema.questions)
     .set({
       text: q.text,
+      context: null,
       resolutionCriteria: q.resolution_criteria,
       sourceName: q.source_name,
       sourceUrl: q.source_url,
@@ -349,7 +353,7 @@ export function draftMessage(
 function bankSystemPrompt(): string {
   return `You author an evergreen entry for ORACLE's draft bank — a spare round held in reserve and published automatically on a day nobody authored one. Produce exactly 5 yes/no questions. Rules:
 - YOU DO NOT KNOW WHAT DATE THIS WILL PUBLISH ON. It may sit in the bank for months. Nothing in a question, its resolution criteria or its source may name a date, a season, a scheduled event, a named fixture, or say "today", "tomorrow" or "this week". A question that only makes sense this month is not an evergreen question.
-- Anchor every question to the round's own window instead. The round opens at noon ET and closes at noon ET the next day: write "while this round is open", "in the 24 hours before this round closes", "on the round's closing day".
+- Anchor every question to the round's own window instead. The round opens at noon ET and closes at noon ET the next day: use a measurement period starting after the common lock and ending within the next 24 hours. No part of its answer may exist while the round is open.
 - resolves_at must be the literal string "after-lock" for ALL FIVE questions — nothing about the outcome may be determinable before the round closes. There are no exceptions and no absolute instants in a bank entry: an instant authored now is already stale by the time this publishes.
 - Therefore NEVER weather. A forecast is always partly knowable, so weather can never be "after-lock". Use exactly the four remaining categories — markets, sports, culture, news — one each in slots 1 to 4.
 - Slot 5 is THE BIG ONE: the widest and most contested of the five, from any of those four categories.

@@ -17,6 +17,13 @@ export async function resolveQuestion(
 ): Promise<void> {
   const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q) throw new Error("question not found");
+  const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
+  // A healed v2 lock is an immutable global void, including resolver retries.
+  if ((round?.rulesVersion ?? 1) >= 2 && q.lockHealedAt) {
+    outcome = "void";
+    evidence = { reason: "THE ANSWER APPEARED EARLY. THIS QUESTION IS VOID FOR EVERYONE." };
+    opts = { force: true };
+  }
   const allowed = FRESH.has(q.status) || (opts.force === true && JUDGED.has(q.status));
   if (!allowed) throw new Error("not resolvable");
 

@@ -65,7 +65,7 @@ export function receiptLine(q: Question): string | null {
 
 // Dopamine hit #2's missing half (audit §3.2): the vigil's day count and the
 // Oracle Score's progress, spoken only once the day is actually settled.
-export function ledgerLines(l: Reveal["ledger"]): string[] {
+export function ledgerLines(l: Reveal["ledger"], version = 1): string[] {
   if (!l.settled) return ["THE VIGIL IS COUNTED SHORTLY"];
   const streakLine = l.streak > 0 ? `VIGIL: DAY ${l.streak}` : "THE VIGIL BEGINS AGAIN";
   if (l.oracle_score !== null) return [streakLine, `ORACLE SCORE ${l.oracle_score}`];
@@ -82,14 +82,14 @@ export function ledgerLines(l: Reveal["ledger"]): string[] {
   return [
     streakLine,
     "ORACLE SCORE UNWRITTEN",
-    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS · FIVE A DAY`,
+    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS${version >= 2 ? " · COMPLETE NON-VOID ROUNDS" : " · FIVE A DAY"}`,
   ];
 }
 
 // A day already past noon and still unresolved reads differently than one
 // still waiting on today's noon (audit §3.5's "RETURN AT NOON" at noon).
 export function pendingLine(date: string, todayIso: string): string {
-  return date < todayIso ? "THE LEDGER IS BEING READ. PATIENCE." : "RETURN AT NOON.";
+  return date < todayIso ? "THE LEDGER IS BEING READ. PATIENCE." : "THE LEDGER IS READ AFTER THE QUESTIONS CLOSE.";
 }
 
 const LAPSED_LINES = COPY_BANK.filter((l) => l.id.startsWith("noon.lapsed"));
@@ -168,6 +168,7 @@ const FIRST_HOUR_WEIGHT = weight(1 + CONSTANTS.FIRST_HOUR_BONUS);
 // this app is to protect the silence; a weight is a fact, and facts take the
 // machine's terse register, not prose.
 export function weightLine(d: Reveal): string | null {
+  if (d.rules_version >= 2) return d.first_hour ? "FIRST HOUR · EARLY MARK" : null;
   const parts: string[] = [];
   if (d.first_hour) parts.push(`FIRST HOUR ×${FIRST_HOUR_WEIGHT}`);
   if (d.vigil_mult !== null && d.vigil_mult > 1) parts.push(`VIGIL ×${weight(d.vigil_mult)}`);

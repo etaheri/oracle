@@ -1,3 +1,4 @@
+import { useToday } from "../api/hooks";
 import { ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Screen, useScreenInset } from "../ui/Screen";
@@ -6,7 +7,7 @@ import { Eyebrow, Mono, Ritual } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { numeral } from "../ui/CardChrome";
-import { RITES_LINES, OPENING_RITES_LINES, LITURGY_LINES } from "@oracle/core";
+import { RITES_LINES, RITES_V2_LINES, INTRO_LINES, LITURGY_LINES } from "@oracle/core";
 import { markRitesSeen } from "../api/flags";
 import { colors, space } from "../theme";
 import { useChromeScale } from "../ui/useChromeScale";
@@ -43,7 +44,8 @@ export default function Rites() {
   // `?all=1` from the standing link; the first-timer gate arrives bare.
   const { all } = useLocalSearchParams<{ all?: string }>();
   const opening = all !== "1";
-  const lines = opening ? OPENING_RITES_LINES : RITES_LINES;
+  const today = useToday();
+  const lines = opening ? INTRO_LINES : (today.data?.rules_version ?? 2) >= 2 ? RITES_V2_LINES : RITES_LINES;
   // The numeral gutter is a reserved slot like any other (spec §4). VIII and
   // XIII tie for the widest — four Cinzel glyphs at size 13 plus tracking is
   // ~34pt — so the slot is 40 at 1x and grows from there. It was 26, which
@@ -82,7 +84,7 @@ export default function Rites() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <Eyebrow>{opening ? "The first rites" : "The rites"}</Eyebrow>
+        <Eyebrow>{opening ? "Your first round" : "The rites"}</Eyebrow>
         {/* These are rules, so they are numbered — in the same carved
             numerals the card slots and the round's progress row use, so a
             rite and a call are visibly the same kind of thing (spec §6).
@@ -113,18 +115,20 @@ export default function Rites() {
             </View>
           ))}
         </View>
-        <View style={{ gap: space(1), marginTop: space(2) }}>
+        {!opening && <View style={{ gap: space(1), marginTop: space(2) }}>
           {LITURGY_LINES.map((line) => (
             <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
           ))}
         </View>
+        }
         {/* The deferred rules are not hidden, only held back: the opening
             says how many remain and where they are, so a player who wants
             the whole rulebook before their first card can have it. */}
+        <QuietLink title="PRACTICE THE PULL" onPress={() => router.push({ pathname: "./practice", params: { opening: opening ? "1" : "0" } })} />
         {opening && (
           <View style={{ alignItems: "center" }}>
             <QuietLink
-              title={`The remaining ${RITES_LINES.length - OPENING_RITES_LINES.length} rites`}
+              title="THE RITES"
               onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })}
             />
           </View>
