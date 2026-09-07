@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ReadingHeader } from "./ReadingHeader";
 import { View, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, space } from "../theme";
@@ -30,27 +32,34 @@ export function useScreenInset() {
 }
 
 // Header and footer own their safe edges; the body pays only the remaining ones.
-export function Screen({ children, scroll = false, bleed = false, header, footer }: {
+export function Screen({ children, scroll = false, bleed = false, header, footer, overlayHeader = false }: {
   children: React.ReactNode;
   scroll?: boolean;
   bleed?: boolean;
   header?: React.ReactNode;
   footer?: React.ReactNode;
+  overlayHeader?: boolean;
 }) {
   const i = useScreenInset();
+  const [headerHeight, setHeaderHeight] = useState(i.top + 44);
+  const [scrolled, setScrolled] = useState(false);
+  const overlay = scroll && overlayHeader && !!header;
   const padding = bleed ? {} : {
-    paddingTop: header ? 0 : i.top,
+    paddingTop: overlay ? headerHeight : header ? 0 : i.top,
     paddingBottom: footer ? space(3) : i.bottom,
     paddingLeft: i.left, paddingRight: i.right,
   };
   return <View style={{ flex: 1, backgroundColor: colors.museumWhite }}>
-    {header && <View style={{ paddingTop: i.top, paddingLeft: i.left, paddingRight: i.right }}>{header}</View>}
+    {header && !overlay && <View style={{ paddingTop: i.top, paddingLeft: i.left, paddingRight: i.right }}>{header}</View>}
     {scroll ? <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, ...padding }}
       contentInsetAdjustmentBehavior="never" automaticallyAdjustsScrollIndicatorInsets={false}
-      alwaysBounceVertical={false} showsVerticalScrollIndicator>
+      alwaysBounceVertical={false} showsVerticalScrollIndicator
+      scrollIndicatorInsets={overlay ? { top: headerHeight } : undefined}
+      scrollEventThrottle={16} onScroll={overlay ? event => setScrolled(event.nativeEvent.contentOffset.y > 2) : undefined}>
       {children}
     </ScrollView> : <View style={{ flex: 1, minHeight: 0, ...padding }}>{children}</View>}
     {footer && <View style={{ paddingTop: space(3), paddingBottom: i.bottom, paddingLeft: i.left, paddingRight: i.right }}>{footer}</View>}
+    {overlay && <ReadingHeader inset={i} scrolled={scrolled} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}>{header}</ReadingHeader>}
     <Grain />
   </View>;
 }

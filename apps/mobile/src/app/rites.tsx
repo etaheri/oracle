@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ReadingHeader } from "../ui/ReadingHeader";
 import { useToday } from "../api/hooks";
 import { ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -52,6 +54,8 @@ export default function Rites() {
   // wrapped VIII onto a second line and knocked its rite out of alignment.
   const gutter = Math.ceil(40 * useChromeScale());
   const inset = useScreenInset();
+  const [headerHeight, setHeaderHeight] = useState(inset.top + 44);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   return (
     // Bleed, so the canon runs to the glass instead of stopping a gutter above
     // it. The bottom inset belongs to whichever element is actually LAST: the
@@ -59,9 +63,7 @@ export default function Rites() {
     // the rules can travel right up to the button; the standing rail has
     // nothing after the scroller, so the scroller carries it.
     <Screen bleed>
-      <View style={{ paddingTop: inset.top, paddingLeft: inset.left, paddingRight: inset.right }}>
-        <TopBar showReturn={!opening} />
-      </View>
+
       {/* The full canon does not fit a phone. The screen used to centre it in a
           fixed box and rely on the count never growing — it was already at
           602pt of content in a 619pt box before the numerals arrived, and the
@@ -76,12 +78,14 @@ export default function Rites() {
         // of the scrollable area — the eyebrow and rule I became unreachable.
         contentContainerStyle={{
           flexGrow: 1,
-          paddingTop: space(4),
+          paddingTop: headerHeight + space(4),
           paddingLeft: inset.left,
           paddingRight: inset.right,
           paddingBottom: opening ? space(4) : inset.bottom,
           gap: space(4),
         }}
+        scrollEventThrottle={16} onScroll={event => setHeaderScrolled(event.nativeEvent.contentOffset.y > 2)}
+        scrollIndicatorInsets={{ top: headerHeight }}
         showsVerticalScrollIndicator contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}
       >
         <Eyebrow>{opening ? "Your first round" : "The rites"}</Eyebrow>
@@ -146,6 +150,7 @@ export default function Rites() {
           />
         </View>
       )}
+      <ReadingHeader inset={inset} scrolled={headerScrolled} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}><TopBar showReturn={!opening} /></ReadingHeader>
     </Screen>
   );
 }

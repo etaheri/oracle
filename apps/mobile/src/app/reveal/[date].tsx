@@ -1,3 +1,4 @@
+import { ReadingHeader } from "../../ui/ReadingHeader";
 import { RevealSummary } from "../../ui/RevealSummary";
 import { calculateDuel, duelLine, MILESTONE_COPY, type MilestoneId } from "@oracle/core";
 import { getSeenMilestones, markMilestoneSeen } from "../../api/flags";
@@ -77,6 +78,8 @@ export default function RevealScreen() {
   const reveal = useReveal(date ?? null);
   const reducedMotion = useReducedMotion();
   const inset = useScreenInset();
+  const [headerHeight, setHeaderHeight] = useState(inset.top + 44);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   const canvasRef = useCanvasRef();
   const [details, setDetails] = useState(false);
   const [milestone, setMilestone] = useState<MilestoneId | null>(null);
@@ -240,12 +243,11 @@ export default function RevealScreen() {
     // the real one. Now the ledger travels the full height and comes to rest
     // clear of the indicator on its own.
     <Screen bleed>
-      <View style={{ paddingTop: inset.top, paddingLeft: inset.left, paddingRight: inset.right }}>
-        <TopBar />
-      </View>
+
       <ScrollView
         contentContainerStyle={{
           gap: space(4),
+          paddingTop: headerHeight + space(4),
           paddingLeft: inset.left,
           paddingRight: inset.right,
           paddingBottom: inset.bottom + space(6),
@@ -256,6 +258,8 @@ export default function RevealScreen() {
         // the ledger) all hide theirs, and this screen has the fold fade
         // below to say there is more. A grey system rail over the museum
         // ground was the least in-voice thing on the page.
+        contentInsetAdjustmentBehavior="never"
+        scrollIndicatorInsets={{ top: headerHeight }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.mutedInk} colors={[colors.agedGold]} />}
         onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; recomputeOverflow(); }}
@@ -263,6 +267,7 @@ export default function RevealScreen() {
         scrollEventThrottle={16}
         onScroll={(e) => {
           const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+          setHeaderScrolled(contentOffset.y > 2);
           // Setting the same boolean back is a React bail-out, so this is free
           // on every frame that does not actually cross the end.
           setAtBottom(contentOffset.y + layoutMeasurement.height >= contentSize.height - 1);
@@ -501,6 +506,7 @@ export default function RevealScreen() {
         )}
         </>}
       </ScrollView>
+      <ReadingHeader inset={inset} scrolled={headerScrolled} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}><TopBar /></ReadingHeader>
       {overflows && !atBottom && (
         // The Big One and the share button live below the fold on smaller
         // devices, and nothing said so. It has to be an actual fade: this was

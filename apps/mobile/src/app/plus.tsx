@@ -35,7 +35,7 @@ function PlusContent() {
   };
 
   return (
-    <Screen scroll header={<TopBar />}>
+    <Screen scroll overlayHeader header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>Oracle plus</Eyebrow>
         {plusActive ? (

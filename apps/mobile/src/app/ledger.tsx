@@ -147,7 +147,7 @@ export default function Ledger() {
     // over ‹ RETURN and dropped STRIKE THE RECORD off the bottom. Screen's
     // scroll variant keeps the centring for a short record and grows for a
     // long one; see its own note for why flexGrow is the load-bearing part.
-    <Screen scroll header={<TopBar />}>
+    <Screen scroll overlayHeader header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
         {/* One column in both states. The frame used to be the only thing
