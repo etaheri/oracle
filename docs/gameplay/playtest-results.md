@@ -25,7 +25,27 @@ Completed automated checks:
 
  The integration fixture uses five synthetic users to exercise the existing leaderboard floor; it does not create real players or alter production.
 
-The local simulator build installed, but macOS denied automated keystrokes at its deep-link confirmation. No gameplay interaction, VoiceOver, large-text, or native share-sheet checks are claimed as passed. These checks remain pending under the protocol.
+## iOS verification follow-up
+
+Retried on iPhone 17 Pro simulator, iOS 26.5, after the user granted permissions. The development server initially listened only on IPv6; starting Metro with `NODE_OPTIONS=--dns-result-order=ipv4first` restored the simulator's IPv4 connection. All API data in this walkthrough was synthetic and local.
+
+Verified on iOS:
+
+- Home → three-idea introduction → practice; returning access through the full rites.
+- Practice button seal and retry; the local fixture still returned zero predictions after sealing practice.
+- The user reproduced a real defect: rightward practice pulls navigated back. Disabling swipe-back on practice and replacing its responder with native gesture handling allowed a practice receipt (`NO AT 65%`), confirmed by the user and the accessibility tree.
+- The user then identified a fidelity issue: practice did not match the actual cards or percentage display. Practice now renders `OracleCard` and `ConvictionColumn` directly, including their animation, confidence steps, haptics, payoff and hold controls. Its local-only seal exits before prediction submission, live analytics or round-state writes. The shared-card button path was verified again on iOS with zero test predictions.
+- Immediate result summary, decisive-call evidence text, confidence comparison, milestone, expanded details and low-crowd wording.
+- Native share sheet opens with the generated PNG and dismisses successfully. Nothing was sent externally.
+- Returning to yesterday's result remains available after its first viewing.
+
+The synthetic fixture initially contained hand-entered rounded totals that differed from the shared scorer; the fixture was corrected. This walkthrough does not replace API integration tests.
+
+Final follow-up checks: 315 mobile tests pass; mobile typecheck passes; iOS Hermes export passes at `/tmp/oracle-ios-verified-export`; `git diff --check` passes.
+
+Evidence: [shared practice card](ios-verification/practice.png), [reveal](ios-verification/reveal.png), [native share sheet](ios-verification/share-sheet.png).
+
+Still pending: final shared-card manual pull/center-cancel walkthrough, uninterrupted full live round, actual VoiceOver operation, large-text and reduced-motion passes, and native pending/missing-forecast/void-heavy scenarios. Automated drag delivery remained unreliable, so these are not claimed as passed. The shared-card code path and existing mechanics tests reduce duplication but do not replace these manual checks.
 
 ## Human evidence
 

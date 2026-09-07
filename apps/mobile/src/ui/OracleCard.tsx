@@ -56,7 +56,9 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
   );
 }
 
-export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
+export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceButtons = false }: {
+  practice?: { onSeal: (answer: boolean, confidence: number) => void };
+  forceButtons?: boolean;
   q: RoundToday["questions"][number];
   // The round's overall lock (if any): a question whose own lock differs
   // from it closes ahead of the round, and the title says so.
@@ -71,7 +73,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   onLean?: (conf: number | null, side: boolean, active: boolean) => void;
 }) {
   const { answers, setAnswer, setConfidence, markSealed } = useRoundStore();
-  const entry = answers[q.id];
+  const entry = practice ? undefined : answers[q.id];
   const submit = useSubmit();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   const now = useNow(sealed ? null : 1000);
   // The accessible twin: screen-reader and reduced-motion players get the
   // hold-to-charge buttons instead of the drag.
-  const buttonsMode = screenReader || reducedMotion;
+  const buttonsMode = forceButtons || screenReader || reducedMotion;
 
   const frontStyle = useAnimatedStyle(() => ({
     transform: [
@@ -179,7 +181,8 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
         runOnJS(onStepChange)(step, prev);
       }
     })
-    .onEnd((e) => {
+    .onEnd((e, success) => {
+      if (!success) return;
       sealingSV.value = leanStep(e.translationX, cardW.value) !== -1 ? 1 : 0;
       runOnJS(commitLean)(e.translationX, cardW.value);
     })
@@ -232,7 +235,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   // few points toward YES and settles, so the hand learns the face is
   // grabbable. Skipped in buttonsMode; never repeats (SecureStore flag).
   useEffect(() => {
-    if (buttonsMode || entry) return;
+    if (practice || buttonsMode || entry) return;
     let cancelled = false;
     void getSwipeHinted().then((seen) => {
       if (seen || cancelled) return;
@@ -258,10 +261,12 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
   // error line, pullable again.
   async function sealWith(answer: boolean, confidence: number) {
     setError(null);
-    setAnswer(q.id, answer);
-    setConfidence(q.id, confidence);
+    if (!practice) {
+      setAnswer(q.id, answer);
+      setConfidence(q.id, confidence);
+    }
     setLiveConf(null);
-    const key = useRoundStore.getState().answers[q.id]!.idempotencyKey;
+    const key = practice ? null : useRoundStore.getState().answers[q.id]!.idempotencyKey;
     let flight: Promise<void> = Promise.resolve();
     if (!reducedMotion) {
       setThrown(true);
@@ -272,8 +277,15 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
         });
       });
     }
+    // Practice shares the entire interaction and throw, but exits before
+    // submission, live flags, analytics, or persisted round-state writes.
+    if (practice) {
+      await flight;
+      practice.onSeal(answer, confidence);
+      return;
+    }
     try {
-      await submit.mutateAsync({ question_id: q.id, answer, confidence, idempotency_key: key });
+      await submit.mutateAsync({ question_id: q.id, answer, confidence, idempotency_key: key! });
       if (await claimFirstLiveSeal()) captureGameplay("first_live_seal");
       await flight;
       if (reducedMotion) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -320,7 +332,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean }: {
           modifiers={modifiers || undefined}
           big={q.is_big_one}
           coordinate={coordinate}
-          status={cardStatus(q.locks_at, now, sealed)}
+          status={practice ? "PRACTICE · UNSCORED" : cardStatus(q.locks_at, now, sealed)}
         >
           {/* The question floats centered in the card's field, tarot-fashion;
               the controls anchor at the foot. The face is also the grab
