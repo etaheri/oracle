@@ -157,19 +157,21 @@ describe("reveal ledger and evidence", () => {
     await a("/v1/predictions", { method: "POST", body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "a" }) });
 
     vi.setSystemTime(new Date("2026-08-20T17:05:00Z"));
-    await resolveQuestion(db, qs[0]!.id, "yes", { quotes: [{ url: "u", quote: "Final 3-1" }] });
+    await resolveQuestion(db, qs[0]!.id, "yes", { quotes: [{ url: "https://example.com/result", quote: "Final 3-1" }] });
     await resolveQuestion(db, qs[1]!.id, "void", { reason: "postponed" });
     for (const q of qs.slice(2)) await resolveQuestion(db, q.id, "yes");
     await db.update(schema.questions).set({ oracleProbYes: "0.61" }).where(eq(schema.questions.id, qs[0]!.id));
 
     type RevealBody = {
       ledger: { settled: boolean; streak: number; calls_rated: number; oracle_score: number | null };
-      questions: Array<{ slot: number; source_name: string; source_url: string | null; evidence_quote: string | null; void_reason: string | null; oracle_p_yes: number | null }>;
+      questions: Array<{ slot: number; source_name: string; source_url: string | null; evidence_quote: string | null; evidence_url: string | null; void_reason: string | null; oracle_p_yes: number | null }>;
     };
     const before = (await (await a("/v1/round/2026-08-20/reveal")).json()) as RevealBody;
     const slot1 = before.questions.find((q) => q.slot === 1)!;
     expect(slot1.source_name).toBe("test");
     expect(slot1.evidence_quote).toBe("Final 3-1");
+    expect(slot1.evidence_url).toBe("https://example.com/result");
+    expect(slot1.evidence_url).not.toBe(slot1.source_url);
     expect(slot1.void_reason).toBeNull();
     expect(slot1.oracle_p_yes).toBeCloseTo(0.61);
     const slot2 = before.questions.find((q) => q.slot === 2)!;

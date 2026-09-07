@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { count, eq, inArray, isNotNull, lt, and } from "drizzle-orm";
-import { calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
+import { confidenceHistory, calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -185,6 +185,7 @@ export const meRoutes = new Hono<AppContext>()
       cohort_size: cohortSize,
       calls_rated: user?.callsResolved ?? 0,
       calls_answered: resolved.length,
+      confidence_history: confidenceHistory(resolved),
       days_consulted: byDate.size,
       streak: user?.streakCurrent ?? 0,
       accuracy_pct: life.accuracyPct,

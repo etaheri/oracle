@@ -18,7 +18,8 @@ import { useMeLedger } from "../api/hooks";
 import { appleClaim, appleRestore, strikeRecord } from "../api/identity";
 import { usePlusStore } from "../monetization/plusState";
 import { colors, space } from "../theme";
-import { LITURGY_LINES, SCORE_GLOSS, calibrationVerdict } from "@oracle/core";
+import { LITURGY_LINES, SCORE_GLOSS } from "@oracle/core";
+import { ConfidenceHistory } from "../ui/ConfidenceHistory";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
 import { standingLine } from "../game/standing";
@@ -199,13 +200,7 @@ export default function Ledger() {
                 <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
                 <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
                 <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
-                {calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered) && (
-                  <DecodeLine
-                    text={calibrationVerdict(d.avg_confidence, d.accuracy_pct, d.calls_answered)!}
-                    delayMs={300} durationMs={600}
-                    size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center", marginTop: space(2) }}
-                  />
-                )}
+                {d.confidence_history && <ConfidenceHistory history={d.confidence_history} />}
               </View>
               <View style={{ minHeight: 78, justifyContent: "center", marginTop: space(2) }}>
                 {d.claimed ? (

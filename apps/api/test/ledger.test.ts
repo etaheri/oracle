@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
+import { MeLedgerSchema } from "@oracle/core";
 import * as schema from "../src/db/schema";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
@@ -355,5 +356,33 @@ describe("the ledger's rival", () => {
     const body = (await ledgerFor(sealedButUnresolvedPlayer)) as LedgerBody;
     expect(body.oracle.days_compared).toBe(0);
     expect(body.oracle.days_outseen).toBe(0);
+  });
+});
+
+describe("confidence history population", () => {
+  it("includes lifetime partial calls and the Big One once, and recomputes corrections and voids", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const p = await freshPlayer(app);
+    const qs = await seedRound(db, { date: "2025-01-01", opensAt: new Date("2025-01-01T16:00:00Z"), locksAt: new Date("2025-01-02T16:00:00Z") });
+    // Leave slot 4 unanswered. Slot 3 is pending; slot 5 is the Big One.
+    for (const index of [0, 1, 2, 4]) {
+      await db.insert(schema.predictions).values({ questionId: qs[index]!.id, userId: p.userId, answer: index === 0, confidence: 80 });
+    }
+    for (const [index, outcome] of [[0, "yes"], [1, "yes"], [3, "yes"], [4, "no"]] as const) {
+      await resolveQuestion(db, qs[index]!.id, outcome);
+    }
+    const read = async () => MeLedgerSchema.parse(await (await p.get("/v1/me/ledger")).json());
+    const first = await read();
+    expect(first.confidence_history).toEqual({ scope: "lifetime_resolved", min_bucket_calls: 20, buckets: [{ confidence: 80, total: 3, correct: 2 }] });
+    expect(first).toMatchObject({ calls_rated: 0, oracle_score: null, oracle: { days_compared: 0, days_outseen: 0 } });
+    await db.update(schema.questions).set({ outcome: "no" }).where(eq(schema.questions.id, qs[1]!.id));
+    expect((await read()).confidence_history!.buckets).toEqual([{ confidence: 80, total: 3, correct: 3 }]);
+    await db.update(schema.questions).set({ outcome: "void" }).where(eq(schema.questions.id, qs[4]!.id));
+    expect((await read()).confidence_history!.buckets).toEqual([{ confidence: 80, total: 2, correct: 2 }]);
+  });
+  it("returns empty history for a new player", async () => {
+    const out = await ledgerFor(newPlayer) as Record<string, unknown>;
+    expect(out.confidence_history).toEqual({ scope: "lifetime_resolved", min_bucket_calls: 20, buckets: [] });
   });
 });

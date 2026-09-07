@@ -6,5 +6,5 @@ export function revealObservation(qs: DuelQuestion[]): string | null {
   const highest = Math.max(...scored.map(q => q.my!.confidence));
   const top = scored.filter(q => q.my!.confidence === highest);
   if (top.length !== 1) return null;
-  return (top[0]!.my!.answer ? "yes" : "no") !== top[0]!.outcome ? "YOUR MOST CONFIDENT CALL WAS WRONG. CONVICTION HAS A COST." : null;
+  return (top[0]!.my!.answer ? "yes" : "no") !== top[0]!.outcome ? "YOUR MOST CONFIDENT CALL WAS WRONG." : null;
 }

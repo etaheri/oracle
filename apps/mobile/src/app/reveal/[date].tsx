@@ -4,8 +4,9 @@ import { calculateDuel, duelLine, MILESTONE_COPY, type MilestoneId } from "@orac
 import { getSeenMilestones, markMilestoneSeen } from "../../api/flags";
 import { useMeLedger } from "../../api/hooks";
 import { QuietLink } from "../../ui/Button";
+import { ResolutionEvidence } from "../../ui/ResolutionEvidence";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, ScrollView, StyleSheet, RefreshControl, Linking } from "react-native";
+import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
@@ -410,7 +411,7 @@ export default function RevealScreen() {
                   {call ? (
                     <Mono size={10} color={colors.mutedInk} style={{ lineHeight: 15 }}>{call}</Mono>
                   ) : null}
-                  {q.source_url && <QuietLink title="READ SOURCE" onPress={() => { void Linking.openURL(q.source_url!); }} />}
+                  <ResolutionEvidence question={q} />
                   {receipt ? (
                     <Mono size={10} color={colors.mutedInk} numberOfLines={2} style={{ lineHeight: 15 }}>{receipt}</Mono>
                   ) : null}
@@ -442,6 +443,7 @@ export default function RevealScreen() {
                 <Ritual bold size={11} letterSpacing={4}>[ ✶ THE BIG ONE ]</Ritual>
               </View>
               <Serif size={17}>{big.text}</Serif>
+              <ResolutionEvidence question={big} />
               {bigState === "pending" && (
                 <Mono size={11} color={colors.mutedInk}>{receiptLine(big)}</Mono>
               )}

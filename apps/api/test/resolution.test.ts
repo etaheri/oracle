@@ -32,10 +32,10 @@ describe("resolveQuestion guard", () => {
 
 describe("evidenceSummary", () => {
   it("lifts the first quote and a reason, tolerating any shape", () => {
-    expect(evidenceSummary({ quotes: [{ url: "u", quote: "Final: 3-1" }], reasoning: "r" })).toEqual({ quote: "Final: 3-1", reason: null });
-    expect(evidenceSummary({ unverifiable: true, reason: "unverifiable by 13:00 ET" })).toEqual({ quote: null, reason: "unverifiable by 13:00 ET" });
-    expect(evidenceSummary(null)).toEqual({ quote: null, reason: null });
-    expect(evidenceSummary("junk")).toEqual({ quote: null, reason: null });
-    expect(evidenceSummary({ quotes: "nope" })).toEqual({ quote: null, reason: null });
+    expect(evidenceSummary({ quotes: [{ url: "https://example.com/result", quote: "Final: 3-1" }], reasoning: "r" })).toEqual({ quote: "Final: 3-1", quoteUrl: "https://example.com/result", reason: null });
+    expect(evidenceSummary({ unverifiable: true, reason: "unverifiable by 13:00 ET" })).toEqual({ quote: null, quoteUrl: null, reason: "unverifiable by 13:00 ET" });
+    expect(evidenceSummary(null)).toEqual({ quote: null, quoteUrl: null, reason: null });
+    expect(evidenceSummary("junk")).toEqual({ quote: null, quoteUrl: null, reason: null });
+    expect(evidenceSummary({ quotes: "nope" })).toEqual({ quote: null, quoteUrl: null, reason: null });
   });
 });

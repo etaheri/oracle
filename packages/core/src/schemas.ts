@@ -108,6 +108,7 @@ export const RevealSchema = z.object({
       source_name: z.string(),
       source_url: z.string().nullable(),
       evidence_quote: z.string().nullable(),
+      evidence_url: z.string().nullable().optional(),
       void_reason: z.string().nullable(),
       oracle_p_yes: z.number().nullable(),
     }),
@@ -156,7 +157,23 @@ export type RoundBoard = z.infer<typeof RoundBoardSchema>;
 export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean() });
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
+export const ConfidenceBucketSchema = z.object({
+  confidence: ConfidenceSchema,
+  total: z.number().int().positive(),
+  correct: z.number().int().nonnegative(),
+}).refine(bucket => bucket.correct <= bucket.total, { message: "correct must not exceed total" });
+
+export const ConfidenceHistorySchema = z.object({
+  scope: z.literal("lifetime_resolved"),
+  min_bucket_calls: z.literal(20),
+  buckets: z.array(ConfidenceBucketSchema).refine(
+    buckets => buckets.every((bucket, index) => index === 0 || buckets[index - 1]!.confidence < bucket.confidence),
+    { message: "confidence buckets must be unique and sorted ascending" },
+  ),
+});
+
 export const MeLedgerSchema = z.object({
+  confidence_history: ConfidenceHistorySchema.optional(),
   milestones: z.array(z.enum(["first_round", "first_result", "first_oracle_win", "three_rounds", "seven_rounds"])).default([]),
   oracle_score: z.number().int().nullable(),
   // Where this record stands among every written Oracle Score. Null until the

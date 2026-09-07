@@ -10,3 +10,5 @@ export * from "./epithet";
 export * from "./duel";
 export * from "./roundRules";
 export * from "./milestones";
+
+export * from "./confidenceHistory";

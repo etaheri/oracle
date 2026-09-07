@@ -155,6 +155,7 @@ export const roundRoutes = new Hono<AppContext>()
           source_name: q.sourceName,
           source_url: q.sourceUrl,
           evidence_quote: ev.quote,
+          evidence_url: ev.quoteUrl,
           void_reason: q.outcome === "void" ? (ev.reason ?? "UNVERIFIABLE") : null,
           oracle_p_yes: q.oracleProbYes === null ? null : Number(q.oracleProbYes),
         };

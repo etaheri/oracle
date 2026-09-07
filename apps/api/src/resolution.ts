@@ -45,14 +45,23 @@ export async function resolveQuestion(
 
 // The reveal's receipt: one quote and/or one reason lifted from whatever
 // shape the evidence JSON took (pipeline resolve, pipeline void, admin).
-export function evidenceSummary(evidence: unknown): { quote: string | null; reason: string | null } {
-  if (!evidence || typeof evidence !== "object") return { quote: null, reason: null };
+export function evidenceSummary(evidence: unknown): { quote: string | null; quoteUrl: string | null; reason: string | null } {
+  const empty = { quote: null, quoteUrl: null, reason: null };
+  if (!evidence || typeof evidence !== "object") return empty;
   const e = evidence as Record<string, unknown>;
-  let quote: string | null = null;
-  if (Array.isArray(e.quotes)) {
-    const first = e.quotes.find((x) => x && typeof x === "object" && typeof (x as Record<string, unknown>).quote === "string") as { quote: string } | undefined;
-    quote = first?.quote ?? null;
-  }
   const reason = typeof e.reason === "string" ? e.reason : null;
-  return { quote, reason };
+  if (Array.isArray(e.quotes)) {
+    for (const item of e.quotes) {
+      if (!item || typeof item !== "object") continue;
+      const { quote, url } = item as Record<string, unknown>;
+      if (typeof quote !== "string" || !quote.trim() || typeof url !== "string") continue;
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+          return { quote: quote.trim(), quoteUrl: parsed.href, reason };
+        }
+      } catch { /* A malformed source cannot support an excerpt. */ }
+    }
+  }
+  return { ...empty, reason };
 }
