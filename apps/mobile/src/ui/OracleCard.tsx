@@ -157,6 +157,11 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
   // 1 while a sealing release is in flight: tells onFinalize NOT to spring
   // the card home — the throw owns dragX from the moment the fingers let go.
   const sealingSV = useSharedValue(0);
+  function resetLean() {
+    setLiveConf(null);
+    setLiveSide(true);
+    setDragActive(false);
+  }
   const pan = Gesture.Pan()
     // buttonsMode players seal ONLY through the hold buttons — a stray brush
     // across the face must never commit a prophecy they can't see moving.
@@ -164,8 +169,11 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
     .activeOffsetX([-12, 12])
     .failOffsetY([-16, 16])
     .onBegin(() => {
-      // The column stands (as static) from the first slid point.
-      runOnJS(setDragActive)(true);
+      // Touching alone has no side. Never reuse the previous pull's meter.
+      sideSV.value = 0;
+      stepSV.value = -1;
+      sealingSV.value = 0;
+      runOnJS(resetLean)();
     })
     .onUpdate((e) => {
       dragX.value = e.translationX;
@@ -173,6 +181,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
       if (s !== sideSV.value) {
         sideSV.value = s;
         runOnJS(setLiveSide)(s === 1);
+        runOnJS(setDragActive)(s !== 0);
       }
       const step = leanStep(e.translationX, cardW.value);
       if (step !== stepSV.value) {
@@ -189,7 +198,8 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
     .onFinalize(() => {
       // Runs on release AND cancellation: stand down, and spring home ONLY
       // when the release didn't seal — a sealing release throws instead.
-      runOnJS(setDragActive)(false);
+      if (sealingSV.value === 0) runOnJS(resetLean)();
+      else runOnJS(setDragActive)(false);
       stepSV.value = -1;
       sideSV.value = 0;
       if (reducedMotion) dragX.value = 0;
