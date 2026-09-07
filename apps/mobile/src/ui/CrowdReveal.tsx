@@ -81,7 +81,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               // it is the one thing that is true at any crowd size.
               const gathering = !c || c.player_count < VERDICT_MIN_PLAYERS;
               return (
-                <View key={q.id} style={{ gap: space(1.5) }}>
+                <View key={q.id} style={{ gap: space(2) }}>
                   <Serif size={15} color={colors.ink} numberOfLines={2}>{q.text}</Serif>
                   {!gathering && c && (
                     <CrowdBar pct={c.crowd_yes_pct} />

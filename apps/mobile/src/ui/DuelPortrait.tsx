@@ -1,7 +1,7 @@
 import { View } from "react-native";
 import { Image } from "expo-image";
 import type { DuelResult } from "@oracle/core";
-import { Mono, Ritual } from "./Text";
+import { Mono, Ritual, role } from "./Text";
 import { colors, space } from "../theme";
 
 export const DUEL_ART = require("../../assets/art/creation-hands-orb.jpg");
@@ -18,10 +18,10 @@ export function DuelPortrait({ duel }: { duel: Extract<DuelResult, { status: "co
       ]).map((side, index) => <View key={side.label} style={{ flex: 1, minWidth: 0, alignItems: "center", gap: space(2), paddingHorizontal: space(2), borderLeftWidth: index ? 1 : 0, borderColor: colors.lineSoft }}>
         <Mono size={11} color={side.winner ? colors.goldText : colors.mutedInk}>{side.label}</Mono>
         <Ritual bold size={28} color={side.winner ? colors.goldText : colors.ink} style={{ textAlign: "center" }}>{side.points}</Ritual>
-        <Mono size={10} style={{ textAlign: "center" }}>{side.correct}/{duel.scoredCount} RIGHT</Mono>
+        <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{side.correct}/{duel.scoredCount} RIGHT</Mono>
       </View>)}
     </View>
-    <Mono size={10} style={{ textAlign: "center" }}>CONFIDENCE POINTS · SAME RULES FOR BOTH</Mono>
-    {duel.oracleAbstained > 0 && <Mono size={10} style={{ textAlign: "center" }}>ORACLE WITHOUT A SIDE ON {duel.oracleAbstained}</Mono>}
+    <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>CONFIDENCE POINTS · SAME RULES FOR BOTH</Mono>
+    {duel.oracleAbstained > 0 && <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>ORACLE WITHOUT A SIDE ON {duel.oracleAbstained}</Mono>}
   </View>;
 }

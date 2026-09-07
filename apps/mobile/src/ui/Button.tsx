@@ -1,6 +1,6 @@
 import { Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
-import { colors, space, typeScale, trackTail } from "../theme";
+import { colors, space } from "../theme";
 import { Mono, role } from "./Text";
 
 export function GoldButton({ title, onPress, disabled, destructive = false }: { title: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
@@ -27,7 +27,7 @@ export function GoldButton({ title, onPress, disabled, destructive = false }: { 
         backgroundColor: pressed ? wash : "transparent",
       })}
     >
-      <Mono {...typeScale.action} color={disabled ? colors.mutedInk : textTone} style={{ textTransform: "uppercase", ...trackTail(typeScale.action.letterSpacing) }}>{title}</Mono>
+      <Mono {...role.action} color={disabled ? colors.mutedInk : textTone} style={[role.action.style, { textTransform: "uppercase" }]}>{title}</Mono>
     </Pressable>
   );
 }
@@ -38,7 +38,7 @@ export function QuietLink({ title, onPress }: { title: string; onPress: () => vo
     <Pressable
       accessibilityRole="button"
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", alignItems: "center", opacity: pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({ minHeight: 44, paddingVertical: space(2), paddingHorizontal: space(2), justifyContent: "center", alignItems: "center", opacity: pressed ? 0.6 : 1 })}
     >
       <Mono {...role.line} color={colors.mutedInk} style={[role.line.style, { textTransform: "uppercase", textDecorationLine: "underline" }]}>{title}</Mono>
     </Pressable>

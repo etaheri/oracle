@@ -1,3 +1,4 @@
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
@@ -15,6 +16,10 @@ import { KEYS } from "../config/keys";
 import { colors, space } from "../theme";
 
 export default function Summons() {
+  return <SafeAreaProvider><SummonsContent /></SafeAreaProvider>;
+}
+
+function SummonsContent() {
   const router = useRouter();
   const qc = useQueryClient();
   const [restoreState, setRestoreState] = useState<"idle" | "none">("idle");

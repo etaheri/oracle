@@ -40,9 +40,9 @@ const PLAQUE_MIN_H = 420;
 // voice beneath it (refinement spec §7).
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-      <Mono size={11} color={colors.mutedInk} letterSpacing={2}>{label}</Mono>
-      <Mono size={11} color={colors.ink} letterSpacing={2}>{value}</Mono>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
+      <Mono size={11} color={colors.mutedInk} letterSpacing={2} style={{ flexShrink: 1 }}>{label}</Mono>
+      <Mono size={11} color={colors.ink} letterSpacing={2} style={{ flexShrink: 1, textAlign: "right" }}>{value}</Mono>
     </View>
   );
 }
@@ -57,11 +57,11 @@ function LeadStat({ label, value }: { label: string; value: string }) {
   const earned = /^\d+$/.test(value);
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
-      <Mono size={11} color={colors.goldText} letterSpacing={2}>{label}</Mono>
+      <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ flexShrink: 1 }}>{label}</Mono>
       {earned ? (
         <Ritual bold size={20} color={colors.ink} letterSpacing={1}>{value}</Ritual>
       ) : (
-        <Mono size={11} color={colors.goldText} letterSpacing={2} numberOfLines={1} style={{ flexShrink: 1 }}>{value}</Mono>
+        <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ flexShrink: 1, textAlign: "right" }}>{value}</Mono>
       )}
     </View>
   );
@@ -179,11 +179,11 @@ export default function Ledger() {
                     how it is earned while it is unwritten, what it measures once
                     it is. The second half is also the legal wall, stated to the
                     player rather than only to the spec. */}
-                <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 15 }}>
+                <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 16 }}>
                   {d.oracle_score === null ? "FIFTY RATED CALLS WRITE YOUR SCORE. COMPLETE EVERY NON-VOID QUESTION; AT LEAST THREE MUST RESOLVE. OLDER ROUNDS REQUIRED ALL FIVE." : SCORE_GLOSS.written}
                 </Mono>
                 {standingLine(d.percentile, d.cohort_size) && (
-                  <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ lineHeight: 15 }}>
+                  <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ lineHeight: 16 }}>
                     {standingLine(d.percentile, d.cohort_size)}
                   </Mono>
                 )}

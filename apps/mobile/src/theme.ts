@@ -45,7 +45,9 @@ export const typeScale = {
   eyebrow: { size: 10, letterSpacing: 4 }, // the screen's stamp
   meta: { size: 10, letterSpacing: 2 }, // passive chrome: countdowns, notices
   line: { size: 11, letterSpacing: 2 }, // one row of machine speech
-  action: { size: 12, letterSpacing: 3 }, // framed buttons
+  action: { size: 12, letterSpacing: 3 },
+  supporting: { size: 11, letterSpacing: 0.5 }, // explanations and evidence
+  caption: { size: 10, letterSpacing: 1 }, // secondary reading text // framed buttons
   body: { size: 12, letterSpacing: 0.5 }, // long-form text
   clock: { size: 16, letterSpacing: 4 }, // the live time under the wordmark
 } as const;
@@ -54,7 +56,7 @@ export const typeScale = {
 // for rather than a font-metric surprise. Lines that arrive late (the notice,
 // the countdown) hold their slot from the first frame and never shove the
 // composition when they land.
-export const ROW_H = { meta: 14, line: 16, body: 20, clock: 22 } as const;
+export const ROW_H = { meta: 14, line: 16, body: 20, supporting: 18, caption: 16, action: 18, clock: 22 } as const;
 
 // A tracked run of text carries its tracking after the last glyph too, which
 // pushes centred text left by one step. Cancel it at the tail.

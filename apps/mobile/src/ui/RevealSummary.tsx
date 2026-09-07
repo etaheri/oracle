@@ -2,7 +2,7 @@ import { Linking, View } from "react-native";
 import { calculateDuel, dayCallCounts, type Reveal } from "@oracle/core";
 import { revealSummary } from "../game/revealSummary";
 import { revealObservation } from "../game/revealObservation";
-import { Serif, Mono, Eyebrow } from "./Text";
+import { Serif, Mono, Eyebrow, role } from "./Text";
 import { DuelPortrait } from "./DuelPortrait";
 import { GoldFrame } from "./GoldFrame";
 import { QuietLink } from "./Button";
@@ -25,14 +25,12 @@ export function RevealSummary({ data, milestone }: { data: Reveal; milestone: st
     {highlight && <GoldFrame><View style={{ padding: space(4), gap: space(2) }}>
       <Eyebrow>{!legacy && duel.status === "complete" && duel.winner !== "tie" ? "The largest difference" : "A call to remember"}</Eyebrow>
       <Serif size={20}>{highlight.text}</Serif>
-      <Mono>YOU {highlight.my?.answer ? "YES" : "NO"} AT {highlight.my?.confidence}% · ANSWER {highlight.outcome?.toUpperCase()}</Mono>
-      {highlight.evidence_quote && <Mono size={11}>{highlight.evidence_quote}</Mono>}
+      <Mono {...role.supporting}>YOU {highlight.my?.answer ? "YES" : "NO"} AT {highlight.my?.confidence}% · ANSWER {highlight.outcome?.toUpperCase()}</Mono>
+      {highlight.evidence_quote && <Mono {...role.supporting}>{highlight.evidence_quote}</Mono>}
       {highlight.source_url && <QuietLink title={`SOURCE · ${highlight.source_name}`} onPress={() => { void Linking.openURL(highlight.source_url!); }} />}
     </View></GoldFrame>}
-    {!legacy && duel.status === "complete" && <View style={{ gap: space(2) }}>
-      {duel.youCorrect > duel.oracleCorrect && duel.winner === "oracle" && <Mono size={11}>MORE RIGHT ANSWERS, BUT FEWER CONFIDENCE POINTS.</Mono>}
-    </View>}
-    <Mono size={11} style={{ textAlign: "center" }}>{summary.explanation}</Mono>
+    {!legacy && duel.status === "complete" && duel.youCorrect > duel.oracleCorrect && duel.winner === "oracle" && <Mono {...role.supporting}>MORE RIGHT ANSWERS, BUT FEWER CONFIDENCE POINTS.</Mono>}
+    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{summary.explanation}</Mono>
     {(milestone || observation) && <Mono color={colors.goldText} style={{ textAlign: "center" }}>{milestone ?? observation}</Mono>}
   </View>;
 }

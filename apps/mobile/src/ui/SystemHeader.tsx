@@ -10,9 +10,9 @@ import { Mono, role } from "./Text";
 // the carved word underneath is the artifact.
 export function SystemHeader({ stamp }: { stamp: string }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: space(2) }}>
-        <Mono {...role.eyebrow} color={colors.goldText} style={[role.eyebrow.style, { textAlign: "left" }]}>SYS · V1.0</Mono>
-        <Mono {...role.eyebrow} color={colors.mutedInk} style={[role.eyebrow.style, { textAlign: "right" }]}>{stamp}</Mono>
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space(3), paddingBottom: space(2) }}>
+        <Mono {...role.eyebrow} color={colors.goldText} style={[role.eyebrow.style, { textAlign: "left", flexShrink: 1 }]}>SYS · V1.0</Mono>
+        <Mono {...role.eyebrow} color={colors.mutedInk} style={[role.eyebrow.style, { textAlign: "right", flexShrink: 1 }]}>{stamp}</Mono>
     </View>
   );
 }

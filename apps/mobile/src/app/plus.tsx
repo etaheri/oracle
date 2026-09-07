@@ -1,9 +1,10 @@
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect, useState } from "react";
 import { View, Linking, Pressable } from "react-native";
 import type { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
-import { Eyebrow, Mono, Ritual } from "../ui/Text";
+import { Eyebrow, Mono, Ritual, role } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { colors, space } from "../theme";
@@ -17,6 +18,10 @@ const CREED = COPY_BANK.filter((l) => l.pool === "paywall" && l.id.startsWith("p
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
 export default function Plus() {
+  return <SafeAreaProvider><PlusContent /></SafeAreaProvider>;
+}
+
+function PlusContent() {
   const [offering, setOffering] = useState<PurchasesOffering | null | "loading">("loading");
   const [errorLine, setErrorLine] = useState<string | null>(null);
   const plusActive = usePlusStore((s) => s.plusActive);
@@ -51,7 +56,7 @@ export default function Plus() {
             argument, the rows above are the decision. */}
         <View style={{ gap: space(2) }}>
           {CREED.map((l, i) => (
-            <DecodeLine key={l.id} text={l.text === "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." ? "YOUR VIGIL MARKS YOUR RETURN. IT DOES NOT CHANGE YOUR SCORE." : l.text} delayMs={i * 160} durationMs={450} size={11} color={colors.mutedInk} letterSpacing={2} style={{ lineHeight: 19 }} />
+            <DecodeLine key={l.id} text={l.text === "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." ? "YOUR VIGIL MARKS YOUR RETURN. IT DOES NOT CHANGE YOUR SCORE." : l.text} delayMs={i * 160} durationMs={450} {...role.supporting} color={colors.mutedInk} />
           ))}
         </View>
         <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center", lineHeight: 16 }}>
