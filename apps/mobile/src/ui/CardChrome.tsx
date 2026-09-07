@@ -44,7 +44,7 @@ function RegisterMarks() {
 // The card's terminal margin (brief §8: "a feature card reveals a static
 // terminal coordinate or symbol cluster"). Two quiet mono fields, optically
 // symmetric: provenance on the left, live state on the right.
-export function CardChrome({ slot, title, modifiers, coordinate, status, big = false, fill = false, children }: {
+export function CardChrome({ slot, title, modifiers, coordinate, status, big = false, fill = false, height, children }: {
   slot: number;
   // The category alone. Modifiers ride their own line — a single long title
   // wrapped badly at the eyebrow's tracking.
@@ -54,6 +54,7 @@ export function CardChrome({ slot, title, modifiers, coordinate, status, big = f
   status?: string;
   big?: boolean;
   fill?: boolean;
+  height?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -65,7 +66,7 @@ export function CardChrome({ slot, title, modifiers, coordinate, status, big = f
         paddingHorizontal: space(6),
         paddingTop: space(6),
         paddingBottom: space(9),
-        ...(fill ? { flex: 1 } : { aspectRatio: DECK_RATIO }),
+        ...(fill ? { flex: 1 } : height !== undefined ? { height } : { aspectRatio: DECK_RATIO }),
       }}
     >
       <RegisterMarks />
@@ -79,7 +80,7 @@ export function CardChrome({ slot, title, modifiers, coordinate, status, big = f
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{modifiers}</Mono>
         ) : null}
       </View>
-      <View style={{ flex: 1, gap: space(3), paddingTop: space(3) }}>{children}</View>
+      <View style={{ flex: 1, minHeight: 0, gap: space(3), paddingTop: space(3) }}>{children}</View>
       {/* One row, not two independent corners. Pinned to opposite edges these
           two fields simply grew into each other: IBM Plex Mono advances 0.6em,
           so at size 10 a full coordinate runs ~238pt from the left while a

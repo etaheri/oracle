@@ -29,68 +29,28 @@ export function useScreenInset() {
   };
 }
 
-// `scroll` moves the margin off the container and onto the CONTENT.
-//
-// A padded container clips its scroller at the safe area, so the last row of a
-// long screen stops a gutter short of the glass and the page ends on a band of
-// dead ground above the home indicator — which is what it looked like: a
-// screen cut off rather than a screen that runs out. Bleeding the ScrollView
-// edge to edge and paying the inset in `contentContainerStyle` lets content
-// travel the full height and simply come to rest clear of the indicator.
-//
-// `flexGrow: 1` is what makes this safe for a CENTRED column. The content box
-// is at least a viewport tall, so a short column still centres exactly as it
-// did in the padded View; a tall one grows the box and scrolls instead of
-// overflowing it in both directions. That overflow is why the ledger's title
-// sat on top of ‹ RETURN and its last row fell off the bottom.
-export function Screen({
-  children,
-  scroll = false,
-  bleed = false,
-  header,
-}: {
+// Header and footer own their safe edges; the body pays only the remaining ones.
+export function Screen({ children, scroll = false, bleed = false, header, footer }: {
   children: React.ReactNode;
   scroll?: boolean;
-  // Pinned above a `scroll` page, outside the scroller and inside the top
-  // inset. A TopBar put in with the children scrolls away with them and ends
-  // up sitting on the status bar's own clock -- so the one control that leaves
-  // the screen is the one that scrolls off it.
-  header?: React.ReactNode;
-  // No margin at all: the screen spends `useScreenInset()` on its own content.
-  // For a screen whose scroller is too specialised to hand over.
   bleed?: boolean;
+  header?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const i = useScreenInset();
-  const pad = { paddingTop: i.top, paddingBottom: i.bottom, paddingLeft: i.left, paddingRight: i.right };
-  const inset = bleed ? null : pad;
-  const contentInset = pad;
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.museumWhite }}>
-      {scroll ? (
-        <>
-        {header ? (
-          <View style={{ paddingTop: i.top, paddingLeft: i.left, paddingRight: i.right }}>{header}</View>
-        ) : null}
-        <ScrollView
-          style={{ flex: 1 }}
-          // The inset is paid HERE, on the content, not on the container.
-          // iOS does not add it for us: contentInsetAdjustmentBehavior only
-          // adjusts under a navigation controller, and a bled ScrollView with
-          // no bottom padding scrolls its last line clean under the home
-          // indicator (verified on device -- the rites' closing liturgy ended
-          // up with the indicator drawn through it).
-          contentContainerStyle={{ ...contentInset, flexGrow: 1, paddingTop: header ? 0 : i.top }}
-          // Every other scroller in the app hides its bar; a grey system rail
-          // over the museum ground is the least in-voice thing on a page.
-          showsVerticalScrollIndicator={false}
-        >
-          {children}
-        </ScrollView>
-        </>
-      ) : (
-        <View style={{ flex: 1, ...inset }}>{children}</View>
-      )}
-      <Grain />
-    </View>
-  );
+  const padding = bleed ? {} : {
+    paddingTop: header ? 0 : i.top,
+    paddingBottom: footer ? space(3) : i.bottom,
+    paddingLeft: i.left, paddingRight: i.right,
+  };
+  return <View style={{ flex: 1, backgroundColor: colors.museumWhite }}>
+    {header && <View style={{ paddingTop: i.top, paddingLeft: i.left, paddingRight: i.right }}>{header}</View>}
+    {scroll ? <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, ...padding }}
+      contentInsetAdjustmentBehavior="never" automaticallyAdjustsScrollIndicatorInsets={false}
+      alwaysBounceVertical={false} showsVerticalScrollIndicator>
+      {children}
+    </ScrollView> : <View style={{ flex: 1, minHeight: 0, ...padding }}>{children}</View>}
+    {footer && <View style={{ paddingTop: space(3), paddingBottom: i.bottom, paddingLeft: i.left, paddingRight: i.right }}>{footer}</View>}
+    <Grain />
+  </View>;
 }

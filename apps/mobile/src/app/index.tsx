@@ -205,18 +205,11 @@ export default function Index() {
   ];
 
   return (
-    <Screen>
-      {/* No scroller. Home is a fixed composition — a hero, a carved word, a
-          clock, a call — and it fits. Wrapping it to add pull-to-refresh gave
-          the screen a rubber-band bounce that read as cheap under a still
-          museum ground, and put a scroll recogniser on top of the orb. The
-          round already refetches when the app returns to the foreground
-          (focusManager, _layout.tsx), which is when a new day actually lands. */}
-      <SystemHeader stamp={dateStamp(stampDate)} />
+    <Screen scroll header={<SystemHeader stamp={dateStamp(stampDate)} />} footer={<FooterNav items={navItems} />}>
       {/* The temple register: hero, wordmark, clock. Centred in whatever the
           reserved call slot below leaves it, so it is at its final position on
           the first frame and stays there whatever resolves later. */}
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(5) }}>
+      <View style={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: space(5), paddingVertical: space(4) }}>
         {/* Temple moment: the near-touch, alive — transparent loop over the
             museum ground, glow tinted by the crowd's mood. */}
         <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} greet={greetOrb} />
@@ -322,12 +315,6 @@ export default function Index() {
             )}
           </View>
         )}
-      </View>
-      {/* The footer rail. Space divides it from the notice above, not a rule —
-          the brief asks for very restrained borders, and the brackets already
-          say these are controls. */}
-      <View style={{ marginTop: space(4) }}>
-      <FooterNav items={navItems} />
       </View>
     </Screen>
   );

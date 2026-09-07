@@ -82,7 +82,7 @@ export default function Rites() {
           paddingBottom: opening ? space(4) : inset.bottom,
           gap: space(4),
         }}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}
       >
         <Eyebrow>{opening ? "Your first round" : "The rites"}</Eyebrow>
         {/* These are rules, so they are numbered — in the same carved

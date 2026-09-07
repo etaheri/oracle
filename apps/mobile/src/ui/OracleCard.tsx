@@ -3,7 +3,7 @@ import { capture as captureGameplay } from "../analytics/analytics";
 import { useEffect, useRef, useState } from "react";
 import { View, Pressable, StyleSheet, Dimensions, Linking } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Gesture, GestureDetector, ScrollView } from "react-native-gesture-handler";
 import { useQueryClient } from "@tanstack/react-query";
 import Animated, { useSharedValue, useAnimatedStyle, useDerivedValue, withTiming, withSpring, withSequence, withDelay, Easing, useReducedMotion, runOnJS } from "react-native-reanimated";
 import { leanRelease, leanStep, holdConfidence, LEAN_DEAD_ZONE, LEAN_FULL } from "../game/swipeLean";
@@ -56,9 +56,10 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
   );
 }
 
-export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceButtons = false }: {
+export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceButtons = false, height }: {
   practice?: { onSeal: (answer: boolean, confidence: number) => void };
   forceButtons?: boolean;
+  height?: number;
   q: RoundToday["questions"][number];
   // The round's overall lock (if any): a question whose own lock differs
   // from it closes ahead of the round, and the title says so.
@@ -337,6 +338,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
         }}
       >
         <CardChrome
+          height={height}
           slot={q.slot}
           title={title}
           modifiers={modifiers || undefined}
@@ -349,13 +351,15 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
               surface: pull it toward a side and release to seal (buttonsMode
               players hold-to-charge instead). */}
           <GestureDetector gesture={pan}>
-            <Animated.View style={[{ flex: 1, justifyContent: "center" }, questionStyle]}>
+            <Animated.View style={[{ flex: 1, minHeight: 0 }, questionStyle]}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
               <QuestionFace text={q.text} seed={q.id} />
               {q.context && <View style={{ gap: space(1) }}>
                 <Pressable accessibilityRole="button" onPress={() => setShowContext(!showContext)} style={{ minHeight: 44, justifyContent: "center" }}><Mono size={11}>{showContext ? "CLOSE CONTEXT" : "CONTEXT"}</Mono></Pressable>
                 {showContext && <><Mono size={11}>{q.context.text}</Mono><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(q.context!.sourceUrl); }} style={{ minHeight: 44 }}><Mono size={9}>SOURCE · AS OF {new Date(q.context.asOf).toLocaleString()}</Mono></Pressable></>}
               </View>}
               {q.is_big_one && <Mono size={10} style={{ textAlign: "center" }}>DOUBLE POINTS · RIGHT OR WRONG</Mono>}
+              </ScrollView>
             </Animated.View>
           </GestureDetector>
           <View style={{ gap: space(3) }}>

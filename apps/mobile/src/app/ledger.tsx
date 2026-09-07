@@ -21,7 +21,7 @@ import { colors, space } from "../theme";
 import { LITURGY_LINES, SCORE_GLOSS, calibrationVerdict } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
-import { standingLine, vigilStat } from "../game/standing";
+import { standingLine } from "../game/standing";
 
 // The plaque's floor, shared by the frame that waits for it. The loading
 // frame exists so the plaque fills rather than flashes, and it only earns
@@ -148,7 +148,7 @@ export default function Ledger() {
     // scroll variant keeps the centring for a short record and grows for a
     // long one; see its own note for why flexGrow is the load-bearing part.
     <Screen scroll header={<TopBar />}>
-      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
+      <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
         {/* One column in both states. The frame used to be the only thing
             held steady while the six children below it did not exist yet —
@@ -194,7 +194,7 @@ export default function Ledger() {
                 )}
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
                 <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
-                <Stat label="CURRENT VIGIL" value={vigilStat(d.streak)} />
+                <Stat label="CURRENT VIGIL" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
                 <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
                 <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
                 <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />

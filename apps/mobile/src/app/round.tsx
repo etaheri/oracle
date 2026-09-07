@@ -4,6 +4,7 @@ import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-nati
 import { Screen } from "../ui/Screen";
 import { Mono, Ritual } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
+import { CardStage } from "../ui/CardStage";
 import { OracleCard } from "../ui/OracleCard";
 import { UndealtCard, STACK_TOP_Y, STACK_TOP_ROTATE } from "../ui/UndealtCard";
 import { ConvictionColumn } from "../ui/ConvictionColumn";
@@ -120,34 +121,36 @@ export default function Round() {
       <TopBar label={`DAY ${today.data.date}`} />
       <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
         {current ? (
-          <View>
+          <CardStage stack={32}>{height => <View>
             {/* The rest of the deck: full undealt cards beneath the live one,
                 their prophecies still static — so a mid-swipe glance shows a
                 real stack, not slivers, and nothing unspoiled is spoiled. */}
             {qs.filter((q) => q.id !== current.id && !answers[q.id]?.sealed).slice(0, 2).reverse().map((q, i, arr) => (
-              <UndealtCard key={q.id} q={q} index={arr.length - 1 - i} />
+              <UndealtCard height={height} key={q.id} q={q} index={arr.length - 1 - i} />
             ))}
             <Animated.View key={current.id} entering={reducedMotion ? FadeIn.duration(200) : Uncover}>
               <OracleCard
+                height={height}
                 q={current}
-                roundLocksAt={today.data.locks_at}
+                roundLocksAt={today.data?.locks_at ?? null}
                 onSealed={() => setLastSealedId(current.id)}
                 onLean={onLean}
               />
             </Animated.View>
-          </View>
+          </View>}</CardStage>
         ) : (
           <CrowdReveal round={today.data} />
         )}
       </View>
-      {(lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
+      {current && (lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
       {/* A healed lock is the most dramatic thing this system does, and without
           this line it happens in silence: the numeral is simply struck, the same
           as a slot the player let expire. Shown only for a healed question the
           player never sealed — that is exactly the strike that needs explaining,
           and a player who sealed in time has nothing to be told. Fixed height so
           the layout does not jump when a probe lands mid-session. */}
-      <View style={{ height: scaledRow(16, chromeScale), justifyContent: "center" }}>
+      {current && <>
+      <View style={{ minHeight: scaledRow(16, chromeScale), justifyContent: "center" }}>
         {qs.some((q) => q.lock_healed && ((today.data?.rules_version ?? 1) >= 2 || !answers[q.id]?.sealed)) && (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
             {today.data.rules_version >= 2 ? "EARLY ANSWER · VOID FOR EVERYONE" : PIPELINE_LINES.lockHealed}
@@ -176,7 +179,7 @@ export default function Round() {
       </View>
       {/* One fixed-height footer slot: reading, verdict, and hint trade
           places without nudging the layout above them. */}
-      <View style={{ height: scaledRow(40, chromeScale), justifyContent: "center" }}>
+      <View style={{ minHeight: scaledRow(40, chromeScale), justifyContent: "center" }}>
         {lean.conf !== null ? (
           // The oracle reads the pull aloud — stationary, in the footer's
           // slot — with the honest stake printed underneath: what this
@@ -207,6 +210,7 @@ export default function Round() {
           </Mono>
         ) : null}
       </View>
+      </>}
     </Screen>
   );
 }

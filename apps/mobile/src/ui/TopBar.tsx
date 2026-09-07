@@ -13,7 +13,7 @@ export function TopBar({ label, showReturn = true }: { label?: string; showRetur
           accessibilityLabel="Return"
           hitSlop={8}
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-          style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+          style={({ pressed }) => ({ minHeight: 44, minWidth: 44, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
         >
           <Mono size={11} color={colors.goldText} letterSpacing={2}>‹ RETURN</Mono>
         </Pressable>
@@ -22,7 +22,7 @@ export function TopBar({ label, showReturn = true }: { label?: string; showRetur
         // when the only way forward is BEGIN.
         <View style={{ minHeight: 44 }} />
       )}
-      {label ? <Mono size={10} color={colors.mutedInk} letterSpacing={3}>{label}</Mono> : null}
+      {label ? <Mono size={10} color={colors.mutedInk} letterSpacing={3} style={{ flexShrink: 1, textAlign: "right", marginLeft: 12 }}>{label}</Mono> : null}
     </View>
   );
 }

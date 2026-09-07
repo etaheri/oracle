@@ -31,7 +31,7 @@ export default function Plus() {
 
   return (
     <Screen scroll header={<TopBar />}>
-      <View style={{ flex: 1, justifyContent: "center", gap: space(4) }}>
+      <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>Oracle plus</Eyebrow>
         {plusActive ? (
           <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{PUSH_CAMPAIGN_LINES.plusWelcome}</Mono>
@@ -51,19 +51,19 @@ export default function Plus() {
             argument, the rows above are the decision. */}
         <View style={{ gap: space(2) }}>
           {CREED.map((l, i) => (
-            <DecodeLine key={l.id} text={l.text} delayMs={i * 160} durationMs={450} size={11} color={colors.mutedInk} letterSpacing={2} style={{ lineHeight: 19 }} />
+            <DecodeLine key={l.id} text={l.text === "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." ? "YOUR VIGIL MARKS YOUR RETURN. IT DOES NOT CHANGE YOUR SCORE." : l.text} delayMs={i * 160} durationMs={450} size={11} color={colors.mutedInk} letterSpacing={2} style={{ lineHeight: 19 }} />
           ))}
         </View>
         <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center", lineHeight: 16 }}>
           AUTO-RENEWS UNTIL CANCELLED IN APP STORE SETTINGS. THE FREE GAME IS NEVER GATED.
         </Mono>
       </View>
-      <View style={{ gap: space(2), paddingBottom: space(2) }}>
+      <View style={{ gap: space(2) }}>
         <QuietLink title={PAYWALL_CTA_LINES.restore} onPress={() => restore()} />
         <View style={{ flexDirection: "row", justifyContent: "center", gap: space(4) }}>
-          <Pressable onPress={() => Linking.openURL(TERMS_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
+          <Pressable accessibilityRole="link" style={{ minHeight: 44, minWidth: 44, paddingHorizontal: space(2), justifyContent: "center" }} onPress={() => Linking.openURL(TERMS_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
           {privacyUrl && (
-            <Pressable onPress={() => Linking.openURL(privacyUrl)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
+            <Pressable accessibilityRole="link" style={{ minHeight: 44, minWidth: 44, paddingHorizontal: space(2), justifyContent: "center" }} onPress={() => Linking.openURL(privacyUrl)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>PRIVACY</Mono></Pressable>
           )}
         </View>
       </View>
@@ -74,7 +74,7 @@ export default function Plus() {
 function PriceRow({ pkg, tag, onPress, featured }: { pkg: PurchasesPackage; tag: string; onPress: (p: PurchasesPackage) => void; featured?: boolean }) {
   return (
     <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: featured ? colors.agedGold : colors.line, padding: space(4), gap: space(3) }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space(2), justifyContent: "space-between", alignItems: "baseline" }}>
         <Mono size={10} color={featured ? colors.goldText : colors.mutedInk} letterSpacing={2}>{tag}</Mono>
         <Ritual bold size={featured ? 24 : 18} color={colors.ink} letterSpacing={1}>{pkg.product.priceString}</Ritual>
       </View>

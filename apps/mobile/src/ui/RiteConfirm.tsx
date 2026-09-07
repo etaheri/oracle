@@ -1,5 +1,6 @@
-import { Modal, View, Pressable, StyleSheet } from "react-native";
+import { Modal, ScrollView, View, Pressable, StyleSheet } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
+import { useScreenInset } from "./Screen";
 import { colors, space } from "../theme";
 import { Mono, Ritual } from "./Text";
 import { GoldButton, QuietLink } from "./Button";
@@ -21,6 +22,7 @@ export function RiteConfirm({ visible, title, body, confirmLabel, destructive = 
   onConfirm: () => void;
   onWithdraw: () => void;
 }) {
+  const inset = useScreenInset();
   const reducedMotion = useReducedMotion();
   if (!visible) return null;
   const tone = destructive ? colors.vermilion : colors.agedGold;
@@ -34,7 +36,7 @@ export function RiteConfirm({ visible, title, body, confirmLabel, destructive = 
     <Modal visible transparent animationType="none" onRequestClose={onWithdraw} statusBarTranslucent>
     <Animated.View
       entering={reducedMotion ? undefined : FadeIn.duration(180)}
-      style={[StyleSheet.absoluteFill, { zIndex: 200, justifyContent: "center", padding: space(6) }]}
+      style={[StyleSheet.absoluteFill, { zIndex: 200, justifyContent: "center", paddingTop: inset.top, paddingBottom: inset.bottom, paddingLeft: inset.left, paddingRight: inset.right }]}
     >
       <Pressable
         accessibilityRole="button"
@@ -44,12 +46,14 @@ export function RiteConfirm({ visible, title, body, confirmLabel, destructive = 
       />
       <View
         accessibilityViewIsModal
-        style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: tone, padding: space(5), gap: space(4) }}
+        style={{ maxHeight: "100%", flexShrink: 1, backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: tone, padding: space(5), gap: space(4) }}
       >
+        <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: space(4) }} alwaysBounceVertical={false} contentInsetAdjustmentBehavior="never">
         <Ritual bold size={16} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{title}</Ritual>
         {body ? (
           <Mono size={11} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: 18 }}>{body}</Mono>
         ) : null}
+        </ScrollView>
         <View style={{ gap: space(2) }}>
           <GoldButton title={confirmLabel} onPress={onConfirm} destructive={destructive} />
           <QuietLink title="Withdraw" onPress={onWithdraw} />

@@ -66,7 +66,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               frame entirely. The scroller flexes, so with a short spread it
               still holds the footer at the foot exactly as the spacer it
               replaces did. */}
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: space(4) }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: space(4) }} showsVerticalScrollIndicator contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
             {sealed.map((q) => {
               const c = byId.get(q.id);
               const mine = answers[q.id]!;

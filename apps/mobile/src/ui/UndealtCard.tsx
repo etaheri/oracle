@@ -17,7 +17,7 @@ import type { RoundToday } from "@oracle/core";
 export const STACK_TOP_Y = 16;
 export const STACK_TOP_ROTATE = "-0.7deg";
 
-export function UndealtCard({ q, index }: { q: RoundToday["questions"][number]; index: number }) {
+export function UndealtCard({ q, index, height }: { q: RoundToday["questions"][number]; index: number; height?: number }) {
   return (
     <View
       pointerEvents="none"
@@ -29,8 +29,8 @@ export function UndealtCard({ q, index }: { q: RoundToday["questions"][number]; 
         transform: [{ rotate: index === 0 ? STACK_TOP_ROTATE : "0.9deg" }],
       }}
     >
-      <CardChrome slot={q.slot} title={decodeFrame(q.category, 0, 1, q.id)} big={q.is_big_one}>
-        <View style={{ flex: 1, justifyContent: "center" }}>
+      <CardChrome height={height} slot={q.slot} title={decodeFrame(q.category, 0, 1, q.id)} big={q.is_big_one}>
+        <View style={{ flex: 1, overflow: "hidden", justifyContent: "center" }}>
           {/* Same face, size, seed and tone as the live card's unresolved
               inscription — so uncovering it changes nothing but time. */}
           <Serif size={QUESTION_FACE.size} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: QUESTION_FACE.lineHeight }}>

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 import type { RoundToday } from "@oracle/core";
+import { CardStage } from "./CardStage";
 import { OracleCard } from "./OracleCard";
 import { ConvictionColumn } from "./ConvictionColumn";
 import { confidenceMeaning } from "../game/confidence";
@@ -23,15 +24,15 @@ export function PracticeCard({ onCompleted }: { onCompleted: () => void }) {
   const onLean = useCallback((conf: number | null, side: boolean, active: boolean) => {
     setLean(prev => prev.conf === conf && prev.side === side && prev.active === active ? prev : { conf, side, active });
   }, []);
-  return <View style={{ gap: space(3) }}>
-    <View style={{ justifyContent: "center", minHeight: 360 }}>
+  return <View style={{ flex: 1, minHeight: 0, gap: space(3) }}>
+    <CardStage>{height => <View>
       {receipt ? <View style={{ gap: space(4), padding: space(5) }}>
         <Serif style={{ textAlign: "center" }}>A practice answer. Nothing recorded.</Serif>
         <Mono style={{ textAlign: "center" }}>{receipt.answer ? "YES" : "NO"} AT {receipt.confidence}%</Mono>
-      </View> : <OracleCard key={attempt} q={question} roundLocksAt={null} onSealed={() => {}} onLean={onLean} forceButtons={buttons}
+      </View> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} onSealed={() => {}} onLean={onLean} forceButtons={buttons}
         practice={{ onSeal: (answer, confidence) => { setReceipt({ answer, confidence }); setLean({ conf: null, side: answer, active: false }); onCompleted(); } }} />}
       {!receipt && (lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
-    </View>
+    </View>}</CardStage>
     <View style={{ minHeight: 48, gap: space(1), justifyContent: "center" }}>
       {lean.conf !== null ? <>
         <Mono size={10} color={colors.goldText} style={{ textAlign: "center" }}>{confidenceMeaning(lean.conf)}</Mono>

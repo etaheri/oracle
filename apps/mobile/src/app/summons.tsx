@@ -41,19 +41,8 @@ export default function Summons() {
     leave();
   };
   return (
-    <Screen>
-      <TopBar />
-      {/* One question, and almost nothing else (spec §6). This screen exists
-          to be answered in two seconds; every line that is not the question
-          is weight the answer has to carry. */}
-      <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: space(2) }}>
-        <View style={{ gap: space(3) }}>
-          {SUMMONS_LINES.map((line, i) => (
-            <DecodeLine key={line} text={line} delayMs={i * 160} durationMs={450} size={13} color={colors.ink} letterSpacing={2} style={{ lineHeight: 22, textAlign: "center" }} />
-          ))}
-        </View>
-      </View>
-      <View style={{ gap: space(2), paddingBottom: space(2) }}>
+    <Screen scroll header={<TopBar />} footer={
+      <View style={{ gap: space(2) }}>
         <GoldButton title="LET IT SPEAK" onPress={onSpeak} />
         <QuietLink title="Not now" onPress={leave} />
         {restoreState === "none" && (
@@ -65,6 +54,17 @@ export default function Summons() {
             someone who arrived here by accident. It sits apart. */}
         <View style={{ paddingTop: space(3) }}>
           <QuietLink title="Restore a claimed record" onPress={handleRestore} />
+        </View>
+      </View>
+    }>
+      {/* One question, and almost nothing else (spec §6). This screen exists
+          to be answered in two seconds; every line that is not the question
+          is weight the answer has to carry. */}
+      <View style={{ flexGrow: 1, justifyContent: "center", paddingVertical: space(4) }}>
+        <View style={{ gap: space(3) }}>
+          {SUMMONS_LINES.map((line, i) => (
+            <DecodeLine key={line} text={line} delayMs={i * 160} durationMs={450} size={13} color={colors.ink} letterSpacing={2} style={{ lineHeight: 22, textAlign: "center" }} />
+          ))}
         </View>
       </View>
     </Screen>

@@ -16,7 +16,7 @@ export type NavItem = { label: string; a11yLabel: string; onPress: () => void };
 // divider rule needed above. Each item still owns a 44pt target.
 export function FooterNav({ items }: { items: NavItem[] }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center" }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
       {items.map((item) => (
         <Pressable
           key={item.label}
