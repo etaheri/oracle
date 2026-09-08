@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, timestamp, date, numeric, jsonb, uniqueIndex, index, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, bigint, boolean, timestamp, date, numeric, jsonb, uniqueIndex, index, pgEnum, primaryKey } from "drizzle-orm/pg-core";
 
 export const questionStatus = pgEnum("question_status", ["draft", "approved", "scheduled", "open", "locked", "resolved", "void"]);
 export const outcome = pgEnum("outcome", ["yes", "no", "void"]);
@@ -154,3 +154,24 @@ export const pipelineSpend = pgTable("pipeline_spend", {
   date: date("date").primaryKey(),
   calls: integer("calls").notNull().default(0),
 });
+
+// Usage telemetry (design 2026-09-08 §4.6). An INSTRUMENT, not a control:
+// nothing reads this to decide anything. The ceiling stays a call count in
+// pipeline_spend, because a price table inside a control path drifts silently
+// and fails in both directions.
+//
+// Keyed by (date, model) rather than by call: the question it answers is "is
+// the call-count proxy drifting?", and a per-call table would be a row per
+// model call for a number nobody reads per call.
+export const pipelineUsage = pgTable(
+  "pipeline_usage",
+  {
+    date: date("date").notNull(),
+    model: text("model").notNull(),
+    calls: integer("calls").notNull().default(0),
+    inputTokens: bigint("input_tokens", { mode: "number" }).notNull().default(0),
+    outputTokens: bigint("output_tokens", { mode: "number" }).notNull().default(0),
+    webSearches: integer("web_searches").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.date, t.model] })],
+);

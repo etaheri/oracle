@@ -3,6 +3,8 @@ import { makeDb } from "./db/client";
 import { runTick, type PipelineDeps } from "./pipeline";
 import { makeTelegramClient } from "./pipeline/telegram";
 import { makeClaudeClient } from "./pipeline/claude";
+import { recordUsage } from "./pipeline/usage";
+import { etNow } from "./pipeline/clock";
 import { bindingStarter, inlineStarter, type WorkflowBinding } from "./pipeline/workflows";
 
 // Cloudflare requires Workflow classes to be exported from the Worker's main
@@ -55,10 +57,13 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
     // exists to fix (design 2026-09-04 §2.1).
     console.warn("pipeline: no Workflow bindings; long actions will run inline inside the cron's 15-minute cap");
   }
+  const db = makeDb(env.DATABASE_URL);
   return {
-    db: makeDb(env.DATABASE_URL),
+    db,
     telegram: makeTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID),
-    claude: env.ANTHROPIC_API_KEY ? makeClaudeClient(env.ANTHROPIC_API_KEY) : null,
+    claude: env.ANTHROPIC_API_KEY
+      ? makeClaudeClient(env.ANTHROPIC_API_KEY, fetch, (u) => recordUsage(db, etNow(new Date()).date, u))
+      : null,
     models: {
       author: env.PIPELINE_AUTHOR_MODEL ?? "claude-opus-5",
       resolve: env.PIPELINE_RESOLVE_MODEL ?? "claude-sonnet-5",

@@ -71,6 +71,13 @@
       "when": 1788827259970,
       "tag": "0009_mighty_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788905833282,
+      "tag": "0010_majestic_calypso",
+      "breakpoints": true
     }
   ]
 }

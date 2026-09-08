@@ -2,6 +2,8 @@
 // makeClaudeClient's implementation to this same file; this task ships only
 // the interfaces so author.ts/resolve.ts stubs and PipelineDeps can type
 // against them.
+import type { CallUsage } from "./usage";
+
 export interface StructuredCall {
   model: string;
   system: string;
@@ -49,7 +51,11 @@ function extractStructuredOutput(content: unknown[], schemaName: string): unknow
   return found;
 }
 
-export function makeClaudeClient(apiKey: string, fetchFn: typeof fetch = fetch): ClaudeClient {
+export function makeClaudeClient(
+  apiKey: string,
+  fetchFn: typeof fetch = fetch,
+  onUsage?: (u: CallUsage) => Promise<void>,
+): ClaudeClient {
   return {
     async structured(call: StructuredCall): Promise<unknown> {
       const tools = buildTools(call);
@@ -78,8 +84,27 @@ export function makeClaudeClient(apiKey: string, fetchFn: typeof fetch = fetch):
           throw new Error(`claude: ${res.status} ${bodySnippet}`);
         }
 
-        const data = (await res.json()) as { stop_reason?: string; content?: unknown[] };
+        const data = (await res.json()) as {
+          stop_reason?: string;
+          content?: unknown[];
+          usage?: { input_tokens?: number; output_tokens?: number; server_tool_use?: { web_search_requests?: number } };
+        };
         const content = data.content ?? [];
+
+        if (onUsage) {
+          const u = data.usage;
+          try {
+            await onUsage({
+              model: call.model,
+              inputTokens: u?.input_tokens ?? 0,
+              outputTokens: u?.output_tokens ?? 0,
+              webSearches: u?.server_tool_use?.web_search_requests ?? 0,
+            });
+          } catch {
+            // An instrument must never take down the thing it measures. A
+            // failed usage write loses a number; a thrown one loses the round.
+          }
+        }
 
         if (data.stop_reason === "pause_turn") {
           if (attempt === MAX_CONTINUATIONS) {
