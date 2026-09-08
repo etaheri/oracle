@@ -1,13 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { POLICY } from "../src/pipeline/steps";
 
+// Parses the "N minute(s)" / "N second(s)" forms POLICY actually uses.
+// Throws on anything else so an unparsed unit fails loudly instead of
+// silently passing the under-600s assertion below.
+function seconds(duration: string): number {
+  const match = /^(\d+) (second|minute)s?$/.exec(duration);
+  if (!match) throw new Error(`unrecognised duration format: ${duration}`);
+  const [, amount, unit] = match;
+  return Number(amount) * (unit === "minute" ? 60 : 1);
+}
+
 describe("step policies", () => {
-  it("never inherits the 10-minute default timeout", () => {
+  it("never inherits or exceeds the 10-minute default timeout", () => {
     // Spec §4.2: an inherited timeout is the defect in §1.1. Every policy
-    // must state its own, and every one must be under the default.
+    // must state its own, and every one must be strictly under the default
+    // — not just different from its literal string ("15 minutes" would
+    // still fail the actual defect this file exists to prevent).
     for (const [name, p] of Object.entries(POLICY)) {
       expect(p.timeout, name).toBeDefined();
-      expect(p.timeout, name).not.toBe("10 minutes");
+      expect(seconds(p.timeout), name).toBeLessThan(600);
     }
   });
 
