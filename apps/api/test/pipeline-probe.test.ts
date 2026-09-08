@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { makeTestDb } from "./helpers/db";
 import * as schema from "../src/db/schema";
-import { probeQuestion, runProbe } from "../src/pipeline/probe";
+import { probeQuestion, runProbe, probeOne, narrateProbe } from "../src/pipeline/probe";
 import { publish } from "../src/pipeline/actions";
 import type { PipelineDeps } from "../src/pipeline";
 import { inlineStarter } from "../src/pipeline/workflows";
@@ -129,7 +129,7 @@ describe("probeQuestion — the lock moves to the information", () => {
     const row = await db.query.questions.findFirst({ where: eq(schema.questions.id, q!.id) });
     expect(row!.locksAt.getTime()).toBe(LOCKS.getTime());
     expect(row!.lockHealedAt).toBeNull();
-    expect(await runProbe(d, "2026-09-04", [q!.id])).toBe(0);
+    expect((await runProbe(d, "2026-09-04", [q!.id])).filter((o) => o.healed)).toHaveLength(0);
     expect(sent.join("\n")).not.toContain("closed early");
   });
 });
@@ -139,8 +139,8 @@ describe("runProbe", () => {
     const { db } = await makeTestDb();
     const [q] = await seedOpen(db);
     const sent: string[] = [];
-    const n = await runProbe(deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent), "2026-09-04", [q!.id]);
-    expect(n).toBe(1);
+    const outcomes = await runProbe(deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent), "2026-09-04", [q!.id]);
+    expect(outcomes.filter((o) => o.healed)).toHaveLength(1);
     expect(sent.join("\n")).toContain("closed early");
   });
 
@@ -149,8 +149,8 @@ describe("runProbe", () => {
     const [q] = await seedOpen(db);
     const sent: string[] = [];
     const d = deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent);
-    const n = await runProbe(d, "2026-09-04", ["00000000-0000-0000-0000-000000000000", q!.id]);
-    expect(n).toBe(1);
+    const outcomes = await runProbe(d, "2026-09-04", ["00000000-0000-0000-0000-000000000000", q!.id]);
+    expect(outcomes.filter((o) => o.healed)).toHaveLength(1);
     expect(sent.join("\n")).toContain("probe failed");
   });
 
@@ -163,5 +163,56 @@ describe("runProbe", () => {
     d.claude = meterClaude(db, d.claude!, "2026-09-04");
     await expect(runProbe(d, "2026-09-04", [q!.id, q!.id])).rejects.toBeInstanceOf(BudgetExhausted);
     expect(sent.filter((t) => t.includes("probe failed"))).toHaveLength(0);
+  });
+});
+
+describe("probeOne and narrateProbe (design 2026-09-08 §3.3, §5.2)", () => {
+  it("probeOne returns the slot and text a narrator needs, without narrating", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOpen(db);
+    const sent: string[] = [];
+    const d = deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent);
+
+    const out = await probeOne(d, q!.id);
+    expect(out.healed).toBe(true);
+    expect(out.slot).toBeTypeOf("number");
+    expect(out.text).toBeTypeOf("string");
+    // A step returns a SUMMARY. Narration is a separate, terminal step, so
+    // probeOne must not send anything itself.
+    expect(sent).toEqual([]);
+  });
+
+  it("probeOne captures a failure instead of throwing it", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOpen(db);
+    const d = deps(db, ANSWERED);
+    d.claude = { structured: async () => { throw new Error("upstream 503"); } };
+    const out = await probeOne(d, q!.id);
+    expect(out).toEqual({ questionId: q!.id, healed: false, error: "upstream 503" });
+  });
+
+  it("probeOne still propagates a spent budget", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOpen(db);
+    await db.insert(schema.pipelineSpend).values({ date: "2026-09-04", calls: PIPELINE_DAILY_CALL_BUDGET });
+    const d = deps(db, ANSWERED);
+    d.claude = meterClaude(db, d.claude!, "2026-09-04");
+    await expect(probeOne(d, q!.id)).rejects.toBeInstanceOf(BudgetExhausted);
+  });
+
+  it("narrateProbe sends one line per heal and nothing when none healed", async () => {
+    const { db } = await makeTestDb();
+    const sent: string[] = [];
+    const d = deps(db, ANSWERED, "2026-09-04T20:00:00Z", sent);
+
+    await narrateProbe(d, "2026-09-08", [{ questionId: "q1", healed: false }]);
+    expect(sent).toEqual([]);
+
+    await narrateProbe(d, "2026-09-08", [
+      { questionId: "q1", healed: true, slot: 3, text: "Will it rain?" },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("slot 3");
+    expect(sent[0]).toContain("Will it rain?");
   });
 });

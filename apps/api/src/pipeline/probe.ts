@@ -55,20 +55,74 @@ export async function probeQuestion(deps: PipelineDeps, questionId: string): Pro
   return updated.length > 0;
 }
 
-export async function runProbe(deps: PipelineDeps, date: string, questionIds: string[]): Promise<number> {
-  let healed = 0;
-  for (const questionId of questionIds) {
-    try {
-      if (await probeQuestion(deps, questionId)) {
-        healed += 1;
-        const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
-        await deps.telegram.send(`⚠ ${date} slot ${q?.slot}: the answer exists, so the question closed early — "${q?.text}"`);
-      }
-    } catch (err) {
-      // A spent budget stops the DAY, not this question — see runResolution.
-      if (err instanceof BudgetExhausted) throw err;
-      await deps.telegram.send(`⚠ probe failed (${date}): ${err instanceof Error ? err.message : String(err)}`);
-    }
+export interface ProbeOutcome {
+  questionId: string;
+  healed: boolean;
+  slot?: number;
+  text?: string;
+  error?: string;
+}
+
+/**
+ * One probe, as a VALUE (design 2026-09-08 §3.3). Carries the slot and text so
+ * the terminal narrator needs no second read — today's in-loop send re-queries
+ * the question purely to build its message.
+ *
+ * Throws only BudgetExhausted, exactly as resolveOne does.
+ */
+export async function probeOne(deps: PipelineDeps, questionId: string): Promise<ProbeOutcome> {
+  try {
+    const healed = await probeQuestion(deps, questionId);
+    if (!healed) return { questionId, healed: false };
+    const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+    return { questionId, healed: true, slot: q?.slot, text: q?.text };
+  } catch (err) {
+    if (err instanceof BudgetExhausted) throw err;
+    return { questionId, healed: false, error: err instanceof Error ? err.message : String(err) };
   }
-  return healed;
+}
+
+/**
+ * Terminal narration (design 2026-09-08 §5.2). Its own step, so that a retry
+ * of an EARLIER step can never re-send it — which is what today's in-loop
+ * sends do.
+ *
+ * Heal messages stay one-per-healed-question, unlike resolve's batched
+ * failures: each heal is its own event worth its own line, not a summary.
+ */
+export async function narrateProbe(
+  deps: PipelineDeps,
+  date: string,
+  outcomes: ProbeOutcome[],
+): Promise<void> {
+  for (const o of outcomes.filter((x) => x.healed)) {
+    await deps.telegram.send(
+      `⚠ ${date} slot ${o.slot}: the answer exists, so the question closed early — "${o.text}"`,
+    );
+  }
+  const failed = outcomes.filter((o) => o.error);
+  if (failed.length > 0) {
+    await deps.telegram.send(
+      `⚠ probe failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
+    );
+  }
+}
+
+/**
+ * The INLINE path — `wrangler dev`, tests, and any deployment without Workflow
+ * bindings. Identical work, same order, in-process. The Workflow drives
+ * probeOne per step instead; both share the unit, which is why the two paths
+ * cannot drift.
+ */
+export async function runProbe(
+  deps: PipelineDeps,
+  date: string,
+  questionIds: string[],
+): Promise<ProbeOutcome[]> {
+  const outcomes: ProbeOutcome[] = [];
+  for (const questionId of questionIds) {
+    outcomes.push(await probeOne(deps, questionId));
+  }
+  await narrateProbe(deps, date, outcomes);
+  return outcomes;
 }
