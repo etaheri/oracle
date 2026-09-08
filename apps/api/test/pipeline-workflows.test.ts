@@ -10,7 +10,11 @@ describe("hourBucket", () => {
 });
 
 describe("bindingStarter", () => {
-  const binding = (created: unknown[]) => ({ create: async (o: unknown) => void created.push(o) });
+  // bindingStarter only ever calls create() — get() is exercised by the admin
+  // routes' own tests — so this stub exists purely to satisfy WorkflowBinding's
+  // shape.
+  const noGet = () => { throw new Error("not exercised by bindingStarter"); };
+  const binding = (created: unknown[]) => ({ create: async (o: unknown) => void created.push(o), get: noGet });
   // bindingStarter ignores the deps argument entirely — the Workflow builds its
   // own deps from env on the other side of the dispatch.
   const noDeps = null as unknown as import("../src/pipeline").PipelineDeps;
@@ -28,18 +32,18 @@ describe("bindingStarter", () => {
 
   it("swallows a duplicate-instance error, because a collision IS the idempotency", async () => {
     const s = bindingStarter({
-      AUTHORING_WORKFLOW: { create: async () => { throw new Error("instance.already_exists: an instance with id author-x already exists"); } },
-      RESOLUTION_WORKFLOW: { create: async () => {} },
-      PROBE_WORKFLOW: { create: async () => {} },
+      AUTHORING_WORKFLOW: { create: async () => { throw new Error("instance.already_exists: an instance with id author-x already exists"); }, get: noGet },
+      RESOLUTION_WORKFLOW: { create: async () => {}, get: noGet },
+      PROBE_WORKFLOW: { create: async () => {}, get: noGet },
     });
     await expect(s.start(noDeps, "author", "author-x", { date: "2026-09-05" })).resolves.toBeUndefined();
   });
 
   it("still throws on any OTHER failure — a broken binding must not look like a duplicate", async () => {
     const s = bindingStarter({
-      AUTHORING_WORKFLOW: { create: async () => { throw new Error("binding is not configured"); } },
-      RESOLUTION_WORKFLOW: { create: async () => {} },
-      PROBE_WORKFLOW: { create: async () => {} },
+      AUTHORING_WORKFLOW: { create: async () => { throw new Error("binding is not configured"); }, get: noGet },
+      RESOLUTION_WORKFLOW: { create: async () => {}, get: noGet },
+      PROBE_WORKFLOW: { create: async () => {}, get: noGet },
     });
     await expect(s.start(noDeps, "author", "author-x", { date: "2026-09-05" })).rejects.toThrow("not configured");
   });

@@ -47,8 +47,13 @@ export function hourBucket(now: ETNow): string {
 // The subset of Cloudflare's Workflow binding this file uses. Declared
 // structurally so the tests can pass a plain object and the Worker types stay
 // out of the test tsconfig.
+export interface WorkflowInstanceHandle {
+  status(): Promise<unknown>;
+  restart(options?: { from?: { name: string; count?: number; type?: "do" | "sleep" | "waitForEvent" } }): Promise<void>;
+}
 export interface WorkflowBinding {
   create(options: { id: string; params: { date: string; questionIds?: string[] } }): Promise<unknown>;
+  get(id: string): Promise<WorkflowInstanceHandle>;
 }
 export interface WorkflowBindings {
   AUTHORING_WORKFLOW: WorkflowBinding;

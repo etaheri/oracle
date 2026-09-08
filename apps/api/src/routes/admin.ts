@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { eq, asc, gte } from "drizzle-orm";
 import type { AppContext } from "../app";
@@ -10,6 +10,7 @@ import { publish } from "../pipeline/actions";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
 import { pooledLeak, loadLeakRows, type SealRow } from "../pipeline/leak";
+import type { WorkflowBinding } from "../pipeline/workflows";
 
 const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
 
@@ -24,6 +25,25 @@ const PatchQuestionSchema = z.object({
 // (telegram, claude, cron deps) isn't wired up — the publish executor still
 // needs a TelegramClient to narrate a skip.
 const noopTelegram = makeTelegramClient(undefined, undefined);
+
+const WORKFLOW_KINDS = { author: "AUTHORING_WORKFLOW", resolve: "RESOLUTION_WORKFLOW", probe: "PROBE_WORKFLOW" } as const;
+
+// Resolves a :kind param to its binding, or explains why not. Two distinct
+// failure modes get two distinct statuses: a kind outside {author, resolve,
+// probe} will NEVER exist, so it's a 400 — the request itself is wrong. A
+// known kind whose binding is absent is a deployment missing its Workflow
+// bindings (spec: they're optional at runtime); that's a 503 — the request
+// is right, the server just isn't configured for it yet.
+function bindingFor(
+  c: Context<AppContext>,
+  kind: string,
+): { binding: WorkflowBinding } | { error: string; status: 400 | 503 } {
+  const key = WORKFLOW_KINDS[kind as keyof typeof WORKFLOW_KINDS];
+  if (!key) return { error: "unknown workflow kind", status: 400 };
+  const binding = c.get("deps").workflows?.[key];
+  if (!binding) return { error: "workflow binding not configured", status: 503 };
+  return { binding };
+}
 
 export const adminRoutes = new Hono<AppContext>()
   .use("*", async (c, next) => {
@@ -156,6 +176,26 @@ export const adminRoutes = new Hono<AppContext>()
   // settle-time LEAK WATCH answers "did this question leak"; this answers
   // "does the window leak", which is the one that decides whether a standing
   // ranks foresight or patience.
+  // The operational lever this whole design exists to make possible: a
+  // resolution that died on question four is resumed AT question four, with
+  // the first three steps served from cache (design 2026-09-08 §6).
+  .get("/workflows/:kind/:id", async (c) => {
+    const resolved = bindingFor(c, c.req.param("kind"));
+    if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const instance = await resolved.binding.get(c.req.param("id"));
+    return c.json(await instance.status());
+  })
+  .post("/workflows/:kind/:id/restart", async (c) => {
+    const resolved = bindingFor(c, c.req.param("kind"));
+    if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const body = await c.req.json().catch(() => ({}));
+    // A string `from` names the step to resume at; anything else restarts
+    // from the top, matching restart()'s own no-argument default.
+    const from = typeof body?.from === "string" ? { from: { name: body.from } } : undefined;
+    const instance = await resolved.binding.get(c.req.param("id"));
+    await instance.restart(from);
+    return c.json({ ok: true });
+  })
   .get("/analytics/leak", async (c) => {
     const db = c.get("deps").db;
     const since = c.req.query("since");

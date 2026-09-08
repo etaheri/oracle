@@ -98,6 +98,15 @@ export default {
         APPLE_BUNDLE_ID: env.APPLE_BUNDLE_ID,
       },
       pipeline: buildPipelineDeps(env),
+      // Independent of buildPipelineDeps's all-or-nothing bindings check
+      // (which requires all three before the pipeline will dispatch to any):
+      // the admin routes should read whichever bindings a deployment happens
+      // to have, even mid-rollout with only one or two configured.
+      workflows: {
+        AUTHORING_WORKFLOW: env.AUTHORING_WORKFLOW,
+        RESOLUTION_WORKFLOW: env.RESOLUTION_WORKFLOW,
+        PROBE_WORKFLOW: env.PROBE_WORKFLOW,
+      },
     });
     return app.fetch(req);
   },
