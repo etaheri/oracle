@@ -87,17 +87,63 @@ export async function resolveWithClaude(deps: PipelineDeps, questionId: string):
   return true;
 }
 
-// Every question resolves independently: one failing read must never stall the
-// others. This is the function the resolution Workflow's step calls.
-export async function runResolution(deps: PipelineDeps, date: string, questionIds: string[]): Promise<void> {
-  for (const questionId of questionIds) {
-    try {
-      await resolveWithClaude(deps, questionId);
-    } catch (err) {
-      // A spent budget stops the DAY, not this question. Swallowing it here
-      // turns one critical into five warnings, repeated hourly until void.
-      if (err instanceof BudgetExhausted) throw err;
-      await deps.telegram.send(`⚠ resolve failed (${date}): ${err instanceof Error ? err.message : String(err)}`);
-    }
+export interface ResolveOutcome {
+  questionId: string;
+  resolved: boolean;
+  error?: string;
+}
+
+/**
+ * One question, resolved or not, as a VALUE rather than an effect.
+ *
+ * This is the unit a Workflow step drives (design 2026-09-08 §3.2). It throws
+ * only BudgetExhausted — a day-level stop that must reach the entrypoint's
+ * mapper and become a NonRetryableError. Every other failure is captured into
+ * the outcome, because one failing read must never stall the others and a step
+ * that returns a summary is one a later step can narrate.
+ */
+export async function resolveOne(deps: PipelineDeps, questionId: string): Promise<ResolveOutcome> {
+  try {
+    const resolved = await resolveWithClaude(deps, questionId);
+    return { questionId, resolved };
+  } catch (err) {
+    if (err instanceof BudgetExhausted) throw err;
+    return { questionId, resolved: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Terminal narration (design 2026-09-08 §5.2). Its own step, so that a retry
+ * of an EARLIER step can never re-send it — which is what today's in-loop
+ * sends do.
+ */
+export async function narrateResolution(
+  deps: PipelineDeps,
+  date: string,
+  outcomes: ResolveOutcome[],
+): Promise<void> {
+  const failed = outcomes.filter((o) => o.error);
+  if (failed.length === 0) return;
+  await deps.telegram.send(
+    `⚠ resolve failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
+  );
+}
+
+/**
+ * The INLINE path — `wrangler dev`, tests, and any deployment without Workflow
+ * bindings. Identical work, same order, in-process. The Workflow drives
+ * resolveOne per step instead; both share the unit, which is why the two paths
+ * cannot drift.
+ */
+export async function runResolution(
+  deps: PipelineDeps,
+  date: string,
+  questionIds: string[],
+): Promise<ResolveOutcome[]> {
+  const outcomes: ResolveOutcome[] = [];
+  for (const questionId of questionIds) {
+    outcomes.push(await resolveOne(deps, questionId));
+  }
+  await narrateResolution(deps, date, outcomes);
+  return outcomes;
 }

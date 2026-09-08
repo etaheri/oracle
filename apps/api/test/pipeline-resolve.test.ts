@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { PIPELINE_LINES } from "@oracle/core";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
-import { resolveWithClaude, runResolution } from "../src/pipeline/resolve";
+import { resolveWithClaude, runResolution, resolveOne, narrateResolution } from "../src/pipeline/resolve";
 import { voidQuestions } from "../src/pipeline/actions";
 import { resolveQuestion } from "../src/resolution";
 import { runTick, type PipelineDeps } from "../src/pipeline";
@@ -424,7 +424,46 @@ describe("runResolution and the spend ceiling", () => {
     await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-26"));
     const { deps, sent } = fakeDeps(db, null);
     deps.claude = { structured: async () => { throw new Error("the source did not answer"); } };
-    await expect(runResolution(deps, "2026-08-26", [qs[0]!.id, qs[1]!.id])).resolves.toBeUndefined();
-    expect(sent.filter((t) => t.includes("resolve failed"))).toHaveLength(2);
+    await expect(runResolution(deps, "2026-08-26", [qs[0]!.id, qs[1]!.id])).resolves.toBeInstanceOf(Array);
+    // Narration moved to a single terminal step (design 2026-09-08 §5.2): one
+    // combined line, not one send per failure.
+    expect(sent.filter((t) => t.includes("resolve failed"))).toHaveLength(1);
+  });
+});
+
+describe("resolveOne and narrateResolution (design 2026-09-08 §3.2, §5.2)", () => {
+  it("resolveOne captures a failure instead of throwing it", async () => {
+    const { db } = await makeTestDb();
+    const { deps, sent } = fakeDeps(db, { structured: async () => { throw new Error("upstream 503"); } });
+    const qid = await lockedQuestion(db);
+
+    const out = await resolveOne(deps, qid);
+    expect(out).toEqual({ questionId: qid, resolved: false, error: "upstream 503" });
+    // A step returns a SUMMARY. Narration is a separate, terminal step, so
+    // resolveOne must not send anything itself.
+    expect(sent).toEqual([]);
+  });
+
+  it("resolveOne still propagates a spent budget", async () => {
+    const { db } = await makeTestDb();
+    const { deps } = fakeDeps(db, { structured: async () => { throw new BudgetExhausted("2026-09-08", 151, true); } });
+    const qid = await lockedQuestion(db);
+    await expect(resolveOne(deps, qid)).rejects.toBeInstanceOf(BudgetExhausted);
+  });
+
+  it("narrateResolution sends one line per failure and nothing when all resolved", async () => {
+    const { db } = await makeTestDb();
+    const { deps, sent } = fakeDeps(db, null);
+
+    await narrateResolution(deps, "2026-09-08", [{ questionId: "q1", resolved: true }]);
+    expect(sent).toEqual([]);
+
+    await narrateResolution(deps, "2026-09-08", [
+      { questionId: "q1", resolved: true },
+      { questionId: "q2", resolved: false, error: "upstream 503" },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("upstream 503");
+    expect(sent[0]).toContain("2026-09-08");
   });
 });
