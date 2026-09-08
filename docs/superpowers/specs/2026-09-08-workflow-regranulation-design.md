@@ -136,11 +136,17 @@ without re-fetching feeds, and so the context is checkpointed.
 `recentTopicKeys` moves into `context` as well, since `screen` consumes it.
 
 **Fan-out naming.** Steps are named `preflight-${index}` over the checkpointed
-`screen` output. Index, NOT `topic_key`: `recentTopicKeys` dedupes candidates
-against PRIOR rounds only, so two candidates within one batch may legitimately
-share a topic key, and a duplicate step name is a correctness bug rather than a
-cosmetic one. The topic key travels in the step's RETURN value, where it serves
-debugging without serving as an identity.
+`screen` output.
+
+Index, NOT `topic_key` — though not because topic keys collide. They do not:
+`screenCandidates` seeds its `seen` set with `recentTopicKeys` and drops any
+repeat WITHIN the batch too, first occurrence winning (`candidate.ts:83-84`), so
+every survivor's key is already unique. The reason is coupling. A step name is
+a durable cache key; deriving it from a value that is unique only because a
+DIFFERENT function currently chooses to dedupe it makes step identity depend on
+an invariant nobody declared and no test guards. Position is unique by
+construction. The topic key travels in the step's RETURN value, where it serves
+debugging without serving as identity.
 
 Determinism holds because `screen`'s output is checkpointed and traversed in
 order — the condition the Rules of Workflows require for dynamic step names.
