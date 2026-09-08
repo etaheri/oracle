@@ -1,4 +1,3 @@
-import { assessEditorial } from "../editorial";
 // The gauntlet, end to end (design 2026-09-04 §3, §4, §9.2).
 //
 // ORDER IS LOAD-BEARING, cheapest first:
@@ -20,6 +19,7 @@ import type { PipelineDeps } from "../index";
 import { addDays, noonET } from "../clock";
 import { upsertDraft } from "../draft";
 import { emptyTally, screenCandidates, type RejectReason, type Rejection } from "../candidate";
+import { assessEditorial, type Edited } from "../editorial";
 import { gatherAuthoringContext, generateCandidates } from "./generate";
 import { checkSources } from "./sources";
 import { criticize } from "./critic";
@@ -49,6 +49,41 @@ function narrate(date: string, written: number, published: boolean, tally: Recor
     `${written} candidates → ${published ? 5 : 0} published${relaxed ? " (categories relaxed to three)" : ""}`,
     `rejected: ${reasons || "none"}`,
   ].join("\n");
+}
+
+/**
+ * Selection plus both writes. Idempotent by construction: upsertDraft is an
+ * upsert and the counter update sets fixed values, so a retry of this step
+ * lands the same round twice with the same content.
+ *
+ * No selection is not a failure — `publish-bank` already covers noon, and
+ * the noon alert already in decideActions fires if the bank is empty too. A
+ * drop that does not happen is the correct outcome for a ledger whose brand
+ * is that it does not lie.
+ */
+export async function commitRound(
+  deps: PipelineDeps,
+  date: string,
+  written: number,
+  tally: Record<RejectReason, number>,
+  edited: Edited[],
+): Promise<GauntletResult> {
+  const rejected = Object.values(tally).reduce((a, b) => a + b, 0);
+  const selection = selectRound(edited);
+  if (!selection) return { written, rejected, tally, published: false, relaxed: false };
+
+  await upsertDraft(deps.db, date, selection.draft, 2);
+  await deps.db
+    .update(schema.rounds)
+    .set({ candidatesWritten: written, candidatesRejected: rejected })
+    .where(eq(schema.rounds.date, date));
+
+  return { written, rejected, tally, published: true, relaxed: selection.relaxed };
+}
+
+/** Terminal narration — its own step, so no earlier retry re-sends it. */
+export async function narrateGauntlet(deps: PipelineDeps, date: string, r: GauntletResult): Promise<void> {
+  await deps.telegram.send(narrate(date, r.written, r.published, r.tally, r.relaxed));
 }
 
 export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Promise<GauntletResult> {
@@ -84,24 +119,8 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
 
   const editorial = await assessEditorial(deps, tier4.passed, opensAt);
   tally.editorial += tier4.passed.length - editorial.length;
-  const rejected = Object.values(tally).reduce((a, b) => a + b, 0);
-  const selection = selectRound(editorial);
 
-  if (!selection) {
-    // No round. `publish-bank` already covers noon, and the noon alert already
-    // in decideActions fires if the bank is empty too. A drop that does not
-    // happen is the correct outcome for a ledger whose brand is that it does
-    // not lie.
-    await deps.telegram.send(narrate(date, written, false, tally, false));
-    return { written, rejected, tally, published: false, relaxed: false };
-  }
-
-  await upsertDraft(deps.db, date, selection.draft, 2);
-  await deps.db
-    .update(schema.rounds)
-    .set({ candidatesWritten: written, candidatesRejected: rejected })
-    .where(eq(schema.rounds.date, date));
-
-  await deps.telegram.send(narrate(date, written, true, tally, selection.relaxed));
-  return { written, rejected, tally, published: true, relaxed: selection.relaxed };
+  const result = await commitRound(deps, date, written, tally, editorial);
+  await narrateGauntlet(deps, date, result);
+  return result;
 }

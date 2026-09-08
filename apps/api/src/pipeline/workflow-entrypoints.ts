@@ -21,8 +21,15 @@ import { NonRetryableError } from "cloudflare:workflows";
 import { buildPipelineDeps, type WorkerEnv } from "../worker";
 import { POLICY, type StepPolicy } from "./steps";
 import { BudgetExhausted, meterClaude, reportBudgetExhaustion } from "./spend";
-import { etNow } from "./clock";
-import { runAuthoringGauntlet } from "./gauntlet";
+import { addDays, etNow, noonET } from "./clock";
+import { emptyTally, screenCandidates, type Rejection } from "./candidate";
+import { gatherAuthoringContext, generateCandidates } from "./gauntlet/generate";
+import { checkSources } from "./gauntlet/sources";
+import { criticize } from "./gauntlet/critic";
+import { preflightOne, assemblePreflight } from "./gauntlet/preflight";
+import { tasteCheck } from "./gauntlet/taste";
+import { assessEditorial } from "./editorial";
+import { commitRound, narrateGauntlet } from "./gauntlet";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
 import { probeOne, narrateProbe, type ProbeOutcome } from "./probe";
 import type { PipelineDeps } from "./index";
@@ -88,18 +95,85 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
   async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
     const deps = metered(this.env);
     if (!deps) return;
-    // Still one step covering the whole gauntlet — Task 9 (design 2026-09-08
-    // §3.1, Phase 2) is what splits this into nine steps plus the fan-out.
-    // The policy below reproduces Cloudflare's own default verbatim, so this
-    // class's behaviour is unchanged; only its budget mapping now goes
-    // through durableStep instead of the deleted narrating().
-    await durableStep(
-      step,
-      "gauntlet",
-      { timeout: "10 minutes", retries: { limit: 5, delay: "10 seconds", backoff: "exponential" } },
-      deps,
-      () => runAuthoringGauntlet(deps, event.payload.date),
+    const { date } = event.payload;
+    const tally = emptyTally();
+    const count = (rs: Rejection[]) => rs.forEach((r) => (tally[r.reason] += 1));
+
+    const ctx = await durableStep(step, "context", POLICY.context, deps, () =>
+      gatherAuthoringContext(deps, date),
     );
+
+    const raw = await durableStep(step, "generate", POLICY.model, deps, async () => {
+      // `generateCandidates` returns `unknown[]` by design (candidate.ts
+      // header) — it is unvalidated model output, and screenCandidates
+      // below is the first thing that parses it. `T extends
+      // Rpc.Serializable<T>` cannot prove a bare `unknown[]` is
+      // serializable, since `unknown` could be a function or symbol; cast
+      // to `object[]`, which DOES satisfy the constraint and is still
+      // assignable everywhere `raw` is used below (screenCandidates takes
+      // `unknown[]`).
+      return (await generateCandidates(deps, date, ctx)) as object[];
+    });
+
+    const opensAt = noonET(date);
+    const locksAtDefault = noonET(addDays(date, 1));
+
+    // Tier 0 — free.
+    const tier0 = await durableStep(step, "screen", POLICY.pure, deps, async () =>
+      screenCandidates(raw, {
+        rulesVersion: 2,
+        opensAt,
+        locksAtDefault,
+        recentTopicKeys: new Set(ctx.recentTopicKeys),
+      }),
+    );
+    count(tier0.rejected);
+
+    // Tier 1 — one GET each.
+    const tier1 = await durableStep(step, "sources", POLICY.sourceFetch, deps, () =>
+      checkSources(deps.sourceFetch ?? fetch, tier0.passed),
+    );
+    count(tier1.rejected);
+
+    // Tier 2 — one model call, plus §7's contestedness gate.
+    const tier2 = await durableStep(step, "critic", POLICY.model, deps, () =>
+      criticize(deps, tier1.passed),
+    );
+    count(tier2.rejected);
+
+    // Tier 3 — THE FAN-OUT. One step per survivor, named by position over the
+    // checkpointed `critic` output so replays reproduce the same names
+    // (design 2026-09-08 §3.1).
+    const outcomes = await Promise.all(
+      tier2.judged.map((j, i) =>
+        durableStep(step, `preflight-${i}`, POLICY.modelWide, deps, () => preflightOne(deps, j, i)),
+      ),
+    );
+    const tier3 = assemblePreflight(tier2.judged, outcomes);
+    count(tier3.rejected);
+
+    // Tier 4 — last, and fail-closed. POLICY.failClosed is zero-retry so the
+    // guarantee is declared rather than emergent (design 2026-09-08 §5.1).
+    const tier4 = await durableStep(step, "taste", POLICY.failClosed, deps, () =>
+      tasteCheck(deps, tier3.passed),
+    );
+    count(tier4.rejected);
+
+    const edited = await durableStep(step, "editorial", POLICY.model, deps, () =>
+      assessEditorial(deps, tier4.passed, opensAt),
+    );
+    tally.editorial += tier4.passed.length - edited.length;
+
+    const result = await durableStep(step, "commit", POLICY.db, deps, () =>
+      commitRound(deps, date, raw.length, tally, edited),
+    );
+
+    await durableStep(step, "narrate", POLICY.narrate, deps, async () => {
+      await narrateGauntlet(deps, date, result);
+      return { published: result.published };
+    });
+
+    return result;
   }
 }
 
