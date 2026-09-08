@@ -1,0 +1,38 @@
+# NOTE: when a .easignore exists, EAS stops honoring .gitignore entirely and
+# uses ONLY this file. So this must re-state every .gitignore exclusion that
+# matters for a build, not just the extra ones. Getting this wrong silently
+# flips the managed prebuild into a bare build by shipping apps/mobile/ios.
+
+# --- the reason this file exists: 127MB of plan-evidence screenshots ---
+docs/
+design/
+.oracle-run/
+
+# --- generated native projects (were covered by apps/mobile/.gitignore) ---
+apps/mobile/ios/
+apps/mobile/android/
+
+# --- dependencies and build output ---
+node_modules/
+dist/
+web-build/
+.expo/
+.wrangler/
+*.tsbuildinfo
+
+# --- secrets and signing material: never ship these to a builder ---
+.dev.vars
+.env*.local
+*.p8
+*.p12
+*.key
+*.jks
+*.mobileprovision
+*.pem
+
+# --- noise ---
+.DS_Store
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
