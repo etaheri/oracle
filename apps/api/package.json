@@ -26,6 +26,7 @@
     "@electric-sql/pglite": "^0.5.5",
     "@types/node": "^26.2.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.124.0"
