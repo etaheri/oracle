@@ -1,0 +1,9 @@
+{
+  // The public site. It exists for two App Store Connect requirements —
+  // a reachable privacy policy (App Review rejects a paywall whose privacy
+  // link is dead or absent) and a support URL (required to submit at all).
+  // Static assets only; no server code, no data collected here.
+  "name": "outseen-site",
+  "compatibility_date": "2026-08-01",
+  "assets": { "directory": "./public" }
+}
