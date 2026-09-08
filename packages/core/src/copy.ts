@@ -106,6 +106,16 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
 
 // Purchase-button labels. Deliberately OUTSIDE the bank: the no-CTA-verb law
 // governs ambient copy; a button IS a CTA. Mini-lint: caps, no emoji/!, ≤32.
+// The reminder door. The summons is the ONE ask a player gets, and it only
+// fires after a seal — so a reader who answers nothing is never asked at all,
+// and is precisely the reader a reminder is for. These two labels are that
+// door: the first opens the summons, the second leaves for Settings, which is
+// the only switch left once iOS has been refused.
+export const REMINDER_CTA_LINES = Object.freeze({
+  ask: "TELL ME BEFORE IT CLOSES",
+  settings: "TURN ON REMINDERS IN SETTINGS",
+} as const);
+
 export const PAYWALL_CTA_LINES = Object.freeze({
   subscribe: "JOIN OUTSEE PLUS",
   rescue: "RAISE THE SHIELD",

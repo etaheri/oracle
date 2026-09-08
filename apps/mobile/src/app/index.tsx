@@ -1,6 +1,8 @@
 import { roundAvailability } from "../game/roundAvailability";
+import { shouldOfferReminder } from "../game/reminderOffer";
+import { useNotificationPermission } from "../notifications/permission";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, View, Pressable } from "react-native";
+import { AppState, View, Pressable, Linking } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, role } from "../ui/Text";
 import { SystemHeader } from "../ui/SystemHeader";
@@ -28,11 +30,11 @@ import { msUntil } from "../game/countdown";
 import { useNow } from "../game/useNow";
 import { getOrbGreeted, getRevealSeen, getRitesSeen, markOrbGreeted } from "../api/flags";
 import { resealReminders } from "../notifications/schedule";
-import { maybeSummon } from "../notifications/summons";
+import { maybeSummon, summonNow } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
-import { vigilLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, type MeLedger } from "@oracle/core";
+import { vigilLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, REMINDER_CTA_LINES, type MeLedger } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -169,6 +171,15 @@ export default function Index() {
   const now = useNow(30_000);
   const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
   const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${yesterday}`);
+  // The summons only ever fires after a seal, so a reader who answers nothing
+  // is never asked for permission — and is exactly who a reminder is for.
+  // This is that reader's only door; see game/reminderOffer.ts.
+  const notifPermission = useNotificationPermission();
+  const reminderOffer = shouldOfferReminder({
+    openCount: availability?.openCount ?? 0,
+    anySealed,
+    permission: notifPermission,
+  });
   const notice = shield ?? risk ?? lapse ?? vigil;
   // Risk/lapse notices are the paywall's entry point — a missed vigil is the
   // one moment protection actually matters. Shield/vigil lines stay plain.
@@ -362,6 +373,35 @@ export default function Index() {
             ) : (
               <Mono {...role.meta} color={colors.mutedInk}>{notice}</Mono>
             )
+          )}
+        </View>
+        {/* The reminder door, one row below the notice and reserved on the
+            same terms: the permission read is async and lands after first
+            paint, so the slot has to exist from frame one or it shoves the
+            composition the moment the OS answers — the same bug the notice
+            row above is reserved against. Empty whenever notifications are
+            already on, which is the common case. */}
+        <View style={{ minHeight: noticeRowH, justifyContent: "center" }}>
+          {reminderOffer && (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }}
+              onPress={() =>
+                reminderOffer === "settings"
+                  // Refused once, iOS will not prompt again — Settings is the
+                  // only switch left, and pretending otherwise would give the
+                  // reader a button that silently does nothing.
+                  ? void Linking.openSettings()
+                  // summonNow, not a bare push: it marks the flag, so a
+                  // reader who enables notifications here is not summoned
+                  // again the first time they seal a question.
+                  : leaveHome(() => void summonNow(() => router.push("/summons")))
+              }
+            >
+              <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textDecorationLine: "underline" }]}>
+                {reminderOffer === "settings" ? REMINDER_CTA_LINES.settings : REMINDER_CTA_LINES.ask}
+              </Mono>
+            </Pressable>
           )}
         </View>
         {/* The block outlives its own offer. The instant a shield lands,
