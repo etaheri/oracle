@@ -113,7 +113,7 @@ export default function Round() {
   );
   if (!today.data) return (
     <Screen>
-      <TopBar label="OUTSEE" />
+      <TopBar label="OUTSEEN" />
       <View style={{ flex: 1, justifyContent: "center" }}>
         <SleepsPanel
           failed={today.isError}

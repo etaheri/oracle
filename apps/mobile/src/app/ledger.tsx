@@ -231,7 +231,7 @@ export default function Ledger() {
             </>
           )}
         </View>
-        {!plusActive && <QuietLink title="Outsee Plus" onPress={() => router.push("/plus")} />}
+        {!plusActive && <QuietLink title="Outseen Plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
           {LITURGY_LINES.map((line) => (
             <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>

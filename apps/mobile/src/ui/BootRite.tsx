@@ -21,7 +21,7 @@ import { OracleOrb } from "./orb/OracleOrb";
 // on landing, Home's orb takes over in its waking state — THE ORB WAKES. With no
 // anchor (deep link, unmeasured) the whole orb+dust group fades out together
 // with the field instead of sliding.
-const LINES = ["OUTSEE", "THE ORACLE WAKES", "YOUR NEXT CALL AWAITS"] as const;
+const LINES = ["OUTSEEN", "THE ORACLE WAKES", "YOUR NEXT CALL AWAITS"] as const;
 const LINE_MS = 420;
 const READY_MS = LINES.length * LINE_MS + 320;
 const HOLD_MS = READY_MS + 700;

@@ -117,7 +117,7 @@ export const REMINDER_CTA_LINES = Object.freeze({
 } as const);
 
 export const PAYWALL_CTA_LINES = Object.freeze({
-  subscribe: "JOIN OUTSEE PLUS",
+  subscribe: "JOIN OUTSEEN PLUS",
   rescue: "RAISE THE SHIELD",
   restore: "RESTORE PURCHASES",
 } as const);
@@ -125,7 +125,7 @@ export const PAYWALL_CTA_LINES = Object.freeze({
 // OneSignal dashboard campaign copy — the repo is the source of truth; the
 // dashboard is a paste target (spec §5). Standard bank rules apply.
 export const PUSH_CAMPAIGN_LINES = Object.freeze({
-  plusWelcome: "OUTSEE PLUS IS ACTIVE. SHIELD PROTECTION DEPENDS ON YOUR STREAK AND AVAILABLE RESERVE.",
+  plusWelcome: "OUTSEEN PLUS IS ACTIVE. SHIELD PROTECTION DEPENDS ON YOUR STREAK AND AVAILABLE RESERVE.",
 } as const);
 
 // Char-walk hash (31-multiplier, 32-bit wrapped): deterministic, and the
@@ -223,7 +223,7 @@ export const SCORE_GLOSS = Object.freeze({
 // The Calling: the one-time cinematic on the app's very first open — the
 // machine recounts the search and assigns the player their role. Lore only;
 // every rule belongs to the rites. Hand-written, linted, versioned.
-export const CALLING_LINES = ["OUTSEE", "MEET THE ORACLE", "IT MAKES A CALL. SO DO YOU."] as const;
+export const CALLING_LINES = ["OUTSEEN", "MEET THE ORACLE", "IT MAKES A CALL. SO DO YOU."] as const;
 
 // The partial-day notice (home, when some but not all five are sealed).
 export const PARTIAL_LINE = "A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION. YOUR CALLS CAN STILL RECEIVE RESULTS.";
@@ -231,7 +231,7 @@ export const PARTIAL_LINE = "A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTI
 // The summons: the interstitial before the OS notification prompt (voice
 // spec §4). Three declaratives, then the machine asks once.
 export const SUMMONS_LINES = [
-  "OUTSEE CAN SEND UP TO TWO REMINDERS A DAY.",
+  "OUTSEEN CAN SEND UP TO TWO REMINDERS A DAY.",
   "AN INVITATION TO PLAY OR RETURN TO YOUR LEDGER.",
   "NOTIFICATIONS ARE OPTIONAL.",
 ] as const;

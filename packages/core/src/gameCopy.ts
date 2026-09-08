@@ -1,6 +1,6 @@
 /** Current vocabulary. Historical rules remain in copy.ts, explicitly versioned. */
 export const GAME_TERMS = {
-  product: 'Outsee', opponent: 'The Oracle', players: 'players',
+  product: 'Outseen', opponent: 'The Oracle', players: 'players',
   rulesNav: 'How to play', rulesTitle: 'The Rites',
   history: 'Your ledger', streak: 'Streak', streakTitle: 'Your vigil',
   playerRating: 'Your forecast rating', opponentRating: 'Oracle rating',

@@ -30,7 +30,7 @@ export async function resealReminders(locksAt: string, roundDate: string, sealed
     for (const r of planReminders(locksAt, roundDate, sealedCount)) {
       if (r.at.getTime() <= now) continue; // inside the 3h window already — no late nag
       await Notifications.scheduleNotificationAsync({
-        content: { title: "Outsee", body: r.body },
+        content: { title: "Outseen", body: r.body },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: r.at,

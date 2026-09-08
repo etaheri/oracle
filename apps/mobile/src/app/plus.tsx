@@ -37,7 +37,7 @@ function PlusContent() {
   return (
     <Screen scroll overlayHeader header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
-        <Eyebrow>Outsee Plus</Eyebrow>
+        <Eyebrow>Outseen Plus</Eyebrow>
         {plusActive ? (
           <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{PUSH_CAMPAIGN_LINES.plusWelcome}</Mono>
         ) : offering === "loading" ? (

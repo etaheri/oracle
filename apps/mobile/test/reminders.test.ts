@@ -34,7 +34,7 @@ describe("planReminders", () => {
     const noon = planReminders(locksAt, "2026-08-28", 1).filter((x) => x.kind === "noon");
     expect(noon).toHaveLength(1);
     expect(noon[0]!.at.toISOString()).toBe("2026-08-29T16:45:00.000Z");
-    expect(noon[0]!.body).toBe("RETURN TO OUTSEE TO CHECK YOUR PREDICTIONS AND THE NEXT CHALLENGE.");
+    expect(noon[0]!.body).toBe("RETURN TO OUTSEEN TO CHECK YOUR PREDICTIONS AND THE NEXT CHALLENGE.");
     expect(planReminders(locksAt, "2026-08-28", 0).some((x) => x.kind === "noon")).toBe(false);
   });
   it("a sealed day still gets its noon reminder and no closing call", () => {

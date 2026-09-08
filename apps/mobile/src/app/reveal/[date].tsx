@@ -178,7 +178,7 @@ export default function RevealScreen() {
 
   if (reveal.isLoading) return (
     <Screen>
-      <TopBar label="OUTSEE" />
+      <TopBar label="OUTSEEN" />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
         <DecodeLine text="CONSULTING THE VOID…" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
@@ -186,12 +186,12 @@ export default function RevealScreen() {
     </Screen>
   );
   if (reveal.isError) return (
-    <Screen><TopBar label="OUTSEE" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
+    <Screen><TopBar label="OUTSEEN" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <DecodeLine text="THE ORB IS BEYOND REACH. IT WILL RETURN." size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
     </View></Screen>
   );
   if (!reveal.data || "pending" in reveal.data) {
-    return <Screen><TopBar label="OUTSEE" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
+    return <Screen><TopBar label="OUTSEEN" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
       <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
@@ -290,7 +290,7 @@ export default function RevealScreen() {
               ? `Day ${d.date}`
               : `Day ${d.date} · the ledger is read`}
         </Eyebrow>
-        <Eyebrow>Outsee · You vs the Oracle</Eyebrow>
+        <Eyebrow>Outseen · You vs the Oracle</Eyebrow>
         <RevealSummary data={d} milestone={milestone ? MILESTONE_COPY[milestone] : null} />
         {rivalry && (
           <View style={{ alignItems: "center", gap: space(1) }}>

@@ -44,7 +44,7 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
       <Fill color={colors.midnightMuseum} />
       <Rect x={INSET + 0.5} y={INSET + 0.5} width={PLAQUE_W - 2 * INSET - 1} height={PLAQUE_H - 2 * INSET - 1} style="stroke" strokeWidth={1} color={NIGHT_LINE} />
       <RegisterMarks />
-      {mono && <SkText font={mono} text="OUTSEE · YOUR LEDGER" x={centered(mono, "OUTSEE · YOUR LEDGER")} y={110} color={colors.agedGold} />}
+      {mono && <SkText font={mono} text="OUTSEEN · YOUR LEDGER" x={centered(mono, "OUTSEEN · YOUR LEDGER")} y={110} color={colors.agedGold} />}
       <Line p1={vec(INSET + 40, 140)} p2={vec(PLAQUE_W - INSET - 40, 140)} color={NIGHT_LINE} strokeWidth={1} />
       <PatinaHalo x={PLAQUE_W / 2 - 190} y={330 - 190} width={380} height={380} center={[PLAQUE_W / 2, 330]} innerR={130} outerR={172} seed={[...data.epithet.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 97} />
       {orb && <SkImage image={orb} x={PLAQUE_W / 2 - 145} y={185} width={290} height={290} fit="contain" />}

@@ -9,7 +9,7 @@ const CLOSING = COPY_BANK.filter((l) => l.pool === "closing" && !(l.requires ?? 
 // The second hit (voice spec §4 beat 3): a single noon reminder, fired once
 // something was sealed today — true whether or not resolution has finished,
 // so the line never claims more than the ledger actually knows yet.
-const NOON_LINE = "RETURN TO OUTSEE TO CHECK YOUR PREDICTIONS AND THE NEXT CHALLENGE.";
+const NOON_LINE = "RETURN TO OUTSEEN TO CHECK YOUR PREDICTIONS AND THE NEXT CHALLENGE.";
 
 export const REMINDER_LEAD_MS = 3 * 3_600_000;
 export const NOON_LAG_MS = 45 * 60_000;
