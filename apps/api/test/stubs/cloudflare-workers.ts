@@ -18,3 +18,13 @@ export class WorkflowEntrypoint<Env = unknown, _T = unknown> {
     public env: Env,
   ) {}
 }
+
+// Cloudflare's NonRetryableError: thrown inside a step to stop retries dead.
+// The real one carries the same shape; tests only need `instanceof` to work
+// and the name to survive, which is what workflow-entrypoints.ts asserts on.
+export class NonRetryableError extends Error {
+  constructor(message: string, name = "NonRetryableError") {
+    super(message);
+    this.name = name;
+  }
+}
