@@ -6,6 +6,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json",
     "test": "vitest run",
+    "test:workflows": "vitest run -c vitest.workflows.config.ts",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:generate": "drizzle-kit generate",
@@ -19,6 +20,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.6",
     "@cloudflare/workers-types": "^5.20260820.1",
     "@electric-sql/pglite": "^0.5.5",
     "@types/node": "^26.2.0",
