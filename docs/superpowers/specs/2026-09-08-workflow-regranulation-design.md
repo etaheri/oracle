@@ -217,12 +217,37 @@ way.
 
 The mapping to `NonRetryableError` happens in a new `durableStep()` helper in
 `workflow-entrypoints.ts`, which is ALREADY the only file in the pipeline that
-imports `cloudflare:workers` (see its header). `durableStep()` wraps `step.do`
-with three responsibilities:
+imports a workerd-only specifier (see its header).
+
+There are TWO such specifiers, not one. `WorkflowEntrypoint`, `WorkflowEvent`,
+`WorkflowStep` and `WorkflowStepConfig` come from `cloudflare:workers`;
+`NonRetryableError` comes from `cloudflare:workflows`. Both resolve only inside
+workerd, both stay confined to this one file, and the vitest alias must cover
+both or `../src/worker` becomes unresolvable in the test suite.
+
+`durableStep()` wraps `step.do` with three responsibilities:
 
 1. Explicit `timeout` and `retries` config — no inherited defaults.
 2. `BudgetExhausted` → narrate once, then rethrow as `NonRetryableError`.
 3. Return a small serialisable summary for §6.
+
+**One seam, and the interlock that covers it.** `StepPolicy` types its durations
+as plain `string` so `steps.ts` can stay free of workerd imports and its values
+stay assertable in the ordinary test suite. The real `WorkflowStepConfig`
+narrows them to a template-literal duration type, so `durableStep` casts at the
+single boundary where a policy meets the engine.
+
+A cast is a hole: `"8 minuts"` would compile. What closes it is not the cast
+site but the TEST — §4.2's assertion parses every policy's duration into
+seconds and THROWS on a format it does not recognise, so a malformed duration
+fails loudly in the suite rather than silently at 3am. This is worth stating
+because the two were designed for different reasons and only combine by
+accident: the parser exists to prove timeouts sit under the default, and it
+turns out to be the only thing type-checking them at all.
+
+The residual risk is a duration written INLINE at a `step.do` call rather than
+taken from `POLICY` — the parser never sees those. Hence the rule: steps take
+their config from `POLICY`, never from a literal.
 
 ### 4.4 The taste gate must let `BudgetExhausted` through
 
