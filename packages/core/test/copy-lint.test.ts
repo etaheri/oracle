@@ -224,13 +224,13 @@ describe("the calling", () => {
       expect(l.length, l).toBeLessThanOrEqual(140);
     }
   });
-  it("identifies the product and AI opponent", async () => {
+  it("introduces the product and rivalry", async () => {
     const { CALLING_LINES } = await import("../src/copy");
     const all = CALLING_LINES.join(" ");
     expect(all).toContain("OUTSEE");
     expect(all).toContain("MEET THE ORACLE");
-    expect(all).toContain("YOUR AI OPPONENT");
-    expect(CALLING_LINES[CALLING_LINES.length - 1]).toBe("YOUR AI OPPONENT");
+    expect(all).toContain("IT MAKES A CALL. SO DO YOU.");
+    expect(CALLING_LINES[CALLING_LINES.length - 1]).toBe("IT MAKES A CALL. SO DO YOU.");
   });
   it("never states a rule the rites own — no scoring, no noon, no shield", async () => {
     const { CALLING_LINES } = await import("../src/copy");

@@ -64,6 +64,7 @@ describe("current factual copy", () => {
     expect(current).toContain("at least one call");
     expect(current).toContain("at least three resolved");
     expect(current).toContain("do not multiply");
+    expect(current).toContain(CURRENT_GAME_COPY.oracleIdentity);
     expect(RITES_LINES.join(" ")).toContain("TEN PERCENT MORE");
     expect(CURRENT_GAME_COPY.shieldUsed).toContain("No calls were added");
     expect(GAME_TERMS.playerRating).toBe("Your forecast rating");

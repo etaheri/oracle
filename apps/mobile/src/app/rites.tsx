@@ -100,7 +100,7 @@ export default function Rites() {
         {opening && <QuietLink title="HOW TO PLAY" onPress={() => leaveRites(() => router.push({ pathname: "/rites", params: { all: "1" } }))} />}
       </ScrollView>
       {opening && <View style={{ paddingTop: space(3), paddingBottom: inset.bottom, paddingLeft: inset.left, paddingRight: inset.right }}>
-        <GoldButton title={checking ? "CHECKING ROUND…" : "BEGIN"} disabled={checking} onPress={() => { void begin(); }} />
+        <GoldButton title={checking ? "CHECKING ROUND…" : "MAKE YOUR FIRST CALL"} disabled={checking} onPress={() => { void begin(); }} />
       </View>}
       <ReadingHeader inset={inset} scrolled={headerScrolled} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}><TopBar showReturn={!opening} /></ReadingHeader>
     </Screen>

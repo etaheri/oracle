@@ -7,7 +7,9 @@ export const GAME_TERMS = {
 } as const;
 export const CURRENT_GAME_COPY = {
   purpose: 'Make your call. Outsee the Oracle. Outscore the field.',
-  streakMeaning: 'Your streak marks your return, not your accuracy.',
+  oracleIdentity: 'The Oracle makes predictions using AI.',
+  opponentChallenge: 'Can you outsee it?',
+  streakMeaning: 'Your streak is a ritual you keep: one daily call is enough. It adds no points.',
   lapse: 'A new streak begins with your next call. Your predictions, results and rating remain.',
   shieldUsed: 'Your shield preserved your streak. No calls were added.',
 } as const;

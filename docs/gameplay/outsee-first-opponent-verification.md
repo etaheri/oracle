@@ -72,3 +72,7 @@ Unfamiliar-player and returning-player interviews require actual participants. N
 - Rites BEGIN now invalidates its pending action on alternative navigation and blur, checks ownership after each await and in failure handling, and permits a fresh attempt after return. Focused guard tests cover stale success/rejection and a newer attempt.
 
 - Final scoped independent review: **PASS, no open findings**. The Rites callback-lifetime correction is addressed; native/accessibility and human-playtest limits above remain separate.
+
+### Creative follow-up
+
+The end-to-end copy/incentive pass is documented in `outsee-creative-gameplay-pass.md`. It supersedes the initial “your AI opponent” label and improves conditional confidence explanations. Current follow-up checks: core162/mobile369/push11 passed, workspace types passed, native home/exhibition inspected. Earlier full API checks remain applicable; the follow-up changes no API logic or scoring rules.

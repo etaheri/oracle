@@ -23,8 +23,9 @@ export function questionPoints(input: {
   const base = C.POINTS_SCALE * (C.POINTS_BASELINE - b); // proper: affine in brier
   const bigMult = input.isBigOne ? C.BIG_ONE_MULT : 1;
   const sidePct = input.answer ? input.crowdYesPct : 100 - input.crowdYesPct;
-  // Contrarian credit is ADDITIVE (a constant, never a multiplier on the
-  // Brier term) so the expected-points maximizer stays the honest belief.
+  // Contrarian credit is additive and independent of reported confidence
+  // WITHIN a chosen side. It can change which side maximizes expected day
+  // points; it is excluded from the duel, board and forecast rating.
   const bonus = base > 0 && contrarianApplies(sidePct, input.crowdCount) ? C.CONTRARIAN_BONUS : 0;
   const result = bigMult * base + bigMult * bonus;
   // Round to high precision first to eliminate floating-point noise, then round to integer

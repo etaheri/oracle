@@ -50,7 +50,7 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
           <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>YOUR CALL · {receipt.answer ? "YES" : "NO"} · {receipt.confidence}%</Mono>
           {revealed ? <PracticeResult prediction={receipt} exhibition={exhibition} previous={previous} /> : <>
             <Serif size={22} style={{ textAlign: "center", lineHeight: 32 }}>Your call is sealed.</Serif>
-            <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>This one-question exhibition is immediate and unranked.</Mono>
+            <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>You made your call. Now see how it compares.</Mono>
           </>}
         </ScrollView>
         {!revealed && <GoldButton title="REVEAL THE RESULT" onPress={() => {
@@ -68,9 +68,9 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
         <Mono size={10} color={colors.goldText} style={{ textAlign: "center" }}>{confidenceMeaning(lean.conf)}</Mono>
         <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{payoffLine(lean.conf, false)}</Mono>
       </> : receipt ? <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>UNRANKED · YOUR RECORD AND STREAK ARE UNCHANGED.</Mono> :
-        <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{previous ? "SAME EXAMPLE AND RESULT. TRY A DIFFERENT CONFIDENCE OR SIDE." : "PULL TO ADJUST. RETURN TO CENTER TO CANCEL. RELEASE TO SEAL."}</Mono>}
+        <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{previous ? "THE OUTCOME IS KNOWN. COMPARE THE POINTS AT A DIFFERENT CONFIDENCE." : "PULL TO ADJUST. RETURN TO CENTER TO CANCEL. RELEASE TO SEAL."}</Mono>}
     </View>
-    {receipt ? revealed && <QuietLink title="TRY THE SAME EXAMPLE AGAIN" onPress={() => {
+    {receipt ? revealed && <QuietLink title="EXPLORE THE SCORING" onPress={() => {
       setPrevious(receipt); setFlow(current => retryExhibition(current)); setAttempt(n => n + 1);
     }} /> : <QuietLink title={buttons ? "USE THE PULL" : "USE HOLD BUTTONS"} onPress={() => setButtons(!buttons)} />}
   </View>;
@@ -83,15 +83,11 @@ function PracticeResult({ prediction, exhibition, previous }: { prediction: Prac
   const result = practiceResult(prediction, exhibition);
   const outcome = exhibition.outcome === "yes";
   const oracleLabel = exhibition.kind === "fictional" ? "EXAMPLE ORACLE FORECAST" : "ORACLE CALL";
-  const winner = result.winner === "tie" ? "You tied the Oracle in this exhibition"
+  const winner = result.winner === "tie" ? exhibition.kind === "fictional" ? "Equal points in this example" : "Level with the Oracle"
     : exhibition.kind === "fictional"
-      ? result.winner === "you" ? "Your call outscored the example Oracle forecast" : "The example Oracle forecast outscored your call"
-      : result.winner === "you" ? "You outscored the Oracle in this exhibition" : "The Oracle outscored you in this exhibition";
-  const explanation = result.oracleAbstained
-    ? `The Oracle stayed neutral at 50%. Your ${prediction.confidence}% confidence determined your side's result.`
-    : result.sameAnswer
-      ? `You both chose ${call(prediction.answer)}. The confidence difference produced the points gap.`
-      : `You chose ${call(prediction.answer)} and the Oracle chose ${call(result.oracleAnswer!)}. The outcome favored ${call(outcome)}.`;
+      ? result.winner === "you" ? "Your call scored higher" : "The example forecast scored higher"
+      : result.winner === "you" ? "You outscored the Oracle" : "The Oracle outscored you";
+
 
   return <>
     <DecodeLine serif text={`Actual outcome: ${call(outcome)}.`} size={22} style={{ textAlign: "center", lineHeight: 32 }} />
@@ -104,9 +100,9 @@ function PracticeResult({ prediction, exhibition, previous }: { prediction: Prac
       <View style={{ flex: 1, alignItems: "center" }}><Mono {...role.caption}>ORACLE BASE POINTS</Mono><Ritual size={22} bold>{signed(result.oraclePoints)}</Ritual></View>
     </View>
     <Serif size={20} style={{ textAlign: "center", lineHeight: 28 }}>{winner}</Serif>
-    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{explanation}</Mono>
+    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{result.explanation}</Mono>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>If the outcome had been {call(!outcome)}, your same call would score {signed(result.oppositePoints)} points.</Mono>
     {previous && <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Previous try: {call(previous.answer)} at {previous.confidence}% → {signed(practiceResult(previous, exhibition).youPoints)} points. Same example and result.</Mono>}
-    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>The daily round also ranks you against other players.</Mono>
+    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Next: a daily round against the Oracle and other players. New questions. Outcomes still to come.</Mono>
   </>;
 }

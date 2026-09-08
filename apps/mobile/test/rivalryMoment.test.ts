@@ -15,7 +15,7 @@ const complete = (highlightId = "q1", winner: "you" | "oracle" | "tie" = "you"):
 describe("rivalryMoment", () => {
   it("explains a same-call confidence gap without calling it decisive", () => {
     expect(rivalryMoment([question()], complete())).toEqual({
-      questionId: "q1", kind: "confidence", line: "Your confidence made the difference on this call.",
+      questionId: "q1", kind: "confidence", line: "You were both right. Your higher confidence earned more.",
     });
   });
 
@@ -27,13 +27,13 @@ describe("rivalryMoment", () => {
 
   it("describes an opposite-call loss locally", () => {
     expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: 0.2 })], complete())).toMatchObject({
-      kind: "opposite_calls", line: "You and the Oracle made opposite calls here; the Oracle scored higher on this call.",
+      kind: "opposite_calls", line: "The Oracle saw what you missed on this call.",
     });
   });
 
   it("names an Oracle abstention", () => {
     expect(rivalryMoment([question({ oracle_p_yes: 0.5 })], complete())).toMatchObject({
-      kind: "abstention", line: "The Oracle abstained; your call created the points gap here.",
+      kind: "abstention", line: "The Oracle stayed at 50%. You took a side.",
     });
   });
 
@@ -62,4 +62,12 @@ describe("rivalryMoment", () => {
     expect(duel).toMatchObject({ status: "complete", winner: "oracle", highlightId: "highlight" });
     expect(rivalryMoment(qs, duel)?.line).toBe("You saw what the Oracle missed on this call.");
   });
+});
+
+// The lesson must distinguish prudent uncertainty from costly overconfidence.
+it("explains confidence on both right and wrong calls, including NO", () => {
+  expect(rivalryMoment([question({ outcome: "no" })], complete())?.line).toContain("Your higher confidence cost more");
+  expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: .95 })], complete())?.line).toContain("Your lower confidence cost less");
+  expect(rivalryMoment([question({ oracle_p_yes: .95 })], complete())?.line).toContain("Oracle's higher confidence earned more");
+  expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: .35, my: { answer: false, confidence: 85 } })], complete())?.line).toContain("Your higher confidence earned more");
 });

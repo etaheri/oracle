@@ -197,7 +197,7 @@ export default function Ledger() {
                 )}
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
                 <Stat label="ROUNDS PLAYED" value={String(d.days_consulted)} />
-                <Mono size={12}>Your vigil is your playing streak. One sealed daily call qualifies; the count updates at settlement. Shields preserve the count without adding played days. It marks return, not accuracy.</Mono>
+                <Mono size={12}>Your vigil is your playing streak: a reason to make one call each day. The count updates when the round settles. Shields can hold it through a missed round. Your rating comes from your forecasts; your streak adds no points.</Mono>
                 <Stat label="STREAK" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
                 <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
                 <Stat label="AVG CONFIDENCE" value={pct(d.avg_confidence)} />

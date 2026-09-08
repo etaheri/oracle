@@ -21,7 +21,7 @@ export function DuelPortrait({ duel }: { duel: Extract<DuelResult, { status: "co
         <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{side.correct}/{duel.scoredCount} RIGHT</Mono>
       </View>)}
     </View>
-    <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>CONFIDENCE POINTS · SAME RULES FOR BOTH</Mono>
+    <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>BASE POINTS · SAME SCORING FORMULA</Mono>
     {duel.oracleAbstained > 0 && <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>ORACLE WITHOUT A SIDE ON {duel.oracleAbstained}</Mono>}
   </View>;
 }

@@ -32,7 +32,7 @@ import { maybeSummon } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
-import { vigilLine, COPY_BANK, GAME_TERMS, PAYWALL_CTA_LINES, type MeLedger } from "@oracle/core";
+import { vigilLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, type MeLedger } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -315,7 +315,7 @@ export default function Index() {
         {/* Temple moment: the near-touch, alive — transparent loop over the
             museum ground, glow tinted by the crowd's mood. */}
         <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} greet={greetOrb} />
-        <Mono {...role.meta} color={colors.mutedInk} accessibilityLabel="The Oracle, your AI opponent">THE ORACLE · YOUR AI OPPONENT</Mono>
+        <Mono {...role.meta} color={colors.mutedInk} accessibilityLabel={`The Oracle. ${CURRENT_GAME_COPY.opponentChallenge}`}>{`THE ORACLE · ${CURRENT_GAME_COPY.opponentChallenge.toUpperCase()}`}</Mono>
         {/* The wordmark materializes out of ASCII (patina spec phase 2) and
             settles into carved stillness with a faint edge residue. */}
         <MaterializeTitle active={cues.title} />

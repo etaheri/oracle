@@ -11,7 +11,7 @@ export function revealSummary(qs: DuelQuestion[], duel: DuelResult) {
   return {
     headline: pending ? "THE ROUND IS STILL BEING READ" : duel.status === "complete" ? ({ you: "YOU OUTSAW THE ORACLE", oracle: "THE ORACLE SAW FURTHER", tie: "YOU AND THE ORACLE STAND LEVEL" }[duel.winner]) : `${right} RIGHT · ${scored.length} CALLS READ`,
     highlightId: pending ? null : duel.status === "complete" ? duel.highlightId : fallback?.id ?? null,
-    explanation: duel.status === "complete" ? "THE SAME CONFIDENCE RULE. NO CROWD OR STREAK BONUSES." : duel.status === "unavailable" ? "NO COMPLETE ORACLE FORECAST. YOUR RECORD STILL COUNTS." : duel.status === "incomplete" ? "AN INCOMPLETE ROUND HAS NO DUEL." : duel.status === "insufficient" ? "TOO FEW SCORED QUESTIONS FOR A DUEL." : "UNREAD QUESTIONS ARE NOT LOSSES.",
+    explanation: duel.status === "complete" ? "BASE POINTS DECIDE THE DUEL. CROWD BONUSES AND STREAKS DO NOT COUNT." : duel.status === "unavailable" ? "NO COMPLETE ORACLE FORECAST. YOUR RECORD STILL COUNTS." : duel.status === "incomplete" ? "AN INCOMPLETE ROUND HAS NO DUEL." : duel.status === "insufficient" ? "TOO FEW SCORED QUESTIONS FOR A DUEL." : "UNREAD QUESTIONS ARE NOT LOSSES.",
     canShareFinal: !pending && scored.length > 0,
     rivalry: rivalryMoment(qs, duel),
   };

@@ -5,7 +5,7 @@ Approved September 8, 2026. Source audit: `rg -n 'ORACLE|Oracle|OUTSEEN|Outseen'
 ## Identity classification
 
 - **App:** ORACLE wordmark, ORACLE OS boot, notification sender, Oracle Plus, OUTSEEN website → Outsee (OUTSEE wordmark).
-- **Opponent:** The Oracle, oracle forecast, opponent duel labels → retained; AI opponent explained separately.
+- **Opponent:** The Oracle, oracle forecast, opponent duel labels → retained; AI forecasting explained in the reference; the home leads with a rivalry challenge.
 - **Rating:** player ORACLE SCORE → Your forecast rating; opponent's rating → Oracle rating. Daily points, board rank and streak remain separate measures.
 - **Internal:** `@oracle/*`, `oracle_score`, oracle forecast fields, URL schemes, bundle/package IDs, purchase products, persistence flags, asset filenames and configured URL destinations → retained.
 - **Historical:** `RITES_LINES` / `OPENING_RITES_LINES` describe version 1, including its original multipliers. Current reference uses explicit `RITES_V2_SECTIONS`. Old-round owners must link `rules_version=1` explicitly.
@@ -18,8 +18,8 @@ Approved September 8, 2026. Source audit: `rg -n 'ORACLE|Oracle|OUTSEEN|Outseen'
 | Wordmark | MaterializeTitle / WORD | ORACLE | What app is this? | OUTSEE | Canvas and static fallback | Source review; native layout check remains |
 | Header | SystemHeader | SYS · V1.0 | What app is this? | OUTSEE | Static header | Source review |
 | Returning boot | BootRite / LINES | ORACLE OS / orb wakes / ledger opens | What is waking? | OUTSEE / THE ORACLE WAKES / YOUR NEXT CALL AWAITS | Existing boot gate | bootGate tests; flags unchanged |
-| First install | CallingRite / CALLING_LINES | Five lore lines, ~13 seconds | Who is my opponent? | OUTSEE / MEET THE ORACLE / YOUR AI OPPONENT | First-install flag only | calling tests; 900/450/800ms timing, visible skip, static continue |
-| Home orientation and orb | index, OracleClock (other owner) | App/opponent conflated | What is this; what can I do? | Daily prediction game; AI opponent; current deadline/action | Arrival state and hydration | Controller/home owner |
+| First install | CallingRite / CALLING_LINES | Five lore lines, ~13 seconds | Who is my opponent? | OUTSEE / MEET THE ORACLE / IT MAKES A CALL. SO DO YOU. | First-install flag only | calling tests; 900/450/800ms timing, visible skip, static continue |
+| Home orientation and orb | index, OracleClock (other owner) | App/opponent conflated | What is this; what can I do? | Daily prediction game; THE ORACLE · CAN YOU OUTSEE IT?; current deadline/action | Arrival state and hydration | Controller/home owner |
 | Participants | homeLines (other owner) | Players called oracles | Who else called? | MAKE THE FIRST CALL; 1 PLAYER; N PLAYERS | Actual distinct participant count | homeLines tests, home owner |
 | First round | INTRO_LINES / rites | Tomorrow; only Oracle | How do I play? | Answer, confidence changes points, Oracle and other-player rank | Opening route | Core copy tests; static readable steps |
 | Full reference | RITES_V2_SECTIONS / rites | Numbered tracked-caps wall derived from legacy strings | Why play; how do rules work? | Purpose first, six heading/body sections | Current reference by default | Core copy tests; mobile typecheck |
@@ -63,3 +63,7 @@ Native small-screen, Dynamic Type, VoiceOver and skip/continue layout checks rem
 ## Verified board-count correction
 
 The API's `field_size`, `your_rank` and `BOARD_MIN_FIELD` count human players only. The Oracle is appended and ranked among humans for comparison without increasing the field count. Current Build your record copy therefore says “eligible players; the Oracle is also shown for comparison.” Scoring and eligibility are unchanged. The controller owns the corresponding plan/spec correction; the board owner coordinates its presentation.
+
+## Follow-up creative and incentive pass
+
+See `outsee-creative-gameplay-pass.md` for the September 8 end-to-end refinement, including result explanations, optional streak motivation, explicit AI disclosure, scoring asymmetry and the distinction between maximizing points and winning a round. It supersedes earlier exact-wording examples while preserving the mechanics.

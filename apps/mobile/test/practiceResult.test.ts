@@ -49,3 +49,17 @@ describe("exhibition practice result", () => {
     expect(practiceResult({ answer: false, confidence: 95 }, exhibition)).toMatchObject({ sameAnswer: false, winner: "oracle" });
   });
 });
+
+it("does not invent a confidence gap when the exhibition points tie", () => {
+  const result = practiceResult({ answer: true, confidence: 70 }, exhibition);
+  expect(result.winner).toBe("tie");
+  expect(result.explanation).toBe("Equal points on this call.");
+});
+
+it("explains why confidence won or lost on the same answer", () => {
+  expect(practiceResult({ answer: true, confidence: 55 }, exhibition).explanation).toContain("Oracle's higher confidence earned more");
+  expect(practiceResult({ answer: true, confidence: 95 }, exhibition).explanation).toContain("Your higher confidence earned more");
+  const missed = { ...exhibition, outcome: "no" as const };
+  expect(practiceResult({ answer: true, confidence: 55 }, missed).explanation).toContain("Your lower confidence cost less");
+  expect(practiceResult({ answer: true, confidence: 95 }, missed).explanation).toContain("Your higher confidence cost more");
+});

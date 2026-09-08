@@ -13,7 +13,7 @@ describe("homeLines", () => {
     expect(spokenLine(0)).toBe("MAKE THE FIRST CALL");
   });
   it("riskLine warns inside three hours of lock, unsealed, with a vigil to lose", () => {
-    expect(riskLine(4, false, 2 * 3_600_000, "k")).toBe("YOUR STREAK: 4 DAYS. EACH DAILY CALL COUNTS AT SETTLEMENT.");
+    expect(riskLine(4, false, 2 * 3_600_000, "k")).toBe("YOUR STREAK: 4 DAYS. ONE SEALED CALL KEEPS IT GOING WHEN THE ROUND SETTLES.");
     expect(riskLine(4, true, 2 * 3_600_000, "k")).toBeNull();
     expect(riskLine(0, false, 2 * 3_600_000, "k")).toBeNull();
     expect(riskLine(1, false, 2 * 3_600_000, "k")).toBeNull(); // the oracle starts counting at 2

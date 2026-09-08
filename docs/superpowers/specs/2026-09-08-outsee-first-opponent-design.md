@@ -1,5 +1,8 @@
 # Outsee: meet your opponent
 
+> Copy refinement: `docs/gameplay/outsee-creative-gameplay-pass.md` supersedes the initial AI-opponent label and exact wording examples below. Mechanics and historical rules remain unchanged.
+
+
 ## Intent
 
 Outsee is the app and daily prediction game. The Oracle is its AI opponent. Players compete against both the Oracle and each other on the daily board; their aggregate predictions are the crowd. The first session should establish those roles, let the player make an interesting judgment, and deliver either a live commitment or a complete unranked exhibition with an immediate result.

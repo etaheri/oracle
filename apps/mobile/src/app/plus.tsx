@@ -41,7 +41,7 @@ function PlusContent() {
         {plusActive ? (
           <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{PUSH_CAMPAIGN_LINES.plusWelcome}</Mono>
         ) : offering === "loading" ? (
-          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>CONSULTING THE STORE…</Mono>
+          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>LOADING PRICES…</Mono>
         ) : offering === null ? (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>THE STORE IS UNAVAILABLE. PLEASE TRY AGAIN LATER.</Mono>
         ) : (
@@ -60,7 +60,7 @@ function PlusContent() {
           ))}
         </View>
         <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center", lineHeight: 16 }}>
-          AUTO-RENEWS UNTIL CANCELLED IN APP STORE SETTINGS. THE FREE GAME IS NEVER GATED.
+          AUTO-RENEWS UNTIL CANCELLED IN APP STORE SETTINGS. EVERY ROUND IS FREE TO PLAY.
         </Mono>
       </View>
       <View style={{ gap: space(2) }}>

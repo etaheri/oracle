@@ -19,7 +19,7 @@ export function rivalryMoment(questions: DuelQuestion[], duel: DuelResult): Riva
   const playerCall = question.my.answer ? "yes" : "no";
   const machineCall = oracleCall(question.oracle_p_yes);
   if (machineCall === null) {
-    return { questionId: question.id, kind: "abstention", line: "The Oracle abstained; your call created the points gap here." };
+    return { questionId: question.id, kind: "abstention", line: "The Oracle stayed at 50%. You took a side." };
   }
   if (playerCall !== machineCall) {
     const playerWasRight = playerCall === question.outcome;
@@ -28,8 +28,15 @@ export function rivalryMoment(questions: DuelQuestion[], duel: DuelResult): Riva
       kind: "opposite_calls",
       line: playerWasRight
         ? "You saw what the Oracle missed on this call."
-        : "You and the Oracle made opposite calls here; the Oracle scored higher on this call.",
+        : "The Oracle saw what you missed on this call.",
     };
   }
-  return { questionId: question.id, kind: "confidence", line: "Your confidence made the difference on this call." };
+  const higherConfidence = playerProbability > 0.5
+    ? playerProbability > question.oracle_p_yes
+    : playerProbability < question.oracle_p_yes;
+  const right = playerCall === question.outcome;
+  const line = right
+    ? higherConfidence ? "You were both right. Your higher confidence earned more." : "You were both right. The Oracle's higher confidence earned more."
+    : higherConfidence ? "You were both wrong. Your higher confidence cost more." : "You were both wrong. Your lower confidence cost less.";
+  return { questionId: question.id, kind: "confidence", line };
 }

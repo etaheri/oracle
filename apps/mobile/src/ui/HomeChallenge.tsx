@@ -38,15 +38,15 @@ export function HomeChallenge({
   const supporting = state.kind === "error"
     ? "COULDN'T LOAD TODAY'S ROUND."
     : state.kind === "partial"
-      ? `${input.openCount} ${input.openCount === 1 ? "QUESTION REMAINS" : "QUESTIONS REMAIN"} · A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION. YOU CAN STILL SEE RESULTS FOR THE CALLS YOU MAKE.`
+      ? `${input.openCount} ${input.openCount === 1 ? "QUESTION REMAINS" : "QUESTIONS REMAIN"} · A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION. YOU CAN STILL PLAY FOR POINTS.`
       : state.kind === "submitted"
-        ? "YOUR CALLS ARE SEALED. RESULTS ARRIVE AFTER THE OUTCOMES ARE KNOWN."
+        ? "YOUR CALLS ARE SEALED. SEE WHERE YOU STOOD WITH THE CROWD WHILE OUTCOMES ARE VERIFIED."
         : state.kind === "waiting"
           ? input.nextOpensAt
-            ? `NEXT ROUND OPENS ${localOpening(input.nextOpensAt)} · ONE PRACTICE QUESTION. IMMEDIATE RESULT. UNRANKED.`
-            : "THE NEXT ROUND HASN'T BEEN ANNOUNCED. · ONE PRACTICE QUESTION. IMMEDIATE RESULT. UNRANKED."
+            ? `NEXT ROUND OPENS ${localOpening(input.nextOpensAt)} · TRY ONE CALL NOW. REVEAL THE RESULT. UNRANKED.`
+            : "THE NEXT ROUND HASN'T BEEN ANNOUNCED. · TRY ONE CALL NOW. REVEAL THE RESULT. UNRANKED."
           : state.kind === "live"
-            ? "CAN YOU SEE SOMETHING IT DOESN'T? · FIVE QUESTIONS ABOUT WHAT HAPPENS NEXT."
+            ? "FIVE QUESTIONS ABOUT WHAT HAPPENS NEXT. HOW SURE ARE YOU?"
             : "LOADING TODAY'S CHALLENGE…";
 
   return (

@@ -1,5 +1,8 @@
 # Outsee First Opponent Implementation Plan
 
+> Copy refinement: `docs/gameplay/outsee-creative-gameplay-pass.md` supersedes the initial AI-opponent label and exact wording examples below. Mechanics and historical rules remain unchanged.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Outsee's identity clear, establish competition against both the Oracle and other players, and give every first or late arrival a compelling path into live play or an immediate exhibition.

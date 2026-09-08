@@ -235,7 +235,7 @@ export default function RevealScreen() {
     } catch {
       // Every other failure in this app has a written line; this one used to
       // be swallowed whole, so a failed share simply did nothing.
-      setShareError("THE PROPHECY WOULD NOT LEAVE. TRY AGAIN.");
+      setShareError("COULD NOT SHARE YOUR RESULT. TRY AGAIN.");
     } finally {
       setSharing(false);
     }
@@ -306,7 +306,7 @@ export default function RevealScreen() {
             ))}
           </View>
         )}
-        {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />}
+        {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "PREPARING…" : "SHARE YOUR RESULT"} onPress={onShare} disabled={sharing} />}
         {shareError && <Mono color={colors.vermilion}>{shareError}</Mono>}
         <QuietLink
           title={details ? "CLOSE THE DETAILS" : "VIEW DAILY BOARD"}

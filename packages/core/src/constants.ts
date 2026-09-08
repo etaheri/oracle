@@ -6,7 +6,7 @@ export const CONSTANTS = {
   POINTS_SCALE: 200,    // points = round(mult × POINTS_SCALE × (POINTS_BASELINE − brier))
   POINTS_BASELINE: 0.25, // coin-flip brier — EV of a 50/50 guess is 0 points
   BIG_ONE_MULT: 2,      // applies to wins and losses
-  CONTRARIAN_BONUS: 20,      // ADDITIVE, wins only, ×BIG_ONE_MULT on the big one — additive keeps the rule proper
+  CONTRARIAN_BONUS: 20,      // ADDITIVE, wins only, ×BIG_ONE_MULT; can affect side choice, not confidence within that side
   CONTRARIAN_MIN_CROWD: 20,  // no tide under this many players on the question
   CONTRARIAN_CROWD_PCT: 40,  // your side's final crowd % must be strictly below this
   SHIELD_MIN_STREAK: 3,      // shields (free or paid) only defend a vigil this long
