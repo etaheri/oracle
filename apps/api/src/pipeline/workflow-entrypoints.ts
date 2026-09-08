@@ -62,8 +62,17 @@ function metered(env: WorkerEnv): PipelineDeps | null {
  * BudgetExhausted stays a plain Error in spend.ts; the mapping lives HERE
  * because this is the only file in the pipeline that may import
  * "cloudflare:workers".
+ *
+ * Exported so the BudgetExhausted → NonRetryableError mapping is a pure unit
+ * test in the PGlite suite (test/pipeline-durable-step.test.ts): `step` is a
+ * parameter here, so a fake `{ do: (_n, _c, cb) => cb() }` reaches this
+ * function's own catch directly. That matters because the workerd
+ * introspector's mockStepError/mockStepResult (apps/api/workflows-test/)
+ * replace a step's real callback outright — this catch lives INSIDE that
+ * callback, so no mocked workerd test can ever reach it. This export exists
+ * for no other consumer.
  */
-async function durableStep<T extends Rpc.Serializable<T>>(
+export async function durableStep<T extends Rpc.Serializable<T>>(
   step: WorkflowStep,
   name: string,
   policy: StepPolicy,
