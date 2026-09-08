@@ -3,13 +3,17 @@ import { score, formatConfusion } from "../eval/score";
 
 describe("score", () => {
   it("counts the two error kinds separately", () => {
+    // Deliberately asymmetric (2 false-passes, 1 false-reject): symmetric
+    // counts can't catch a transposition of the two cells this whole design
+    // exists to tell apart (review round 1, minor-1).
     const c = score([
       { expected: "pass", actual: "pass" },
       { expected: "reject", actual: "reject" },
       { expected: "reject", actual: "pass" },
+      { expected: "reject", actual: "pass" },
       { expected: "pass", actual: "reject" },
     ]);
-    expect(c).toEqual({ truePass: 1, trueReject: 1, falsePass: 1, falseReject: 1 });
+    expect(c).toEqual({ truePass: 1, trueReject: 1, falsePass: 2, falseReject: 1 });
   });
 
   it("reports false passes first, because they are the expensive error", () => {
