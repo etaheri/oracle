@@ -1,13 +1,24 @@
-import { payoff } from "@oracle/core";
+import { compareExhibition, type Exhibition } from "@oracle/core";
 
 export type PracticePrediction = { answer: boolean; confidence: number };
 
-// One fixed fictional home win makes retries comparable. No crowd or Big One.
-export function practiceResult(prediction: PracticePrediction) {
-  const points = payoff(prediction.confidence, false);
+export function practiceResult(prediction: PracticePrediction, exhibition: Exhibition) {
+  const comparison = compareExhibition(prediction, exhibition);
+  const opposite = compareExhibition(prediction, {
+    ...exhibition,
+    outcome: exhibition.outcome === "yes" ? "no" : "yes",
+  });
+  const oracleAnswer = exhibition.oraclePYes === 0.5 ? null : exhibition.oraclePYes > 0.5;
+  const oracleConfidence = oracleAnswer === null
+    ? null
+    : Math.round((oracleAnswer ? exhibition.oraclePYes : 1 - exhibition.oraclePYes) * 100);
   return {
-    correct: prediction.answer,
-    points: prediction.answer ? points.win : points.loss,
-    oppositePoints: prediction.answer ? points.loss : points.win,
+    ...comparison,
+    correct: prediction.answer === (exhibition.outcome === "yes"),
+    oppositePoints: opposite.youPoints,
+    oracleAnswer,
+    oracleConfidence,
+    oracleAbstained: oracleAnswer === null,
+    sameAnswer: oracleAnswer !== null && prediction.answer === oracleAnswer,
   };
 }

@@ -50,7 +50,7 @@ export function ConfidenceHistory({ history }: { history: History }) {
             </View>
           ))}
           <Mono size={12} maxFontSizeMultiplier={0}>These are results so far, not a measure of certainty about your ability.</Mono>
-          <Mono size={12} maxFontSizeMultiplier={0}>Includes resolved calls from incomplete rounds. Some calls do not qualify toward the competitive Oracle Score. History can change after an outcome correction or void.</Mono>
+          <Mono size={12} maxFontSizeMultiplier={0}>Includes resolved calls from incomplete rounds. Some calls do not qualify toward the forecast rating. History can change after an outcome correction or void.</Mono>
         </View>
       )}
     </View>

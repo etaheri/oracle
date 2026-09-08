@@ -48,7 +48,7 @@ function SummonsContent() {
   return (
     <Screen scroll header={<TopBar />} footer={
       <View style={{ gap: space(2) }}>
-        <GoldButton title="LET IT SPEAK" onPress={onSpeak} />
+        <GoldButton title="ALLOW REMINDERS" onPress={onSpeak} />
         <QuietLink title="Not now" onPress={leave} />
         {restoreState === "none" && (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>

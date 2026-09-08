@@ -1,17 +1,18 @@
 import { roundAvailability } from "../game/roundAvailability";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, Pressable } from "react-native";
+import { AppState, View, Pressable } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, role } from "../ui/Text";
 import { SystemHeader } from "../ui/SystemHeader";
 import { FooterNav, type NavItem } from "../ui/FooterNav";
 import { DecodeLine } from "../ui/DecodeText";
-import { GoldButton, QuietLink } from "../ui/Button";
+import { GoldButton } from "../ui/Button";
 import { LivingHero } from "../ui/LivingHero";
 import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { OracleClock } from "../ui/OracleClock";
+import { HomeChallenge } from "../ui/HomeChallenge";
 import { useQueryClient } from "@tanstack/react-query";
-import { useToday, useCrowdSoFar, useMeLedger, useReveal } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMeLedger, useNextRound, useReveal } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
@@ -20,7 +21,9 @@ import { useHeroCues } from "../ui/useHeroCues";
 import { shieldNotice } from "../game/shieldNotice";
 import { rescueOffered } from "../game/rescueOffer";
 import { revealReady } from "../game/revealReady";
-import { partialLine, spokenLine, riskLine, lapseNotice } from "../game/homeLines";
+import { riskLine, lapseNotice } from "../game/homeLines";
+import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
+import { beginHomeAction, invalidateHomeAction, ownsHomeAction, type HomeActionGate } from "../game/homeActionGate";
 import { msUntil } from "../game/countdown";
 import { useNow } from "../game/useNow";
 import { getOrbGreeted, getRevealSeen, getRitesSeen, markOrbGreeted } from "../api/flags";
@@ -29,7 +32,7 @@ import { maybeSummon } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
-import { vigilLine, COPY_BANK, PAYWALL_CTA_LINES, type MeLedger } from "@oracle/core";
+import { vigilLine, COPY_BANK, GAME_TERMS, PAYWALL_CTA_LINES, type MeLedger } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -70,34 +73,41 @@ export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
   const router = useRouter();
+  const actionGate = useRef<HomeActionGate>({ generation: 0, pending: false, focused: true });
+  const [checkingArrival, setCheckingArrival] = useState(false);
+  const invalidateArrivalAction = useCallback((focused: boolean) => {
+    actionGate.current = invalidateHomeAction(actionGate.current, focused);
+    setCheckingArrival(false);
+  }, []);
+  const leaveHome = useCallback((navigate: () => void) => {
+    invalidateArrivalAction(false);
+    navigate();
+  }, [invalidateArrivalAction]);
   const chromeScale = useChromeScale();
   // The state row reserves two printed lines. Most days it prints one — "THE
   // PROPHECY IS SEALED" — but the partial-day line ("3 OF 5 SEALED · THE DAY
   // RATES ONLY WHEN ALL FIVE ARE SEALED.") wraps, and sealing a single answer
   // should not move the temple when you come back to it.
-  const stateRowH = scaledRow(ROW_H.line, chromeScale) * 2;
   const noticeRowH = scaledRow(ROW_H.meta, chromeScale);
 
   const round = today.data;
   const availabilityNow = useNow(1000);
-  const availability = round ? roundAvailability(round.questions, new Set(round.questions.filter(q => answers[q.id]?.sealed).map(q => q.id)), availabilityNow, round.rules_version) : null;
-  const allSealed = !!round && round.questions.some(q => answers[q.id]?.sealed) && round.questions.every((q) => answers[q.id]?.sealed || (round.rules_version >= 2 && q.lock_healed));
+  const localSealedIds = new Set(round?.questions.filter(q => answers[q.id]?.sealed).map(q => q.id) ?? []);
+  const hydration = useHydratePlayedState(!!round, round?.date ?? null);
+  const sealedIds = new Set([...localSealedIds, ...hydration.sealedQuestionIds]);
+  const availability = round ? roundAvailability(round.questions, sealedIds, availabilityNow, round.rules_version) : null;
+  const requiredQuestions = round?.questions.filter((question) => !(round.rules_version >= 2 && question.lock_healed)) ?? [];
+  const submittedFromData = requiredQuestions.length > 0 && requiredQuestions.every((question) => sealedIds.has(question.id));
+  const needsNext = !round || (availability?.openCount === 0 && !submittedFromData);
   const sealedCount = round ? round.questions.filter((q) => answers[q.id]?.sealed).length : 0;
-  const partial = round ? round.rules_version >= 2 && sealedCount > 0 && !allSealed ? "EVERY NON-VOID QUESTION COUNTS TOWARD THE DAY" : partialLine(sealedCount, round.questions.length) : null;
   // Fires once per day's round, the moment it first renders live (still
   // open) here — not on every 30s re-render from the risk-line clock below.
   const openedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (round && !allSealed && openedFor.current !== round.date) {
-      openedFor.current = round.date;
-      capture("round_opened", { date: round.date });
-    }
-  }, [round, allSealed]);
   const yesterday = yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
   const playedYesterday = reveal.data && !("pending" in reveal.data) ? reveal.data.questions.some((q) => q.my !== null) : null;
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
-  const [ritesSeen, setRitesSeen] = useState(true); // optimistic: never flash the gate at a veteran
+  const [ritesSeen, setRitesSeen] = useState<boolean | undefined>(undefined);
   const anySealed = !!round && round.questions.some((q) => answers[q.id]?.sealed);
   // Home never remounts under the Stack (back-nav from /reveal or /rites just
   // refocuses it), so re-read both flags on every focus, not just on mount.
@@ -126,10 +136,31 @@ export default function Index() {
       if (anySealed) void maybeSummon((href) => router.push(href));
     }, [anySealed, router, round?.date, round?.locks_at, sealedCount])
   );
-  const showLedgerCta = revealReady(reveal.data) && revealSeen !== yesterday;
+  useFocusEffect(
+    useCallback(() => {
+      actionGate.current = invalidateHomeAction(actionGate.current, true);
+      return () => invalidateArrivalAction(false);
+    }, [invalidateArrivalAction])
+  );
+  const showLedgerCta = revealReady(reveal.data) && playedYesterday === true && revealSeen !== yesterday;
   const crowd = useCrowdSoFar(anySealed);
   const lean = crowdLean(crowd.data?.questions ?? []);
-  useHydratePlayedState(!!round);
+  const next = useNextRound(!today.isLoading && needsNext);
+  const arrivalInput = arrivalInputForRound(round, sealedIds, availabilityNow, {
+    loading: today.isLoading || (needsNext && next.isLoading),
+    failed: today.isError || hydration.failed || (needsNext && next.isError),
+    hydrated: ritesSeen !== undefined && hydration.hydrated,
+    firstVisit: ritesSeen === false,
+    nextOpensAt: next.data?.opens_at ?? null,
+  });
+  const arrival = arrivalState(arrivalInput);
+  const allSealed = arrival.kind === "submitted";
+  useEffect(() => {
+    if (round && (arrival.kind === "live" || arrival.kind === "partial") && openedFor.current !== round.date) {
+      openedFor.current = round.date;
+      capture("round_opened", { date: round.date });
+    }
+  }, [arrival.kind, round]);
   const ledger = useMeLedger();
   const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
   const shield = shieldNotice(ledger.data?.shield_used_on ?? null, yesterday);
@@ -157,6 +188,35 @@ export default function Index() {
   });
   const [rescueResult, setRescueResult] = useState<"idle" | "waiting" | "success" | "pending" | "error">("idle");
   const qc = useQueryClient();
+
+  const refreshArrivalQueries = useCallback(async () => {
+    await Promise.all([today.refetch(), hydration.refetch(), next.refetch()]);
+  }, [today.refetch, hydration.refetch, next.refetch]);
+
+  useEffect(() => {
+    const transitionAt = availability?.earliestOpenLock ?? (needsNext ? next.data?.opens_at : null);
+    if (!transitionAt) return;
+    const delay = Date.parse(transitionAt) - Date.now();
+    if (delay <= 0) return;
+    const timer = setTimeout(() => { void refreshArrivalQueries(); }, Math.min(delay + 25, 2_147_000_000));
+    return () => clearTimeout(timer);
+  }, [availability?.earliestOpenLock, needsNext, next.data?.opens_at, refreshArrivalQueries]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshArrivalQueries();
+    });
+    return () => subscription.remove();
+  }, [refreshArrivalQueries]);
+
+  const arrivalEvent = useRef<string | null>(null);
+  useEffect(() => {
+    if (arrival.kind === "loading") return;
+    const key = `${arrival.kind}:${arrivalInput.hasRound}:${arrivalInput.firstVisit}`;
+    if (arrivalEvent.current === key) return;
+    arrivalEvent.current = key;
+    capture("arrival_viewed", { state: arrival.kind, first_visit: arrivalInput.firstVisit, has_schedule: arrivalInput.hasRound || !!arrivalInput.nextOpensAt });
+  }, [arrival.kind, arrivalInput.firstVisit, arrivalInput.hasRound, arrivalInput.nextOpensAt]);
   const doRescue = useCallback(async () => {
     setRescueResult("waiting");
     const shieldsNow = () => qc.getQueryData<MeLedger>(["me", "ledger"])?.paid_shields ?? 0;
@@ -185,7 +245,49 @@ export default function Index() {
   const heroPhase = orbLanded ? "live" : booted ? "waking" : "cold";
   const cues = useHeroCues(orbLanded);
 
-  const enterRound = useCallback(() => router.push(ritesSeen ? "/round" : "/rites"), [ritesSeen, router]);
+  const openExhibition = useCallback(() => {
+    leaveHome(() => router.push({ pathname: "/practice", params: { entry_point: "waiting_home" } }));
+  }, [leaveHome, router]);
+  const resolveArrivalAtPress = useCallback(async () => {
+    const [todayResult, hydrationResult] = await Promise.all([
+      today.refetch(),
+      hydration.refetch(true),
+    ]);
+    const freshRound = todayResult.data;
+    const failed = todayResult.isError || !hydrationResult.ok;
+    const currentAnswers = useRoundStore.getState().answers;
+    const freshSealedIds = new Set([
+      ...(freshRound?.questions.filter((question) => currentAnswers[question.id]?.sealed).map((question) => question.id) ?? []),
+      ...hydrationResult.sealedQuestionIds,
+    ]);
+    const input = arrivalInputForRound(freshRound, freshSealedIds, Date.now(), {
+      loading: false,
+      failed,
+      hydrated: true,
+      firstVisit: ritesSeen === false,
+      nextOpensAt: next.data?.opens_at ?? null,
+    });
+    return { input, state: arrivalState(input) };
+  }, [hydration.refetch, next.data?.opens_at, ritesSeen, today.refetch]);
+  const performArrivalAction = useCallback(async () => {
+    const started = beginHomeAction(actionGate.current);
+    if (!started) return;
+    actionGate.current = started.gate;
+    setCheckingArrival(true);
+    try {
+      const fresh = await resolveArrivalAtPress();
+      if (!ownsHomeAction(actionGate.current, started.token) || fresh.state.kind === "error") return;
+      if (fresh.state.primary === "live") {
+        leaveHome(() => router.push(ritesSeen ? "/round" : "/rites"));
+      } else if (fresh.state.primary === "crowd") {
+        leaveHome(() => router.push("/round"));
+      } else if (fresh.state.primary === "exhibition") {
+        openExhibition();
+      }
+    } finally {
+      if (ownsHomeAction(actionGate.current, started.token)) invalidateArrivalAction(true);
+    }
+  }, [invalidateArrivalAction, leaveHome, openExhibition, resolveArrivalAtPress, ritesSeen, router]);
   const stampDate = round?.date ?? new Date().toISOString().slice(0, 10);
   // The day's first arrival: the orb ripples once, unprompted, a beat after
   // it lands. `undefined` while the flag reads — greeting on an unread flag
@@ -199,9 +301,9 @@ export default function Index() {
   // Yesterday's ledger keeps a rail slot only while it is not already the
   // screen's headline action.
   const navItems: NavItem[] = [
-    { label: "YOUR LEDGER", a11yLabel: "The forecaster's ledger", onPress: () => router.push("/ledger") },
-    ...(showLedgerCta ? [] : [{ label: "YESTERDAY", a11yLabel: "Yesterday's ledger", onPress: () => router.push(`/reveal/${yesterday}`) }]),
-    { label: "THE RITES", a11yLabel: "The rites", onPress: () => router.push({ pathname: "/rites", params: { all: "1" } }) },
+    { label: "YOUR LEDGER", a11yLabel: "The forecaster's ledger", onPress: () => leaveHome(() => router.push("/ledger")) },
+    ...(showLedgerCta ? [] : [{ label: "YESTERDAY", a11yLabel: "Yesterday's ledger", onPress: () => leaveHome(() => router.push(`/reveal/${yesterday}`)) }]),
+    { label: GAME_TERMS.rulesNav.toUpperCase(), a11yLabel: GAME_TERMS.rulesNav, onPress: () => leaveHome(() => router.push({ pathname: "/rites", params: { all: "1" } })) },
   ];
 
   return (
@@ -213,64 +315,35 @@ export default function Index() {
         {/* Temple moment: the near-touch, alive — transparent loop over the
             museum ground, glow tinted by the crowd's mood. */}
         <LivingHero lean={lean} playerCount={round?.player_count ?? 0} phase={heroPhase} greet={greetOrb} />
+        <Mono {...role.meta} color={colors.mutedInk} accessibilityLabel="The Oracle, your AI opponent">THE ORACLE · YOUR AI OPPONENT</Mono>
         {/* The wordmark materializes out of ASCII (patina spec phase 2) and
             settles into carved stillness with a faint edge residue. */}
         <MaterializeTitle active={cues.title} />
         {/* The live line: what the oracle is doing, right now. */}
-        <OracleClock round={round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} />
+        <OracleClock round={arrival.kind === "waiting" ? null : round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} nextQuestionClosesAt={availability?.earliestOpenLock ?? null} />
       </View>
       <View style={{ gap: space(3) }}>
         <View style={{ minHeight: callSlotHeight(chromeScale), justifyContent: "flex-end", gap: space(3) }}>
           {showLedgerCta && (
             <>
               <DecodeLine active={booted} text="YESTERDAY'S LEDGER IS READ" {...role.line} color={colors.goldText} />
-              <GoldButton title="READ THE LEDGER" onPress={() => router.push(`/reveal/${yesterday}`)} />
+              <GoldButton title="READ THE LEDGER" onPress={() => leaveHome(() => router.push(`/reveal/${yesterday}`))} />
             </>
           )}
-          {round && !allSealed && (
-            <>
-              {/* One gold voice per screen. When yesterday's ledger owns the
-                  frame, today's state line steps down to muted chrome rather
-                  than stacking a second headline in the same colour beneath
-                  the first. */}
-              <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
-                <DecodeLine
-                  active={booted}
-                  text={availability && !availability.completeStillPossible ? `${availability.openCount} STILL OPEN · THIS DAY CANNOT RATE` : partial ?? spokenLine(round.player_count)}
-                  {...(showLedgerCta ? role.meta : role.line)}
-                  color={showLedgerCta ? colors.mutedInk : colors.goldText}
-                />
-              </View>
-              {availability?.earliestOpenLock && <Mono size={10} style={{ textAlign: "center" }}>NEXT CLOSE · {new Date(availability.earliestOpenLock).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</Mono>}
-              {showLedgerCta ? (
-                <QuietLink title="PLAY TODAY" onPress={enterRound} />
-              ) : (
-                <GoldButton title="PLAY TODAY" onPress={enterRound} />
-              )}
-            </>
-          )}
-          {round && allSealed && (
-            <>
-              <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
-                <DecodeLine
-                  active={booted}
-                  text="THE PROPHECY IS SEALED"
-                  {...(showLedgerCta ? role.meta : role.line)}
-                  color={showLedgerCta ? colors.mutedInk : colors.goldText}
-                />
-              </View>
-              {showLedgerCta ? (
-                <QuietLink title="Behold the crowd" onPress={() => router.push("/round")} />
-              ) : (
-                <GoldButton title="BEHOLD THE CROWD" onPress={() => router.push("/round")} />
-              )}
-            </>
-          )}
-          {!round && !today.isLoading && (
-            <View style={{ minHeight: stateRowH, justifyContent: "flex-end" }}>
-              <DecodeLine active={booted} text="THE ORACLE SLEEPS" cursor {...role.line} color={colors.mutedInk} />
-            </View>
-          )}
+          <HomeChallenge
+            state={arrival}
+            input={arrivalInput}
+            active={booted}
+            secondary={showLedgerCta}
+            checking={checkingArrival}
+            onPrimary={() => {
+              if (arrival.primary === "exhibition") openExhibition();
+              else if (arrival.primary === "crowd") leaveHome(() => router.push("/round"));
+              else void performArrivalAction();
+            }}
+            onRetry={() => { void refreshArrivalQueries(); }}
+            onExhibition={openExhibition}
+          />
         </View>
         {/* The notice rides the ledger query and lands long after first paint —
             this is the row that used to arrive and shove everything above it.
@@ -283,7 +356,7 @@ export default function Index() {
               // thing separating a notice you can act on from one that is just
               // the machine talking — it is free now that the footer rail has
               // stopped underlining everything.
-              <Pressable accessibilityRole="button" hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => router.push("/plus")}>
+              <Pressable accessibilityRole="button" hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => leaveHome(() => router.push("/plus"))}>
                 <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textDecorationLine: "underline" }]}>{notice}</Mono>
               </Pressable>
             ) : (

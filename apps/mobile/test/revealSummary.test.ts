@@ -12,3 +12,10 @@ it("allows a personal receipt without claiming an Oracle victory", () => {
   const round = qs(); round[0]!.oracle_p_yes = null;
   expect(revealSummary(round, calculateDuel(round))).toMatchObject({ headline: "5 RIGHT · 5 CALLS READ", canShareFinal: true });
 });
+it("carries a truthful largest-gap rivalry moment without changing the duel headline", () => {
+  const round = qs(); round[0]!.oracle_p_yes = .55;
+  expect(revealSummary(round, calculateDuel(round, 2))).toMatchObject({
+    headline: "YOU OUTSAW THE ORACLE",
+    rivalry: { questionId: "0", kind: "confidence", line: "Your confidence made the difference on this call." },
+  });
+});

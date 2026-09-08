@@ -14,11 +14,10 @@ export function partialLine(sealedCount: number, total: number): string | null {
   return `${numeral(sealedCount)} OF ${numeral(total)} SEALED · ${PARTIAL_LINE}`;
 }
 
-// "N ORACLES ALREADY WAITING" counts people who already sealed (audit #9) —
-// this counts who has spoken, and never claims a crowd that doesn't exist.
+// This counts distinct participants and never renames players as the opponent.
 export function spokenLine(playerCount: number): string {
-  if (playerCount <= 0) return "THE ORACLE SPEAKS";
-  return playerCount === 1 ? "1 ORACLE HAS ALREADY SPOKEN" : `${playerCount} ORACLES HAVE ALREADY SPOKEN`;
+  if (playerCount <= 0) return "MAKE THE FIRST CALL";
+  return playerCount === 1 ? "1 PLAYER HAS MADE A CALL" : `${playerCount} PLAYERS HAVE MADE THEIR CALLS`;
 }
 
 // The streak is invisible on the day it matters (audit §5.2): warn inside

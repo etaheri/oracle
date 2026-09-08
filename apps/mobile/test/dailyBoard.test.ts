@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CONSTANTS, type RoundBoard } from "@oracle/core";
-import { boardLines, BOARD_MAX_LINES, FIELD_GATHERING_LINE, UNRATED_LINE, oracleDayLine, boardRowLines } from "../src/game/dailyBoard";
+import { boardLines, boardSupportingLines, BOARD_MAX_LINES, FIELD_GATHERING_LINE, oracleDayLine, boardRowLines } from "../src/game/dailyBoard";
 
 function board(overrides: Partial<RoundBoard> = {}): RoundBoard {
   return {
@@ -21,7 +21,7 @@ describe("boardLines", () => {
   });
 
   it("reads the rank against the shape of the field", () => {
-    expect(boardLines(board())).toEqual(["RANK 31 OF 214 · BEST 268 · MEDIAN 44"]);
+    expect(boardLines(board())).toEqual(["RANK 31 OF 214 PLAYERS · BEST 268 · MEDIAN 44"]);
   });
 
   it("holds its tongue while the field is smaller than the floor", () => {
@@ -32,19 +32,37 @@ describe("boardLines", () => {
   });
 
   it("says why a partial day has no rank, rather than showing none", () => {
-    expect(boardLines(board({ your_points: null, your_rank: null }))).toEqual([UNRATED_LINE]);
+    expect(boardLines(board({ your_points: null, your_rank: null }), 1)).toEqual(["NO COMPETITIVE PLACING"]);
+    expect(boardLines(board({ your_points: null, your_rank: null }), 2)).toEqual(["NO COMPETITIVE PLACING"]);
+    expect(boardSupportingLines(board({ your_points: null, your_rank: null }), 1)).toEqual([
+      "Complete all five questions.", "Oracle shown for comparison; ranks are among players.",
+    ]);
+    expect(boardSupportingLines(board({ your_points: null, your_rank: null }), 2)).toEqual([
+      "Complete every non-void question.", "At least three must resolve.", "Oracle shown for comparison; ranks are among players.",
+    ]);
   });
 
   it("names the caller's own absence before the field's size", () => {
     // Both are true at once on a quiet install day. The reader's own day is
     // the more specific fact, and the one they can do something about.
     expect(boardLines(board({ field_size: 2, your_points: null, your_rank: null, best_points: null, median_points: null })))
-      .toEqual([UNRATED_LINE]);
+      .toEqual(["NO COMPETITIVE PLACING"]);
+  });
+
+  it("labels the denominator as player entries while the Oracle remains visible", () => {
+    expect(boardLines(board())).toEqual(["RANK 31 OF 214 PLAYERS · BEST 268 · MEDIAN 44"]);
+    expect(boardSupportingLines(board())).toEqual(["Oracle shown for comparison; ranks are among players."]);
+    expect(boardRowLines([{ name: "THE ORACLE", points: 184, rank: 3, is_you: false, is_oracle: true }]))
+      .toEqual(["3 · THE ORACLE · 184"]);
+  });
+
+  it("preserves the server rank for ties without client reranking", () => {
+    expect(boardLines(board({ your_rank: 2, field_size: 8 }))[0]).toContain("RANK 2 OF 8 PLAYERS");
   });
 
   it("writes a losing field with a true minus, never a hyphen", () => {
     const lines = boardLines(board({ your_points: -100, your_rank: 5, best_points: -20, median_points: -60 }));
-    expect(lines).toEqual(["RANK 5 OF 214 · BEST −20 · MEDIAN −60"]);
+    expect(lines).toEqual(["RANK 5 OF 214 PLAYERS · BEST −20 · MEDIAN −60"]);
     expect(lines.join("")).not.toContain("-");
   });
 

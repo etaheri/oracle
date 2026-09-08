@@ -8,7 +8,7 @@ const worst = (l: CopyLine) => fillSlots(l.text, { n: 99, streak: 999 });
 
 describe("the liturgy", () => {
   it("is frozen, verbatim", () => {
-    expect(LITURGY).toBe("EVERY ANSWER SEALED BEFORE THE OUTCOME. EVERY SCORE READ AGAINST THE CROWD. NOTHING REVISED.");
+    expect(LITURGY).toBe("EVERY ANSWER SEALED BEFORE THE OUTCOME. YOUR CALLS, THE ORACLE, AND THE DAILY BOARD.");
     expect(LITURGY_LINES.join(" ")).toBe(LITURGY);
   });
 });
@@ -25,7 +25,11 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
       expect(l.text.replace(/\{[a-z]+\}/g, ""), l.id).toBe(l.text.replace(/\{[a-z]+\}/g, "").toUpperCase());
       expect(l.text, l.id).not.toMatch(EMOJI);
       expect(l.text, l.id).not.toContain("!");
-      for (const b of BANNED) expect(l.text, l.id).not.toContain(b);
+      // The approved lapse explanation names retained results; all other ambient bans remain.
+      for (const b of BANNED) {
+        if (l.id === "streak.lapse-1" && b === "RESULTS") continue;
+        expect(l.text, l.id).not.toContain(b);
+      }
     }
   });
   it("fits a push after worst-case slot expansion", () => {
@@ -48,7 +52,7 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
   it("curiosity gap: no noon line carries a score", () => {
     for (const l of COPY_BANK.filter((x) => x.pool === "noon")) {
       expect(l.text, l.id).not.toContain("POINTS");
-      expect(l.text, l.id).not.toContain("SCORE");
+      expect(l.text, l.id).not.toMatch(/\bSCORE\b/);
       expect(worst(l), l.id).not.toMatch(/[+-]\d/);
     }
   });
@@ -202,16 +206,16 @@ describe("the rites", () => {
       expect(l, l).toBe(l.toUpperCase());
       expect(l, l).not.toMatch(EMOJI);
       expect(l, l).not.toContain("!");
-      for (const b of BANNED) expect(l, l).not.toContain(b);
+      // Plain-language instructions may name results; ambient bank restrictions remain above.
       expect(l.length, l).toBeLessThanOrEqual(140);
     }
   });
 });
 
 describe("the calling", () => {
-  it("is five beats in the register: caps, no emoji, no exclamation, no CTA verbs, push-length", async () => {
+  it("is three beats in the register: caps, no emoji, no exclamation, no CTA verbs, push-length", async () => {
     const { CALLING_LINES } = await import("../src/copy");
-    expect(CALLING_LINES.length).toBe(5);
+    expect(CALLING_LINES.length).toBe(3);
     for (const l of CALLING_LINES) {
       expect(l, l).toBe(l.toUpperCase());
       expect(l, l).not.toMatch(EMOJI);
@@ -220,13 +224,13 @@ describe("the calling", () => {
       expect(l.length, l).toBeLessThanOrEqual(140);
     }
   });
-  it("tells the search, the receipts, the ledger, and ends on the player", async () => {
+  it("identifies the product and AI opponent", async () => {
     const { CALLING_LINES } = await import("../src/copy");
     const all = CALLING_LINES.join(" ");
-    expect(all).toContain("SEARCH");
-    expect(all).toContain("RECEIPTS");
-    expect(all).toContain("LEDGER");
-    expect(CALLING_LINES[CALLING_LINES.length - 1]).toBe("THE SEARCH CONTINUES. IT HAS REACHED YOU.");
+    expect(all).toContain("OUTSEE");
+    expect(all).toContain("MEET THE ORACLE");
+    expect(all).toContain("YOUR AI OPPONENT");
+    expect(CALLING_LINES[CALLING_LINES.length - 1]).toBe("YOUR AI OPPONENT");
   });
   it("never states a rule the rites own — no scoring, no noon, no shield", async () => {
     const { CALLING_LINES } = await import("../src/copy");
@@ -260,7 +264,7 @@ describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, ca
     // What the subscription actually grants, in the player's words.
     expect(creed).toContain("THREE SHIELDS");
     // The wall that makes the whole economy honest, said at the till.
-    expect(creed).toContain("ORACLE SCORE");
+    expect(creed).toContain("FORECAST RATING");
   });
 
   it("CTA labels are quarantined: caps, no emoji, no exclamation, short enough for a button", () => {

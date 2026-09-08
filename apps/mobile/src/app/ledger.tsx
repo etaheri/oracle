@@ -150,7 +150,9 @@ export default function Ledger() {
     // long one; see its own note for why flexGrow is the load-bearing part.
     <Screen scroll overlayHeader header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
-        <Eyebrow>The forecaster&apos;s ledger</Eyebrow>
+        <Eyebrow>Your ledger</Eyebrow>
+        <Mono size={12}>Your predictions and results</Mono>
+        <QuietLink title="HOW TO PLAY" onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })} />
         {/* One column in both states. The frame used to be the only thing
             held steady while the six children below it did not exist yet —
             so the plaque itself stayed the right size and still jumped
@@ -168,11 +170,11 @@ export default function Ledger() {
               <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
               <View style={{ gap: space(2) }}>
                 {d.milestones.map(id => <Mono key={id} size={11} style={{ textAlign: "center" }}>{MILESTONE_COPY[id]}</Mono>)}
-                <LeadStat label="ORACLE SCORE" value={scoreValue(d.oracle_score, d.calls_rated)} />
+                <LeadStat label="YOUR FORECAST RATING" value={scoreValue(d.oracle_score, d.calls_rated)} />
                 {/* The machine's own plaque row, on the same fifty-call floor
                     the player meets -- so for its first ten days it too reads
                     UNWRITTEN beside them (schema comment, MeLedgerSchema.oracle). */}
-                <LeadStat label="THE ORACLE" value={scoreValue(d.oracle.score, d.oracle.calls_rated)} />
+                <LeadStat label="ORACLE RATING" value={scoreValue(d.oracle.score, d.oracle.calls_rated)} />
                 {/* The score is the premise of the whole app — the ledger naming
                     who can actually see — and it used to sit here as a bare label
                     over a progress string that never said what fifty was fifty OF
@@ -194,10 +196,11 @@ export default function Ledger() {
                   </Mono>
                 )}
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
-                <Stat label="DAYS CONSULTED" value={String(d.days_consulted)} />
-                <Stat label="CURRENT VIGIL" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
+                <Stat label="ROUNDS PLAYED" value={String(d.days_consulted)} />
+                <Mono size={12}>Your vigil is your playing streak. One sealed daily call qualifies; the count updates at settlement. Shields preserve the count without adding played days. It marks return, not accuracy.</Mono>
+                <Stat label="STREAK" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
                 <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
-                <Stat label="AVG CONVICTION" value={pct(d.avg_confidence)} />
+                <Stat label="AVG CONFIDENCE" value={pct(d.avg_confidence)} />
                 <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
                 <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
                 {d.confidence_history && <ConfidenceHistory history={d.confidence_history} />}
@@ -228,7 +231,7 @@ export default function Ledger() {
             </>
           )}
         </View>
-        {!plusActive && <QuietLink title="Oracle plus" onPress={() => router.push("/plus")} />}
+        {!plusActive && <QuietLink title="Outsee Plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
           {LITURGY_LINES.map((line) => (
             <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>

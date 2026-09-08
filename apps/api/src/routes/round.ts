@@ -6,6 +6,7 @@ import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
 import { evidenceSummary } from "../resolution";
 import { noonET } from "../pipeline/clock";
+import { selectExhibition } from "../exhibition";
 
 // The live round: earliest open round whose latest question lock is still
 // ahead of the server clock. The cron flips statuses on a 10-minute tick;
@@ -90,6 +91,11 @@ export const roundRoutes = new Hono<AppContext>()
     const next = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "scheduled"), orderBy: [asc(schema.rounds.date)] });
     if (!next) return c.json({ error: "no round scheduled" }, 404);
     return c.json({ date: next.date, opens_at: noonET(next.date).toISOString() });
+  })
+  .get("/exhibition", async (c) => {
+    const exhibition = await selectExhibition(c.get("deps").db);
+    if (!exhibition) return c.json({ error: "no exhibition available" }, 404);
+    return c.json(exhibition);
   })
   .get("/:date/reveal", async (c) => {
     const { db } = c.get("deps");

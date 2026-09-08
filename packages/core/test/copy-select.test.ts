@@ -54,3 +54,35 @@ describe("vigilLine", () => {
     expect(vigilLine(4, "home:2026-08-27:4")).toBe(vigilLine(4, "home:2026-08-27:4"));
   });
 });
+
+import { RITES_V2_LINES, RITES_LINES, PUSH_CAMPAIGN_LINES } from "../src/copy";
+import { CURRENT_GAME_COPY, GAME_TERMS } from "../src/gameCopy";
+describe("current factual copy", () => {
+  it("separates cumulative skill, participation and archived multipliers", () => {
+    const current = RITES_V2_LINES.join(" ");
+    expect(current).toContain("50 cumulative qualifying calls, not consecutive days");
+    expect(current).toContain("at least one call");
+    expect(current).toContain("at least three resolved");
+    expect(current).toContain("do not multiply");
+    expect(RITES_LINES.join(" ")).toContain("TEN PERCENT MORE");
+    expect(CURRENT_GAME_COPY.shieldUsed).toContain("No calls were added");
+    expect(GAME_TERMS.playerRating).toBe("Your forecast rating");
+    expect(PUSH_CAMPAIGN_LINES.plusWelcome).not.toContain("YOUR VIGIL IS PROTECTED");
+  });
+  it("requires evidence for results and social proof", () => {
+    for (const line of COPY_BANK) {
+      if (line.text.includes("RESULT IS READY")) expect(line.requires).toContain("results");
+      if (line.text.includes("PLAYERS HAVE MADE")) expect(line.requires).toContain("players");
+    }
+    const social = COPY_BANK.filter(line => line.requires?.includes("players"));
+    expect(selectLine(social, "empty-crowd", [])).toBeNull();
+  });
+});
+
+it("counts human players for the daily board minimum", async () => {
+  const { RITES_V2_SECTIONS } = await import("../src/copy");
+  const { CONSTANTS } = await import("../src/constants");
+  const record = RITES_V2_SECTIONS.find(section => section.title === "Build your record")!.text;
+  expect(record).toContain(`${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison`);
+  expect(record).not.toContain("including the Oracle");
+});

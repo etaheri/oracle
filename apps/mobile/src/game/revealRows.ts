@@ -66,9 +66,9 @@ export function receiptLine(q: Question): string | null {
 // Dopamine hit #2's missing half (audit §3.2): the vigil's day count and the
 // Oracle Score's progress, spoken only once the day is actually settled.
 export function ledgerLines(l: Reveal["ledger"], version = 1): string[] {
-  if (!l.settled) return ["THE VIGIL IS COUNTED SHORTLY"];
-  const streakLine = l.streak > 0 ? `VIGIL: DAY ${l.streak}` : "THE VIGIL BEGINS AGAIN";
-  if (l.oracle_score !== null) return [streakLine, `ORACLE SCORE ${l.oracle_score}`];
+  if (!l.settled) return ["YOUR STREAK UPDATES WHEN THE ROUND SETTLES"];
+  const streakLine = l.streak > 0 ? `STREAK: ${l.streak} DAYS` : "A NEW STREAK CAN BEGIN. YOUR RECORD REMAINS";
+  if (l.oracle_score !== null) return [streakLine, `YOUR FORECAST RATING ${l.oracle_score}`];
   // This used to read "0 OF 50 CALLS WRITTEN" — a progress bar toward an
   // unnamed thing, in which nothing said what a CALL was, what 50 bought, or
   // what was being written. The first line now names the thing that does not
@@ -81,15 +81,15 @@ export function ledgerLines(l: Reveal["ledger"], version = 1): string[] {
   // DAY" answers it in three words and makes fifty legible as ten days.
   return [
     streakLine,
-    "ORACLE SCORE UNWRITTEN",
-    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS${version >= 2 ? " · COMPLETE NON-VOID ROUNDS" : " · FIVE A DAY"}`,
+    "YOUR FORECAST RATING UNWRITTEN",
+    `${l.calls_rated} OF ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} RATED CALLS${version >= 2 ? " · CUMULATIVE QUALIFYING CALLS" : " · FIVE A DAY"}`,
   ];
 }
 
 // A day already past noon and still unresolved reads differently than one
 // still waiting on today's noon (audit §3.5's "RETURN AT NOON" at noon).
 export function pendingLine(date: string, todayIso: string): string {
-  return date < todayIso ? "THE LEDGER IS BEING READ. PATIENCE." : "THE LEDGER IS READ AFTER THE QUESTIONS CLOSE.";
+  return date < todayIso ? "OUTCOMES ARE STILL BEING VERIFIED." : "RESULTS FOLLOW VERIFICATION AFTER QUESTIONS CLOSE.";
 }
 
 const LAPSED_LINES = COPY_BANK.filter((l) => l.id.startsWith("noon.lapsed"));

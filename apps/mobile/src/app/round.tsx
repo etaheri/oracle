@@ -10,6 +10,7 @@ import { UndealtCard, STACK_TOP_Y, STACK_TOP_ROTATE } from "../ui/UndealtCard";
 import { ConvictionColumn } from "../ui/ConvictionColumn";
 import { confidenceMeaning } from "../game/confidence";
 import { crowdVerdict } from "../game/crowdVerdict";
+import { crowdAnticipation } from "../game/crowdAnticipation";
 import { payoffLine } from "../game/payoffLine";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
@@ -25,6 +26,7 @@ import { colors, space } from "../theme";
 import { useChromeScale } from "../ui/useChromeScale";
 import { scaledRow } from "../game/typeScaling";
 import { PIPELINE_LINES } from "@oracle/core";
+import { useRouter } from "expo-router";
 
 // The throw UNCOVERS the stack — the next card was already on the table as
 // the deck's top, so the live card enters from exactly that resting pose: a
@@ -37,6 +39,7 @@ const Uncover = new Keyframe({
 
 export default function Round() {
   const today = useToday();
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const answers = useRoundStore((s) => s.answers);
   // The last thrown card's id: its crowd verdict prints in the stationary
@@ -108,13 +111,28 @@ export default function Round() {
       </View>
     </Screen>
   );
-  if (!today.data) return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center" }}><SleepsPanel /></View></Screen>;
+  if (!today.data) return (
+    <Screen>
+      <TopBar label="OUTSEE" />
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <SleepsPanel
+          failed={today.isError}
+          onHome={() => router.dismissTo("/")}
+          onExhibition={() => router.replace({ pathname: "/practice", params: { opening: "0", entry_point: "waiting_home" } })}
+        />
+      </View>
+    </Screen>
+  );
 
   const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
   const current = nextOpenQuestion(qs, (id) => !!answers[id]?.sealed, now);
   const lastEntry = lastSealedId ? answers[lastSealedId] : undefined;
   const lastCrowd = lastSealedId ? crowdById.get(lastSealedId) : undefined;
   const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct, lastCrowd.player_count) : null;
+  const anticipation = crowdAnticipation(
+    Object.entries(answers).map(([questionId, entry]) => ({ questionId, answer: entry.answer, sealed: entry.sealed })),
+    crowd.data?.questions ?? [],
+  );
 
   return (
     <Screen>
@@ -139,7 +157,10 @@ export default function Round() {
             </Animated.View>
           </View>}</CardStage>
         ) : (
-          <CrowdReveal round={today.data} />
+          <View style={{ flex: 1, gap: space(2) }}>
+            {anticipation && <Mono size={10} color={colors.goldText} style={{ textAlign: "center" }}>{anticipation}</Mono>}
+            <CrowdReveal round={today.data} />
+          </View>
         )}
       </View>
       {current && (lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}

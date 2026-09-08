@@ -51,3 +51,19 @@ describe("settleStreak", () => {
     expect(r.streakCurrent).toBe(3);
   });
 });
+
+import { calculateDuel, type DuelQuestion } from "../src/duel";
+it("one call maintains participation without earning a ranked duel", () => {
+  const questions: DuelQuestion[] = Array.from({ length: 5 }, (_, i) => ({
+    id: String(i), slot: i + 1, is_big_one: i === 4, outcome: "yes", oracle_p_yes: .7,
+    my: i === 0 ? { answer: true, confidence: 70 } : null,
+  }));
+  expect(settleStreak(base, questions.some(q => q.my !== null), "2026-08-20").streakCurrent).toBe(11);
+  expect(calculateDuel(questions, 2).status).toBe("incomplete");
+});
+it("a protected gap adds no played day before the next return", () => {
+  const protectedGap = settleStreak(base, false, "2026-08-20");
+  expect(protectedGap.streakCurrent).toBe(base.streakCurrent);
+  expect(protectedGap.streakBest).toBe(base.streakBest);
+  expect(settleStreak(protectedGap, true, "2026-08-21").streakCurrent).toBe(base.streakCurrent + 1);
+});

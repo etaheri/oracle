@@ -3,17 +3,17 @@ import { partialLine, spokenLine, riskLine, lapseNotice } from "../src/game/home
 
 describe("homeLines", () => {
   it("partialLine names the count and the rule, only for a partial day", () => {
-    expect(partialLine(3, 5)).toBe("III OF V SEALED · THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED.");
+    expect(partialLine(3, 5)).toBe("III OF V SEALED · A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION. YOUR CALLS CAN STILL RECEIVE RESULTS.");
     expect(partialLine(0, 5)).toBeNull();
     expect(partialLine(5, 5)).toBeNull();
   });
-  it("spokenLine counts those who sealed, or announces the oracle", () => {
-    expect(spokenLine(142)).toBe("142 ORACLES HAVE ALREADY SPOKEN");
-    expect(spokenLine(1)).toBe("1 ORACLE HAS ALREADY SPOKEN");
-    expect(spokenLine(0)).toBe("THE ORACLE SPEAKS");
+  it("spokenLine counts players without calling them oracles", () => {
+    expect(spokenLine(142)).toBe("142 PLAYERS HAVE MADE THEIR CALLS");
+    expect(spokenLine(1)).toBe("1 PLAYER HAS MADE A CALL");
+    expect(spokenLine(0)).toBe("MAKE THE FIRST CALL");
   });
   it("riskLine warns inside three hours of lock, unsealed, with a vigil to lose", () => {
-    expect(riskLine(4, false, 2 * 3_600_000, "k")).toBe("YOUR VIGIL OF 4 DAYS ENDS AT NOON.");
+    expect(riskLine(4, false, 2 * 3_600_000, "k")).toBe("YOUR STREAK: 4 DAYS. EACH DAILY CALL COUNTS AT SETTLEMENT.");
     expect(riskLine(4, true, 2 * 3_600_000, "k")).toBeNull();
     expect(riskLine(0, false, 2 * 3_600_000, "k")).toBeNull();
     expect(riskLine(1, false, 2 * 3_600_000, "k")).toBeNull(); // the oracle starts counting at 2

@@ -9,3 +9,16 @@ it("distinguishes an unanswered expiry from an already sealed question", () => {
   expect(roundAvailability(qs, new Set(), now - 1).openCount).toBe(1);
   expect(confidenceMeaning(95)).toBe("ALMOST CERTAIN");
 });
+
+it("does not count a version 2 healed lock as a player miss", () => {
+  const qs = [
+    { id: "void", locks_at: "2026-09-07T14:00:00Z", lock_healed: true },
+    { id: "missed", locks_at: "2026-09-07T14:00:00Z", lock_healed: false },
+    { id: "open", locks_at: "2026-09-07T16:00:00Z", lock_healed: false },
+  ];
+  expect(roundAvailability(qs, new Set(), Date.parse("2026-09-07T15:00:00Z"), 2)).toMatchObject({
+    openCount: 1,
+    missedCount: 1,
+    voidCount: 1,
+  });
+});

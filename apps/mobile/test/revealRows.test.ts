@@ -130,15 +130,15 @@ describe("revealRows", () => {
       // same scale. The pair now names what does not exist yet, counts toward
       // it, and states the rate that makes fifty mean ten days.
       expect(ledgerLines({ settled: true, streak: 4, calls_rated: 0, oracle_score: null })).toEqual([
-        "VIGIL: DAY 4",
-        "ORACLE SCORE UNWRITTEN",
+        "STREAK: 4 DAYS",
+        "YOUR FORECAST RATING UNWRITTEN",
         "0 OF 50 RATED CALLS · FIVE A DAY",
       ]);
     });
     it("settled with streak reset to zero", () => {
       expect(ledgerLines({ settled: true, streak: 0, calls_rated: 12, oracle_score: null })).toEqual([
-        "THE VIGIL BEGINS AGAIN",
-        "ORACLE SCORE UNWRITTEN",
+        "A NEW STREAK CAN BEGIN. YOUR RECORD REMAINS",
+        "YOUR FORECAST RATING UNWRITTEN",
         "12 OF 50 RATED CALLS · FIVE A DAY",
       ]);
     });
@@ -151,24 +151,24 @@ describe("revealRows", () => {
     });
     it("settled once the oracle score exists", () => {
       expect(ledgerLines({ settled: true, streak: 6, calls_rated: 50, oracle_score: 73 })).toEqual([
-        "VIGIL: DAY 6",
-        "ORACLE SCORE 73",
+        "STREAK: 6 DAYS",
+        "YOUR FORECAST RATING 73",
       ]);
     });
     it("not settled — a single holding line", () => {
       expect(ledgerLines({ settled: false, streak: 6, calls_rated: 50, oracle_score: 73 })).toEqual([
-        "THE VIGIL IS COUNTED SHORTLY",
+        "YOUR STREAK UPDATES WHEN THE ROUND SETTLES",
       ]);
     });
   });
 
   describe("pendingLine", () => {
     it("a past date still unread: patience line", () => {
-      expect(pendingLine("2026-08-20", "2026-08-21")).toBe("THE LEDGER IS BEING READ. PATIENCE.");
+      expect(pendingLine("2026-08-20", "2026-08-21")).toBe("OUTCOMES ARE STILL BEING VERIFIED.");
     });
     it("today or a future date: return-at-noon line", () => {
-      expect(pendingLine("2026-08-21", "2026-08-21")).toBe("THE LEDGER IS READ AFTER THE QUESTIONS CLOSE.");
-      expect(pendingLine("2026-08-22", "2026-08-21")).toBe("THE LEDGER IS READ AFTER THE QUESTIONS CLOSE.");
+      expect(pendingLine("2026-08-21", "2026-08-21")).toBe("RESULTS FOLLOW VERIFICATION AFTER QUESTIONS CLOSE.");
+      expect(pendingLine("2026-08-22", "2026-08-21")).toBe("RESULTS FOLLOW VERIFICATION AFTER QUESTIONS CLOSE.");
     });
   });
 

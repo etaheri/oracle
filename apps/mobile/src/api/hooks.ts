@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -27,6 +27,24 @@ export function useNextRound(enabled: boolean) {
       const token = await getDeviceToken();
       try {
         return await api("/v1/round/next", RoundNextSchema, { token });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
+}
+
+export function useExhibition(enabled: boolean) {
+  return useQuery({
+    queryKey: ["exhibition"],
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      try {
+        return await api("/v1/round/exhibition", ExhibitionSchema, { token });
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) return null;
         throw e;

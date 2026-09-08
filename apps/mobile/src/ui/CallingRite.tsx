@@ -24,9 +24,9 @@ import { AsciiDust, GOLD } from "./TerminalPatina";
 // CTA, and the reduced-motion branch below already offers CONTINUE.
 const SKIP_LABEL = "SKIP";
 
-const BEAT_MS = 2400; // one beat: print (~900ms) + hold
-const PRINT_MS = 900;
-const FINAL_HOLD_MS = 2000;
+const BEAT_MS = 900; // one beat: print (~900ms) + hold
+const PRINT_MS = 450;
+const FINAL_HOLD_MS = 800;
 const FADE_MS = 600;
 
 export function CallingRite() {
@@ -37,7 +37,7 @@ export function CallingRite() {
   // The score: beat i starts printing at i·BEAT, lands (haptic) at
   // i·BEAT + PRINT. After the final beat holds, the fade begins.
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || done) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     CALLING_LINES.forEach((_, i) => {
       if (i > 0) timers.push(setTimeout(() => setShown(i + 1), i * BEAT_MS));
@@ -58,7 +58,7 @@ export function CallingRite() {
       }, (CALLING_LINES.length - 1) * BEAT_MS + PRINT_MS + FINAL_HOLD_MS),
     );
     return () => timers.forEach(clearTimeout);
-  }, [reducedMotion]);
+  }, [reducedMotion, done]);
 
   useEffect(() => {
     if (done) {
@@ -121,7 +121,7 @@ export function CallingRite() {
             its own words rather than on its exit. Absolutely positioned: it
             must not enter the centred column's layout and shift the lines.
             The whole field is still the tap target; this only says so. */}
-        {shown > 1 && (
+        {(
           <Animated.View entering={FadeIn.duration(600)} style={styles.skip}>
             <Pressable
               accessibilityRole="button"

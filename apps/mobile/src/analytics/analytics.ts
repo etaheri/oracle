@@ -6,6 +6,7 @@ import { KEYS } from "../config/keys";
 // the ledger job) — the PostHog dashboard reads both from reveal views
 // instead. Every other event below has a real client-side call site.
 export type AnalyticsEvent =
+  | "arrival_viewed"
   | "confidence_history_viewed"
   | "confidence_history_expanded"
   | "resolution_evidence_opened"

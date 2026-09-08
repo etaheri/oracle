@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Canvas, Fill, LinearGradient, useCanvasRef, vec } from "@shopify/react-native-skia";
 import { Screen, useScreenInset } from "../../ui/Screen";
@@ -27,7 +27,8 @@ import { payoff, oracleCallRight, dayCallCounts, CONSTANTS, provenanceLine } fro
 import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
-import { boardLines, boardRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
+import { boardLines, boardSupportingLines, boardRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
+import { rivalryMoment } from "../../game/rivalryMoment";
 import { capture } from "../../analytics/analytics";
 import { colors, space } from "../../theme";
 
@@ -76,6 +77,7 @@ const TideFlash = new Keyframe({
 
 export default function RevealScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
+  const router = useRouter();
   const reveal = useReveal(date ?? null);
   const reducedMotion = useReducedMotion();
   const inset = useScreenInset();
@@ -118,6 +120,8 @@ export default function RevealScreen() {
   const [atBottom, setAtBottom] = useState(false);
   const viewportH = useRef(0);
   const contentH = useRef(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const boardScrollRequested = useRef(false);
   const recomputeOverflow = () => setOverflows(contentH.current > viewportH.current + 1);
   const loaded = !!reveal.data && !("pending" in reveal.data);
   // reveal.data's reference changes on every refetch (staleTime 0 + AppState
@@ -174,7 +178,7 @@ export default function RevealScreen() {
 
   if (reveal.isLoading) return (
     <Screen>
-      <TopBar />
+      <TopBar label="OUTSEE" />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
         <DecodeLine text="CONSULTING THE VOID…" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
@@ -182,12 +186,12 @@ export default function RevealScreen() {
     </Screen>
   );
   if (reveal.isError) return (
-    <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
+    <Screen><TopBar label="OUTSEE" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <DecodeLine text="THE ORB IS BEYOND REACH. IT WILL RETURN." size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
     </View></Screen>
   );
   if (!reveal.data || "pending" in reveal.data) {
-    return <Screen><TopBar /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
+    return <Screen><TopBar label="OUTSEE" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
       <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
@@ -209,6 +213,7 @@ export default function RevealScreen() {
   // until it actually forecast a scored question. Computed once here rather
   // than at each of its two call sites (the closing line, the night card).
   const duel = calculateDuel(d.questions.map(q => ({ ...q, is_big_one: q.slot === 5 })), d.rules_version);
+  const rivalry = rivalryMoment(d.questions.map(q => ({ ...q, is_big_one: q.slot === 5 })), duel);
   const oracleLine = d.rules_version >= 2 ? duelLine(duel) : oracleDayLine(d.questions);
   const oracleCounts = oracleLine !== null ? dayCallCounts(d.questions) : null;
   const cardData: ShareCardData = {
@@ -246,6 +251,7 @@ export default function RevealScreen() {
     <Screen bleed>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{
           gap: space(4),
           paddingTop: headerHeight + space(4),
@@ -284,13 +290,56 @@ export default function RevealScreen() {
               ? `Day ${d.date}`
               : `Day ${d.date} · the ledger is read`}
         </Eyebrow>
+        <Eyebrow>Outsee · You vs the Oracle</Eyebrow>
         <RevealSummary data={d} milestone={milestone ? MILESTONE_COPY[milestone] : null} />
+        {rivalry && (
+          <View style={{ alignItems: "center", gap: space(1) }}>
+            <Eyebrow>Largest points gap</Eyebrow>
+            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>{rivalry.line}</Mono>
+          </View>
+        )}
+        {!allSpectator && (
+          <View style={{ alignItems: "center", gap: space(1) }}>
+            <Eyebrow>Daily board</Eyebrow>
+            {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+              <Mono key={`board-summary-${i}`} size={10} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{line}</Mono>
+            ))}
+          </View>
+        )}
         {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "CONJURING…" : "SHARE THE PROPHECY"} onPress={onShare} disabled={sharing} />}
         {shareError && <Mono color={colors.vermilion}>{shareError}</Mono>}
-        <QuietLink title={details ? "CLOSE THE DETAILS" : "ALL CALLS AND THE BOARD"} onPress={() => setDetails(!details)} />
+        <QuietLink
+          title={details ? "CLOSE THE DETAILS" : "VIEW DAILY BOARD"}
+          onPress={() => {
+            if (details) setDetails(false);
+            else { boardScrollRequested.current = true; setDetails(true); }
+          }}
+        />
+        <QuietLink title="SHOW RULES" onPress={() => router.push({ pathname: "/rites", params: { all: "1", rules_version: String(d.rules_version) } })} />
         {details && <>
         {allSpectator && !anyPending && (
           <DecodeLine text={lapsedLine(d.date)} size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
+        )}
+        {!allSpectator && (
+          <View
+            onLayout={(event) => {
+              if (!boardScrollRequested.current) return;
+              boardScrollRequested.current = false;
+              scrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - headerHeight - space(2)), animated: !reducedMotion });
+            }}
+            style={{ minHeight: BOARD_SLOT_H, alignItems: "center", justifyContent: "center", gap: space(1) }}
+          >
+            <Eyebrow>Daily board</Eyebrow>
+            {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+              <Mono key={i} size={10} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} letterSpacing={3} style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}>{line}</Mono>
+            ))}
+            {boardSupportingLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+              <Mono key={`support-${i}`} size={10} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}>{line}</Mono>
+            ))}
+            {!!board.data?.rows?.length && boardRowLines(board.data.rows).map((line, i) => (
+              <Mono key={`row-${i}`} size={10} color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}>{line}</Mono>
+            ))}
+          </View>
         )}
         <Animated.View
           entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)}
@@ -329,38 +378,6 @@ export default function RevealScreen() {
               )}
             </>
           ))}
-          {/* Where the day stood among everyone who played it (design §4).
-              Held open at a fixed height because it arrives on its own query,
-              after the reveal has already drawn. */}
-          {!allSpectator && (
-            <View style={{ minHeight: BOARD_SLOT_H, alignItems: "center", justifyContent: "center", gap: space(1) }}>
-              {boardLines(board.data ?? undefined).map((line, i) => (
-                <Mono
-                  key={i}
-                  size={10}
-                  color={i === 0 && board.data?.your_rank != null ? colors.goldText : colors.mutedInk}
-                  letterSpacing={3}
-                  style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}
-                >
-                  {line}
-                </Mono>
-              ))}
-              {/* The field as a room, not only a rank (design §4) — who else
-                  is standing near the reader, and where the machine itself
-                  landed among them. */}
-              {!!board.data?.rows?.length && boardRowLines(board.data.rows).map((line, i) => (
-                <Mono
-                  key={`row-${i}`}
-                  size={10}
-                  color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk}
-                  letterSpacing={2}
-                  style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}
-                >
-                  {line}
-                </Mono>
-              ))}
-            </View>
-          )}
           {/* Your standing, which is NOT this day's news — the vigil's count
               and the score are true before the page loads and stay true after
               it. They were gold, which put four gold lines under one number

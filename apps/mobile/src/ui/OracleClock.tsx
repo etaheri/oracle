@@ -25,11 +25,12 @@ const READING_LINE = COPY_BANK.find((l) => l.id === "system.reading-1")!.text;
 
 export type ClockRound = { locks_at: string | null } | null | undefined;
 
-export function OracleClock({ round, allSealed, loading, active }: {
+export function OracleClock({ round, allSealed, loading, active, nextQuestionClosesAt }: {
   round: ClockRound;
   allSealed: boolean;
   loading: boolean;
   active: boolean;
+  nextQuestionClosesAt?: string | null;
 }) {
   // Only ask when there is no round to count down to; while `today` is still
   // in flight we say nothing rather than flash "THE ORACLE SPEAKS IN".
@@ -39,10 +40,10 @@ export function OracleClock({ round, allSealed, loading, active }: {
   const scale = useChromeScale();
   const clockH = scaledRow(ROW_H.meta, scale) + space(1) + scaledRow(ROW_H.clock, scale);
 
-  const until = round ? round.locks_at : asleep ? (next.data?.opens_at ?? null) : null;
+  const until = round ? (nextQuestionClosesAt ?? null) : asleep ? (next.data?.opens_at ?? null) : null;
   const prefix = round
-    ? allSealed ? "TODAY'S LEDGER IS READ IN" : "THE ORACLE CLOSES IN"
-    : "THE ORACLE SPEAKS IN";
+    ? "NEXT QUESTION CLOSES IN"
+    : "NEXT ROUND OPENS IN";
   // Past the lock the round is being read; asleep with no schedule yet, the
   // machine is stirring. Neither is a countdown, so both print as one line.
   const fallback = round ? (allSealed ? READING_LINE : null) : next.data ? "THE ORACLE STIRS" : null;

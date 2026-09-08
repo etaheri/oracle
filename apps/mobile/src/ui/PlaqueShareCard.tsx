@@ -32,8 +32,10 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
 
   const pct = (v: number | null) => (v === null ? "-" : `${v}%`);
   const statLines = [
-    `DAYS CONSULTED ${data.days_consulted} · VIGIL ${data.streak}`,
-    `ACCURACY ${pct(data.accuracy_pct)} · CONVICTION ${pct(data.avg_confidence)}`,
+    `ROUNDS PLAYED ${data.days_consulted} · STREAK ${data.streak}`,
+    `ACCURACY ${pct(data.accuracy_pct)} · CONFIDENCE ${pct(data.avg_confidence)}`,
+    `YOUR FORECAST RATING ${data.oracle_score ?? "UNWRITTEN"}`,
+    `ORACLE RATING ${data.oracle.score ?? "UNWRITTEN"}`,
     `AGAINST THE TIDE x${data.tide_wins}`,
   ];
 
@@ -42,14 +44,14 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
       <Fill color={colors.midnightMuseum} />
       <Rect x={INSET + 0.5} y={INSET + 0.5} width={PLAQUE_W - 2 * INSET - 1} height={PLAQUE_H - 2 * INSET - 1} style="stroke" strokeWidth={1} color={NIGHT_LINE} />
       <RegisterMarks />
-      {mono && <SkText font={mono} text="THE FORECASTER'S LEDGER" x={centered(mono, "THE FORECASTER'S LEDGER")} y={110} color={colors.agedGold} />}
+      {mono && <SkText font={mono} text="OUTSEE · YOUR LEDGER" x={centered(mono, "OUTSEE · YOUR LEDGER")} y={110} color={colors.agedGold} />}
       <Line p1={vec(INSET + 40, 140)} p2={vec(PLAQUE_W - INSET - 40, 140)} color={NIGHT_LINE} strokeWidth={1} />
       <PatinaHalo x={PLAQUE_W / 2 - 190} y={330 - 190} width={380} height={380} center={[PLAQUE_W / 2, 330]} innerR={130} outerR={172} seed={[...data.epithet.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 97} />
       {orb && <SkImage image={orb} x={PLAQUE_W / 2 - 145} y={185} width={290} height={290} fit="contain" />}
       {ritual && <SkText font={ritual} text={data.epithet.title} x={centered(ritual, data.epithet.title)} y={600} color={colors.museumWhite} />}
       {receiptFont && <SkText font={receiptFont} text={data.epithet.receipt} x={centered(receiptFont, data.epithet.receipt)} y={644} color={colors.agedGold} />}
       {mono && statLines.map((line, i) => (
-        <SkText key={line} font={mono} text={line} x={centered(mono, line)} y={730 + i * 34} color={NIGHT_DIM} />
+        <SkText key={line} font={mono} text={line} x={centered(mono, line)} y={710 + i * 32} color={NIGHT_DIM} />
       ))}
       <Line p1={vec(INSET + 40, 880)} p2={vec(PLAQUE_W - INSET - 40, 880)} color={NIGHT_LINE} strokeWidth={1} />
       {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={926} color={colors.agedGold} />}

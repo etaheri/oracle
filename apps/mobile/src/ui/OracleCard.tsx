@@ -57,7 +57,7 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
 }
 
 export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceButtons = false, height }: {
-  practice?: { onSeal: (answer: boolean, confidence: number) => void };
+  practice?: { onSeal: (answer: boolean, confidence: number) => void; context?: string };
   forceButtons?: boolean;
   height?: number;
   q: RoundToday["questions"][number];
@@ -344,7 +344,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
           modifiers={modifiers || undefined}
           big={q.is_big_one}
           coordinate={coordinate}
-          status={practice ? "PRACTICE · UNSCORED" : cardStatus(q.locks_at, now, sealed)}
+          status={practice ? "EXHIBITION · UNRANKED" : cardStatus(q.locks_at, now, sealed)}
         >
           {/* The question floats centered in the card's field, tarot-fashion;
               the controls anchor at the foot. The face is also the grab
@@ -354,6 +354,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
             <Animated.View style={[{ flex: 1, minHeight: 0 }, questionStyle]}>
               <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
               <QuestionFace text={q.text} seed={q.id} />
+              {practice?.context && <Mono size={11} style={{ textAlign: "center" }}>{practice.context}</Mono>}
               {q.context && <View style={{ gap: space(1) }}>
                 <Pressable accessibilityRole="button" onPress={() => setShowContext(!showContext)} style={{ minHeight: 44, justifyContent: "center" }}><Mono size={11}>{showContext ? "CLOSE CONTEXT" : "CONTEXT"}</Mono></Pressable>
                 {showContext && <><Mono size={11}>{q.context.text}</Mono><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(q.context!.sourceUrl); }} style={{ minHeight: 44 }}><Mono size={9}>SOURCE · AS OF {new Date(q.context.asOf).toLocaleString()}</Mono></Pressable></>}
@@ -365,7 +366,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
           <View style={{ gap: space(3) }}>
             {liveConf === null && !sealed && !thrown ? (
               buttonsMode ? (
-                <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>HOLD TO RAISE CONVICTION · RELEASE TO SEAL</Mono>
+                <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>HOLD TO RAISE CONFIDENCE · RELEASE TO SEAL</Mono>
               ) : (
                 <DecodeLine text="‹ NO ─ PULL · RELEASE ─ YES ›" size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />
               )
@@ -382,7 +383,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
                       key={String(v)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: sel }}
-                      accessibilityHint="Hold to raise conviction; releasing seals the prophecy."
+                      accessibilityHint="Hold to raise confidence; releasing seals your call."
                       onPressIn={() => beginHold(v)}
                       onPressOut={() => endHold(v)}
                       style={{ flex: 1, borderWidth: 1, borderColor: sel ? tone : colors.line, minHeight: 48, justifyContent: "center", alignItems: "center", backgroundColor: sel ? wash : "transparent" }}>

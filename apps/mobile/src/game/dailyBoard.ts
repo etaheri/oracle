@@ -16,7 +16,8 @@ export const FIELD_GATHERING_LINE = "THE FIELD IS STILL GATHERING";
 // Why a reader with a real day of points has no rank on it. Past tense: by
 // reveal time the sealing is over, and the app has already said the present-
 // tense version all through the round (PARTIAL_LINE).
-export const UNRATED_LINE = "THE DAY RATED ONLY THOSE WHO SEALED ALL FIVE";
+export const UNRATED_LINE = "NO COMPETITIVE PLACING";
+export const ORACLE_COMPARISON_LINE = "Oracle shown for comparison; ranks are among players.";
 
 // The reveal reserves this block's height for this many lines, so the board
 // ARRIVES when its query resolves instead of shoving the page down under the
@@ -32,7 +33,7 @@ export const BOARD_MAX_LINES = 1;
 // deltas, so a winning field is written bare and only a losing one is signed.
 const level = (n: number) => (n < 0 ? `−${Math.abs(n)}` : String(n));
 
-export function boardLines(b: RoundBoard | undefined): string[] {
+export function boardLines(b: RoundBoard | undefined, _rulesVersion = 1): string[] {
   if (!b) return [];
   // The reader's own absence first: on a quiet day it is true at the same time
   // as the small field, and it is the more specific of the two facts -- also
@@ -43,8 +44,18 @@ export function boardLines(b: RoundBoard | undefined): string[] {
   const shape = b.best_points === null || b.median_points === null
     ? null
     : `BEST ${level(b.best_points)} · MEDIAN ${level(b.median_points)}`;
-  const rank = `RANK ${b.your_rank} OF ${b.field_size}`;
+  const rank = `RANK ${b.your_rank} OF ${b.field_size} PLAYERS`;
   return [shape === null ? rank : `${rank} · ${shape}`];
+}
+
+export function boardSupportingLines(b: RoundBoard | undefined, rulesVersion = 1): string[] {
+  if (!b) return [];
+  if (b.your_points === null) {
+    return rulesVersion >= 2
+      ? ["Complete every non-void question.", "At least three must resolve.", ORACLE_COMPARISON_LINE]
+      : ["Complete all five questions.", ORACLE_COMPARISON_LINE];
+  }
+  return [ORACLE_COMPARISON_LINE];
 }
 
 /**

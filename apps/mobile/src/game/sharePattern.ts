@@ -18,6 +18,6 @@ export function shareMessage(
   url: string | null = SHARE_URL,
 ): string {
   const points = d.dayPoints >= 0 ? `+${d.dayPoints}` : String(d.dayPoints);
-  const body = `🔮 ORACLE ${d.date} — ${patternLine(d.results)} · ${points}${d.duelText ? ` · ${d.duelText}` : ""} · can you outsee me?`;
+  const body = `🔮 OUTSEE ${d.date} — ${patternLine(d.results)} · ${points}${d.duelText ? ` · ${d.duelText}` : ""} · can you outsee me?`;
   return url ? `${body} ${url}` : body;
 }

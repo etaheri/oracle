@@ -103,7 +103,7 @@ export async function composeHingePushes(db: Db, date: string): Promise<HingePus
     let scored = false;
     for (const p of mine) {
       const q = qById.get(p.questionId);
-      if (!q || q.outcome === null || q.outcome === "void") continue;
+      if (!q || q.outcome === null || q.outcome === "void" || p.points === null) continue;
       scored = true;
       const correct = p.answer === (q.outcome === "yes");
       if (!correct) wrong++;

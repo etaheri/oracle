@@ -12,3 +12,5 @@ export * from "./roundRules";
 export * from "./milestones";
 
 export * from "./confidenceHistory";
+export * from "./exhibition";
+export * from "./gameCopy";

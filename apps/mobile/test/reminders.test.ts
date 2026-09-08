@@ -28,17 +28,27 @@ describe("planReminders", () => {
   });
   it("a partial day draws a partial-aware closing line", () => {
     const r = planReminders(locksAt, "2026-08-28", 3);
-    expect(r.find((x) => x.kind === "closing" && x.date === "2026-08-28")!.body).toMatch(/ALL FIVE|WHOLE DAYS/);
+    expect(r.find((x) => x.kind === "closing" && x.date === "2026-08-28")!.body).toMatch(/NON-VOID QUESTION|INCOMPLETE ROUND/);
   });
   it("schedules one noon reminder 45 minutes after lock, only once something is sealed", () => {
     const noon = planReminders(locksAt, "2026-08-28", 1).filter((x) => x.kind === "noon");
     expect(noon).toHaveLength(1);
     expect(noon[0]!.at.toISOString()).toBe("2026-08-29T16:45:00.000Z");
-    expect(noon[0]!.body).toBe("NOON HAS PASSED. THE OUTCOMES BELONG TO THE LEDGER NOW.");
+    expect(noon[0]!.body).toBe("RETURN TO OUTSEE TO CHECK YOUR PREDICTIONS AND THE NEXT CHALLENGE.");
     expect(planReminders(locksAt, "2026-08-28", 0).some((x) => x.kind === "noon")).toBe(false);
   });
   it("a sealed day still gets its noon reminder and no closing call", () => {
     const r = planReminders(locksAt, "2026-08-28", 5);
     expect(r.filter((x) => x.date === "2026-08-28").map((x) => x.kind)).toEqual(["noon"]);
   });
+});
+
+it("never invents future settlement, deadlines, or crowd activity", () => {
+  for (let day = 1; day <= 28; day++) {
+    for (const count of [0, 1, 5]) {
+      for (const reminder of planReminders(locksAt, `2026-08-${String(day).padStart(2, "0")}`, count)) {
+        expect(reminder.body).not.toMatch(/RESULT IS READY|NOW SETTLED|OUTCOMES BELONG|CROWD HAS|CROWD IS|UNTIL NOON|HOURS REMAIN|ENDS AT/);
+      }
+    }
+  }
 });

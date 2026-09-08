@@ -31,23 +31,23 @@ function PlusContent() {
 
   const buy = async (pkg: PurchasesPackage) => {
     setErrorLine(null);
-    if (!(await purchasePackage(pkg))) setErrorLine("THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.");
+    if (!(await purchasePackage(pkg))) setErrorLine("PURCHASE NOT CONFIRMED. CHECK YOUR APP STORE PURCHASES BEFORE TRYING AGAIN.");
   };
 
   return (
     <Screen scroll overlayHeader header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
-        <Eyebrow>Oracle plus</Eyebrow>
+        <Eyebrow>Outsee Plus</Eyebrow>
         {plusActive ? (
           <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{PUSH_CAMPAIGN_LINES.plusWelcome}</Mono>
         ) : offering === "loading" ? (
           <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>CONSULTING THE STORE…</Mono>
         ) : offering === null ? (
-          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>THE STORE IS BEYOND THE VEIL. RETURN LATER.</Mono>
+          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>THE STORE IS UNAVAILABLE. PLEASE TRY AGAIN LATER.</Mono>
         ) : (
           <View style={{ gap: space(3) }}>
-            {offering.annual && <PriceRow pkg={offering.annual} tag="TWELVE MOONS" onPress={buy} featured />}
-            {offering.monthly && <PriceRow pkg={offering.monthly} tag="ONE MOON" onPress={buy} />}
+            {offering.annual && <PriceRow pkg={offering.annual} tag="YEAR" onPress={buy} featured />}
+            {offering.monthly && <PriceRow pkg={offering.monthly} tag="MONTH" onPress={buy} />}
           </View>
         )}
         {errorLine && <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{errorLine}</Mono>}
@@ -56,7 +56,7 @@ function PlusContent() {
             argument, the rows above are the decision. */}
         <View style={{ gap: space(2) }}>
           {CREED.map((l, i) => (
-            <DecodeLine key={l.id} text={l.text === "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." ? "YOUR VIGIL MARKS YOUR RETURN. IT DOES NOT CHANGE YOUR SCORE." : l.text} delayMs={i * 160} durationMs={450} {...role.supporting} color={colors.mutedInk} />
+            <DecodeLine key={l.id} text={l.text} delayMs={i * 160} durationMs={450} {...role.supporting} color={colors.mutedInk} />
           ))}
         </View>
         <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center", lineHeight: 16 }}>
@@ -64,7 +64,7 @@ function PlusContent() {
         </Mono>
       </View>
       <View style={{ gap: space(2) }}>
-        <QuietLink title={PAYWALL_CTA_LINES.restore} onPress={() => restore()} />
+        <QuietLink title={PAYWALL_CTA_LINES.restore} onPress={async () => { await restore(); setErrorLine("RESTORE REQUEST FINISHED. SUBSCRIPTION STATUS IS SHOWN ABOVE; IF UNCHANGED, CHECK APP STORE PURCHASES."); }} />
         <View style={{ flexDirection: "row", justifyContent: "center", gap: space(4) }}>
           <Pressable accessibilityRole="link" style={{ minHeight: 44, minWidth: 44, paddingHorizontal: space(2), justifyContent: "center" }} onPress={() => Linking.openURL(TERMS_URL)}><Mono size={10} color={colors.mutedInk} letterSpacing={1}>TERMS</Mono></Pressable>
           {privacyUrl && (

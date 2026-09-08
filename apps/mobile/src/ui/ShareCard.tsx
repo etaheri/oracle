@@ -117,7 +117,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       <Rect x={INSET + 0.5} y={INSET + 0.5} width={CARD_W - 2 * INSET - 1} height={CARD_H - 2 * INSET - 1} style="stroke" strokeWidth={1} color={NIGHT_LINE} />
       <RegisterMarks />
       {numeralFont && <SkText font={numeralFont} text="V" x={centered(numeralFont, "V")} y={92} color={colors.agedGold} />}
-      {ritual && <SkText font={ritual} text="ORACLE" x={centered(ritual, "ORACLE")} y={152} color={colors.museumWhite} />}
+      {ritual && <SkText font={ritual} text="OUTSEE" x={centered(ritual, "OUTSEE")} y={152} color={colors.museumWhite} />}
       {mono && <SkText font={mono} text={`DAY ${data.date}`} x={centered(mono, `DAY ${data.date}`)} y={192} color={colors.agedGold} />}
       <Line p1={vec(INSET + 40, 218)} p2={vec(CARD_W - INSET - 40, 218)} color={NIGHT_LINE} strokeWidth={1} />
       {data.duelScores && portrait ? <>

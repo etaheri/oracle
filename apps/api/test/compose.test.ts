@@ -106,6 +106,7 @@ describe("composeHingePushes", () => {
     // ever eligible to them -- that is a guarantee, and this is the test.
     const voidedPush = pushes.find((p) => p.userId === voided.userId)!;
     expect(requires(voidedPush.lineId)).not.toContain("results");
+    expect(voidedPush.text).not.toMatch(/RESULT IS READY|NOW SETTLED|CROWD IS COUNTING/);
 
     // The scored player is the non-vacuity control, and it must NOT be
     // written as "they drew a results line". selectLine picks uniformly from

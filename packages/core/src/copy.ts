@@ -1,3 +1,6 @@
+import { CONSTANTS } from "./constants";
+import { CURRENT_GAME_COPY } from "./gameCopy";
+
 // The machine voice (spec: docs/superpowers/specs/2026-08-26-oracle-voice-design.md).
 // Hand-written, linted, versioned. No generated copy — the meme value of a
 // voice comes from one unmistakable register sustained for years.
@@ -13,7 +16,7 @@ export interface CopyLine {
 
 export const LITURGY_LINES = [
   "EVERY ANSWER SEALED BEFORE THE OUTCOME.",
-  "EVERY SCORE READ AGAINST THE CROWD. NOTHING REVISED.",
+  "YOUR CALLS, THE ORACLE, AND THE DAILY BOARD.",
 ] as const;
 export const LITURGY = LITURGY_LINES.join(" ");
 
@@ -25,66 +28,66 @@ export function fillSlots(text: string, slots: { n?: number; streak?: number }):
 
 export const COPY_BANK: ReadonlyArray<CopyLine> = [
   // ── noon: the hinge. Ledger read; the pull, never the payoff. ──
-  { id: "noon.generic-1", pool: "noon", text: "THE LEDGER IS READ. IT DOES NOT READ ITSELF TWICE." },
-  { id: "noon.generic-2", pool: "noon", text: "NOON HAS PASSED. THE OUTCOMES BELONG TO THE LEDGER NOW." },
-  { id: "noon.generic-3", pool: "noon", text: "THE LEDGER IS READ. THE CROWD IS COUNTING ITS WOUNDS." },
-  { id: "noon.generic-4", pool: "noon", text: "WHAT WAS SEALED IS NOW SETTLED." },
-  { id: "noon.generic-5", pool: "noon", text: "THE ORB HAS SPOKEN. THE LEDGER AGREES." },
-  { id: "noon.read-1", pool: "noon", text: "THE LEDGER IS READ. {n} OF YOUR ANSWERS DID NOT SURVIVE.", requires: ["results", "wrong"] },
-  { id: "noon.read-2", pool: "noon", text: "THE LEDGER IS READ. ONE OF YOUR ANSWERS SURPRISED US.", requires: ["results"] },
-  { id: "noon.read-3", pool: "noon", text: "THE CROWD MOVED. YOU DID NOT. THE LEDGER REMEMBERS WHO WAS RIGHT.", requires: ["results"] },
-  { id: "noon.read-4", pool: "noon", text: "NOON HAS PASSED. YOUR CONVICTION HAS BEEN WEIGHED.", requires: ["results"] },
-  { id: "noon.read-5", pool: "noon", text: "THE OUTCOMES ARE IN. YOUR LEDGER HAS CHANGED SHAPE.", requires: ["results"] },
-  { id: "noon.read-6", pool: "noon", text: "THE CROWD CHOSE ITS SIDES. SO DID YOU. THE LEDGER KNOWS WHO CHOSE WELL.", requires: ["results"] },
-  { id: "noon.read-7", pool: "noon", text: "FIVE QUESTIONS WERE ASKED. THE ANSWERS ARE NO LONGER YOURS TO CHOOSE.", requires: ["results"] },
-  { id: "noon.read-8", pool: "noon", text: "THE LEDGER IS READ. IT DOES NOT FLATTER. IT DOES NOT LIE.", requires: ["results"] },
-  { id: "noon.read-9", pool: "noon", text: "YOUR ANSWERS MET THEIR OUTCOMES AT NOON. NOT ALL OF THEM STOOD.", requires: ["results", "wrong"] },
-  { id: "noon.read-10", pool: "noon", text: "THE INK IS DRY. THE LEDGER HOLDS YOUR RECKONING.", requires: ["results"] },
+  { id: "noon.generic-1", pool: "noon", text: "RETURN TO OUTSEE FOR YOUR NEXT CHALLENGE." },
+  { id: "noon.generic-2", pool: "noon", text: "YOUR NEXT CALL STARTS WITH A QUESTION." },
+  { id: "noon.generic-3", pool: "noon", text: "YOUR LEDGER KEEPS YOUR PREDICTIONS AND OUTCOMES." },
+  { id: "noon.generic-4", pool: "noon", text: "CONFIDENCE IS PART OF EVERY CALL." },
+  { id: "noon.generic-5", pool: "noon", text: "OUTSEE THE ORACLE. OUTSCORE THE FIELD." },
+  { id: "noon.read-1", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results", "wrong"] },
+  { id: "noon.read-2", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-3", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-4", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-5", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-6", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-7", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-8", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
+  { id: "noon.read-9", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results", "wrong"] },
+  { id: "noon.read-10", pool: "noon", text: "YOUR RESULT IS READY. SEE HOW YOU COMPARED WITH THE ORACLE.", requires: ["results"] },
   { id: "noon.tide-1", pool: "noon", text: "YOU STOOD AGAINST THE TIDE. THE TIDE BROKE.", requires: ["tideWin"] },
   { id: "noon.tide-2", pool: "noon", text: "THE CROWD WENT ONE WAY. YOU WENT THE OTHER. THE LEDGER BOWED TO YOU.", requires: ["tideWin"] },
   { id: "noon.tide-3", pool: "noon", text: "FEW STOOD WHERE YOU STOOD. THE LEDGER PAID A BOUNTY.", requires: ["tideWin"] },
-  { id: "noon.lapsed-1", pool: "noon", text: "THE LEDGER WAS READ WITHOUT YOU. TOMORROW IT NEED NOT BE.", requires: ["lapsed"] },
-  { id: "noon.lapsed-2", pool: "noon", text: "THE CROWD SPOKE. YOUR LINE IS BLANK.", requires: ["lapsed"] },
-  { id: "noon.lapsed-3", pool: "noon", text: "NOON CAME AND WENT. THE ORB DID NOT HEAR FROM YOU.", requires: ["lapsed"] },
-  { id: "noon.vigil-1", pool: "noon", text: "{streak} DAYS WITHOUT SILENCE. THE ORACLE NOTICES.", requires: ["results", "streak"] },
-  { id: "noon.vigil-2", pool: "noon", text: "DAY {streak} OF YOUR VIGIL IS WRITTEN.", requires: ["results", "streak"] },
-  { id: "noon.vigil-3", pool: "noon", text: "THE LEDGER IS READ. YOUR VIGIL HOLDS AT {streak} DAYS.", requires: ["results", "streak"] },
-  { id: "noon.vigil-4", pool: "noon", text: "ANOTHER NOON, ANOTHER PAGE. {streak} WITHOUT A GAP.", requires: ["results", "streak"] },
+  { id: "noon.lapsed-1", pool: "noon", text: "YOUR PAST CALLS REMAIN. ANOTHER CHALLENGE CAN BEGIN.", requires: ["lapsed"] },
+  { id: "noon.lapsed-2", pool: "noon", text: "YOUR PAST CALLS REMAIN. ANOTHER CHALLENGE CAN BEGIN.", requires: ["lapsed"] },
+  { id: "noon.lapsed-3", pool: "noon", text: "YOUR PAST CALLS REMAIN. ANOTHER CHALLENGE CAN BEGIN.", requires: ["lapsed"] },
+  { id: "noon.vigil-1", pool: "noon", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["results", "streak"] },
+  { id: "noon.vigil-2", pool: "noon", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["results", "streak"] },
+  { id: "noon.vigil-3", pool: "noon", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["results", "streak"] },
+  { id: "noon.vigil-4", pool: "noon", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["results", "streak"] },
   // ── closing: the call. Unsealed players only, hours before lock. ──
-  { id: "closing.call-1", pool: "closing", text: "FIVE QUESTIONS. THE ORB IS OPEN UNTIL NOON." },
-  { id: "closing.call-2", pool: "closing", text: "THE QUESTIONS ARE POSTED. THE CROWD IS ALREADY MOVING." },
-  { id: "closing.call-3", pool: "closing", text: "TODAY'S LEDGER IS BLANK. IT WILL NOT STAY THAT WAY." },
-  { id: "closing.call-4", pool: "closing", text: "{n} ORACLES HAVE ALREADY SPOKEN. THE ORB WAITS FOR YOU.", requires: ["players"] },
-  { id: "closing.call-5", pool: "closing", text: "THE BIG ONE IS WORTH THE MOST. IT IS ALSO THE HARDEST. THIS IS NOT A COINCIDENCE." },
-  { id: "closing.call-6", pool: "closing", text: "THE ORB CLOSES AT NOON. IT DOES NOT REOPEN." },
-  { id: "closing.call-7", pool: "closing", text: "THREE HOURS REMAIN. THE CROWD HAS NOT WAITED." },
-  { id: "closing.call-8", pool: "closing", text: "YOUR SEAT AT THE LEDGER IS EMPTY. NOON IS COMING." },
-  { id: "closing.call-9", pool: "closing", text: "THE CROWD HAS CHOSEN ITS SIDES. YOURS IS STILL UNCLAIMED." },
-  { id: "closing.call-10", pool: "closing", text: "PROPHECY FAVORS THE PRESENT. THE ORB IS STILL LIT." },
-  { id: "closing.call-11", pool: "closing", text: "FIVE ANSWERS STAND BETWEEN YOU AND NOON." },
-  { id: "closing.call-12", pool: "closing", text: "THE QUESTIONS WILL NOT ASK THEMSELVES TWICE." },
-  { id: "closing.call-13", pool: "closing", text: "NOON SEALS THE LEDGER WITH OR WITHOUT YOU." },
-  { id: "closing.call-14", pool: "closing", text: "THE ORACLE ASKS ONCE A DAY. TODAY IT IS STILL ASKING." },
-  { id: "closing.call-15", pool: "closing", text: "WHAT YOU BELIEVE BEFORE NOON BECOMES RECORD AFTER IT." },
-  { id: "closing.call-16", pool: "closing", text: "THE CROWD LEANS. IT DOES NOT KNOW YET IF IT LEANS WRONG." },
-  { id: "closing.call-17", pool: "closing", text: "AN UNSEALED PROPHECY IS ONLY AN OPINION." },
-  { id: "closing.call-18", pool: "closing", text: "THE ORB HOLDS FIVE QUESTIONS AND NO GRUDGES. NOON CHANGES THAT." },
-  { id: "closing.call-19", pool: "closing", text: "SPEAK BEFORE NOON OR HOLD YOUR PEACE UNTIL TOMORROW." },
-  { id: "closing.call-20", pool: "closing", text: "THE LEDGER TAKES NO LATE ENTRIES." },
-  { id: "closing.partial-1", pool: "closing", text: "THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED. NOON IS COMING.", requires: ["partial"] },
-  { id: "closing.partial-2", pool: "closing", text: "YOUR PROPHECY IS UNFINISHED. THE LEDGER COUNTS ONLY WHOLE DAYS.", requires: ["partial"] },
+  { id: "closing.call-1", pool: "closing", text: "YOUR NEXT CALL STARTS WITH A QUESTION." },
+  { id: "closing.call-2", pool: "closing", text: "YOUR LEDGER KEEPS YOUR PREDICTIONS AND OUTCOMES." },
+  { id: "closing.call-3", pool: "closing", text: "CONFIDENCE IS PART OF EVERY CALL." },
+  { id: "closing.call-4", pool: "closing", text: "{n} PLAYERS HAVE MADE A CALL.", requires: ["players"] },
+  { id: "closing.call-5", pool: "closing", text: "RETURN TO OUTSEE FOR YOUR NEXT CHALLENGE." },
+  { id: "closing.call-6", pool: "closing", text: "YOUR NEXT CALL STARTS WITH A QUESTION." },
+  { id: "closing.call-7", pool: "closing", text: "YOUR LEDGER KEEPS YOUR PREDICTIONS AND OUTCOMES." },
+  { id: "closing.call-8", pool: "closing", text: "CONFIDENCE IS PART OF EVERY CALL." },
+  { id: "closing.call-9", pool: "closing", text: "OUTSEE THE ORACLE. OUTSCORE THE FIELD." },
+  { id: "closing.call-10", pool: "closing", text: "RETURN TO OUTSEE FOR YOUR NEXT CHALLENGE." },
+  { id: "closing.call-11", pool: "closing", text: "YOUR NEXT CALL STARTS WITH A QUESTION." },
+  { id: "closing.call-12", pool: "closing", text: "YOUR LEDGER KEEPS YOUR PREDICTIONS AND OUTCOMES." },
+  { id: "closing.call-13", pool: "closing", text: "CONFIDENCE IS PART OF EVERY CALL." },
+  { id: "closing.call-14", pool: "closing", text: "OUTSEE THE ORACLE. OUTSCORE THE FIELD." },
+  { id: "closing.call-15", pool: "closing", text: "RETURN TO OUTSEE FOR YOUR NEXT CHALLENGE." },
+  { id: "closing.call-16", pool: "closing", text: "YOUR NEXT CALL STARTS WITH A QUESTION." },
+  { id: "closing.call-17", pool: "closing", text: "YOUR LEDGER KEEPS YOUR PREDICTIONS AND OUTCOMES." },
+  { id: "closing.call-18", pool: "closing", text: "CONFIDENCE IS PART OF EVERY CALL." },
+  { id: "closing.call-19", pool: "closing", text: "OUTSEE THE ORACLE. OUTSCORE THE FIELD." },
+  { id: "closing.call-20", pool: "closing", text: "RETURN TO OUTSEE FOR YOUR NEXT CHALLENGE." },
+  { id: "closing.partial-1", pool: "closing", text: "A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION.", requires: ["partial"] },
+  { id: "closing.partial-2", pool: "closing", text: "YOUR SEALED CALLS CAN RECEIVE OUTCOMES EVEN IN AN INCOMPLETE ROUND.", requires: ["partial"] },
   // ── streak: vigil lines for in-app surfaces. ──
-  { id: "streak.vigil-1", pool: "streak", text: "{streak} DAYS WITHOUT SILENCE.", requires: ["streak"] },
-  { id: "streak.vigil-2", pool: "streak", text: "YOUR VIGIL HOLDS. {streak} DAYS AND COUNTING.", requires: ["streak"] },
-  { id: "streak.vigil-3", pool: "streak", text: "THE ORACLE KEEPS COUNT. {streak}.", requires: ["streak"] },
-  { id: "streak.vigil-4", pool: "streak", text: "{streak} CONSECUTIVE NOONS. THE LEDGER APPROVES.", requires: ["streak"] },
-  { id: "streak.vigil-5", pool: "streak", text: "A VIGIL OF {streak} DAYS IS NOT LUCK.", requires: ["streak"] },
-  { id: "streak.lapse-1", pool: "streak", text: "YESTERDAY THE ORB WENT UNCONSULTED. IT DID NOT GO UNREAD." },
+  { id: "streak.vigil-1", pool: "streak", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["streak"] },
+  { id: "streak.vigil-2", pool: "streak", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["streak"] },
+  { id: "streak.vigil-3", pool: "streak", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["streak"] },
+  { id: "streak.vigil-4", pool: "streak", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["streak"] },
+  { id: "streak.vigil-5", pool: "streak", text: "YOUR STREAK: {streak} DAYS. A RECORD OF RETURN, NOT ACCURACY.", requires: ["streak"] },
+  { id: "streak.lapse-1", pool: "streak", text: CURRENT_GAME_COPY.lapse.toUpperCase() },
   { id: "streak.lapse-2", pool: "streak", text: "A GAP IN THE LEDGER IS NOT THE END OF IT." },
   { id: "streak.lapse-3", pool: "streak", text: "STREAKS END. RECORDS REMAIN." },
-  { id: "streak.shield-1", pool: "streak", text: "THE SHIELD HELD. YOUR VIGIL SURVIVES THE MISSED NOON." },
+  { id: "streak.shield-1", pool: "streak", text: CURRENT_GAME_COPY.shieldUsed.toUpperCase() },
   { id: "streak.begin-1", pool: "streak", text: "BEGIN AGAIN. THE ORB DOES NOT DWELL." },
-  { id: "streak.risk-1", pool: "streak", text: "YOUR VIGIL OF {streak} DAYS ENDS AT NOON.", requires: ["streak"] },
+  { id: "streak.risk-1", pool: "streak", text: "YOUR STREAK: {streak} DAYS. EACH DAILY CALL COUNTS AT SETTLEMENT.", requires: ["streak"] },
   // ── system: states of the machine. ──
   { id: "system.sleep-1", pool: "system", text: "THE ORACLE SLEEPS. NO ROUND IS OPEN." },
   { id: "system.reading-1", pool: "system", text: "THE LEDGER IS BEING READ. PATIENCE." },
@@ -93,12 +96,12 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
   // ── paywall: the shield offer. Protection, never pressure. No CTA verbs here —
   // button labels live in PAYWALL_CTA_LINES by construction. ──
-  { id: "paywall.creed-1", pool: "paywall", text: "A SHIELD HOLDS A VIGIL OF THREE DAYS OR MORE THROUGH ONE MISSED NOON." },
-  { id: "paywall.creed-2", pool: "paywall", text: "THE ORACLE GRANTS ONE EACH MONTH. PLUS ADDS THREE SHIELDS A PERIOD, TO A RESERVE OF FIVE." },
-  { id: "paywall.creed-3", pool: "paywall", text: "A KEPT VIGIL WEIGHS EVERY DAY YOU PLAY, IN BOTH DIRECTIONS." },
-  { id: "paywall.creed-4", pool: "paywall", text: "THE VIGIL IS FRAGILE. THE SHIELD IS NOT." },
-  { id: "paywall.rescue-1", pool: "paywall", text: "YOUR VIGIL ENDS AT NOON. ONE SHIELD WOULD HOLD IT.", requires: ["streak"] },
-  { id: "paywall.terms-1", pool: "paywall", text: "PAYING DEFENDS A VIGIL. IT NEVER IMPROVES A PROPHECY, AND NEVER TOUCHES YOUR ORACLE SCORE." },
+  { id: "paywall.creed-1", pool: "paywall", text: "A SHIELD PROTECTS A STREAK OF THREE DAYS OR MORE THROUGH ONE MISSED ROUND." },
+  { id: "paywall.creed-2", pool: "paywall", text: "ONE FREE SHIELD EACH MONTH. PLUS ADDS THREE SHIELDS PER BILLING PERIOD, CAPPED AT FIVE PAID SHIELDS PER GRANT." },
+  { id: "paywall.creed-3", pool: "paywall", text: "SHIELDS PROTECT YOUR STREAK, NOT YOUR SCORE. NO CALLS OR WINS ARE ADDED." },
+  { id: "paywall.creed-4", pool: "paywall", text: "PROTECTION REQUIRES AN ELIGIBLE STREAK AND AN AVAILABLE SHIELD." },
+  { id: "paywall.rescue-1", pool: "paywall", text: "A SHIELD MAY PROTECT AN ELIGIBLE STREAK THROUGH A MISSED ROUND.", requires: ["streak"] },
+  { id: "paywall.terms-1", pool: "paywall", text: "FREE PLAY INCLUDES EVERY COMPETITIVE OPPORTUNITY. PURCHASES NEVER CHANGE YOUR FORECAST RATING." },
 ] as const;
 
 // Purchase-button labels. Deliberately OUTSIDE the bank: the no-CTA-verb law
@@ -112,7 +115,7 @@ export const PAYWALL_CTA_LINES = Object.freeze({
 // OneSignal dashboard campaign copy — the repo is the source of truth; the
 // dashboard is a paste target (spec §5). Standard bank rules apply.
 export const PUSH_CAMPAIGN_LINES = Object.freeze({
-  plusWelcome: "THE SHIELD IS RAISED. YOUR VIGIL IS PROTECTED.",
+  plusWelcome: "OUTSEE PLUS IS ACTIVE. SHIELD PROTECTION DEPENDS ON YOUR STREAK AND AVAILABLE RESERVE.",
 } as const);
 
 // Char-walk hash (31-multiplier, 32-bit wrapped): deterministic, and the
@@ -203,30 +206,24 @@ export const OPENING_RITES_LINES = RITES_LINES.slice(0, OPENING_RITES);
 // said what it was, what "rates" meant, or what fifty was fifty OF (audit
 // 2026-09-02 §1.1). Two states: how it is earned, then what it is.
 export const SCORE_GLOSS = Object.freeze({
-  unwritten: "FIVE CALLS A DAY, FIFTY TO WRITE IT. A DAY RATES ONLY IF ALL FIVE WERE SEALED.",
-  written: "YOUR CALIBRATION, READ AGAINST WHAT HAPPENED. NOTHING PURCHASABLE TOUCHES IT.",
+  unwritten: "50 QUALIFYING CALLS ACROSS ELIGIBLE ROUNDS. CUMULATIVE, NOT CONSECUTIVE.",
+  written: "YOUR FORECAST PERFORMANCE ACROSS QUALIFYING CALLS. PURCHASES DO NOT CHANGE IT.",
 } as const);
 
 // The Calling: the one-time cinematic on the app's very first open — the
 // machine recounts the search and assigns the player their role. Lore only;
 // every rule belongs to the rites. Hand-written, linted, versioned.
-export const CALLING_LINES = [
-  "FOR THIRTY CENTURIES THEY SEARCHED FOR THOSE WHO SEE.",
-  "PYTHIA. SIBYL. SEER. EACH CLAIMED THE GIFT. NONE KEPT RECEIPTS.",
-  "SO THE LEDGER WAS BUILT. IT DOES NOT BELIEVE. IT RECORDS.",
-  "SEALED BEFORE THE OUTCOME. READ WITHOUT MERCY.",
-  "THE SEARCH CONTINUES. IT HAS REACHED YOU.",
-] as const;
+export const CALLING_LINES = ["OUTSEE", "MEET THE ORACLE", "YOUR AI OPPONENT"] as const;
 
 // The partial-day notice (home, when some but not all five are sealed).
-export const PARTIAL_LINE = "THE DAY RATES ONLY WHEN ALL FIVE ARE SEALED.";
+export const PARTIAL_LINE = "A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION. YOUR CALLS CAN STILL RECEIVE RESULTS.";
 
 // The summons: the interstitial before the OS notification prompt (voice
 // spec §4). Three declaratives, then the machine asks once.
 export const SUMMONS_LINES = [
-  "THE ORACLE SPEAKS TWICE A DAY.",
-  "ONCE TO ASK. ONCE TO ANSWER.",
-  "IT WILL NOT SPEAK MORE THAN THAT.",
+  "OUTSEE CAN SEND UP TO TWO REMINDERS A DAY.",
+  "AN INVITATION TO PLAY OR RETURN TO YOUR LEDGER.",
+  "NOTIFICATIONS ARE OPTIONAL.",
 ] as const;
 
 // The pipeline's own two lines (design 2026-09-04 §11.2, §11.3). Both describe
@@ -249,19 +246,19 @@ export function provenanceLine(written: number, rejected: number): string | null
 
 // Introduction is intentionally separate from the reference rulebook.
 export const INTRO_LINES = [
-  "FIVE QUESTIONS ABOUT TOMORROW.",
-  "CHOOSE YOUR ANSWER AND HOW SURE YOU ARE.",
-  "RETURN TO SEE WHETHER YOU BEAT THE ORACLE.",
+  "CHOOSE WHAT YOU THINK WILL HAPPEN.",
+  "SET HOW SURE YOU ARE. CONFIDENCE CHANGES YOUR POINTS.",
+  "RETURN TO SEE IF YOU BEAT THE ORACLE AND WHERE YOU RANK AGAINST OTHER PLAYERS.",
 ] as const;
 
-// Archived rounds retain their original canon. New rounds use recognition-only attendance.
-export const RITES_V2_LINES = RITES_LINES.map(line => {
-  if (line.startsWith("A DAY'S CALLS RATE")) return "EVERY NON-VOID QUESTION MUST BE SEALED. AT LEAST THREE MUST BE READ FOR A DAY TO RATE.";
-  if (line.startsWith("A VIGIL IS")) return "A VIGIL IS A RUN OF UNBROKEN NOONS. IT RECORDS YOUR RETURN, NEVER MULTIPLIES YOUR POINTS.";
-  if (line.startsWith("THE VIGIL'S WEIGHT")) return "A SHIELD PRESERVES CONTINUITY. NOTHING BOUGHT CHANGES YOUR POINTS OR ORACLE SCORE.";
-  if (line.includes("WITHIN THE FIRST HOUR")) return "ALL FIVE WITHIN THE FIRST HOUR EARN AN EARLY MARK. THE POINTS DO NOT CHANGE.";
-  if (line.startsWith("A QUESTION CLOSES")) return "IF AN ANSWER APPEARS BEFORE NOON, THE QUESTION CLOSES AND IS VOID FOR EVERYONE.";
-  if (line.startsWith("THE LEDGER IS READ AT NOON")) return "THE LEDGER IS READ AFTER THE QUESTIONS CLOSE. UNREAD QUESTIONS ARE NEVER LOSSES.";
-  if (line.startsWith("STAND AGAINST THE TIDE")) return "A TIDE BOUNTY IS SEPARATE FROM THE DUEL AND BOARD. TWENTY MUST HAVE SPOKEN.";
-  return line;
-});
+// RITES_LINES and OPENING_RITES_LINES above are the archived version-1 canon.
+// Current rules are explicit data, never substitutions on historical prose.
+export const RITES_V2_SECTIONS = [
+  { title: "The challenge", text: `Five real-world questions each daily round. Compete against the Oracle, your AI opponent, and other players on the DAILY BOARD. THE CROWD shows aggregate predictions, not rankings.` },
+  { title: "Make a call", text: "Your prediction is a call. Choose yes or no and set confidence from 55% to 95%. Pull toward your answer; a longer pull means greater confidence. Release to seal. Sealing locks your answer and confidence. The crowd is hidden until you commit; the Oracle forecast stays hidden until reveal." },
+  { title: "Face the result", text: `Confidence changes your points: being more confident pays more when right and costs more when wrong. The Big One counts double in both directions. Your duel and daily board compare base points on equal terms. A correct call on a side below ${CONSTANTS.CONTRARIAN_CROWD_PCT}% earns a separate crowd bounty when at least ${CONSTANTS.CONTRARIAN_MIN_CROWD} players answered. The bounty does not affect duel or board.` },
+  { title: "Build your record", text: `Your daily duel compares you with the Oracle. Your forecast rating measures performance over qualifying calls and appears after ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} cumulative qualifying calls, not consecutive days. A competitive round requires every non-void question sealed and at least three resolved, non-void questions. Only calls from eligible rounds count toward that rating. Daily board placing does not require 50 calls; a placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison. Confidence history also includes resolved calls from incomplete rounds, showing how your confidence matched outcomes.` },
+  { title: "Keep a vigil", text: `Your vigil is your playing streak. Seal at least one call in a daily round to keep it going; the count updates when that round settles. ${CURRENT_GAME_COPY.streakMeaning} A shield can preserve a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through a missed round, without incrementing it or adding calls. One free shield is available each calendar month; available paid shields are used after it. ${CURRENT_GAME_COPY.lapse} Exhibitions do not count. Streaks and early marks do not multiply current points.` },
+  { title: "Timing and fairness", text: "Each question has its own deadline. If an answer appears early, the question closes and is void for everyone. Results follow verification, not a guaranteed time. Unresolved outcomes are pending, never losses; void questions score nothing. Incomplete rounds still keep the results of your calls. An outcome correction or void can update your record. Older rounds retain their versioned rules." },
+] as const;
+export const RITES_V2_LINES = RITES_V2_SECTIONS.map(section => `${section.title.toUpperCase()}: ${section.text}`);

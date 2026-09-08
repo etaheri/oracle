@@ -99,7 +99,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(1) }}>
             <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
-              {playerCount < VERDICT_MIN_PLAYERS ? GATHERING_LINE : `${playerCount} ORACLES HAVE SPOKEN`}
+              {playerCount < VERDICT_MIN_PLAYERS ? GATHERING_LINE : `UP TO ${playerCount} PLAYERS PER SHOWN QUESTION`}
             </Mono>
             <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={1}>
               THE LEDGER IS READ AFTER THE QUESTIONS CLOSE

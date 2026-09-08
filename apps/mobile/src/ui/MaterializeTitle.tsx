@@ -24,7 +24,7 @@ const ATLAS_W = 768;
 const ATLAS_H = 128;
 const GLYPH_COUNT = 8;
 
-const WORD = "ORACLE";
+const WORD = "OUTSEE";
 // 34/8 rather than 40/11: at the old setting the wordmark was spaced like a
 // luxury logotype rather than an inscription, and it was the only serif on a
 // screen of eight mono rows. Tighter and smaller, it sits closer to the

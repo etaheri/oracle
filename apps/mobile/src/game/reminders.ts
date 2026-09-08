@@ -5,11 +5,11 @@ import { COPY_BANK, selectLine } from "@oracle/core";
 // assumed 24h apart — a DST shift drifts them by an hour until the next app
 // open reseals the schedule. Pure — node-tested; expo scheduling lives in
 // src/notifications/schedule.ts.
-const CLOSING = COPY_BANK.filter((l) => l.pool === "closing");
+const CLOSING = COPY_BANK.filter((l) => l.pool === "closing" && !(l.requires ?? []).includes("players"));
 // The second hit (voice spec §4 beat 3): a single noon reminder, fired once
 // something was sealed today — true whether or not resolution has finished,
 // so the line never claims more than the ledger actually knows yet.
-const NOON_LINE = COPY_BANK.find((l) => l.id === "noon.generic-2")!.text;
+const NOON_LINE = "RETURN TO OUTSEE TO CHECK YOUR PREDICTIONS AND THE NEXT CHALLENGE.";
 
 export const REMINDER_LEAD_MS = 3 * 3_600_000;
 export const NOON_LAG_MS = 45 * 60_000;
