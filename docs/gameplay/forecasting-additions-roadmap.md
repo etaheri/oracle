@@ -115,6 +115,7 @@ This order is a recommendation, not a dated delivery promise. Prioritize fixes e
 
 ## Supporting records
 
+- [Pipeline architecture and additions](../architecture/pipeline-architecture-and-additions.md)
 - [Launch playbook](../launch-playbook.md)
 - [Earlier feature verification](forecasting-learning-launch-verification.md)
 - [Commitment fix verification](oracle-commitment-verification.md)
