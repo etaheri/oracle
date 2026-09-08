@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeTestDb } from "./helpers/db";
-import { preflight } from "../src/pipeline/gauntlet/preflight";
+import { preflight, preflightOne } from "../src/pipeline/gauntlet/preflight";
 import type { Judged } from "../src/pipeline/gauntlet/critic";
 import type { Candidate } from "../src/pipeline/candidate";
 import type { PipelineDeps } from "../src/pipeline";
@@ -101,5 +101,43 @@ describe("preflight — tier 3, the inversion", () => {
       throw new BudgetExhausted("2026-09-04", 150, true);
     });
     await expect(preflight(d, [judged("Will it?", "k1")])).rejects.toBeInstanceOf(BudgetExhausted);
+  });
+});
+
+describe("preflightOne — the per-candidate unit the Workflow fan-out will call directly", () => {
+  it("carries the index it was given back out on a pass", async () => {
+    const { db } = await makeTestDb();
+    const out = await preflightOne(deps(db, () => UNVERIFIABLE), judged("Will it?", "k1"), 0);
+    expect(out.index).toBe(0);
+    expect(out.passed).toBe(true);
+  });
+
+  it("rejects a candidate whose answer already exists, index intact", async () => {
+    const { db } = await makeTestDb();
+    const out = await preflightOne(deps(db, () => ANSWERED), judged("Will it?", "k1"), 3);
+    expect(out.index).toBe(3);
+    expect(out.passed).toBe(false);
+    if (!out.passed) expect(out.rejection.reason).toBe("already-resolvable");
+  });
+
+  it("turns a transient resolver failure into an ambiguous rejection rather than throwing", async () => {
+    const { db } = await makeTestDb();
+    const out = await preflightOne(
+      deps(db, () => {
+        throw new Error("503");
+      }),
+      judged("Will it?", "k1"),
+      1,
+    );
+    expect(out.passed).toBe(false);
+    if (!out.passed) expect(out.rejection.reason).toBe("ambiguous");
+  });
+
+  it("still propagates a spent budget instead of converting it into a rejection", async () => {
+    const { db } = await makeTestDb();
+    const d = deps(db, () => {
+      throw new BudgetExhausted("2026-09-08", 151, true);
+    });
+    await expect(preflightOne(d, judged("Will it?", "k1"), 0)).rejects.toBeInstanceOf(BudgetExhausted);
   });
 });
