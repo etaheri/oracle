@@ -36,3 +36,10 @@ web-build/
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+
+# --- git history: 176MB, and the builder has no use for it. EAS excludes .git
+# automatically in its git-based archiving mode, but NOT once .easignore takes
+# over. UNVERIFIED: added after the first successful build, so the next build
+# is the one that proves it. If a build ever needs commit metadata, this is the
+# first line to suspect.
+.git/
