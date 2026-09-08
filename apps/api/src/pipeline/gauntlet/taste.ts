@@ -13,12 +13,18 @@
 // failing closed is a night that falls through to the evergreen bank — a
 // mechanism that already exists and is already tested.
 //
+// ONE CARVE-OUT: BudgetExhausted propagates instead of rejecting the batch.
+// A spent budget is a day-level stop, not this batch's problem — swallowing
+// it here would end the night silently, with no ‼️ critical, exactly the
+// defect this gate exists to avoid on every OTHER failure.
+//
 // It runs LAST, on the small set that survived everything else, so the
 // fail-closed blast radius is as small as it can be.
 import { z } from "zod";
 import type { PipelineDeps } from "../index";
 import type { Rejection } from "../candidate";
 import type { Judged } from "./critic";
+import { BudgetExhausted } from "../spend";
 
 const TasteSchema = z.object({
   verdicts: z.array(z.object({ index: z.number().int().min(0), allowed: z.boolean(), reason: z.string().default("") })),
@@ -80,6 +86,11 @@ export async function tasteCheck(
       // No webSearch. Classification, not research.
     });
   } catch (err) {
+    // A spent budget is a day-level stop, not one batch's problem — let it
+    // propagate exactly as preflight.ts does, so reportBudgetExhaustion sees
+    // it and the ‼️ critical actually fires. Every OTHER error still fails
+    // closed: a taste check that fails open is not a taste check.
+    if (err instanceof BudgetExhausted) throw err;
     return rejectAll(judged, `the taste gate could not be reached, so the batch was refused: ${err instanceof Error ? err.message : String(err)}`);
   }
 

@@ -4,6 +4,7 @@ import { tasteCheck } from "../src/pipeline/gauntlet/taste";
 import type { Judged } from "../src/pipeline/gauntlet/critic";
 import type { PipelineDeps } from "../src/pipeline";
 import { inlineStarter } from "../src/pipeline/workflows";
+import { BudgetExhausted } from "../src/pipeline/spend";
 
 const judged = (text: string, key: string): Judged => ({
   candidate: {
@@ -82,6 +83,23 @@ describe("tasteCheck — tier 4", () => {
     expect(called).toBe(false);
     expect(r.passed).toHaveLength(0);
     expect(r.rejected).toHaveLength(0);
+  });
+
+  it("lets a spent budget through instead of failing the batch closed", async () => {
+    const { db } = await makeTestDb();
+    const d = deps(db, { structured: async () => { throw new BudgetExhausted("2026-09-04", 151, true); } });
+    // A day-level stop must PROPAGATE. Converting it to rejectAll makes the
+    // night end silently with no critical alert — the defect this test pins.
+    await expect(tasteCheck(d, batch)).rejects.toBeInstanceOf(BudgetExhausted);
+  });
+
+  it("still fails closed on any other error, even after the BudgetExhausted carve-out", async () => {
+    const { db } = await makeTestDb();
+    const d = deps(db, { structured: async () => { throw new Error("429 rate limited"); } });
+    const r = await tasteCheck(d, batch);
+    expect(r.passed).toHaveLength(0);
+    expect(r.rejected).toHaveLength(2);
+    expect(r.rejected.every((x) => x.reason === "taste")).toBe(true);
   });
 
   it("asks for no web search — this is classification, not research", async () => {
