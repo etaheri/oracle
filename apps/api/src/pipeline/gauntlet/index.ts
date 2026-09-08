@@ -19,8 +19,8 @@ import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
 import { addDays, noonET } from "../clock";
 import { upsertDraft } from "../draft";
-import { emptyTally, recentTopicKeys, screenCandidates, type RejectReason, type Rejection } from "../candidate";
-import { generateCandidates } from "./generate";
+import { emptyTally, screenCandidates, type RejectReason, type Rejection } from "../candidate";
+import { gatherAuthoringContext, generateCandidates } from "./generate";
 import { checkSources } from "./sources";
 import { criticize } from "./critic";
 import { preflight } from "./preflight";
@@ -55,14 +55,15 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
   const tally = emptyTally();
   const count = (rejections: Rejection[]) => rejections.forEach((r) => (tally[r.reason] += 1));
 
-  const raw = await generateCandidates(deps, date);
+  const ctx = await gatherAuthoringContext(deps, date);
+  const raw = await generateCandidates(deps, date, ctx);
   const written = raw.length;
 
   const opensAt = noonET(date);
   const locksAtDefault = noonET(addDays(date, 1));
 
   // Tier 0 — free.
-  const tier0 = screenCandidates(raw, { rulesVersion: 2, opensAt, locksAtDefault, recentTopicKeys: await recentTopicKeys(deps.db, date) });
+  const tier0 = screenCandidates(raw, { rulesVersion: 2, opensAt, locksAtDefault, recentTopicKeys: new Set(ctx.recentTopicKeys) });
   count(tier0.rejected);
 
   // Tier 1 — one GET each.

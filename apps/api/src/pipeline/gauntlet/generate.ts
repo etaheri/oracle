@@ -7,6 +7,7 @@
 // a rejection in one category is substituted rather than re-authored.
 import type { PipelineDeps } from "../index";
 import { addDays } from "../clock";
+import { recentTopicKeys } from "../candidate";
 import { fetchMarketSignals, type MarketSignal } from "../feeds";
 import { loadQualityRows, qualityReport, questionQuality } from "../quality";
 import { recentQuestionDigest } from "../author";
@@ -92,19 +93,46 @@ ${scorecard}
 Search the web for today's actual news before writing. When your candidates are final, call the candidate_round tool exactly once.`;
 }
 
-export async function generateCandidates(deps: PipelineDeps, date: string): Promise<unknown[]> {
-  if (!deps.claude) throw new Error("pipeline: no claude client");
+export interface AuthoringContext {
+  recent: string;
+  signals: MarketSignal[];
+  scorecard: string;
+  /**
+   * An ARRAY, not a Set. This crosses a Workflow step boundary, and step
+   * returns must be structured-cloneable; a Set is not reliably so. The
+   * gauntlet rebuilds the Set on the far side.
+   */
+  recentTopicKeys: string[];
+}
 
+/**
+ * Every input the author needs, and NO model call (design 2026-09-08 §3.1).
+ *
+ * Split out so the expensive generate step retries without re-fetching feeds,
+ * and so the inputs are checkpointed: a retry must see the same context the
+ * first attempt saw, or it is not a retry, it is a different question.
+ */
+export async function gatherAuthoringContext(deps: PipelineDeps, date: string): Promise<AuthoringContext> {
   const recent = await recentQuestionDigest(deps.db, date);
   // Market feeds are advisory: any failure logs inside fetchMarketSignals and
   // authoring proceeds market-blind on an empty list. Cold start reaches here
   // with no history and no signals and must still produce a round.
   const { signals } = await fetchMarketSignals(deps.marketFetch ?? fetch, deps.now());
   const scorecard = qualityReport(questionQuality(await loadQualityRows(deps.db, date))).join("\n  ");
+  const keys = await recentTopicKeys(deps.db, date);
+  return { recent, signals, scorecard, recentTopicKeys: [...keys] };
+}
+
+export async function generateCandidates(
+  deps: PipelineDeps,
+  date: string,
+  ctx: AuthoringContext,
+): Promise<unknown[]> {
+  if (!deps.claude) throw new Error("pipeline: no claude client");
 
   const response = await deps.claude.structured({
     model: deps.models.author,
-    system: systemPrompt(date, recent, signals, scorecard),
+    system: systemPrompt(date, ctx.recent, ctx.signals, ctx.scorecard),
     user: `Produce ${CANDIDATE_TARGET} candidate questions for ${date} now.`,
     schemaName: "candidate_round",
     schema: candidateSetJsonSchema,
