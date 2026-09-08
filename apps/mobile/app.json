@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.erikt.oracle",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "ORACLE never asks for or uses your location. This notice exists only because a bundled notifications library ships location features that this app leaves switched off."
+        "NSLocationWhenInUseUsageDescription": "Outseen never asks for or uses your location. This notice exists only because a bundled notifications library ships location features that this app leaves switched off.",
+        "CFBundleDisplayName": "OUTSEEN"
       }
     },
     "android": {
@@ -52,7 +53,7 @@
       [
         "expo-sensors",
         {
-          "motionPermission": "ORACLE lets the orb answer the way you move the phone. Motion is read on-device only and never leaves it."
+          "motionPermission": "Outseen lets the orb answer the way you move the phone. Motion is read on-device only and never leaves it."
         }
       ]
     ],
