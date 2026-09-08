@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import { makeTestDb } from "./helpers/db";
-import type { WorkflowBindings } from "../src/pipeline/workflows";
+import type { WorkflowInstanceBindings } from "../src/pipeline/workflows";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "s" };
 
-async function makeApp(workflows: Partial<WorkflowBindings>) {
+async function makeApp(workflows: Partial<WorkflowInstanceBindings>) {
   const { db } = await makeTestDb();
   return createApp({ db, env, workflows });
 }

@@ -5,7 +5,7 @@ import { makeTelegramClient } from "./pipeline/telegram";
 import { makeClaudeClient } from "./pipeline/claude";
 import { recordUsage } from "./pipeline/usage";
 import { etNow } from "./pipeline/clock";
-import { bindingStarter, inlineStarter, type WorkflowBinding } from "./pipeline/workflows";
+import { bindingStarter, inlineStarter, type WorkflowInstanceBinding } from "./pipeline/workflows";
 
 // Cloudflare requires Workflow classes to be exported from the Worker's main
 // module, which is why this re-export lives here rather than the classes being
@@ -33,9 +33,12 @@ export interface WorkerEnv {
   APPLE_BUNDLE_ID?: string;
   ONESIGNAL_APP_ID?: string;
   ONESIGNAL_API_KEY?: string;
-  AUTHORING_WORKFLOW?: WorkflowBinding;
-  RESOLUTION_WORKFLOW?: WorkflowBinding;
-  PROBE_WORKFLOW?: WorkflowBinding;
+  // WorkflowInstanceBinding, not the narrower WorkflowBinding: Cloudflare's
+  // real binding provides get() too, and the admin routes (wired below) need
+  // it. bindingStarter only reads the create() half it declares.
+  AUTHORING_WORKFLOW?: WorkflowInstanceBinding;
+  RESOLUTION_WORKFLOW?: WorkflowInstanceBinding;
+  PROBE_WORKFLOW?: WorkflowInstanceBinding;
 }
 
 // Enablement gate (spec §11): the pipeline is fully wired but stays inert

@@ -10,7 +10,7 @@ import { publish } from "../pipeline/actions";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
 import { pooledLeak, loadLeakRows, type SealRow } from "../pipeline/leak";
-import type { WorkflowBinding } from "../pipeline/workflows";
+import type { WorkflowInstanceBinding } from "../pipeline/workflows";
 
 const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
 
@@ -37,7 +37,7 @@ const WORKFLOW_KINDS = { author: "AUTHORING_WORKFLOW", resolve: "RESOLUTION_WORK
 function bindingFor(
   c: Context<AppContext>,
   kind: string,
-): { binding: WorkflowBinding } | { error: string; status: 400 | 503 } {
+): { binding: WorkflowInstanceBinding } | { error: string; status: 400 | 503 } {
   const key = WORKFLOW_KINDS[kind as keyof typeof WORKFLOW_KINDS];
   if (!key) return { error: "unknown workflow kind", status: 400 };
   const binding = c.get("deps").workflows?.[key];

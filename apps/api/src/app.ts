@@ -8,7 +8,7 @@ import { meRoutes } from "./routes/me";
 import { telegramRoutes } from "./routes/telegram";
 import { webhookRoutes } from "./routes/webhooks";
 import type { PipelineDeps } from "./pipeline";
-import type { WorkflowBindings } from "./pipeline/workflows";
+import type { WorkflowInstanceBindings } from "./pipeline/workflows";
 export type { Db };
 export interface AppEnv {
   DEVICE_TOKEN_SECRET: string;
@@ -25,7 +25,7 @@ export interface Deps {
   // Optional, and partial, for the same reason pipeline is: a deployment
   // without Workflow bindings (or with only some of the three) must not crash
   // the admin routes that read them.
-  workflows?: Partial<WorkflowBindings>;
+  workflows?: Partial<WorkflowInstanceBindings>;
   verifyApple?: (token: string, opts: { audience: string }) => Promise<{ sub: string } | null>;
 }
 export type AppContext = { Variables: { deps: Deps; userId: string; deviceId: string } };

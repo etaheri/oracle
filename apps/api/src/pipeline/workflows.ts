@@ -47,18 +47,32 @@ export function hourBucket(now: ETNow): string {
 // The subset of Cloudflare's Workflow binding this file uses. Declared
 // structurally so the tests can pass a plain object and the Worker types stay
 // out of the test tsconfig.
-export interface WorkflowInstanceHandle {
-  status(): Promise<unknown>;
-  restart(options?: { from?: { name: string; count?: number; type?: "do" | "sleep" | "waitForEvent" } }): Promise<void>;
-}
+//
+// What the STARTER needs: dispatch, nothing else. bindingStarter never reads
+// an instance back, which is why its tests can pass a one-method fake.
 export interface WorkflowBinding {
   create(options: { id: string; params: { date: string; questionIds?: string[] } }): Promise<unknown>;
-  get(id: string): Promise<WorkflowInstanceHandle>;
 }
 export interface WorkflowBindings {
   AUTHORING_WORKFLOW: WorkflowBinding;
   RESOLUTION_WORKFLOW: WorkflowBinding;
   PROBE_WORKFLOW: WorkflowBinding;
+}
+
+export interface WorkflowInstanceHandle {
+  status(): Promise<unknown>;
+  restart(options?: { from?: { name: string; count?: number; type?: "do" | "sleep" | "waitForEvent" } }): Promise<void>;
+}
+// What the ADMIN SURFACE needs: dispatch plus instance lookup. Cloudflare's
+// real binding satisfies both; splitting them keeps each consumer's
+// requirement visible in its own type rather than in a comment.
+export interface WorkflowInstanceBinding extends WorkflowBinding {
+  get(id: string): Promise<WorkflowInstanceHandle>;
+}
+export interface WorkflowInstanceBindings {
+  AUTHORING_WORKFLOW: WorkflowInstanceBinding;
+  RESOLUTION_WORKFLOW: WorkflowInstanceBinding;
+  PROBE_WORKFLOW: WorkflowInstanceBinding;
 }
 
 const DUPLICATE = /already exists|instance\.already_exists|duplicate/i;
