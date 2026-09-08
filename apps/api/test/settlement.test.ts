@@ -20,7 +20,11 @@ const body = (q: string, answer: boolean) => JSON.stringify({ question_id: q, an
 // question, return question rows.
 async function playedRound(db: Awaited<ReturnType<typeof makeTestDb>>["db"], app: ReturnType<typeof createApp>, date: string, plays: Array<{ p: (path: string, init?: RequestInit) => Response | Promise<Response>; slots: number[] }>, outcomes: Array<"yes" | "no" | "void"> = ["yes", "yes", "yes", "yes", "yes"]) {
   const qs = await seedRound(db, { date, opensAt: new Date(`${date}T16:00:00Z`), locksAt: new Date(`${date}T17:00:00Z`) });
-  for (const { p, slots } of plays) for (const s of slots) await p("/v1/predictions", { method: "POST", body: body(qs.find((q) => q.slot === s)!.id, true) });
+  vi.setSystemTime(new Date(`${date}T16:30:00Z`));
+  for (const { p, slots } of plays) for (const s of slots) {
+    const response = await p("/v1/predictions", { method: "POST", body: body(qs.find((q) => q.slot === s)!.id, true) });
+    expect(response.status).toBe(200);
+  }
   for (const q of qs) await resolveQuestion(db, q.id, outcomes[q.slot - 1]!);
   return qs;
 }
@@ -162,7 +166,11 @@ describe("settleRound", () => {
 
     // Round B: same player answers all 5, but only 3 questions get resolved — round B is NOT settled.
     const qsB = await seedRound(db, { date: "2026-08-21", opensAt: new Date("2026-08-21T16:00:00Z"), locksAt: new Date("2026-08-21T17:00:00Z") });
-    for (const s of [1, 2, 3, 4, 5]) await a("/v1/predictions", { method: "POST", body: body(qsB.find((q) => q.slot === s)!.id, true) });
+    vi.setSystemTime(new Date("2026-08-21T16:30:00Z"));
+    for (const s of [1, 2, 3, 4, 5]) {
+      const response = await a("/v1/predictions", { method: "POST", body: body(qsB.find((q) => q.slot === s)!.id, true) });
+      expect(response.status).toBe(200);
+    }
     for (const q of qsB.filter((q) => q.slot <= 3)) await resolveQuestion(db, q.id, "yes");
 
     expect(await completeRoundBriers(db, uid, "2026-08-20")).toHaveLength(5); // B's 3 resolved briers do not leak in

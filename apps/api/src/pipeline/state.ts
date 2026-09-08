@@ -74,8 +74,7 @@ export async function loadPipelineState(db: Db, now: Date, claudeAvailable: bool
     openRound = {
       date: openRoundRow.date,
       lockPassed: now.getTime() >= maxLocksAt,
-      // The Oracle owes this round a position on every question. Recomputed
-      // from the rows each tick, so a partial stamp simply retries.
+      // Retained for missing-forecast alerts; open rounds are never retried.
       needsForecast: questions.some((q) => q.oracleProbYes === null),
       probeIds: questions
         .filter((q) => q.status === "open" && q.locksAt.getTime() > now.getTime())
@@ -115,24 +114,17 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     actions.push({ kind: "lock", date: state.openRound.date });
   }
 
-  // FORECAST (catch-up) — the same-tick attempt pushed right after PUBLISH /
-  // PUBLISH-BANK below is the normal path; this is only for when that attempt
-  // failed (or claudeAvailable was false) and an already-open round still
-  // needsForecast. Hourly throttle (minute<10) like authoring — the call
-  // makes chained web searches and a failure simply retries — and the
-  // throttle belongs ONLY here, never on the same-tick attempt.
-  // Never past the lock: at that point a forecast would be a look-up.
-  // Gated on claudeAvailable: with no client the call would only throw, and
-  // it would throw every ten minutes for up to 24h straight (spec amendment,
-  // 2026-09-03 review) — the once-daily ALERT below narrates this instead.
+  // FORECAST — today's scheduled draft only, from 09:00 until noon ET.
+  // Hourly retries stop before players can see the round. The stamp action
+  // skips an already committed draft before calling the model.
   if (
-    state.openRound &&
-    !state.openRound.lockPassed &&
-    state.openRound.needsForecast &&
+    state.scheduledDates.includes(today) &&
+    hour >= 9 &&
+    hour < 12 &&
     state.claudeAvailable &&
     minute < 10
   ) {
-    actions.push({ kind: "forecast", date: state.openRound.date });
+    actions.push({ kind: "forecast", date: today });
   }
 
   // PROBE (design 2026-09-04 §5) — sweep the open window for questions whose
@@ -153,26 +145,17 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     actions.push({ kind: "probe", date: state.openRound.date, questionIds: state.openRound.probeIds });
   }
 
-  // PUBLISH — noon or later, today has a draft, and no still-open round blocking it
+  // PUBLISH — noon or later, even if the pre-open forecast is missing.
+  // Today has a draft, and no still-open round blocking it
   // (the round we just decided to lock above no longer blocks, since it locks first).
   const openBlocksPublish = state.openRound !== null && !state.openRound.lockPassed;
   if (hour >= 12 && state.scheduledDates.includes(today) && !openBlocksPublish) {
     actions.push({ kind: "publish", date: today });
-    // The Oracle commits in the SAME tick that opens the round — before any
-    // player has seen a single question (spec §2.1: "commits… earlier than
-    // any player can", "the Oracle answers first"). loadPipelineState ran
-    // before this publish executes, so state.openRound is still null/closed
-    // here; stampOracleForecast queries questions by roundDate regardless of
-    // status, so it works on the rows publish is about to open. If this
-    // attempt fails (or claudeAvailable is false), the FORECAST block above
-    // is the catch-up: an already-open round that still needsForecast.
-    if (state.claudeAvailable) {
-      actions.push({ kind: "forecast", date: today });
-    }
   }
 
   // PUBLISH FROM THE BANK — noon with nothing scheduled for today: the drop
   // must never depend on the author having been awake (design spec §6).
+  // A noon bank fallback has no pre-open Oracle commitment and gets no duel.
   if (
     hour >= 12 &&
     !state.scheduledDates.includes(today) &&
@@ -182,11 +165,6 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     state.bankCount > 0
   ) {
     actions.push({ kind: "publish-bank", date: today });
-    // Same same-tick commitment as PUBLISH above — the bank drop must not
-    // leave the Oracle waiting an extra hour any more than an authored one.
-    if (state.claudeAvailable) {
-      actions.push({ kind: "forecast", date: today });
-    }
   }
 
   // RESOLVE / VOID / SETTLE on the locked round. Late, never wrong (design
@@ -283,9 +261,8 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     });
   }
 
-  // Once a day, not hourly: the FORECAST action above is gated off entirely
-  // while claudeAvailable is false, so without this the missing-key state
-  // would go completely unnarrated for the whole open window. Shares the
+  // Once a day, report the missing-client state behind a missed pre-open
+  // forecast. An open round cannot recover a commitment. Shares the
   // 23:00 window with the no-draft-for-tomorrow alert — same "end of day,
   // still not right" posture.
   if (

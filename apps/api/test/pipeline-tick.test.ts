@@ -75,7 +75,7 @@ describe("runTick", () => {
     expect(questions.every((q) => q.oracleProbYes === null)).toBe(true);
   });
 
-  it("publishes a scheduled draft at noon and stamps noon open/lock times", async () => {
+  it("publishes a scheduled draft without an Oracle forecast at noon and stamps noon open/lock times", async () => {
     const { db } = await makeTestDb();
     await db.insert(schema.rounds).values({ date: "2026-08-27", status: "scheduled" });
     await db.insert(schema.questions).values([1, 2, 3, 4, 5].map((slot) => ({
@@ -88,6 +88,7 @@ describe("runTick", () => {
     expect(qs[0]!.opensAt.toISOString()).toBe("2026-08-27T16:00:00.000Z");
     expect(qs[0]!.locksAt.toISOString()).toBe("2026-08-28T16:00:00.000Z");
     expect(qs.every((q) => q.status === "open")).toBe(true);
+    expect(qs.every((q) => q.oracleProbYes === null)).toBe(true);
   });
 
   it("publish keeps an authored early locks_at and defaults everything else (incl. epoch-seeded rows) to noon D+1", async () => {
@@ -110,8 +111,7 @@ describe("runTick", () => {
     const { db } = await makeTestDb();
     // open round whose lock is NOT passed (hand-seeded anomaly)
     await seedRound(db, { date: "2026-08-26", opensAt: new Date("2026-08-26T16:00:00Z"), locksAt: new Date("2026-08-29T16:00:00Z") });
-    // Already forecast, so this tick's decision is about publish alone, not
-    // muddied by a forecast retry (claude is null in this file's fakeDeps).
+    // An existing forecast does not change the publication gate.
     await db.update(schema.questions).set({ oracleProbYes: "0.5" }).where(eq(schema.questions.roundDate, "2026-08-26"));
     await db.insert(schema.rounds).values({ date: "2026-08-27", status: "scheduled" });
     const { deps, sent } = fakeDeps(db, "2026-08-27T16:01:00Z");

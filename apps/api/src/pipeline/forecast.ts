@@ -1,97 +1,76 @@
-// THE ORACLE takes its own position, crowd-blind, before the answers exist.
-//
-// It runs as its own action rather than inside publish for one reason: the
-// call makes chained web searches and takes minutes, and the noon drop must
-// never wait on it (spec §2.2 + the plan's spec amendment). Crowd-blindness
-// does not depend on that ordering -- it holds because this file never reads
-// the predictions table, which is a property of what it queries.
-//
-// It must also never see questions.author_prob: that is a contestedness
-// TARGET chosen to make the question hard, not a belief, and handing it to
-// the forecaster would have the machine grade its own homework.
-import { and, eq } from "drizzle-orm";
+// The Oracle researches a finalized scheduled round. Only the database can
+// commit it: one transaction, before opening, with the exact input snapshot.
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { schema } from "../db/client";
 import type { PipelineDeps } from "./index";
 
+export const FORECAST_PROMPT_VERSION = "forecast-v2";
 const ForecastSchema = z.object({
-  forecasts: z.array(
-    z.object({ slot: z.number().int().min(1).max(5), p_yes: z.number().min(0).max(1) }),
-  ),
+  forecasts: z.array(z.object({
+    slot: z.number().int().min(1).max(5), p_yes: z.number().min(0).max(1),
+  })).length(5).refine(rows => new Set(rows.map(r => r.slot)).size === 5, "slots must be exactly 1..5"),
 });
-
 const forecastJsonSchema = {
-  type: "object",
-  properties: {
-    forecasts: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          slot: { type: "integer" },
-          p_yes: { type: "number", description: "Your probability that the answer is YES, 0 to 1." },
-        },
-        required: ["slot", "p_yes"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["forecasts"],
-  additionalProperties: false,
+  type: "object", properties: {
+    forecasts: { type: "array", minItems: 5, maxItems: 5, items: {
+      type: "object", properties: {
+        slot: { type: "integer", minimum: 1, maximum: 5 },
+        p_yes: { type: "number", minimum: 0, maximum: 1, description: "Your probability that the answer is YES, 0 to 1." },
+      }, required: ["slot", "p_yes"], additionalProperties: false,
+    } },
+  }, required: ["forecasts"], additionalProperties: false,
 };
 
 function systemPrompt(date: string): string {
-  return `You are THE ORACLE. Today is the round dated ${date}; it closes at noon ET tomorrow. You will be shown the round's five yes/no questions and you must state, for each, your own probability that the answer is YES.
+  return `You are THE ORACLE. You are preparing the round dated ${date}, before it opens. It closes at noon ET the following day. State your own probability of YES for each question.
 
-- You are forecasting, not resolving. Nobody has answered yet and the outcomes do not exist. Search the web for what is known NOW, then commit.
-- State a real belief. You will be scored on it with a proper rule, so an honest probability is your best play and a hedge toward 0.5 is not a safe answer, it is a weak one.
-- You may state 0.5 exactly, and it means you decline to call the question. It is scored as neither right nor wrong. Use it when you genuinely have no read, never to be safe.
-- You never revise. There is no second look before this round closes.
+- Research only evidence available now. You are forecasting, not resolving.
+- Report your best-supported probability. Do not exaggerate confidence or hedge for appearances. A proper scoring rule rewards an accurate expression of your uncertainty.
+- Exactly 0.5 is a valid probability when the evidence supports equal chances. It earns zero base points and has no directional correct-answer count.
+- These forecasts will be sealed before players can answer. No revision is allowed after commitment.
 
-Call the oracle_forecast tool exactly once, with one entry per slot.`;
+Call the oracle_forecast tool exactly once with exactly one entry for each slot 1 through 5.`;
 }
 
 export async function stampOracleForecast(deps: PipelineDeps, date: string): Promise<void> {
+  const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+  if (!round) throw new Error("forecast: round missing");
+  // Idempotent retries do not spend tokens, even when the model is unavailable.
+  if (round.oracleCommittedAt !== null) return;
+  if (round.status !== "scheduled") throw new Error("forecast: round already opened");
   if (!deps.claude) throw new Error("pipeline: no claude client");
 
-  // Questions only. No join to predictions, and author_prob is not selected:
-  // the explicit `columns` allowlist below is what makes that structural
-  // rather than merely a property of what the prompt template happens to
-  // interpolate -- author_prob is not in the list, so it cannot reach here.
+  // Author probabilities and player/crowd data are deliberately not selected.
   const rows = await deps.db.query.questions.findMany({
     where: eq(schema.questions.roundDate, date),
     orderBy: (q, { asc }) => [asc(q.slot)],
-    columns: { id: true, slot: true, isBigOne: true, text: true, resolutionCriteria: true, sourceName: true },
+    columns: { id: true, slot: true, isBigOne: true, text: true, category: true,
+      resolutionCriteria: true, sourceName: true, sourceUrl: true, context: true,
+      opensAt: true, locksAt: true, status: true, outcome: true, oracleProbYes: true },
   });
-  if (rows.length === 0) throw new Error(`no round for ${date}`);
+  if (rows.length !== 5 || rows.some((q, i) => q.slot !== i + 1)) throw new Error("forecast: five unique slots required");
+  const opening = Math.min(...rows.map(q => q.opensAt.getTime()));
+  if (deps.now().getTime() >= opening) throw new Error("forecast: opening deadline passed");
+  if (rows.some(q => q.status !== "scheduled" || q.outcome !== null || q.oracleProbYes !== null)) {
+    throw new Error("forecast: questions not eligible for a new commitment");
+  }
 
-  const user = rows
-    .map((q) => `[slot ${q.slot}${q.isBigOne ? " · THE BIG ONE" : ""}] ${q.text}\n  RESOLVES BY: ${q.resolutionCriteria}\n  SOURCE: ${q.sourceName}`)
-    .join("\n\n");
-
+  const user = rows.map(q => `[slot ${q.slot}${q.isBigOne ? " · THE BIG ONE" : ""}] ${q.text}\nRESOLVES BY: ${q.resolutionCriteria}\nSOURCE: ${q.sourceName}${q.sourceUrl ? ` · ${q.sourceUrl}` : ""}\nOPENS: ${q.opensAt.toISOString()}\nLOCKS: ${q.locksAt.toISOString()}${q.context ? `\nCONTEXT: ${JSON.stringify(q.context)}` : ""}`).join("\n\n");
   const response = await deps.claude.structured({
-    model: deps.models.forecast,
-    system: systemPrompt(date),
-    user: `${user}\n\nState your probability for each slot now.`,
-    schemaName: "oracle_forecast",
-    schema: forecastJsonSchema,
-    webSearch: { maxUses: 8 },
+    model: deps.models.forecast, system: systemPrompt(date), user,
+    schemaName: "oracle_forecast", schema: forecastJsonSchema, webSearch: { maxUses: 8 },
   });
-
   const parsed = ForecastSchema.safeParse(response);
-  if (!parsed.success) throw new Error(`forecast: response failed validation`);
-
-  const bySlot = new Map(parsed.data.forecasts.map((f) => [f.slot, f.p_yes]));
-  // All or nothing: a partial stamp would leave needsForecast true forever
-  // while half the round carried a position, and the record would be built
-  // on a round the Oracle only half answered.
-  for (const q of rows) {
-    if (!bySlot.has(q.slot)) throw new Error(`forecast: missing slot ${q.slot}`);
-  }
-  for (const q of rows) {
-    await deps.db
-      .update(schema.questions)
-      .set({ oracleProbYes: String(bySlot.get(q.slot)!) })
-      .where(and(eq(schema.questions.id, q.id), eq(schema.questions.roundDate, date)));
-  }
+  if (!parsed.success) throw new Error("forecast: response failed validation (exact slots required)");
+  const completedAt = deps.now();
+  if (completedAt.getTime() >= opening) throw new Error("forecast: opening deadline passed");
+  const bySlot = new Map(parsed.data.forecasts.map(f => [f.slot, f.p_yes]));
+  const snapshot = rows.map(({ status: _status, outcome: _outcome, oracleProbYes: _old, ...q }) => ({ ...q, pYes: bySlot.get(q.slot)! }));
+  // The function locks/rechecks live rows, compares the entire snapshot, and
+  // uses the DB clock after lock waits. Any failure rolls back all five writes.
+  await deps.db.execute(sql`select commit_oracle_forecast(
+    ${date}::date, ${JSON.stringify(snapshot)}::jsonb, ${deps.models.forecast},
+    ${FORECAST_PROMPT_VERSION}, ${completedAt.toISOString()}::timestamptz
+  )`);
 }

@@ -56,6 +56,8 @@ export const adminRoutes = new Hono<AppContext>()
     const question = await db.query.questions.findFirst({ where: eq(schema.questions.id, c.req.param("id")) });
     if (!question) return c.json({ error: "unknown question" }, 404);
     if (question.status !== "scheduled") return c.json({ error: "not editable" }, 409);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, question.roundDate) });
+    if (round?.oracleCommittedAt) return c.json({ error: "Oracle forecast already committed" }, 409);
 
     const patch: Partial<typeof schema.questions.$inferInsert> = {};
     if (parsed.data.text !== undefined) patch.text = parsed.data.text;
@@ -63,7 +65,15 @@ export const adminRoutes = new Hono<AppContext>()
     if (parsed.data.source_name !== undefined) patch.sourceName = parsed.data.source_name;
     if (parsed.data.source_url !== undefined) patch.sourceUrl = parsed.data.source_url;
 
-    await db.update(schema.questions).set(patch).where(eq(schema.questions.id, question.id));
+    try {
+      await db.update(schema.questions).set(patch).where(eq(schema.questions.id, question.id));
+    } catch (error) {
+      // A forecast may have committed after the initial read. The database
+      // preserves the question; surface that conflict rather than a 500.
+      const latest = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, question.roundDate) });
+      if (latest?.oracleCommittedAt) return c.json({ error: "Oracle forecast already committed" }, 409);
+      throw error;
+    }
     return c.json({ ok: true });
   })
   .post("/rounds/:date", async (c) => {

@@ -93,7 +93,7 @@ export function lockFromResolvesAt(resolvesAt: string, opensAt: Date, defaultLoc
 
 export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersion = 1): Promise<void> {
   const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
-  if (existing && existing.status !== "scheduled") throw new Error("round not editable");
+  if (existing && (existing.status !== "scheduled" || existing.oracleCommittedAt !== null)) throw new Error("round not editable");
 
   const opensAt = noonET(date);
   const locksAtDefault = noonET(addDays(date, 1));

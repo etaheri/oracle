@@ -124,6 +124,18 @@ describe("POST /admin/rounds/:date/publish", () => {
 });
 
 describe("PATCH /admin/questions/:id", () => {
+  it("409s for a committed scheduled question and preserves the draft", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    await upsertDraft(db, "2026-08-27", validDraft);
+    const q = (await db.query.questions.findFirst({ where: eq(schema.questions.roundDate, "2026-08-27") }))!;
+    await db.update(schema.rounds).set({ oracleCommittedAt: new Date() }).where(eq(schema.rounds.date, "2026-08-27"));
+    const res = await admin(app)(`/admin/questions/${q.id}`, { method: "PATCH", body: JSON.stringify({ text: "Will the edited thing happen tomorrow?" }) });
+    expect(res.status).toBe(409);
+    const reroll = await admin(app)("/admin/rounds/2026-08-27", { method: "POST", body: JSON.stringify(validDraft) });
+    expect(reroll.status).toBe(409);
+    expect((await db.query.questions.findFirst({ where: eq(schema.questions.id, q.id) }))!.text).toBe(q.text);
+  });
   it("edits a scheduled question", async () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });

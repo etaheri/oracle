@@ -16,9 +16,9 @@ describe("decideActions", () => {
     const acts = decideActions(at(12), { ...empty, openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false, probeIds: [] } });
     expect(acts[0]).toEqual({ kind: "lock", date: "2026-08-26" });
   });
-  it("locks then publishes in one noon tick, forecasting today right after", () => {
+  it("locks then publishes in one noon tick without a late forecast", () => {
     const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false, probeIds: [] }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
-    expect(acts.map((a) => a.kind)).toEqual(["lock", "publish", "forecast"]);
+    expect(acts.map((a) => a.kind)).toEqual(["lock", "publish"]);
   });
   it("never publishes while another round is open and not yet lockable", () => {
     const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false, probeIds: [] }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
@@ -70,9 +70,8 @@ describe("decideActions", () => {
   it("falls through to the bank at noon when nothing is scheduled for today", () => {
     expect(decideActions(at(12), { ...empty, bankCount: 2 })).toEqual([
       { kind: "publish-bank", date: "2026-08-27" },
-      { kind: "forecast", date: "2026-08-27" },
     ]);
-    expect(decideActions(at(12), { ...empty, bankCount: 2, scheduledDates: ["2026-08-27"] }).map((a) => a.kind)).toEqual(["publish", "forecast"]);
+    expect(decideActions(at(12), { ...empty, bankCount: 2, scheduledDates: ["2026-08-27"] }).map((a) => a.kind)).toEqual(["publish"]);
     expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false, probeIds: [] } })).toEqual([]);
     expect(decideActions(at(11, 50), { ...empty, bankCount: 2 })).toEqual([]);
   });
@@ -129,39 +128,25 @@ describe("the forecast action", () => {
     openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true, probeIds: [] },
     lockedRound: null, scheduledDates: [], bankCount: 5, claudeAvailable: true,
   };
-  it("is decided while the open round has unforecast questions", () => {
-    const actions = decideActions(
-      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow, openNeeding,
-    );
-    expect(actions).toContainEqual({ kind: "forecast", date: "2026-09-03" });
+  const scheduled = { ...empty, scheduledDates: ["2026-08-27"] };
+  it.each([9, 10, 11])("forecasts today's scheduled draft at %i ET", (hour) => {
+    expect(decideActions(at(hour), scheduled)).toEqual([{ kind: "forecast", date: "2026-08-27" }]);
   });
-  it("is throttled to once an hour, like authoring", () => {
-    const actions = decideActions(
-      { date: "2026-09-03", hour: 13, minute: 35 } as ETNow, openNeeding,
-    );
-    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  it.each([0, 8, 12, 13, 23])("never forecasts outside the morning window at %i ET", (hour) => {
+    expect(decideActions(at(hour), scheduled).some((a) => a.kind === "forecast")).toBe(false);
   });
-  it("stops once every question carries a forecast", () => {
-    const actions = decideActions(
-      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
-      { ...openNeeding, openRound: { ...openNeeding.openRound, needsForecast: false } },
-    );
-    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  it("throttles morning retries to minute < 10", () => {
+    expect(decideActions(at(11, 9), scheduled)).toEqual([{ kind: "forecast", date: "2026-08-27" }]);
+    expect(decideActions(at(11, 10), scheduled)).toEqual([]);
+    expect(decideActions(at(11, 59), scheduled)).toEqual([]);
   });
-  it("is never decided for a round that has already passed its lock", () => {
-    // Past lock the answers exist; a forecast then would be a look-up.
-    const actions = decideActions(
-      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
-      { ...openNeeding, openRound: { ...openNeeding.openRound, lockPassed: true } },
-    );
-    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  it("requires today's draft and a Claude client", () => {
+    expect(decideActions(at(9), { ...scheduled, claudeAvailable: false })).toEqual([]);
+    expect(decideActions(at(9), { ...empty, scheduledDates: ["2026-08-28"] })).toEqual([]);
   });
-  it("is never decided with no Claude client — it would only throw", () => {
-    const actions = decideActions(
-      { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
-      { ...openNeeding, claudeAvailable: false },
-    );
-    expect(actions.find((a) => a.kind === "forecast")).toBeUndefined();
+  it.each([9, 11, 12, 13, 23])("never retries an open round at %i ET", (hour) => {
+    const actions = decideActions({ date: "2026-09-03", hour, minute: 5 }, openNeeding);
+    expect(actions.some((a) => a.kind === "forecast")).toBe(false);
   });
   it("warns once daily, in the 23:00 window, when the round still needs a forecast and there is no Claude client", () => {
     const blocked = { ...openNeeding, claudeAvailable: false };
@@ -181,42 +166,9 @@ describe("the forecast action", () => {
     expect(recovered.some((a) => a.kind === "alert" && a.message.includes("Claude client"))).toBe(false);
   });
 
-  // 2026-09-03 review: the Oracle must commit in the SAME tick that opens the
-  // round -- ahead of every player -- not an hour later on the minute<10
-  // catch-up throttle.
-  describe("same-tick commitment (spec §2.1: the Oracle answers first)", () => {
-    const noon = { date: "2026-09-03", hour: 12, minute: 0 } as ETNow;
-
-    it("decides forecast for today right after publish, with no open round yet", () => {
-      const acts = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: ["2026-09-03"], bankCount: 0, claudeAvailable: true });
-      expect(acts).toEqual([
-        { kind: "publish", date: "2026-09-03" },
-        { kind: "forecast", date: "2026-09-03" },
-      ]);
-    });
-
-    it("decides forecast for today right after publish-bank", () => {
-      const acts = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 3, claudeAvailable: true });
-      expect(acts).toEqual([
-        { kind: "publish-bank", date: "2026-09-03" },
-        { kind: "forecast", date: "2026-09-03" },
-      ]);
-    });
-
-    it("still catches up on an already-open round that needs a forecast (same-tick attempt not applicable)", () => {
-      const acts = decideActions(
-        { date: "2026-09-03", hour: 13, minute: 5 } as ETNow,
-        { openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true, probeIds: [] }, lockedRound: null, scheduledDates: [], bankCount: 0, claudeAvailable: true },
-      );
-      expect(acts).toEqual([{ kind: "forecast", date: "2026-09-03" }]);
-    });
-
-    it("decides neither publish's nor publish-bank's forecast when claudeAvailable is false", () => {
-      const published = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: ["2026-09-03"], bankCount: 0, claudeAvailable: false });
-      expect(published).toEqual([{ kind: "publish", date: "2026-09-03" }]);
-      const banked = decideActions(noon, { openRound: null, lockedRound: null, scheduledDates: [], bankCount: 3, claudeAvailable: false });
-      expect(banked).toEqual([{ kind: "publish-bank", date: "2026-09-03" }]);
-    });
+  it.each([true, false])("publishes on time without a forecast, client available: %s", (claudeAvailable) => {
+    expect(decideActions(at(12), { ...scheduled, claudeAvailable })).toEqual([{ kind: "publish", date: "2026-08-27" }]);
+    expect(decideActions(at(12), { ...empty, bankCount: 3, claudeAvailable })).toEqual([{ kind: "publish-bank", date: "2026-08-27" }]);
   });
 });
 

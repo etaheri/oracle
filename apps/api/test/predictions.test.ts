@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
+import * as schema from "../src/db/schema";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 
@@ -32,6 +34,26 @@ const body = (questionId: string) => ({ question_id: questionId, answer: true, c
 afterEach(() => vi.useRealTimers());
 
 describe("POST /v1/predictions", () => {
+  it("rejects a known question ID before its opening", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T15:59:59Z"), toFake: ["Date"] });
+    const { db, qs, submit } = await setup();
+    expect((await submit(body(qs[0]!.id))).status).toBe(409);
+    expect(await db.query.predictions.findMany()).toHaveLength(0);
+  });
+  it("rejects scheduled questions even after their nominal opening", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db, qs, submit } = await setup();
+    await db.update(schema.questions).set({ status: "scheduled" }).where(eq(schema.questions.id, qs[0]!.id));
+    expect((await submit(body(qs[0]!.id))).status).toBe(409);
+    expect(await db.query.predictions.findMany()).toHaveLength(0);
+  });
+  it("rejects questions in a round that is not published yet", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db, qs, submit } = await setup();
+    await db.update(schema.rounds).set({ status: "scheduled" }).where(eq(schema.rounds.date, "2026-08-20"));
+    expect((await submit(body(qs[0]!.id))).status).toBe(409);
+    expect(await db.query.predictions.findMany()).toHaveLength(0);
+  });
   it("inserts and flags first hour", async () => {
     vi.useFakeTimers({ now: new Date("2026-08-20T16:30:00Z"), toFake: ["Date"] });
     const { qs, submit } = await setup();

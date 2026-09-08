@@ -16,6 +16,9 @@ export const predictionRoutes = new Hono<AppContext>()
     if (!q) return c.json({ error: "unknown question" }, 404);
 
     const now = new Date();
+    if (q.status !== "open" || now.getTime() < q.opensAt.getTime()) return c.json({ error: "not open" }, 409);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
+    if (round?.status !== "open") return c.json({ error: "not open" }, 409);
     if (now.getTime() >= q.locksAt.getTime()) return c.json({ error: "locked" }, 409);
 
     const firstHour = now.getTime() <= q.opensAt.getTime() + 3_600_000;

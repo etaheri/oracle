@@ -35,6 +35,11 @@ export const rounds = pgTable("rounds", {
   status: roundStatus("status").notNull().default("scheduled"),
   rulesVersion: integer("rules_version").notNull().default(1),
   playerCount: integer("player_count").notNull().default(0),
+  // One immutable pre-opening Oracle commitment. Null on legacy rounds.
+  oracleCommittedAt: timestamp("oracle_committed_at", { withTimezone: true }),
+  oracleForecastModel: text("oracle_forecast_model"),
+  oraclePromptVersion: text("oracle_prompt_version"),
+  oracleForecastSnapshot: jsonb("oracle_forecast_snapshot"),
   // What the gauntlet cost, in candidates (design 2026-09-04 §11.1). Default
   // 0 so every round authored before 0007 reads as "unknown" rather than as a
   // perfect night — the reveal withholds the line entirely at 0.
@@ -76,7 +81,7 @@ export const questions = pgTable("questions", {
   // every question asked before 0006 predates the column and must stay
   // unscored rather than be imputed a 0.5 nobody stated.
   authorProb: numeric("author_prob"),
-  // The Oracle's own forecast (skill-weighted aggregate), stamped at lock.
+  // The Oracle's own forecast, committed atomically before the round opens.
   oracleProbYes: numeric("oracle_p_yes"),
   // Written ONLY by the in-window probe (pipeline/probe.ts) when it finds the
   // answer already exists and pulls the lock forward. This is why a boolean
