@@ -20,6 +20,13 @@ describe("step policies", () => {
     for (const [name, p] of Object.entries(POLICY)) {
       expect(p.timeout, name).toBeDefined();
       expect(seconds(p.timeout), name).toBeLessThan(600);
+      // No ceiling on retry delay — parsing it successfully is the whole
+      // requirement. seconds() throws on an unrecognised unit, and that
+      // throw IS the assertion: durableStep casts the merged config to
+      // WorkflowStepConfig before it reaches step.do, which switches off
+      // type checking on both duration fields, so a malformed delay like
+      // "10 secs" must fail loudly here, not silently at 3am.
+      seconds(p.retries.delay);
     }
   });
 
