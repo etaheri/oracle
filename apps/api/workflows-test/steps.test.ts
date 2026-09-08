@@ -22,8 +22,9 @@ describe("resolution workflow step semantics", () => {
 		// If a future edit re-collapsed this back into one step wrapping a loop,
 		// these two step names would stop existing and the mocks below would
 		// silently miss — the real (unmocked) steps would then run for real
-		// against an unreachable DATABASE_URL and waitForStatus("complete")
-		// would reject instead of resolving, failing this test.
+		// against an unreachable DATABASE_URL. That instance would go
+		// `errored`, not `complete`, so waitForStatus("complete") would hang to
+		// the test timeout rather than reject — still failing this test.
 		await using instance = await introspectWorkflowInstance(env.RESOLUTION_WORKFLOW, "t-1");
 		await instance.modify(async (m) => {
 			await m.disableRetryDelays();

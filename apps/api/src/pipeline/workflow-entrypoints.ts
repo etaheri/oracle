@@ -90,7 +90,15 @@ export async function durableStep<T extends Rpc.Serializable<T>>(
       return await fn();
     } catch (err) {
       if (err instanceof BudgetExhausted) {
-        await reportBudgetExhaustion(deps.telegram, err);
+        // The narration must never be able to prevent the mapping below: if
+        // reportBudgetExhaustion threw, an ordinary error would escape this
+        // catch instead of a NonRetryableError, and the step would retry
+        // under its policy — re-entering meterClaude and charging again,
+        // which is defect §1.3 returning through the narration path. Today
+        // this is safe only because makeTelegramClient.send swallows its own
+        // errors (telegram.ts); the .catch makes that guarantee structural
+        // here too, rather than borrowed from another file's invariant.
+        await reportBudgetExhaustion(deps.telegram, err).catch(() => {});
         // NOT retryable. The ceiling has already been crossed; retrying
         // charges again and does no work.
         throw new NonRetryableError(err.message, "BudgetExhausted");

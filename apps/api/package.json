@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p eval/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p eval/tsconfig.json && tsc --noEmit -p workflows-test/tsconfig.json",
     "test": "vitest run",
     "test:workflows": "vitest run -c vitest.workflows.config.ts",
     "eval": "tsx eval/run.ts",

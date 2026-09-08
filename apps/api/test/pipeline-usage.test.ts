@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
 import { makeTestDb } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { recordUsage } from "../src/pipeline/usage";

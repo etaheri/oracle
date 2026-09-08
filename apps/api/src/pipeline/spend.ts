@@ -5,10 +5,17 @@
 // spends until the window closes. This caps it.
 //
 // THE CEILING IS APPLIED BY WRAPPING deps.claude, and that is the whole
-// argument for its correctness: every model call in this pipeline goes through
-// that one object, and no deterministic action (lock, publish, void, settle)
-// touches it at all. The game therefore keeps turning after the budget is
-// gone; only the machine's opinions stop.
+// argument for its correctness: every model call the UNATTENDED loop makes
+// goes through that one object, and no deterministic action (lock, publish,
+// void, settle) touches it at all. The game therefore keeps turning after the
+// budget is gone; only the machine's opinions stop.
+//
+// One path is NOT wrapped, and pre-dates this ceiling: an operator's Telegram
+// /reroll (routes/telegram.ts) calls rerollSlot (pipeline/author.ts) with
+// deps.pipeline, which is built UNMETERED, so that call reaches Anthropic
+// without passing through this object. It is human-triggered and low-volume,
+// but it means "every model call" above is a claim about the unattended
+// pipeline, not a literal one about the process.
 //
 // The budget is an ops threshold, not a game rule, so it lives here beside
 // BANK_LOW_WATER rather than in @oracle/core, whose header says "Scoring/game

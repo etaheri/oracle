@@ -4,13 +4,22 @@
 // THE LIMIT, MEASURED. Cloudflare Cron Triggers on a sub-hour schedule get 30
 // seconds of CPU and a HARD 15-MINUTE WALL-CLOCK CAP. CPU is not the
 // constraint here — waiting on fetch is I/O. The 15 minutes is, and runTick's
-// resolve case has been sitting on it: five sequential resolves, each of which
-// "can take minutes across chained web searches" by resolve.ts's own admission.
-// It has not bitten only because the pipeline has never run an unattended day.
-// The gauntlet adds roughly eight more long calls to the authoring tick.
+// resolve case USED TO sit on it: five sequential resolves, each of which
+// "can take minutes across chained web searches" by resolve.ts's own
+// admission, once ran inline as a single unbroken call with no checkpoint
+// between them. It never bit only because the pipeline had never run an
+// unattended day. The gauntlet adds roughly eight more long calls to the
+// authoring tick.
 //
-// Cloudflare Workflows: unlimited wall-clock per step, retries built in. Fan-out
-// of long external calls is its shape.
+// A Workflow INSTANCE has no wall-clock limit — that is what makes this
+// substrate the fix for the cap above. A STEP does: Cloudflare's default step
+// config carries a 10-MINUTE TIMEOUT, and THAT DEFAULT IS NEVER INHERITED
+// here. Every step this pipeline runs carries its own explicit timeout and
+// retry policy, chosen from the POLICY table in steps.ts by kind of work (see
+// that file's header for why the inherited default was the defect in the
+// first place). Granularity — many short, independently-checkpointed steps —
+// is what makes fan-out of long external calls safe, not an unbounded
+// per-step clock.
 //
 // decideActions DOES NOT CHANGE ITS NATURE. It stays pure over
 // (ETNow, PipelineState) — that purity is what makes every action idempotent,

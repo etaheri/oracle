@@ -172,19 +172,15 @@ export const adminRoutes = new Hono<AppContext>()
       drafts: rows.map((r) => ({ id: r.id, created_at: r.createdAt.toISOString(), used_on: r.usedOn })),
     });
   })
-  // The window's leak, across every round rather than one at a time. The
-  // settle-time LEAK WATCH answers "did this question leak"; this answers
-  // "does the window leak", which is the one that decides whether a standing
-  // ranks foresight or patience.
-  // The operational lever this whole design exists to make possible: a
-  // resolution that died on question four is resumed AT question four, with
-  // the first three steps served from cache (design 2026-09-08 §6).
   .get("/workflows/:kind/:id", async (c) => {
     const resolved = bindingFor(c, c.req.param("kind"));
     if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status);
     const instance = await resolved.binding.get(c.req.param("id"));
     return c.json(await instance.status());
   })
+  // The operational lever this whole design exists to make possible: a
+  // resolution that died on question four is resumed AT question four, with
+  // the first three steps served from cache (design 2026-09-08 §6).
   .post("/workflows/:kind/:id/restart", async (c) => {
     const resolved = bindingFor(c, c.req.param("kind"));
     if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status);
@@ -196,6 +192,10 @@ export const adminRoutes = new Hono<AppContext>()
     await instance.restart(from);
     return c.json({ ok: true });
   })
+  // The window's leak, across every round rather than one at a time. The
+  // settle-time LEAK WATCH answers "did this question leak"; this answers
+  // "does the window leak", which is the one that decides whether a standing
+  // ranks foresight or patience.
   .get("/analytics/leak", async (c) => {
     const db = c.get("deps").db;
     const since = c.req.query("since");
