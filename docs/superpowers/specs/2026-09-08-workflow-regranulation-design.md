@@ -378,17 +378,19 @@ Cloudflare's vitest integration ships a Workflows introspection API. Its purpose
 here is narrow: to test the things §1 got wrong, which the PGlite suite
 structurally cannot see.
 
-**Verify the package name at install time.** Cloudflare's docs refer to this API
-under both `@cloudflare/vitest-pool-workers` (≥0.9.0) and
-`@cloudflare/vitest-plugin` (≥1.0.0); the latter appears to be a rename. Do not
-take either on faith from this document — check what actually publishes the
-`introspectWorkflow` export before pinning.
+**The package is `@cloudflare/vitest-plugin` (pinned at 1.1.6).** The docs also
+name `@cloudflare/vitest-pool-workers`; the two publish an identical API and
+`vitest-plugin` is the current name. Confirmed by diffing the published
+tarballs, not by reading the docs.
+
+**`defineWorkersConfig` no longer exists** in either package. The current
+configuration API is the plugin-based `cloudflareTest()`. Any example — this
+document's earlier drafts included — that calls `defineWorkersConfig` is stale.
 
 | Assertion | API |
 |---|---|
 | Retry limits hold per step | `mockStepError(step, err, times)` |
 | Timeouts are configured, not inherited | `forceStepTimeout(step)` |
-| `BudgetExhausted` halts the instance with no further steps | `mockStepError` + `waitForStatus("errored")` |
 | Fan-out names are deterministic across replays | `waitForStepResult({ name, index })` |
 | Suite runs fast | `disableRetryDelays()` |
 
@@ -396,9 +398,38 @@ Configured as a SEPARATE vitest project so the PGlite suite is never dragged
 into workerd. Introspectors are disposed per test via `await using` — Workflows
 uses per-file storage isolation and a leaked introspector cross-contaminates.
 
-**Known risk:** `vitest-pool-workers` has an open reliability issue running
-Workflows tests in CI (`cloudflare/workers-sdk#10600`). If it proves flaky,
-this suite runs locally and on demand rather than gating merges. It is a
+The tests live in `workflows-test/`, NOT `test/workflows/`: `vitest.config.ts`'s
+`test/**/*.test.ts` glob and `test/tsconfig.json`'s `**/*` would both collect
+them and break the PGlite suite's collection.
+
+### 7.3 What this suite CANNOT reach, and the unit test that covers it
+
+**`mockStepError` and `mockStepResult` bypass a step's real callback entirely.**
+Nothing mocked can therefore reach `durableStep`'s catch — which means the
+introspection API structurally cannot test the
+`BudgetExhausted → NonRetryableError` mapping, the single defect (§1.3) this
+substrate work most needed to prove. Reaching it for real would require a step
+to raise a genuine `BudgetExhausted`, which requires a live database already
+over its ceiling.
+
+The mapping does not need the engine. `durableStep(step, name, policy, deps, fn)`
+takes `step` as a PARAMETER, so it is a pure unit: a fake step whose
+`do(name, config, cb)` merely calls `cb()`, an `fn` that throws
+`BudgetExhausted`, and three assertions — it rejects with `NonRetryableError`,
+`reportBudgetExhaustion` fired exactly once, and an ORDINARY error propagates
+UNWRAPPED. That last one matters as much as the first: wrapping every error
+would make each transient failure non-retryable, a regression in the opposite
+direction.
+
+**What remains unverified even then:** that the real Workflow engine invokes
+that catch on a real step failure. The mapping is proven in isolation; its
+wiring to the engine is not. Say so plainly rather than claiming §1.3 is
+covered.
+
+**Known risk (not observed):** `cloudflare/workers-sdk#10600` reports Workflows
+tests running unreliably in CI under this pool. Eight consecutive local runs
+were clean, so it is recorded as a risk rather than a finding. If it does prove
+flaky, this suite runs locally and on demand rather than gating merges — it is a
 correctness instrument, not a gate.
 
 ---
