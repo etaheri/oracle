@@ -1,0 +1,62 @@
+[
+  {
+    "text": "Will the incumbent win re-election and will voter turnout exceed 60%?",
+    "resolution_criteria": "Resolves YES if the incumbent is declared the winner by the state election board, per official results.",
+    "expected": "reject",
+    "note": "compound: two clauses joined by \"and\", and the criteria only cover the first one"
+  },
+  {
+    "text": "Will the company's new product be considered a success?",
+    "resolution_criteria": "Resolves based on general public and critical reception.",
+    "expected": "reject",
+    "note": "criteria do not determine the outcome: no named source, threshold, or measurement"
+  },
+  {
+    "text": "Will the team win their next game?",
+    "resolution_criteria": "Resolves YES if the team wins their next game, per the league's official box score.",
+    "expected": "reject",
+    "note": "readable two ways: \"their next game\" does not name an opponent or date, so which game resolves it is ambiguous"
+  },
+  {
+    "text": "Will the policy be seen as effective by economists?",
+    "resolution_criteria": "Resolves YES if a majority of surveyed economists rate the policy effective.",
+    "expected": "reject",
+    "note": "criteria do not determine the outcome: no named survey, surveyor, or sample"
+  },
+  {
+    "text": "Will the bill pass before the deadline?",
+    "resolution_criteria": "Resolves YES if the legislature passes the bill before the deadline, per the legislature's official record.",
+    "expected": "reject",
+    "note": "readable two ways: \"the deadline\" is never named"
+  },
+  {
+    "text": "Will Bitcoin close above $100,000 on Coinbase at 11:59pm ET on Friday?",
+    "resolution_criteria": "Resolves YES if Coinbase's BTC-USD closing price at 23:59 ET on Friday is above $100,000, per Coinbase's published closing data.",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the Kansas City Chiefs beat the Buffalo Bills on Sunday, September 13, 2026?",
+    "resolution_criteria": "Resolves YES if the Chiefs have more points than the Bills at the end of the game, per the NFL's official final score.",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the incumbent be declared the winner of the November 3, 2026 mayoral election?",
+    "resolution_criteria": "Resolves YES if the city's official election board certifies the incumbent as the winner of the race.",
+    "expected": "pass"
+  },
+  {
+    "text": "Will more than 6 inches of snow be recorded at O'Hare International Airport on December 1, 2026?",
+    "resolution_criteria": "Resolves YES if the National Weather Service's official snowfall total for O'Hare for that calendar date exceeds 6 inches.",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the film released this weekend gross more than $150 million domestically in its opening weekend?",
+    "resolution_criteria": "Resolves YES if Box Office Mojo reports a domestic opening-weekend gross above $150 million for the film.",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the central bank raise its benchmark interest rate at its next scheduled meeting on October 15, 2026?",
+    "resolution_criteria": "Resolves YES if the central bank's official statement from the October 15, 2026 meeting announces an increase to the benchmark rate.",
+    "expected": "pass"
+  }
+]

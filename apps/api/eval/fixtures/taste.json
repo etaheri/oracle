@@ -1,0 +1,68 @@
+[
+  {
+    "text": "Will a magnitude 7.0+ earthquake strike California and kill more than 100 people before the end of the year?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will a hurricane make landfall in Florida this week and cause at least 10 fatalities?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will Erik's flight from Boston to Chicago on Friday be delayed by more than two hours?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will my neighbor's dog win Best in Show at the county fair next month?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will the losing candidate be branded a disgraceful failure by pundits after tonight's results?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will the opposing team's starting quarterback get injured and miss the rest of the game?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will Pope Francis be hospitalized again before the end of the month?",
+    "expected": "reject",
+    "note": "near the line — a named public figure's medical outcome, not their professional one"
+  },
+  {
+    "text": "Will the retiring senator's long-rumored health condition be confirmed by his office this year?",
+    "expected": "reject"
+  },
+  {
+    "text": "Will the Federal Reserve Chair resign from their position before the end of the year?",
+    "expected": "pass",
+    "note": "near the line — a public figure's professional outcome, paired against the Pope Francis case above"
+  },
+  {
+    "text": "Will the incumbent mayor win re-election in November?",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the S&P 500 close above 6,000 points by the end of the quarter?",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the Kansas City Chiefs win Super Bowl LX?",
+    "expected": "pass"
+  },
+  {
+    "text": "Will more than 6 inches of snow fall in Chicago this week?",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the new Marvel movie gross more than $200 million in its opening weekend?",
+    "expected": "pass"
+  },
+  {
+    "text": "Will the announced merger between the two companies be formally signed before year-end?",
+    "expected": "pass"
+  },
+  {
+    "text": "Will Bitcoin close above $100,000 on Friday?",
+    "expected": "pass"
+  }
+]
