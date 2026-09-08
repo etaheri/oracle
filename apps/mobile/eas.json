@@ -5,10 +5,7 @@
   },
   "build": {
     "base": {
-      "node": "22.23.2",
-      "env": {
-        "ONESIGNAL_DISABLE_LOCATION": "true"
-      }
+      "node": "22.23.2"
     },
     "development": {
       "extends": "base",

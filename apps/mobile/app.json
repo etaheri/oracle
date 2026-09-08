@@ -11,7 +11,8 @@
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.erikt.oracle",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "ORACLE never asks for or uses your location. This notice exists only because a bundled notifications library ships location features that this app leaves switched off."
       }
     },
     "android": {
