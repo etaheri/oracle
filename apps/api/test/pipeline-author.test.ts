@@ -428,6 +428,22 @@ describe("rerollSlot", () => {
     const { deps } = fakeDeps(db, claude);
     await expect(rerollSlot(deps, "2026-08-27", 2, "")).rejects.toThrow("only the big one may resolve after the evening");
   });
+
+  it("the v2 reroll prompt states the fast-round rule, so a slot 1-4 reroll knows it must resolve by the evening", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft, 2);
+    const replacement = {
+      ...validDraft.questions[1],
+      resolves_at: "2026-08-28T18:00:00Z", // fast: before fast-by (08-28 20:00Z)
+    };
+    const { claude, calls } = fakeClaude([replacement]);
+    const { deps } = fakeDeps(db, claude);
+
+    await rerollSlot(deps, "2026-08-27", 2, "make it sharper");
+
+    expect(calls[0]!.system).toContain("evening");
+    expect(calls[0]!.system).toContain("noon ET on 2026-08-29");
+  });
 });
 
 describe("draftMessage", () => {

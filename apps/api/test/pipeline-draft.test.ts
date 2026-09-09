@@ -218,7 +218,7 @@ describe("lockFromResolvesAt across a DST boundary (design 2026-09-04 §10)", ()
 });
 
 // Round 2026-08-27: lock 08-28 16:00Z, fast-by 20:00Z, void 08-29 16:00Z.
-const WINDOW: FastRoundWindow = { lockAt: LOCKS, fastBy: fastResolveBy("2026-08-27"), voidAt: voidDeadline("2026-08-27") };
+const WINDOW: FastRoundWindow = { fastBy: fastResolveBy("2026-08-27"), voidAt: voidDeadline("2026-08-27") };
 const q = (slot: number, resolves_at: string) => ({ slot, is_big_one: slot === 5, resolves_at });
 
 describe("checkFastRound (design 2026-09-09 §1.1-1.2)", () => {
@@ -243,6 +243,10 @@ describe("checkFastRound (design 2026-09-09 §1.1-1.2)", () => {
   it("rejects any instant past the void deadline, Big One included", () => {
     const qs = [q(1, RESOLVES_AFTER_LOCK), q(2, RESOLVES_AFTER_LOCK), q(3, RESOLVES_AFTER_LOCK), q(4, RESOLVES_AFTER_LOCK), q(5, "2026-08-30T16:00:00Z")];
     expect(checkFastRound(qs, WINDOW)).toBe("resolves_at is past the void deadline");
+  });
+  it("rejects an unparseable resolves_at instead of comparing against NaN", () => {
+    const qs = [q(1, "not-a-time"), q(2, RESOLVES_AFTER_LOCK), q(3, RESOLVES_AFTER_LOCK), q(4, RESOLVES_AFTER_LOCK), q(5, RESOLVES_AFTER_LOCK)];
+    expect(checkFastRound(qs, WINDOW)).toBe("resolves_at out of range");
   });
 });
 

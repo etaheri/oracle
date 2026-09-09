@@ -91,7 +91,16 @@ export function lockFromResolvesAt(resolvesAt: string, opensAt: Date, defaultLoc
   return t.getTime() < defaultLocksAt.getTime() ? t : defaultLocksAt;
 }
 
-export interface FastRoundWindow { lockAt: Date; fastBy: Date; voidAt: Date }
+export interface FastRoundWindow { fastBy: Date; voidAt: Date }
+
+// The two throws checkFastRound raises, shared with the callers that need to
+// recognize them by string (rerollSlot's error message, admin's BAD_DRAFT
+// allowlist) — one place naming each message instead of two literals that
+// could drift apart.
+export const FAST_ROUND_ERRORS = {
+  pastVoidDeadline: "resolves_at is past the void deadline",
+  slowNotBigOne: "only the big one may resolve after the evening",
+} as const;
 
 // The fast-round rule (design 2026-09-09 §1.1-1.2). A v2 round settles only
 // when its slowest question does, so one Sunday question holds the whole
@@ -107,10 +116,11 @@ export function checkFastRound(
   for (const q of questions) {
     if (q.resolves_at === RESOLVES_AFTER_LOCK) continue;
     const t = new Date(q.resolves_at).getTime();
-    if (t > window.voidAt.getTime()) return "resolves_at is past the void deadline";
+    if (Number.isNaN(t)) return "resolves_at out of range";
+    if (t > window.voidAt.getTime()) return FAST_ROUND_ERRORS.pastVoidDeadline;
     if (t > window.fastBy.getTime()) {
       slow += 1;
-      if (!q.is_big_one || slow > 1) return "only the big one may resolve after the evening";
+      if (!q.is_big_one || slow > 1) return FAST_ROUND_ERRORS.slowNotBigOne;
     }
   }
   return null;
@@ -125,7 +135,7 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
   if (rulesVersion >= 2) {
-    const fast = checkFastRound(draft.questions, { lockAt: locksAtDefault, fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
+    const fast = checkFastRound(draft.questions, { fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
     if (fast) throw new Error(fast);
   }
 

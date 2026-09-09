@@ -203,12 +203,14 @@ export async function authorRound(deps: PipelineDeps, date: string): Promise<voi
 function rerollSystemPrompt(date: string, slot: number, othersTexts: string, guidance: string, version = 1): string {
   const isBigOne = slot === 5;
   const lockDay = addDays(date, 1);
+  const fastByLabel = `${fastResolveBy(date).toISOString().slice(11, 16)}Z on ${lockDay}`;
+  const voidDayLabel = addDays(date, 2);
   return `You author a single replacement question for the ORACLE round dated ${date} (ET), slot ${slot}${isBigOne ? " (THE BIG ONE)" : ""}. Rules:
 - The question must be binary YES/NO in plain English, resolvable from ONE named public source.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. No gimmes.
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
 - THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. For every question, set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. Answers are closed automatically at that instant, so an honest resolves_at costs you nothing and a late one hands the answer to whoever plays last. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
-${version >= 2 ? `- Keep every outcome unknown through noon ET on ${lockDay}. WEATHER: the measurement period must begin after that common lock and end within the following 24 hours. Set resolves_at to its end; never use "after-lock" for weather.` : `- WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".`}
+${version >= 2 ? `- Keep this outcome unknown through noon ET on ${lockDay}, and then DECIDE FAST: give the instant, not "after-lock" — it must resolve by ${fastByLabel}, the same evening as the lock, and nothing may resolve later than noon ET on ${voidDayLabel}, or the round voids unseen. ${isBigOne ? "As THE BIG ONE, this replacement alone may run past the evening, to the next morning." : "This is NOT THE BIG ONE, so the replacement MUST resolve by the evening."} WEATHER: the measurement period must begin after that common lock and end within the following 24 hours. Set resolves_at to its end; never use "after-lock" for weather.` : `- WEATHER: the measurement period must begin after the round opens and its end must fall before noon ET on ${lockDay} — never ask about a period already underway, because half its answer already exists, and never one that runs past the round's own close. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".`}
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine.
 ${isBigOne ? "- This is THE BIG ONE: pick the day's most contested story from any category." : "- Pick a category different from the other four questions below."}
 Do not overlap these existing questions: ${othersTexts}
@@ -273,7 +275,7 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
         ? { slot, is_big_one: q.is_big_one, resolves_at: q.resolves_at }
         : { slot: s.slot, is_big_one: s.isBigOne, resolves_at: s.resolvesAt ? s.resolvesAt.toISOString() : RESOLVES_AFTER_LOCK },
     );
-    const fast = checkFastRound(merged, { lockAt: locksAtDefault, fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
+    const fast = checkFastRound(merged, { fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
     if (fast) throw new Error(`reroll: ${fast}`);
   }
 

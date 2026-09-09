@@ -5,7 +5,7 @@ import type { AppContext } from "../app";
 import { resolveQuestion, withdrawQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";
 import { schema } from "../db/client";
-import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft } from "../pipeline/draft";
+import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft, FAST_ROUND_ERRORS } from "../pipeline/draft";
 import { publish } from "../pipeline/actions";
 import { stampOracleForecast } from "../pipeline/forecast";
 import { makeTelegramClient } from "../pipeline/telegram";
@@ -134,8 +134,8 @@ export const adminRoutes = new Hono<AppContext>()
         "resolves_at out of range",
         "weather must lock before noon",
         "new rounds require the full common answering window",
-        "resolves_at is past the void deadline",
-        "only the big one may resolve after the evening",
+        FAST_ROUND_ERRORS.pastVoidDeadline,
+        FAST_ROUND_ERRORS.slowNotBigOne,
       ]);
       if (BAD_DRAFT.has(msg)) return c.json({ error: msg }, 400);
       return c.json({ error: "upsert failed" }, 500);
