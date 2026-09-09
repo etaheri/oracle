@@ -19,6 +19,7 @@ function fakeClaude(over: Partial<Record<string, unknown>> = {}) {
     market_prob: null,
     resolves_at: "2026-09-06T17:00:00Z",
     topic_key: `topic-${n}`,
+    forecast_point: n === 3 ? { lat: 40.78, lon: -73.97 } : null,
   }));
   const defaults: Record<string, unknown> = {
     candidate_round: { candidates },

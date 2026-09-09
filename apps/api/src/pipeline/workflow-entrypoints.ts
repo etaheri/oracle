@@ -21,7 +21,7 @@ import { NonRetryableError } from "cloudflare:workflows";
 import { buildPipelineDeps, type WorkerEnv } from "../worker";
 import { POLICY, type StepPolicy } from "./steps";
 import { BudgetExhausted, meterClaude, reportBudgetExhaustion } from "./spend";
-import { addDays, etNow, noonET } from "./clock";
+import { addDays, etNow, noonET, voidDeadline } from "./clock";
 import { emptyTally, screenCandidates, type Rejection } from "./candidate";
 import { gatherAuthoringContext, generateCandidates } from "./gauntlet/generate";
 import { checkSources } from "./gauntlet/sources";
@@ -141,6 +141,7 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
         rulesVersion: 2,
         opensAt,
         locksAtDefault,
+        voidAt: voidDeadline(date),
         recentTopicKeys: new Set(ctx.recentTopicKeys),
       }),
     );

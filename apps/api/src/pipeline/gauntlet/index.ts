@@ -16,7 +16,7 @@
 import { eq } from "drizzle-orm";
 import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
-import { addDays, noonET } from "../clock";
+import { addDays, noonET, voidDeadline } from "../clock";
 import { upsertDraft } from "../draft";
 import { emptyTally, screenCandidates, type RejectReason, type Rejection } from "../candidate";
 import { assessEditorial, type Edited } from "../editorial";
@@ -98,7 +98,7 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
   const locksAtDefault = noonET(addDays(date, 1));
 
   // Tier 0 — free.
-  const tier0 = screenCandidates(raw, { rulesVersion: 2, opensAt, locksAtDefault, recentTopicKeys: new Set(ctx.recentTopicKeys) });
+  const tier0 = screenCandidates(raw, { rulesVersion: 2, opensAt, locksAtDefault, voidAt: voidDeadline(date), recentTopicKeys: new Set(ctx.recentTopicKeys) });
   count(tier0.rejected);
 
   // Tier 1 — one GET each.

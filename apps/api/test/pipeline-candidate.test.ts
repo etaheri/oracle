@@ -105,6 +105,37 @@ describe("screenCandidates — tier 0", () => {
   });
 });
 
+describe("tier-0 at v2 — instants and the void deadline (design 2026-09-09 §1)", () => {
+  const voidAt = new Date("2026-09-06T16:00:00Z");
+  const v2 = { opensAt, locksAtDefault, rulesVersion: 2, voidAt, recentTopicKeys: none };
+
+  it("rejects after-lock at v2: the gauntlet must state the instant", () => {
+    const r = screenCandidates([cand({ resolves_at: RESOLVES_AFTER_LOCK, category: "news" })], v2);
+    expect(r.passed).toHaveLength(0);
+    expect(r.rejected[0]!.reason).toBe("structural");
+    expect(r.rejected[0]!.detail).toContain("instant");
+  });
+  it("rejects an instant past the void deadline as slow", () => {
+    const r = screenCandidates([cand({ resolves_at: "2026-09-07T12:00:00Z" })], v2);
+    expect(r.rejected[0]!.reason).toBe("slow");
+  });
+  it("passes an instant between the lock and the void deadline", () => {
+    const r = screenCandidates([cand({ resolves_at: "2026-09-05T20:00:00Z" })], v2);
+    expect(r.passed).toHaveLength(1);
+  });
+  it("requires forecast_point on weather and accepts it", () => {
+    const noPoint = screenCandidates([cand({ category: "weather", resolves_at: "2026-09-06T00:00:00Z", topic_key: "nyc-high" })], v2);
+    expect(noPoint.rejected[0]!.reason).toBe("structural");
+    const withPoint = screenCandidates([cand({ category: "weather", resolves_at: "2026-09-06T00:00:00Z", topic_key: "nyc-high-2", forecast_point: { lat: 40.78, lon: -73.97 } })], v2);
+    expect(withPoint.passed).toHaveLength(1);
+    expect(withPoint.passed[0]!.forecast_point).toEqual({ lat: 40.78, lon: -73.97 });
+  });
+  it("ignores forecast_point on a non-weather candidate without rejecting it", () => {
+    const r = screenCandidates([cand({ forecast_point: { lat: 1, lon: 1 }, resolves_at: "2026-09-05T20:00:00Z" })], v2);
+    expect(r.passed).toHaveLength(1);
+  });
+});
+
 describe("recentTopicKeys", () => {
   it("reads the last seven days and ignores older rounds and null keys", async () => {
     const { db } = await makeTestDb();

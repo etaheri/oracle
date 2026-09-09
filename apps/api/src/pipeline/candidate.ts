@@ -30,11 +30,19 @@ export const CandidateSchema = z
     // never "Will BTC close above $70,000 on Friday?".
     context: QuestionContextSchema.optional(),
     topic_key: z.string().min(3).max(64).regex(/^[a-z0-9-]+$/),
+    // Where to fetch the public forecast for a weather candidate (design
+    // 2026-09-09 §1.3). The critic is shown that forecast, because a line a
+    // forecast already clears by six degrees is not contested however the
+    // sentence reads. Required for weather; ignored elsewhere.
+    forecast_point: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).nullable().optional(),
   })
   .strict()
   .superRefine((q, ctx) => {
     if (q.category === "weather" && q.resolves_at === RESOLVES_AFTER_LOCK) {
       ctx.addIssue({ code: "custom", message: "weather must name a resolves_at instant", path: ["resolves_at"] });
+    }
+    if (q.category === "weather" && !q.forecast_point) {
+      ctx.addIssue({ code: "custom", message: "weather candidates must carry forecast_point", path: ["forecast_point"] });
     }
   });
 
@@ -48,6 +56,7 @@ export const REJECT_REASONS = [
   "ambiguous",
   "uncontested",
   "already-resolvable",
+  "slow",
   "taste",
   "editorial",
 ] as const;
@@ -76,7 +85,7 @@ function textOf(raw: unknown): string {
 
 export function screenCandidates(
   raw: unknown[],
-  opts: { opensAt: Date; locksAtDefault: Date; rulesVersion?: number; recentTopicKeys: ReadonlySet<string> },
+  opts: { opensAt: Date; locksAtDefault: Date; rulesVersion?: number; voidAt?: Date; recentTopicKeys: ReadonlySet<string> },
 ): Screened {
   const passed: Candidate[] = [];
   const rejected: Rejection[] = [];
@@ -96,20 +105,30 @@ export function screenCandidates(
     }
     const c = parsed.data;
 
-    if (c.resolves_at !== RESOLVES_AFTER_LOCK) {
+    const v2 = (opts.rulesVersion ?? 1) >= 2;
+    if (c.resolves_at === RESOLVES_AFTER_LOCK) {
+      if (v2) {
+        rejected.push({ text: c.text, reason: "structural", detail: "v2 candidates must state a resolution instant" });
+        continue;
+      }
+    } else {
       const t = new Date(c.resolves_at);
       if (Number.isNaN(t.getTime()) || t.getTime() <= opts.opensAt.getTime()) {
         rejected.push({ text: c.text, reason: "structural", detail: "resolves_at is at or before the round opens" });
         continue;
       }
-      if ((opts.rulesVersion ?? 1) < 2 && t.getTime() > opts.locksAtDefault.getTime()) {
+      if (!v2 && t.getTime() > opts.locksAtDefault.getTime()) {
         rejected.push({ text: c.text, reason: "structural", detail: "resolves_at runs past the round's own close" });
         continue;
       }
-    }
-
-    if ((opts.rulesVersion ?? 1) >= 2 && c.resolves_at !== RESOLVES_AFTER_LOCK && new Date(c.resolves_at).getTime() < opts.locksAtDefault.getTime()) {
-      rejected.push({ text: c.text, reason: "structural", detail: "the common answering window must stay open" }); continue;
+      if (v2 && t.getTime() < opts.locksAtDefault.getTime()) {
+        rejected.push({ text: c.text, reason: "structural", detail: "the common answering window must stay open" });
+        continue;
+      }
+      if (v2 && opts.voidAt && t.getTime() > opts.voidAt.getTime()) {
+        rejected.push({ text: c.text, reason: "slow", detail: "resolves after the void deadline; it would void unseen" });
+        continue;
+      }
     }
 
     if (seen.has(c.topic_key)) {

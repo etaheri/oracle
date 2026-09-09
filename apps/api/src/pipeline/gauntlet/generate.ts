@@ -6,7 +6,7 @@
 // the category spread are selection constraints applied to survivors, so that
 // a rejection in one category is substituted rather than re-authored.
 import type { PipelineDeps } from "../index";
-import { addDays } from "../clock";
+import { addDays, fastResolveBy } from "../clock";
 import { recentTopicKeys } from "../candidate";
 import { fetchMarketSignals, type MarketSignal } from "../feeds";
 import { loadQualityRows, qualityReport, questionQuality } from "../quality";
@@ -35,12 +35,19 @@ const candidateProperties = {
   resolves_at: {
     type: "string",
     description:
-      'ISO-8601 UTC instant at which this outcome first becomes publicly determinable from the named source, or the literal "after-lock" when nothing about it is knowable before the round locks.',
+      "ISO-8601 UTC instant at which this outcome first becomes publicly determinable from the named source: the final whistle, the close, the release time. Always an instant. Never the word after-lock.",
   },
   topic_key: {
     type: "string",
     description:
       'A normalized, lower-case, hyphenated subject key for what this question is ABOUT, never its wording: "btc-close-above-threshold", not "will-btc-close-above-70000-on-friday". Two questions about the same underlying subject must share a key even when their numbers differ.',
+  },
+  forecast_point: {
+    type: ["object", "null"],
+    description: "WEATHER ONLY: the latitude/longitude of the measuring station, so the public forecast can be fetched. Null for every other category.",
+    properties: { lat: { type: "number" }, lon: { type: "number" } },
+    required: ["lat", "lon"],
+    additionalProperties: false,
   },
 };
 
@@ -78,6 +85,8 @@ ${lines.join("\n")}
 
 function systemPrompt(date: string, recent: string, signals: MarketSignal[], scorecard: string): string {
   const lockDay = addDays(date, 1);
+  const fastByLabel = `${fastResolveBy(date).toISOString().slice(11, 16)}Z on ${lockDay}`;
+  const voidDayLabel = addDays(date, 2);
   return `You author CANDIDATE questions for ORACLE, a prediction game. Produce ${CANDIDATE_TARGET} yes/no candidates for the round dated ${date} (ET). The round opens at noon ET on ${date} and closes at noon ET on ${lockDay}.
 
 You are writing a SURPLUS on purpose. Every candidate you write is put through a gauntlet — an adversarial reader, a source check, and a resolver that tries to answer it tonight — and most nights several are thrown away. Do not write five careful questions; write ${CANDIDATE_TARGET} you would defend, and let the gauntlet choose. Do not assign slots, do not nominate a big one, and do not try to balance the categories: something else does all three from whatever survives.
@@ -85,13 +94,13 @@ You are writing a SURPLUS on purpose. Every candidate you write is put through a
 Rules for every candidate:
 - Binary YES/NO in plain English, resolvable from ONE named public source.
 - ONE CLAUSE. Never join two conditions with "and" or "or" — a compound question is the classic way for two careful readers to reach different answers, and it will be thrown out.
-- THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. Set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. A resolver will be run against your named source TONIGHT, and any candidate it can already answer is rejected. If nothing about the outcome is determinable before noon ET on ${lockDay}, set resolves_at to "after-lock".
-- Every question must remain unknowable until noon ET on ${lockDay}. Prefer events just after that lock, with results in the next 24 hours. Never use early-closing events just to deliver a noon result.
+- THE ANSWER MUST NOT EXIST WHILE PLAYERS CAN STILL ANSWER. Set resolves_at to the ISO-8601 UTC instant at which the outcome first becomes publicly determinable — the final whistle, the market's close, the moment the report is published. Always give the instant; "after-lock" is not accepted. A resolver will be run against your named source TONIGHT, and any candidate it can already answer is rejected.
+- Every question must remain unknowable until noon ET on ${lockDay}, and then DECIDE FAST. At least four of the five chosen will be questions that resolve by ${fastByLabel} — the same evening as the lock. Only the Big One may run to the next morning, and nothing may resolve later than noon ET on ${voidDayLabel}: a question that decides on Sunday voids unseen. Tonight's games, today's close, tomorrow morning's release. Never a weekend total on a Wednesday.
 - Genuinely contested: your own probability for YES must be between 0.30 and 0.70. An independent reader will state its own probability without seeing yours, and a candidate the two of you read very differently is rejected as ambiguous.
 - resolution_criteria must name the exact measurement and the exact source page. Zero ambiguity: a stranger must be able to resolve it identically.
 - source_url must be a real, reachable page. Every URL is fetched before the round is chosen, and one that does not answer is rejected.
 - topic_key is the SUBJECT, not the wording. A key used in the last seven days is rejected, so do not re-ask last week's question with a new number.
-- WEATHER: the measurement period must begin after noon ET on ${lockDay} and end within the following 24 hours. Set resolves_at to the end of the measurement period. Weather may never use "after-lock".
+- WEATHER: the measurement period must begin after noon ET on ${lockDay} and end the same evening. Set resolves_at to the end of the measurement period, and set forecast_point to the station's latitude and longitude. The public forecast will be fetched and shown to the reader who judges whether the question is contested — so set the line where the forecast is genuinely uncertain, never at a number today's forecast already clears.
 - FORBIDDEN: deaths, disasters, or tragedies as betting objects; private individuals; medical outcomes of named people; anything derogatory or that rewards hoping for harm. Public figures' professional outcomes are fine. A separate screen refuses these, and a refusal there costs the whole night.
 - Here is your own record in aggregate. It is the standard you are held to.
 ${scorecard}
