@@ -27,7 +27,13 @@ export interface Habit { hour: number; localHourOf: (ms: number) => number }
 
 // Scans hourly from the start of the window; the first instant whose local
 // hour matches is snapped to the top of that hour (UTC minutes, which is
-// also local minutes for any whole-hour-offset timezone) before use.
+// also local minutes for any whole-hour-offset timezone) before use. The
+// snap can shift the local hour when the lock itself isn't hour-aligned
+// (an early v1 lock) combined with a fractional-offset timezone (IST,
+// Newfoundland), so the hour is re-checked after snapping — a mismatch
+// falls through to the next sample. The default lead time is reachable
+// only when no whole hour in the window survives that re-check: a DST
+// spring-forward, or a non-hour-aligned lock in a fractional-offset zone.
 function habitualInstant(lockMs: number, habit: Habit): Date | null {
   const start = lockMs - HABIT_WINDOW_MS;
   const end = lockMs - HABIT_TAIL_MS;
@@ -35,7 +41,9 @@ function habitualInstant(lockMs: number, habit: Habit): Date | null {
     if (habit.localHourOf(t) !== habit.hour) continue;
     const snapped = new Date(t);
     snapped.setUTCMinutes(0, 0, 0);
-    if (snapped.getTime() >= start && snapped.getTime() <= end) return snapped;
+    if (snapped.getTime() < start || snapped.getTime() > end) continue;
+    if (habit.localHourOf(snapped.getTime()) !== habit.hour) continue;
+    return snapped;
   }
   return null;
 }

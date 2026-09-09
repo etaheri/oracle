@@ -86,6 +86,25 @@ describe("planReminders with a habitual hour (design 2026-09-09 §4.2)", () => {
     const without = planReminders(lock, "2026-09-10", 1).find((r) => r.kind === "noon")!;
     expect(withHabit.at.toISOString()).toBe(without.at.toISOString());
   });
+  // A non-hour-aligned lock (an early v1 lock can be ":15") combined with a
+  // fractional-offset timezone (IST is UTC+5:30) means the top-of-UTC-hour
+  // snap can shift the local hour away from the one that matched before the
+  // snap. The invariant must still hold for every closing reminder: either
+  // the chosen instant truly reads as the habitual local hour, or the
+  // default lead time stands.
+  it("re-checks the local hour after snapping, for a non-aligned lock in a fractional-offset zone", () => {
+    const skewedLock = "2026-09-11T16:15:00Z"; // 15 past — not hour-aligned
+    const istHour = (ms: number) => new Date(ms + 5.5 * 3_600_000).getUTCHours();
+    const habit = { hour: 20, localHourOf: istHour };
+    const out = planReminders(skewedLock, "2026-09-10", 0, 5, habit);
+    const lock0 = new Date(skewedLock).getTime();
+    out.filter((r) => r.kind === "closing").forEach((r, k) => {
+      const lockK = lock0 + k * 86_400_000;
+      const isDefault = r.at.getTime() === lockK - REMINDER_LEAD_MS;
+      const isHabitual = istHour(r.at.getTime()) === habit.hour;
+      expect(isDefault || isHabitual).toBe(true);
+    });
+  });
 });
 
 it("never invents future settlement, deadlines, or crowd activity", () => {
