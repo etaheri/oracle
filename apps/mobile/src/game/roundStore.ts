@@ -44,8 +44,11 @@ export const useRoundStore = create<RoundState>((set) => ({
       const existing = answers[p.question_id];
       // Server is the source of truth (Plan-3 carry-over): a server-known
       // prediction is sealed, and its answer/confidence overwrite any local
-      // draft or divergent replay.
+      // draft or divergent replay. `atSeal` is not this function's field —
+      // it's `setAtSeal`'s — so it survives untouched rather than getting
+      // dropped and waiting for the sibling mine.data effect to restore it.
       answers[p.question_id] = {
+        ...existing,
         answer: p.answer,
         confidence: p.confidence,
         sealed: true,

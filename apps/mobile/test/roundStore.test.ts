@@ -56,4 +56,11 @@ describe("hydrate", () => {
     useRoundStore.getState().hydrate([{ question_id: "q1", answer: true, confidence: 75 }]);
     expect(useRoundStore.getState().answers["q1"]!.idempotencyKey).toBe(key);
   });
+  it("preserves the crowd-at-seal snapshot across a later hydrate — hydrate does not own that field", () => {
+    useRoundStore.getState().setAnswer("q1", true);
+    useRoundStore.getState().markSealed("q1");
+    useRoundStore.getState().setAtSeal("q1", { pct: 40, count: 12 });
+    useRoundStore.getState().hydrate([{ question_id: "q1", answer: true, confidence: 75 }]);
+    expect(useRoundStore.getState().answers["q1"]).toMatchObject({ sealed: true, atSeal: { pct: 40, count: 12 } });
+  });
 });
