@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import { COPY_BANK, CONSTANTS, fillSlots, selectLine, type Requirement } from "@oracle/core";
 import { schema, type Db } from "../db/client";
 
@@ -124,4 +124,66 @@ export async function composeHingePushes(db: Db, date: string): Promise<HingePus
     if (line) out.push({ userId: u.id, externalIds, lineId: line.id, text: fillSlots(line.text, { n: wrong, streak: u.streakCurrent }) });
   }
   return out;
+}
+
+const RESOLVE = COPY_BANK.filter((l) => l.pool === "resolve");
+const HEADLINE_MAX = 70;
+
+export interface ResolutionPush {
+  userId: string;
+  predictionId: string;
+  externalIds: string[];
+  lineId: string;
+  text: string;
+}
+
+// The question, in the reader's register (sentence case, as authored), cut
+// to a headline. The caps line that follows is the push's own voice.
+export function headline(text: string): string {
+  const t = text.trim();
+  return t.length <= HEADLINE_MAX ? t : `${t.slice(0, HEADLINE_MAX - 1).trimEnd()}…`;
+}
+
+function signed(points: number | null): string {
+  if (points === null || points === 0) return "0";
+  return points > 0 ? `+${points}` : String(points);
+}
+
+// The trickle (design 2026-09-09 §2.1): one push per (player, question) the
+// moment a question resolves yes/no. THE CLAIM IS THE IDEMPOTENCY — one UPDATE
+// stamps resolve_pushed_at on every unclaimed row and returns exactly those,
+// so the hourly re-dispatch, a crashed step's replay, and two ticks racing
+// on the same question all compose each push at most once. State-based on
+// purpose: it reads the question's outcome, not a caller's "I just resolved
+// it" flag, so a resolve whose step never checkpointed still gets its push
+// on the next pass.
+export async function claimResolutionPushes(db: Db, questionId: string, now: Date): Promise<ResolutionPush[]> {
+  const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+  if (!q || q.outcome === null || q.outcome === "void") return [];
+
+  const claimed = await db
+    .update(schema.predictions)
+    .set({ resolvePushedAt: now })
+    .where(and(eq(schema.predictions.questionId, questionId), isNull(schema.predictions.resolvePushedAt)))
+    .returning();
+  if (claimed.length === 0) return [];
+
+  const userIds = [...new Set(claimed.map((p) => p.userId))];
+  const devices = await db.query.devices.findMany({ where: inArray(schema.devices.userId, userIds) });
+  const aliasesOf = new Map<string, string[]>();
+  for (const d of devices) aliasesOf.set(d.userId, [...(aliasesOf.get(d.userId) ?? []), d.id]);
+
+  const outcome = q.outcome === "yes" ? "YES" : "NO";
+  const head = headline(q.text);
+  return claimed.map((p) => {
+    const line = selectLine(RESOLVE, `${p.userId}:${questionId}`, ["outcome", "call", "points"])!;
+    const call = `${p.answer ? "YES" : "NO"} AT ${p.confidence}%`;
+    return {
+      userId: p.userId,
+      predictionId: p.id,
+      externalIds: aliasesOf.get(p.userId) ?? [],
+      lineId: line.id,
+      text: `${head} ${fillSlots(line.text, { outcome, call, points: signed(p.points) })}`,
+    };
+  });
 }

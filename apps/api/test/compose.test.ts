@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { resolveQuestion } from "../src/resolution";
 import { settleRound } from "../src/settlement";
 import { COPY_BANK as COPY } from "@oracle/core";
-import { composeHingePushes } from "../src/push/compose";
+import { schema } from "../src/db/client";
+import { composeHingePushes, claimResolutionPushes } from "../src/push/compose";
 import { sendPushes } from "../src/push/onesignal";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
@@ -206,6 +208,82 @@ describe("the lapsed line fires once per lapse, never daily", () => {
 
     const lapsed = (await composeHingePushes(db, "2026-08-21")).filter((p) => p.lineId.startsWith("noon.lapsed"));
     expect(lapsed).toHaveLength(1); // the returning player only, never the stranger
+  });
+});
+
+describe("claimResolutionPushes (design 2026-09-09 §2.1)", () => {
+  async function seeded() {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const a = await player(app);
+    const b = await player(app);
+    const qs = await seedRound(db, { date: "2026-09-12", opensAt: new Date("2026-09-12T16:00:00Z"), locksAt: new Date("2026-09-13T16:00:00Z") });
+    await db.insert(schema.predictions).values([
+      { questionId: qs[0]!.id, userId: a.userId, answer: true, confidence: 75 },
+      { questionId: qs[0]!.id, userId: b.userId, answer: false, confidence: 60 },
+      { questionId: qs[1]!.id, userId: a.userId, answer: true, confidence: 55 },
+    ]);
+    return { db, qs, a, b };
+  }
+
+  it("returns nothing for an unresolved question and claims nothing", async () => {
+    const { db, qs } = await seeded();
+    expect(await claimResolutionPushes(db, qs[0]!.id, new Date())).toEqual([]);
+    const rows = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, qs[0]!.id) });
+    expect(rows.every((r) => r.resolvePushedAt === null)).toBe(true);
+  });
+
+  it("composes one push per answering player with outcome, call and signed points, and stamps the claim", async () => {
+    const { db, qs, a, b } = await seeded();
+    await resolveQuestion(db, qs[0]!.id, "yes");
+    const now = new Date("2026-09-13T20:00:00Z");
+    const pushes = await claimResolutionPushes(db, qs[0]!.id, now);
+    expect(pushes).toHaveLength(2);
+    const mine = pushes.find((p) => p.userId === a.userId)!;
+    expect(mine.text).toContain("YES");
+    expect(mine.text).toContain("YES AT 75%");
+    expect(mine.text).toMatch(/\+\d+\./);
+    expect(mine.externalIds).toEqual([a.deviceId]);
+    expect(mine.lineId.startsWith("resolve.")).toBe(true);
+    expect(mine.text).not.toMatch(/[{}]/);
+    const theirs = pushes.find((p) => p.userId === b.userId)!;
+    expect(theirs.text).toContain("NO AT 60%");
+    expect(theirs.text).toMatch(/-\d+\./);
+    const rows = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, qs[0]!.id) });
+    expect(rows.every((r) => r.resolvePushedAt?.toISOString() === now.toISOString())).toBe(true);
+  });
+
+  it("is idempotent: a second claim returns nothing", async () => {
+    const { db, qs } = await seeded();
+    await resolveQuestion(db, qs[0]!.id, "yes");
+    expect(await claimResolutionPushes(db, qs[0]!.id, new Date())).toHaveLength(2);
+    expect(await claimResolutionPushes(db, qs[0]!.id, new Date())).toEqual([]);
+  });
+
+  it("never pushes a void, and leaves the claim unset so nothing later mistakes it for sent", async () => {
+    const { db, qs } = await seeded();
+    await resolveQuestion(db, qs[0]!.id, "void", { reason: "test" });
+    expect(await claimResolutionPushes(db, qs[0]!.id, new Date())).toEqual([]);
+    const rows = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, qs[0]!.id) });
+    expect(rows.every((r) => r.resolvePushedAt === null)).toBe(true);
+  });
+
+  it("truncates a long question to a 70-char headline and keeps the whole text under 160", async () => {
+    const { db, qs } = await seeded();
+    await db.update(schema.questions).set({ text: "Will the S&P 500 close higher on Thursday, September 10 than it closed on Wednesday, September 9, per S&P Dow Jones Indices?" }).where(eq(schema.questions.id, qs[0]!.id));
+    await resolveQuestion(db, qs[0]!.id, "no");
+    const [p] = await claimResolutionPushes(db, qs[0]!.id, new Date());
+    expect(p!.text.length).toBeLessThanOrEqual(160);
+    expect(p!.text).toContain("…");
+  });
+
+  it("selects the line deterministically per user and question", async () => {
+    const { db, qs } = await seeded();
+    await resolveQuestion(db, qs[0]!.id, "yes");
+    const first = await claimResolutionPushes(db, qs[0]!.id, new Date());
+    await db.update(schema.predictions).set({ resolvePushedAt: null }).where(eq(schema.predictions.questionId, qs[0]!.id));
+    const second = await claimResolutionPushes(db, qs[0]!.id, new Date());
+    expect(second.map((p) => p.lineId)).toEqual(first.map((p) => p.lineId));
   });
 });
 
