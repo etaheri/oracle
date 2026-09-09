@@ -50,6 +50,11 @@ export const roundRoutes = new Hono<AppContext>()
         context: q.context,
         locks_at: q.locksAt.toISOString(),
         lock_healed: q.lockHealedAt !== null,
+        // Struck for everyone (v2): healed by the probe OR withdrawn by the
+        // operator. The client gates the required set on this; lock_healed
+        // above stays probe-only so the leak analytics keep their meaning.
+        struck: q.lockHealedAt !== null || q.withdrawnAt !== null,
+        struck_reason: q.lockHealedAt !== null || q.withdrawnAt !== null ? (evidenceSummary(q.resolutionEvidence).reason ?? null) : null,
       })),
     });
   })

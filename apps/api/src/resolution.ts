@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { brier, questionPoints } from "@oracle/core";
+import { brier, questionPoints, PIPELINE_LINES } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 // Statuses a fresh resolution may write over. `open` is allowed because the
@@ -64,4 +64,34 @@ export function evidenceSummary(evidence: unknown): { quote: string | null; quot
     }
   }
   return { ...empty, reason };
+}
+
+export type WithdrawalReason = "misauthored" | "unresolvable";
+
+const WITHDRAWAL_LINE: Record<WithdrawalReason, string> = {
+  misauthored: PIPELINE_LINES.withdrawnMisauthored,
+  unresolvable: PIPELINE_LINES.withdrawnUnresolvable,
+};
+
+// Editorial withdrawal (design 2026-09-09 §1.4). The operator strikes a live
+// question with a TRUE reason. The lock moves to now so no further seal can
+// land, withdrawn_at marks it (distinct from lock_healed_at, which only the
+// probe writes when an answer leaked), and the void goes through
+// resolveQuestion so every prediction is zeroed exactly the way any other
+// void is. Idempotent by the status guard: a retry after the write sees
+// "already withdrawn".
+export async function withdrawQuestion(db: Db, questionId: string, reason: WithdrawalReason, now: Date): Promise<{ remaining: number }> {
+  const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+  if (!q) throw new Error("question not found");
+  if (q.withdrawnAt) throw new Error("already withdrawn");
+  if (!FRESH.has(q.status)) throw new Error("not withdrawable");
+
+  await db.update(schema.questions)
+    .set({ locksAt: q.locksAt.getTime() < now.getTime() ? q.locksAt : now, withdrawnAt: now })
+    .where(eq(schema.questions.id, questionId));
+  await resolveQuestion(db, questionId, "void", { reason: WITHDRAWAL_LINE[reason], withdrawn: true, checked_at: now.toISOString() });
+
+  const siblings = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, q.roundDate) });
+  const remaining = siblings.filter((s) => s.id !== questionId && s.status !== "void" && !s.withdrawnAt).length;
+  return { remaining };
 }

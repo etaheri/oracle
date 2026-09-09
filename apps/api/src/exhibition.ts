@@ -25,7 +25,7 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
     const provenance = provenanceByDate.get(question.roundDate);
     if (!provenance?.oracleCommittedAt || !Array.isArray(provenance.oracleForecastSnapshot)) continue;
     if (provenance.oracleCommittedAt.getTime() > question.opensAt.getTime()) continue;
-    if (question.lockHealedAt !== null) continue;
+    if (question.lockHealedAt !== null || question.withdrawnAt !== null) continue;
     if (question.outcome !== "yes" && question.outcome !== "no") continue;
     if (typeof question.oracleProbYes !== "string" && typeof question.oracleProbYes !== "number") continue;
     const oraclePYes = Number(question.oracleProbYes);

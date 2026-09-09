@@ -373,3 +373,28 @@ describe("POST /admin/rounds/:date/forecast", () => {
     expect((await res.json() as { error: string }).error).toMatch(/claude/i);
   });
 });
+
+describe("POST /admin/questions/:id/withdraw (design 2026-09-09 §1.4)", () => {
+  it("withdraws with the admin secret and returns the remaining count", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    const res = await app.request(`/admin/questions/${qs[3]!.id}/withdraw`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-secret": "admin" },
+      body: JSON.stringify({ reason: "unresolvable" }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, remaining: 4 });
+  });
+  it("400s a bad reason, 404s an unknown id, 409s a second withdrawal", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    const post = (id: string, body: unknown) => app.request(`/admin/questions/${id}/withdraw`, { method: "POST", headers: { "content-type": "application/json", "x-admin-secret": "admin" }, body: JSON.stringify(body) });
+    expect((await post(qs[0]!.id, { reason: "because" })).status).toBe(400);
+    expect((await post("00000000-0000-0000-0000-000000000000", { reason: "misauthored" })).status).toBe(404);
+    expect((await post(qs[0]!.id, { reason: "misauthored" })).status).toBe(200);
+    expect((await post(qs[0]!.id, { reason: "misauthored" })).status).toBe(409);
+  });
+});

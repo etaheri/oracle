@@ -115,6 +115,12 @@ describe("selectExhibition", () => {
     expect((await selectExhibition(db))?.id).toBe(questions[1]!.id);
   });
 
+  it("never exhibits a withdrawn question", async () => {
+    const questions = await resolvedRound(db, "2099-08-20");
+    await db.update(schema.questions).set({ withdrawnAt: new Date("2099-08-20T16:30:00Z") }).where(eq(schema.questions.id, questions[0]!.id));
+    expect((await selectExhibition(db))?.id).toBe(questions[1]!.id);
+  });
+
   it("excludes pending, live, void, malformed-context, and missing-forecast records while accepting 0.5", async () => {
     await seedRound(db, { date: "2099-08-24", opensAt: new Date("2099-08-24T16:00:00Z"), locksAt: new Date("2099-08-25T16:00:00Z") });
     const voided = await resolvedRound(db, "2099-08-23");

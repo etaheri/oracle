@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
-import { resolveQuestion, evidenceSummary } from "../src/resolution";
+import { resolveQuestion, evidenceSummary, withdrawQuestion } from "../src/resolution";
+import { PIPELINE_LINES } from "@oracle/core";
 import * as schema from "../src/db/schema";
 
 describe("resolveQuestion guard", () => {
@@ -37,5 +38,36 @@ describe("evidenceSummary", () => {
     expect(evidenceSummary(null)).toEqual({ quote: null, quoteUrl: null, reason: null });
     expect(evidenceSummary("junk")).toEqual({ quote: null, quoteUrl: null, reason: null });
     expect(evidenceSummary({ quotes: "nope" })).toEqual({ quote: null, quoteUrl: null, reason: null });
+  });
+});
+
+describe("withdrawQuestion (design 2026-09-09 §1.4)", () => {
+  it("closes the lock, marks withdrawn, voids with the honest reason, zeroes predictions", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    await db.update(schema.rounds).set({ rulesVersion: 2 }).where(eq(schema.rounds.date, "2026-09-09"));
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ userId: u!.id, questionId: qs[2]!.id, answer: true, confidence: 70 });
+    const now = new Date("2026-09-09T20:00:00Z");
+    const { remaining } = await withdrawQuestion(db, qs[2]!.id, "misauthored", now);
+    expect(remaining).toBe(4);
+    const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, qs[2]!.id) });
+    expect(q!.status).toBe("void");
+    expect(q!.outcome).toBe("void");
+    expect(q!.withdrawnAt?.toISOString()).toBe(now.toISOString());
+    expect(q!.locksAt.toISOString()).toBe(now.toISOString());
+    expect(q!.lockHealedAt).toBeNull();
+    expect((q!.resolutionEvidence as { reason: string }).reason).toBe(PIPELINE_LINES.withdrawnMisauthored);
+    const p = await db.query.predictions.findFirst({ where: eq(schema.predictions.questionId, qs[2]!.id) });
+    expect(p!.points).toBe(0);
+    expect(p!.brier).toBeNull();
+  });
+  it("refuses a second withdrawal and a resolved question", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    await withdrawQuestion(db, qs[0]!.id, "unresolvable", new Date("2026-09-09T20:00:00Z"));
+    await expect(withdrawQuestion(db, qs[0]!.id, "unresolvable", new Date())).rejects.toThrow("already withdrawn");
+    await resolveQuestion(db, qs[1]!.id, "yes");
+    await expect(withdrawQuestion(db, qs[1]!.id, "misauthored", new Date())).rejects.toThrow("not withdrawable");
   });
 });

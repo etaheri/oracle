@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { eq, asc, gte } from "drizzle-orm";
 import type { AppContext } from "../app";
-import { resolveQuestion } from "../resolution";
+import { resolveQuestion, withdrawQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";
 import { schema } from "../db/client";
 import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft } from "../pipeline/draft";
@@ -69,6 +69,22 @@ export const adminRoutes = new Hono<AppContext>()
       if (q) rescored = (await resettleRound(db, q.roundDate)).users;
     }
     return c.json({ ok: true, rescored });
+  })
+  // Honest withdrawal (design 2026-09-09 §1.4): an operator strikes a live
+  // question with a TRUE reason, distinct from the probe's leak-heal. Every
+  // prediction on it zeroes exactly the way any other void does.
+  .post("/questions/:id/withdraw", async (c) => {
+    const parsed = z.object({ reason: z.enum(["misauthored", "unresolvable"]) }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    try {
+      const out = await withdrawQuestion(c.get("deps").db, c.req.param("id"), parsed.data.reason, new Date());
+      return c.json({ ok: true, remaining: out.remaining });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "withdraw failed";
+      if (msg === "question not found") return c.json({ error: msg }, 404);
+      if (msg === "already withdrawn" || msg === "not withdrawable") return c.json({ error: msg }, 409);
+      return c.json({ error: "withdraw failed" }, 500);
+    }
   })
   .patch("/questions/:id", async (c) => {
     const parsed = PatchQuestionSchema.safeParse(await c.req.json().catch(() => null));

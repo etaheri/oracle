@@ -3,8 +3,8 @@ import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { and, eq, ne } from "drizzle-orm";
-import { CONSTANTS } from "@oracle/core";
-import { resolveQuestion } from "../src/resolution";
+import { CONSTANTS, PIPELINE_LINES } from "@oracle/core";
+import { resolveQuestion, withdrawQuestion } from "../src/resolution";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -499,5 +499,27 @@ describe("/today says which locks were healed (design 2026-09-04 §11.2)", () =>
     await db.update(schema.questions).set({ lockHealedAt: new Date() }).where(eq(schema.questions.id, qs[0]!.id));
     const body = (await (await call("/v1/round/today")).json()) as { questions: Array<{ id: string; lock_healed: boolean }> };
     expect(body.questions.filter((q) => q.lock_healed).map((q) => q.id)).toEqual([qs[0]!.id]);
+  });
+  it("reports struck + struck_reason for a withdrawn question, with lock_healed still false", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const call = await player(app);
+    const qs = await seedOpenRoundNow(db);
+    await withdrawQuestion(db, qs[1]!.id, "misauthored", new Date());
+    const body = (await (await call("/v1/round/today")).json()) as { questions: Array<{ id: string; lock_healed: boolean; struck: boolean; struck_reason: string | null }> };
+    const w = body.questions.find((q) => q.id === qs[1]!.id)!;
+    expect(w.lock_healed).toBe(false);
+    expect(w.struck).toBe(true);
+    expect(w.struck_reason).toBe(PIPELINE_LINES.withdrawnMisauthored);
+    expect(body.questions.filter((q) => q.id !== w.id).every((q) => q.struck === false && q.struck_reason === null)).toBe(true);
+  });
+  it("reports struck for a probe-healed question too", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const call = await player(app);
+    const qs = await seedOpenRoundNow(db);
+    await db.update(schema.questions).set({ lockHealedAt: new Date() }).where(eq(schema.questions.id, qs[0]!.id));
+    const body = (await (await call("/v1/round/today")).json()) as { questions: Array<{ id: string; struck: boolean }> };
+    expect(body.questions.find((q) => q.id === qs[0]!.id)!.struck).toBe(true);
   });
 });
