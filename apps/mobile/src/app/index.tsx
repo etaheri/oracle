@@ -23,6 +23,7 @@ import { useHeroCues } from "../ui/useHeroCues";
 import { shieldNotice } from "../game/shieldNotice";
 import { rescueOffered } from "../game/rescueOffer";
 import { readingSlot } from "../game/readingSlot";
+import { homeDates } from "../game/homeDates";
 import { riskLine, lapseNotice } from "../game/homeLines";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
 import { beginHomeAction, invalidateHomeAction, ownsHomeAction, type HomeActionGate } from "../game/homeActionGate";
@@ -66,11 +67,6 @@ function callSlotHeight(scale: number) {
   return scaledRow(ROW_H.line, scale) * 2 + space(3) + Math.ceil(48 * scale);
 }
 
-function yesterdayOf(date: string | undefined): string {
-  const base = date ? new Date(`${date}T00:00:00Z`) : new Date();
-  return new Date(base.getTime() - 86_400_000).toISOString().slice(0, 10);
-}
-
 export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
@@ -106,8 +102,12 @@ export default function Index() {
   // open) here — not on every 30s re-render from the risk-line clock below.
   const openedFor = useRef<string | null>(null);
   const ledger = useMeLedger();
-  const yesterday = ledger.data?.reading?.date ?? yesterdayOf(round?.date);
-  const reveal = useReveal(yesterday);
+  // Two different "yesterdays" (homeDates.ts, audit finding A): the shield
+  // and lapse notices mean CALENDAR yesterday — shield_used_on is the date
+  // NOT played, so it can never equal the reading round's own date — while
+  // the rail item and the slot CTA want the ledger's own reading date.
+  const { calendarYesterday, ledgerDate } = homeDates(ledger.data?.reading?.date, round?.date);
+  const reveal = useReveal(calendarYesterday);
   const playedYesterday = reveal.data && !("pending" in reveal.data) ? reveal.data.questions.some((q) => q.my !== null) : null;
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
   const [ritesSeen, setRitesSeen] = useState<boolean | undefined>(undefined);
@@ -166,12 +166,12 @@ export default function Index() {
     }
   }, [arrival.kind, round]);
   const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
-  const shield = shieldNotice(ledger.data?.shield_used_on ?? null, yesterday);
+  const shield = shieldNotice(ledger.data?.shield_used_on ?? null, calendarYesterday);
   // Re-evaluated every 30s so the risk line can appear without a remount —
   // Home never remounts under the Stack (see the focus effect above).
   const now = useNow(30_000);
   const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
-  const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${yesterday}`);
+  const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${calendarYesterday}`);
   // The summons only ever fires after a seal, so a reader who answers nothing
   // is never asked for permission — and is exactly who a reminder is for.
   // This is that reader's only door; see game/reminderOffer.ts.
@@ -314,7 +314,7 @@ export default function Index() {
   // already the screen's headline action.
   const navItems: NavItem[] = [
     { label: "YOUR LEDGER", a11yLabel: "The forecaster's ledger", onPress: () => leaveHome(() => router.push("/ledger")) },
-    ...(showLedgerCta ? [] : [{ label: READING_LINES.rail, a11yLabel: "Your latest ledger", onPress: () => leaveHome(() => router.push(`/reveal/${yesterday}`)) }]),
+    ...(showLedgerCta ? [] : [{ label: READING_LINES.rail, a11yLabel: "Your last round", onPress: () => leaveHome(() => router.push(`/reveal/${ledgerDate}`)) }]),
     { label: GAME_TERMS.rulesNav.toUpperCase(), a11yLabel: GAME_TERMS.rulesNav, onPress: () => leaveHome(() => router.push({ pathname: "/rites", params: { all: "1" } })) },
   ];
 

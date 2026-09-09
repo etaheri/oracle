@@ -310,7 +310,7 @@ export const READING_LINES = Object.freeze({
   inPlayCta: "SEE WHAT IS DECIDED",
   settled: "THE LEDGER IS READ",
   settledCta: "READ THE LEDGER",
-  rail: "LEDGER",
+  rail: "LAST ROUND",
 } as const);
 
 export function inPlayLine(decided: number, pending: number): string {

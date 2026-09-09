@@ -14,6 +14,9 @@ describe("readingSlot (design 2026-09-09 §2.2, §3.1)", () => {
   it("is none for a locked round with nothing decided yet", () => {
     expect(readingSlot({ date: "2026-09-09", settled: false, decided: 0, total: 5 }, null)).toEqual({ kind: "none" });
   });
+  it("is none once every question is decided but the round has not yet settled (settle lands within a tick)", () => {
+    expect(readingSlot({ date: "2026-09-09", settled: false, decided: 5, total: 5 }, null)).toEqual({ kind: "none" });
+  });
   it("is settled until the reveal has been seen", () => {
     expect(readingSlot({ date: "2026-09-09", settled: true, decided: 5, total: 5 }, "2026-09-08")).toEqual({
       kind: "settled", date: "2026-09-09", line: "THE LEDGER IS READ", cta: "READ THE LEDGER",
