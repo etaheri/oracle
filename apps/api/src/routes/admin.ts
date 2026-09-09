@@ -7,6 +7,7 @@ import { settleRound, resettleRound } from "../settlement";
 import { schema } from "../db/client";
 import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft } from "../pipeline/draft";
 import { publish } from "../pipeline/actions";
+import { stampOracleForecast } from "../pipeline/forecast";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
 import { pooledLeak, loadLeakRows, type SealRow } from "../pipeline/leak";
@@ -157,6 +158,35 @@ export const adminRoutes = new Hono<AppContext>()
     if (existing) return c.json({ error: "round already exists" }, 409);
     await pipeline.workflows.start(pipeline, "author", `author-${date}-manual-${Date.now()}`, { date });
     return c.json({ ok: true, date });
+  })
+  // Stamp the Oracle's forecast for a date, by hand.
+  //
+  // decideActions gives this exactly one automatic window — hour 9..11 with
+  // minute < 10 — and stampOracleForecast refuses once the round has opened,
+  // because a machine that forecasts a round players can already see is not
+  // forecasting. A round seeded outside that window therefore had no way to
+  // ever get a commitment, and played out as a v2 round whose reveal says
+  // "No complete Oracle forecast": scored, but with no duel, which is the
+  // premise the whole app is built on.
+  //
+  // Idempotent, because stampOracleForecast returns early on an already
+  // committed round — so this is safe to run without first knowing whether
+  // the cron got there.
+  .post("/rounds/:date/forecast", async (c) => {
+    const pipeline = c.get("deps").pipeline;
+    if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
+    const date = c.req.param("date");
+    const round = await c.get("deps").db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+    if (!round) return c.json({ error: "unknown round" }, 404);
+    try {
+      await stampOracleForecast(pipeline, date);
+      return c.json({ ok: true, date });
+    } catch (e) {
+      // Every refusal here is a statement about the round's state — already
+      // open, deadline passed, no client, wrong slots — and the caller can act
+      // on all of them. A 500 would say only that something went wrong.
+      return c.json({ error: e instanceof Error ? e.message : "forecast failed" }, 409);
+    }
   })
   .post("/rounds/:date/publish", async (c) => {
     const db = c.get("deps").db;

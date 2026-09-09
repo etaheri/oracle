@@ -339,3 +339,37 @@ describe("POST /admin/rounds/:date?rules_version=2", () => {
     expect(await res.json()).toEqual({ error: "rules_version must be 1 or 2" });
   });
 });
+
+describe("POST /admin/rounds/:date/forecast", () => {
+  // The Oracle's commitment has exactly one automatic window: hour 9..11 with
+  // minute < 10, and stampOracleForecast refuses once the round has opened.
+  // A round seeded by hand at 11:15 therefore has no way to ever get one, and
+  // silently plays out as "No complete Oracle forecast" — a v2 round with no
+  // duel, which is the whole premise missing. This is the manual door.
+  it("503s when the pipeline isn't configured", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-09/forecast", { method: "POST" });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "pipeline not configured" });
+  });
+
+  it("404s a date with no round", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env, pipeline: fakePipeline(db, "2026-09-09T15:00:00Z") });
+    const res = await admin(app)("/admin/rounds/2026-09-09/forecast", { method: "POST" });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "unknown round" });
+  });
+
+  it("reports why the stamp was refused instead of 500ing", async () => {
+    // fakePipeline has claude: null, which stampOracleForecast rejects — the
+    // same shape as "round already opened" or a passed deadline.
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-09-09", validDraft, 2);
+    const app = createApp({ db, env, pipeline: fakePipeline(db, "2026-09-09T15:00:00Z") });
+    const res = await admin(app)("/admin/rounds/2026-09-09/forecast", { method: "POST" });
+    expect(res.status).toBe(409);
+    expect((await res.json() as { error: string }).error).toMatch(/claude/i);
+  });
+});
