@@ -115,6 +115,12 @@ export const predictions = pgTable("predictions", {
   firstHour: boolean("first_hour").notNull().default(false),
   brier: numeric("brier"),
   points: integer("points"),
+  // When this prediction's resolution push was claimed (design 2026-09-09
+  // §2.1). Claimed by ONE atomic UPDATE … WHERE resolve_pushed_at IS NULL
+  // RETURNING, so a retried tick composes nothing for rows already claimed.
+  // Null forever for predictions on void questions and on rounds that
+  // predate the column.
+  resolvePushedAt: timestamp("resolve_pushed_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId), index("predictions_user_idx").on(t.userId)]);
 
 // Oracle Plus entitlements (backend spec L55). Written by the RevenueCat

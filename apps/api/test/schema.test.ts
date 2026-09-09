@@ -119,3 +119,18 @@ describe("migration 0007", () => {
     expect(row!.calls).toBe(3);
   });
 });
+
+describe("migration 0012", () => {
+  it("leaves resolve_pushed_at null on a fresh prediction (design 2026-09-09 §2.1)", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-09-12" });
+    const [q] = await db.insert(schema.questions).values({
+      roundDate: "2026-09-12", slot: 1, text: "Will it?", category: "news",
+      resolutionCriteria: "per test", sourceName: "SRC",
+      opensAt: new Date("2026-09-12T16:00:00Z"), locksAt: new Date("2026-09-13T16:00:00Z"), resolveBy: new Date("2026-09-13T17:00:00Z"),
+    }).returning();
+    const [u] = await db.insert(schema.users).values({}).returning();
+    const [p] = await db.insert(schema.predictions).values({ questionId: q!.id, userId: u!.id, answer: true, confidence: 70 }).returning();
+    expect(p!.resolvePushedAt).toBeNull();
+  });
+});

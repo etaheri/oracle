@@ -1,0 +1,1 @@
+ALTER TABLE "predictions" ADD COLUMN "resolve_pushed_at" timestamp with time zone;
