@@ -12,6 +12,12 @@ import { fetchMarketSignals, type MarketSignal } from "../feeds";
 import { loadQualityRows, qualityReport, questionQuality } from "../quality";
 import { recentQuestionDigest } from "../author";
 
+// Room for the set plus the thinking that produces it. A candidate carries
+// two prose fields (text, resolution_criteria) and twelve short ones, so the
+// JSON alone runs a few hundred tokens each; adaptive thinking at "medium"
+// draws from the same allowance.
+export const CANDIDATE_MAX_TOKENS = 32000;
+
 export const CANDIDATE_MIN = 12;
 export const CANDIDATE_TARGET = 14;
 export const CANDIDATE_MAX = 15;
@@ -143,6 +149,12 @@ export async function generateCandidates(
     // and safe here because the author model is Opus 5 (design 2026-09-08 §4.7).
     webSearch: { maxUses: 5 },
     effort: "medium",
+    // The budget has to hold the thinking AND the whole candidate set:
+    // CANDIDATE_MAX candidates of fourteen fields each, two of them prose.
+    // At the client's 8000 default this turn spent two minutes on Opus 5,
+    // stopped at max_tokens before emitting one input_json_delta, and — until
+    // the client learned to say so — reported it as "0 candidates".
+    maxTokens: CANDIDATE_MAX_TOKENS,
   });
 
   const list = (response as { candidates?: unknown }).candidates;

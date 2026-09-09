@@ -27,6 +27,13 @@ export interface StructuredCall {
    * their model supports it may set it.
    */
   effort?: "low" | "medium" | "high" | "xhigh" | "max";
+  /**
+   * OPT-IN, defaulting to DEFAULT_MAX_TOKENS. One budget covers the thinking
+   * AND the tool input, so a call that asks for a large structured answer has
+   * to say so: the authoring call wants fourteen candidates of fourteen
+   * fields, and at 8000 the turn ran out before emitting any of the input.
+   */
+  maxTokens?: number;
 }
 export interface ClaudeClient { structured(call: StructuredCall): Promise<unknown> }
 
@@ -55,6 +62,11 @@ function buildTools(call: StructuredCall): Record<string, unknown>[] {
   }
   return tools;
 }
+
+// Enough for every short structured answer in the pipeline — a resolution
+// verdict, a critic's rubric, a taste score. The authoring call is the one
+// that needs more, and asks for it.
+const DEFAULT_MAX_TOKENS = 8000;
 
 function extractStructuredOutput(content: unknown[], schemaName: string): unknown | undefined {
   let found: unknown | undefined;
@@ -119,7 +131,24 @@ function applyEvent(
     }
     case "content_block_stop": {
       const entry = blocks.get(ev.index);
-      if (!entry || !entry.partialJson) break;
+      if (!entry) break;
+      // Only the schema tool is checked. `web_search_tool_result` blocks
+      // arrive whole and carry no input_json_delta at all, so an empty
+      // partialJson is normal for them and must stay normal.
+      if (entry.block.type !== "tool_use") break;
+      if (!entry.partialJson) {
+        // A tool_use block that opened and never received its input.
+        //
+        // content_block_start carries `input: {}` and the shallow copy above
+        // keeps it, so breaking here left a well-formed, empty tool call —
+        // which is not undefined, so structured()'s "no structured output"
+        // guard never fired, and the caller read its own key off {} and got
+        // nothing. On 2026-09-09 that turned an authoring turn which stopped
+        // at max_tokens into a cheerful "0 candidates, rejected: none" and a
+        // workflow that exited Completed. Absence must be as loud as
+        // corruption: both mean the model did not answer.
+        throw new Error("claude: tool input never arrived (turn ended before the input was sent)");
+      }
       try {
         entry.block.input = JSON.parse(entry.partialJson);
       } catch {
@@ -230,7 +259,7 @@ export function makeClaudeClient(
           },
           body: JSON.stringify({
             model: call.model,
-            max_tokens: 8000,
+            max_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
             system: call.system,
             messages,
             tools,

@@ -215,3 +215,77 @@ describe("makeClaudeClient", () => {
     await expect(makeClaudeClient("key", fn).structured(call)).rejects.toThrow("not valid JSON");
   });
 });
+
+describe("a tool input that never arrived", () => {
+  // The gauntlet ran on prod at 2026-09-09 10:39, burned two minutes of real
+  // Opus 5 work, reported "0 candidates → 0 published, rejected: none", and
+  // exited ✅ Completed. Nothing threw and nothing retried.
+  //
+  // The turn had stopped at max_tokens before emitting a single
+  // input_json_delta. content_block_start for a tool_use carries `input: {}`
+  // (see helpers/sse.ts), the shallow copy keeps it, and content_block_stop
+  // bailed on `!entry.partialJson` without ever replacing it — so the client
+  // handed back {}. That is not undefined, so structured()'s "no structured
+  // output" guard never fired, and generateCandidates read `.candidates` off
+  // an empty object and returned [].
+  //
+  // 7dd4b68 meant a truncated input to throw. It covered partialJson that
+  // will not PARSE; this is partialJson that never came.
+  const startedButNeverFilled = (stopReason: string) =>
+    sse([
+      { type: "message_start", message: { usage: { input_tokens: 9, output_tokens: 0 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "…" } },
+      { type: "content_block_stop", index: 0 },
+      // The schema tool opens, and the budget runs out before its input.
+      { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "t1", name: "report", input: {} } },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_delta", delta: { stop_reason: stopReason }, usage: { output_tokens: 8000 } },
+      { type: "message_stop" },
+    ]);
+
+  it("throws rather than passing off the empty input from content_block_start", async () => {
+    const { fn } = capturingFetch([startedButNeverFilled("max_tokens")]);
+    await expect(makeClaudeClient("key", fn).structured(call)).rejects.toThrow(/tool input/i);
+  });
+
+  it("throws on a stopped turn too, not only on max_tokens", async () => {
+    const { fn } = capturingFetch([startedButNeverFilled("end_turn")]);
+    await expect(makeClaudeClient("key", fn).structured(call)).rejects.toThrow(/tool input/i);
+  });
+
+  it("still returns a genuinely empty object when the model sent one", async () => {
+    // "{}" is a real answer the model chose to give; absence is not.
+    const explicitlyEmpty = sse([
+      { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "t1", name: "report", input: {} } },
+      { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 2 } },
+      { type: "message_stop" },
+    ]);
+    const { fn } = capturingFetch([explicitlyEmpty]);
+    expect(await makeClaudeClient("key", fn).structured(call)).toEqual({});
+  });
+});
+
+describe("max_tokens", () => {
+  // 8000 was hardcoded for every call in the pipeline. The authoring call asks
+  // for CANDIDATE_TARGET (14) candidates of 14 fields each — two of them prose
+  // — in one tool input, and now also sets effort "medium", whose thinking
+  // draws from the same budget. It does not fit, which is how a two-minute
+  // Opus 5 turn ended with no tool input at all.
+  //
+  // Opt-in per call, like `effort`, rather than a raised default: the taste
+  // gate runs on Haiku 4.5 and nothing else in the pipeline needs the room.
+  it("defaults to 8000 when the caller says nothing", async () => {
+    const { fn, seen } = capturingFetch([toolResp({ ok: true })]);
+    await makeClaudeClient("key", fn).structured(call);
+    expect(seen[0]!.body.max_tokens).toBe(8000);
+  });
+
+  it("carries a caller's larger budget", async () => {
+    const { fn, seen } = capturingFetch([toolResp({ ok: true })]);
+    await makeClaudeClient("key", fn).structured({ ...call, maxTokens: 32000 });
+    expect(seen[0]!.body.max_tokens).toBe(32000);
+  });
+});
