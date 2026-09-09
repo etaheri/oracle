@@ -23,6 +23,16 @@ describe("roundStore", () => {
     useRoundStore.getState().markSealed("q1");
     expect(useRoundStore.getState().answers["q1"]!.sealed).toBe(true);
   });
+  it("setAtSeal attaches the crowd-at-seal snapshot without touching sealed or answer", () => {
+    useRoundStore.getState().setAnswer("q1", true);
+    useRoundStore.getState().markSealed("q1");
+    useRoundStore.getState().setAtSeal("q1", { pct: 40, count: 12 });
+    expect(useRoundStore.getState().answers["q1"]).toMatchObject({ answer: true, sealed: true, atSeal: { pct: 40, count: 12 } });
+  });
+  it("setAtSeal is a no-op for a question with no local entry", () => {
+    useRoundStore.getState().setAtSeal("qUnknown", { pct: 40, count: 12 });
+    expect(useRoundStore.getState().answers["qUnknown"]).toBeUndefined();
+  });
 });
 
 describe("hydrate", () => {

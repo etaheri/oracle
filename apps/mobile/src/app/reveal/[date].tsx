@@ -26,7 +26,7 @@ import type { QuestionResult } from "../../game/sharePattern";
 import { payoff, oracleCallRight, dayCallCounts, CONSTANTS, provenanceLine } from "@oracle/core";
 import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
-import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { scaledLines } from "../../game/typeScaling";
 import { boardLines, boardSupportingLines, boardRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { rivalryMoment } from "../../game/rivalryMoment";
@@ -375,6 +375,7 @@ export default function RevealScreen() {
             const color = st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
             const receipt = receiptLine(q);
             const call = callLine(q);
+            const movement = movementLine(q);
             return (
               <Animated.View
                 key={q.id}
@@ -392,6 +393,12 @@ export default function RevealScreen() {
                       not tell you what you had answered. */}
                   {call ? (
                     <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{call}</Mono>
+                  ) : null}
+                  {/* How the tide moved after this player sealed (design
+                      2026-09-09 §4.1) — no reserved space: rows are already
+                      variable height, and most days say nothing here. */}
+                  {movement ? (
+                    <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{movement}</Mono>
                   ) : null}
                   <ResolutionEvidence question={q} />
                   {receipt ? (

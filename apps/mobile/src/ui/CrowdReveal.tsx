@@ -11,6 +11,7 @@ import { useCrowdSoFar } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { asciiGauge } from "../game/terminalPrint";
 import { GATHERING_LINE, VERDICT_MIN_PLAYERS } from "../game/crowdVerdict";
+import { crowdMovement } from "../game/crowdMovement";
 import { contrarianApplies, type RoundToday } from "@oracle/core";
 
 // The crowd bar in the machine's own alphabet: [#######·····], the fill
@@ -82,6 +83,15 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               // and the same string. The player's own call still prints —
               // it is the one thing that is true at any crowd size.
               const gathering = !c || c.player_count < VERDICT_MIN_PLAYERS;
+              // The tide's move since this player committed (design
+              // 2026-09-09 §4.1) — silent until the store has both a
+              // crowd-at-seal snapshot (arrives via /today/mine, after the
+              // seal round-trips) and a live crowd to compare it against.
+              const movement = crowdMovement(
+                mine.atSeal,
+                c ? { pct: c.crowd_yes_pct, count: c.player_count } : null,
+                false,
+              );
               return (
                 <View key={q.id} style={{ gap: space(2) }}>
                   <Serif size={displayScale.inline} color={colors.ink} numberOfLines={scaledLines(2, fontScale)}>{q.text}</Serif>
@@ -94,6 +104,9 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
                       {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>
                   </View>
+                  {movement && (
+                    <Mono {...role.meta} color={colors.mutedInk}>{movement}</Mono>
+                  )}
                 </View>
               );
             })}

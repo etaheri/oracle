@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CONSTANTS, type Reveal, provenanceLine, PIPELINE_LINES } from "@oracle/core";
-import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine } from "../src/game/revealRows";
+import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine } from "../src/game/revealRows";
+import { VERDICT_MIN_PLAYERS } from "../src/game/crowdVerdict";
 
 type Question = Reveal["questions"][number];
 
@@ -13,7 +14,7 @@ function question(overrides: Partial<Question> = {}): Question {
     crowd_yes_pct: 60,
     crowd_count: 40,
     market_prob: 0.55,
-    my: { answer: true, confidence: 75, points: 12, brier: 0.1 },
+    my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null },
     source_name: "reuters",
     source_url: "https://example.com",
     evidence_quote: "It happened, per officials.",
@@ -48,15 +49,15 @@ describe("revealRows", () => {
       expect(rowState(question({ my: null, outcome: "void" }))).toBe("spectator");
     });
     it("void when outcome is void and my is present", () => {
-      expect(rowState(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null } }))).toBe("void");
+      expect(rowState(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("void");
     });
     it("win when points positive", () => {
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: 8, brier: 0.2 } }))).toBe("win");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: 8, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("win");
     });
     it("loss otherwise (zero or negative points)", () => {
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.2 } }))).toBe("loss");
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: -4, brier: 0.2 } }))).toBe("loss");
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: null, brier: 0.2 } }))).toBe("loss");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("loss");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: -4, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("loss");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: null, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("loss");
     });
   });
 
@@ -72,12 +73,12 @@ describe("revealRows", () => {
 
   describe("rowRight", () => {
     it("signs points for win/loss", () => {
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 12, brier: 0.1 } }))).toBe("+12");
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.1 } }))).toBe("0");
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: -6, brier: 0.1 } }))).toBe("−6");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("+12");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("0");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: -6, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("−6");
     });
     it("shows an em dash for void and pending", () => {
-      expect(rowRight(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null } }))).toBe("—");
+      expect(rowRight(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } }))).toBe("—");
       expect(rowRight(question({ outcome: null }))).toBe("—");
     });
     it("shows the outcome word for spectator rows, including YES", () => {
@@ -94,7 +95,7 @@ describe("revealRows", () => {
           question({
             outcome: "void",
             void_reason: "source retracted the claim",
-            my: { answer: true, confidence: 60, points: 0, brier: null },
+            my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null },
           })
         )
       ).toBe("VOID · SOURCE RETRACTED THE CLAIM");
@@ -187,9 +188,9 @@ describe("revealRows", () => {
 describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)", () => {
   describe("callLine", () => {
     it("prints the call and the crowd when the crowd was big enough to read", () => {
-      expect(callLine(question({ my: { answer: true, confidence: 75, points: 12, brier: 0.1 }, crowd_yes_pct: 62, crowd_count: 40 })))
+      expect(callLine(question({ my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null }, crowd_yes_pct: 62, crowd_count: 40 })))
         .toBe("YOU: YES @ 75% · CROWD 62% YES");
-      expect(callLine(question({ my: { answer: false, confidence: 55, points: -10, brier: 0.3 }, crowd_yes_pct: 62, crowd_count: 40 })))
+      expect(callLine(question({ my: { answer: false, confidence: 55, points: -10, brier: 0.3, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null }, crowd_yes_pct: 62, crowd_count: 40 })))
         .toBe("YOU: NO @ 55% · CROWD 62% YES");
     });
     it("drops the crowd clause rather than reading a crowd of three", () => {
@@ -208,7 +209,7 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
       expect(callLine(question({ my: null, crowd_yes_pct: null, crowd_count: null }))).toBeNull();
     });
     it("still reads back a call the ledger refused to score", () => {
-      expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null } })))
+      expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null } })))
         .toBe("YOU: YES @ 90% · CROWD 60% YES");
     });
   });
@@ -219,6 +220,43 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
       expect(crowdReadable(question({ crowd_count: 5 }))).toBe(true);
       expect(crowdReadable(question({ crowd_count: null }))).toBe(false);
       expect(crowdReadable(question({ crowd_yes_pct: null, crowd_count: 40 }))).toBe(false);
+    });
+  });
+
+  describe("movementLine (design 2026-09-09 §4.1)", () => {
+    it("reads the tide's move in the past tense once the question is settled", () => {
+      expect(
+        movementLine(
+          question({
+            outcome: "yes",
+            crowd_yes_pct: 60,
+            crowd_count: 40,
+            my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: 40, crowd_count_at_seal: 12 },
+          }),
+        ),
+      ).toBe("WHEN YOU SEALED 40% SAID YES · IT ENDED AT 60%");
+    });
+    it("says nothing when the crowd at seal was under the display floor", () => {
+      expect(
+        movementLine(
+          question({
+            outcome: "yes",
+            crowd_yes_pct: 60,
+            crowd_count: 40,
+            my: {
+              answer: true,
+              confidence: 75,
+              points: 12,
+              brier: 0.1,
+              crowd_yes_pct_at_seal: 40,
+              crowd_count_at_seal: VERDICT_MIN_PLAYERS - 1,
+            },
+          }),
+        ),
+      ).toBeNull();
+    });
+    it("says nothing without a seal snapshot", () => {
+      expect(movementLine(question({ outcome: "yes", crowd_yes_pct: 60, crowd_count: 40 }))).toBeNull();
     });
   });
 });

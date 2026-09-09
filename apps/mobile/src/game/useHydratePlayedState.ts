@@ -10,6 +10,7 @@ type HydrationSnapshot = { roundKey: string; failed: boolean; sealedQuestionIds:
 export function useHydratePlayedState(enabled: boolean, roundDate: string | null = null) {
   const mine = useMineToday(enabled);
   const hydrate = useRoundStore((s) => s.hydrate);
+  const setAtSeal = useRoundStore((s) => s.setAtSeal);
   const roundKey = roundDate ?? "enabled-round";
   const [snapshot, setSnapshot] = useState<HydrationSnapshot | null>(null);
   const requestGeneration = useRef(0);
@@ -51,6 +52,25 @@ export function useHydratePlayedState(enabled: boolean, roundDate: string | null
     setSnapshot(null);
     void refetch();
   }, [enabled, refetch, roundKey]);
+
+  // The crowd-at-seal snapshot (design 2026-09-09 §4.1) lands in the SAME
+  // /today/mine payload the answers above hydrate from, but it must keep
+  // arriving after the seal too: submit's onSuccess invalidates
+  // ["round","mine"], which refetches this query in the background — no call
+  // through `refetch` above, which only runs on mount/roundKey change or an
+  // explicit caller. React Query gives back the same `data` reference when a
+  // refetch's content is unchanged, so this only actually re-applies on a
+  // real change. `setAtSeal` merges a single field onto whatever entry
+  // already exists and never touches `sealed` or `answer`, so re-running it
+  // on every fetch (rather than gating it like the once-per-round `hydrate`
+  // above) can never un-seal an entry or clobber a local in-flight answer.
+  useEffect(() => {
+    for (const p of mine.data?.predictions ?? []) {
+      if (p.crowd_yes_pct_at_seal != null && p.crowd_count_at_seal != null) {
+        setAtSeal(p.question_id, { pct: p.crowd_yes_pct_at_seal, count: p.crowd_count_at_seal });
+      }
+    }
+  }, [mine.data, setAtSeal]);
 
   const current = snapshot?.roundKey === roundKey ? snapshot : null;
   return {

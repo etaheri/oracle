@@ -1,5 +1,6 @@
 import { CONSTANTS, COPY_BANK, selectLine, type Reveal } from "@oracle/core";
 import { VERDICT_MIN_PLAYERS } from "./crowdVerdict";
+import { crowdMovement } from "./crowdMovement";
 import { numeral } from "./numerals";
 
 type Question = Reveal["questions"][number];
@@ -126,6 +127,20 @@ export function callLine(q: Question): string | null {
   if (!q.my) return crowd;
   const mine = `YOU: ${q.my.answer ? "YES" : "NO"} @ ${q.my.confidence}%`;
   return crowd ? `${mine} · ${crowd}` : mine;
+}
+
+// The tide's move since this player sealed (design 2026-09-09 §4.1): the
+// reveal always speaks in the past tense (final=true), since by reveal time
+// the crowd has finished moving. Null under crowdMovement's own floors —
+// either snapshot below VERDICT_MIN_PLAYERS, or a move under its threshold.
+export function movementLine(q: Question): string | null {
+  return crowdMovement(
+    q.my?.crowd_yes_pct_at_seal != null && q.my.crowd_count_at_seal != null
+      ? { pct: q.my.crowd_yes_pct_at_seal, count: q.my.crowd_count_at_seal }
+      : null,
+    q.crowd_yes_pct != null && q.crowd_count != null ? { pct: q.crowd_yes_pct, count: q.crowd_count } : null,
+    q.outcome !== null,
+  );
 }
 
 // How much of the day has actually been read. Shown in the day-points slot
