@@ -26,6 +26,7 @@ import { emptyTally, screenCandidates, type Rejection } from "./candidate";
 import { gatherAuthoringContext, generateCandidates } from "./gauntlet/generate";
 import { checkSources } from "./gauntlet/sources";
 import { criticize } from "./gauntlet/critic";
+import { gatherForecasts } from "./gauntlet/forecast";
 import { preflightOne, assemblePreflight } from "./gauntlet/preflight";
 import { tasteCheck } from "./gauntlet/taste";
 import { assessEditorial } from "./editorial";
@@ -153,9 +154,13 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
     );
     count(tier1.rejected);
 
-    // Tier 2 — one model call, plus §7's contestedness gate.
+    // Tier 2 — the public forecast (its own step: a fetch, checkpointed as a
+    // plain object), then one model call, plus §7's contestedness gate.
+    const forecasts = await durableStep(step, "forecasts", POLICY.sourceFetch, deps, () =>
+      gatherForecasts(deps.sourceFetch ?? fetch, tier1.passed),
+    );
     const tier2 = await durableStep(step, "critic", POLICY.model, deps, () =>
-      criticize(deps, tier1.passed),
+      criticize(deps, tier1.passed, forecasts),
     );
     count(tier2.rejected);
 

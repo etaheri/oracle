@@ -43,6 +43,26 @@ function fakeClaude(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+// The one weather candidate (n === 3) now also needs a live forecast fetch
+// at tier 2 — sourceFetch is shared between checkSources (tier 1) and
+// gatherForecasts (tier 2), so every sourceFetch stub in this file must
+// answer api.weather.gov too, or the weather candidate gets blind-rejected
+// before the model ever sees it, throwing off tallies these tests already
+// assert on. `sourceCheck` supplies only the tier-1 behaviour; weather.gov
+// is always served a valid forecast underneath it.
+function stubSourceFetch(sourceCheck: (input: RequestInfo | URL) => Response): typeof fetch {
+  return (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.startsWith("https://api.weather.gov/points/")) {
+      return new Response(JSON.stringify({ properties: { forecast: "https://api.weather.gov/gridpoints/OKX/33,35/forecast" } }), { status: 200 });
+    }
+    if (url.startsWith("https://api.weather.gov/gridpoints/")) {
+      return new Response(JSON.stringify({ properties: { periods: [{ name: "Today", temperature: 75, temperatureUnit: "F", shortForecast: "Sunny" }] } }), { status: 200 });
+    }
+    return sourceCheck(input);
+  }) as unknown as typeof fetch;
+}
+
 function deps(db: PipelineDeps["db"], claude: PipelineDeps["claude"], sent: string[] = []): PipelineDeps {
   return {
     workflows: inlineStarter(),
@@ -52,7 +72,7 @@ function deps(db: PipelineDeps["db"], claude: PipelineDeps["claude"], sent: stri
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     now: () => new Date("2026-09-04T22:00:00Z"),
     marketFetch: (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch,
-    sourceFetch: (async () => new Response("", { status: 200 })) as unknown as typeof fetch,
+    sourceFetch: stubSourceFetch(() => new Response("", { status: 200 })),
   };
 }
 
@@ -79,9 +99,9 @@ describe("runAuthoringGauntlet", () => {
   it("counts a dead source as a rejection and still ships the round", async () => {
     const { db } = await makeTestDb();
     const d = deps(db, fakeClaude());
-    d.sourceFetch = (async (input: RequestInfo | URL) =>
-      String(input).endsWith("/6") ? new Response("", { status: 404 }) : new Response("", { status: 200 })
-    ) as unknown as typeof fetch;
+    d.sourceFetch = stubSourceFetch((input) =>
+      String(input).endsWith("/6") ? new Response("", { status: 404 }) : new Response("", { status: 200 }),
+    );
     const r = await runAuthoringGauntlet(d, "2026-09-05");
     expect(r.published).toBe(true);
     expect(r.rejected).toBe(1);
@@ -141,9 +161,9 @@ describe("runAuthoringGauntlet", () => {
     const { db } = await makeTestDb();
     const sent: string[] = [];
     const d = deps(db, fakeClaude(), sent);
-    d.sourceFetch = (async (input: RequestInfo | URL) =>
-      String(input).endsWith("/6") ? new Response("", { status: 404 }) : new Response("", { status: 200 })
-    ) as unknown as typeof fetch;
+    d.sourceFetch = stubSourceFetch((input) =>
+      String(input).endsWith("/6") ? new Response("", { status: 404 }) : new Response("", { status: 200 }),
+    );
     await runAuthoringGauntlet(d, "2026-09-05");
     const msg = sent.join("\n");
     expect(msg).toContain("rejected:");

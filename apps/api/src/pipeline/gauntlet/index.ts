@@ -23,6 +23,7 @@ import { assessEditorial, type Edited } from "../editorial";
 import { gatherAuthoringContext, generateCandidates } from "./generate";
 import { checkSources } from "./sources";
 import { criticize } from "./critic";
+import { gatherForecasts } from "./forecast";
 import { preflight } from "./preflight";
 import { tasteCheck } from "./taste";
 import { selectRound } from "./select";
@@ -105,8 +106,9 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
   const tier1 = await checkSources(deps.sourceFetch ?? fetch, tier0.passed);
   count(tier1.rejected);
 
-  // Tier 2 — one model call, plus §7.
-  const tier2 = await criticize(deps, tier1.passed);
+  // Tier 2 — the public forecast for weather, then one model call, plus §7.
+  const forecasts = await gatherForecasts(deps.sourceFetch ?? fetch, tier1.passed);
+  const tier2 = await criticize(deps, tier1.passed, forecasts);
   count(tier2.rejected);
 
   // Tier 3 — one model call per survivor.

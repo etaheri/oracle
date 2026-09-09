@@ -110,3 +110,36 @@ describe("criticize — tier 2", () => {
     expect(calls).toBe(1);
   });
 });
+
+describe("criticize reads the public forecast (design 2026-09-09 §1.3)", () => {
+  const weather = (o: Partial<Candidate> = {}): Candidate =>
+    cand({ category: "weather", forecast_point: { lat: 40.78, lon: -73.97 }, topic_key: "nyc-high", ...o });
+
+  it("shows the critic the forecast beside a weather candidate", async () => {
+    const { db } = await makeTestDb();
+    const seen: { user?: string } = {};
+    await criticize(deps(db, { verdicts: [verdict(0)] }, seen), [weather()], { "0": "Thursday: 86F, Partly sunny" });
+    expect(seen.user).toContain("PUBLIC FORECAST");
+    expect(seen.user).toContain("86F");
+  });
+  it("rejects a weather candidate whose forecast could not be fetched, without calling the model", async () => {
+    const { db } = await makeTestDb();
+    let called = false;
+    const d = deps(db, { verdicts: [] });
+    d.claude = { structured: async () => { called = true; return { verdicts: [] }; } };
+    const r = await criticize(d, [weather()], {});
+    expect(called).toBe(false);
+    expect(r.rejected[0]).toMatchObject({ reason: "uncontested" });
+    expect(r.rejected[0]!.detail).toContain("forecast");
+  });
+  it("does not require a forecast for a non-weather candidate", async () => {
+    const { db } = await makeTestDb();
+    const r = await criticize(deps(db, { verdicts: [verdict(0)] }), [cand()], {});
+    expect(r.passed).toHaveLength(1);
+  });
+  it("still rejects the lopsided read the forecast produces", async () => {
+    const { db } = await makeTestDb();
+    const r = await criticize(deps(db, { verdicts: [verdict(0, { critic_probability: 0.92 })] }), [weather()], { "0": "Thursday: 86F" });
+    expect(r.rejected[0]!.reason).toBe("uncontested");
+  });
+});

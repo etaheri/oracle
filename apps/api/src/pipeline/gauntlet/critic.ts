@@ -11,6 +11,7 @@
 import { z } from "zod";
 import type { PipelineDeps } from "../index";
 import type { Candidate, Rejection, Screened } from "../candidate";
+import type { ForecastsByIndex } from "./forecast";
 
 // Outside 0.25–0.75. The author's own band is 0.3–0.7; this is the same band,
 // verified by someone else, with a little tolerance.
@@ -64,27 +65,53 @@ For every candidate, report:
 - critic_probability: YOUR OWN probability that the answer is YES. Nobody else's number has been shown to you and you must not try to guess one. State what you actually believe.
 - reasons: short notes on anything you flagged.
 
+Some candidates carry a PUBLIC FORECAST fetched tonight. That forecast is public information every player will have. Your critic_probability must account for it: a threshold the forecast already clears by a wide margin is not contested, and you should say so with a probability near 0 or 1.
+
 Return exactly one verdict per candidate, carrying that candidate's index unchanged. Call the critic_verdicts tool exactly once.`;
 
 // The explicit field list is the enforcement mechanism, not a convenience:
 // author_probability, market_prob and topic_key are absent by construction.
-function candidateBlock(candidates: Candidate[]): string {
+function candidateBlock(candidates: Candidate[], forecasts: ForecastsByIndex): string {
   return candidates
-    .map((c, i) => `[${i}] (${c.category}) ${c.text}\n  CRITERIA: ${c.resolution_criteria}\n  SOURCE: ${c.source_name} <${c.source_url}>\n  RESOLVES AT: ${c.resolves_at}`)
+    .map((c, i) => {
+      const f = forecasts[String(i)];
+      return `[${i}] (${c.category}) ${c.text}\n  CRITERIA: ${c.resolution_criteria}\n  SOURCE: ${c.source_name} <${c.source_url}>\n  RESOLVES AT: ${c.resolves_at}${f ? `\n  PUBLIC FORECAST (fetched tonight): ${f}` : ""}`;
+    })
     .join("\n\n");
 }
 
 export async function criticize(
   deps: PipelineDeps,
   candidates: Candidate[],
+  forecasts: ForecastsByIndex = {},
 ): Promise<Screened & { judged: Judged[] }> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
-  if (candidates.length === 0) return { passed: [], rejected: [], judged: [] };
+
+  // A weather candidate whose forecast did not arrive is judged by no one:
+  // the critic would be reading it blind, which is the exact failure §1.3
+  // exists to close.
+  const blindRejected: Rejection[] = [];
+  const judgeable: Candidate[] = [];
+  const judgeableIndex: number[] = [];
+  candidates.forEach((c, i) => {
+    if (c.category === "weather" && !forecasts[String(i)]) {
+      blindRejected.push({ text: c.text, reason: "uncontested", detail: "no public forecast could be fetched, so contestedness cannot be judged" });
+    } else {
+      judgeable.push(c);
+      judgeableIndex.push(i);
+    }
+  });
+  if (judgeable.length === 0) return { passed: [], rejected: blindRejected, judged: [] };
+
+  // Re-key forecasts to the judgeable list's own indices, which is what the
+  // model is shown and what its verdict indices refer to.
+  const shown: ForecastsByIndex = {};
+  judgeableIndex.forEach((orig, j) => { const f = forecasts[String(orig)]; if (f) shown[String(j)] = f; });
 
   const response = await deps.claude.structured({
     model: deps.models.critic,
     system: SYSTEM,
-    user: `${candidateBlock(candidates)}\n\nReturn one verdict per candidate now.`,
+    user: `${candidateBlock(judgeable, shown)}\n\nReturn one verdict per candidate now.`,
     schemaName: "critic_verdicts",
     schema: criticJsonSchema,
     // No search. This is a reading of the sentence, not of the world.
@@ -98,7 +125,7 @@ export async function criticize(
     return {
       passed: [],
       judged: [],
-      rejected: candidates.map((c) => ({ text: c.text, reason: "ambiguous" as const, detail: "the critic's response could not be read" })),
+      rejected: [...blindRejected, ...judgeable.map((c) => ({ text: c.text, reason: "ambiguous" as const, detail: "the critic's response could not be read" }))],
     };
   }
 
@@ -107,7 +134,7 @@ export async function criticize(
   const judged: Judged[] = [];
   const rejected: Rejection[] = [];
 
-  candidates.forEach((c, i) => {
+  judgeable.forEach((c, i) => {
     const v = byIndex.get(i);
     if (!v) {
       rejected.push({ text: c.text, reason: "ambiguous", detail: "the critic returned no verdict for this candidate" });
@@ -138,5 +165,5 @@ export async function criticize(
     judged.push({ candidate: c, criticProbability: v.critic_probability });
   });
 
-  return { passed, rejected, judged };
+  return { passed, rejected: [...blindRejected, ...rejected], judged };
 }
