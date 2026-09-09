@@ -415,6 +415,19 @@ describe("rerollSlot", () => {
     expect(slot3.text).toBe(validDraft.questions[2]!.text); // unchanged
     expect(sent).toHaveLength(0);
   });
+
+  it("refuses a reroll whose replacement would make a non-Big-One slow (design 2026-09-09 §1.2)", async () => {
+    const { db } = await makeTestDb();
+    await upsertDraft(db, "2026-08-27", validDraft, 2);
+    const replacement = {
+      ...validDraft.questions[1],
+      text: "Will the weekend gross leader be a sequel?",
+      resolves_at: "2026-08-29T12:30:00Z", // after fast-by (08-28 20:00Z), before void (08-29 16:00Z)
+    };
+    const { claude } = fakeClaude([replacement]);
+    const { deps } = fakeDeps(db, claude);
+    await expect(rerollSlot(deps, "2026-08-27", 2, "")).rejects.toThrow("only the big one may resolve after the evening");
+  });
 });
 
 describe("draftMessage", () => {

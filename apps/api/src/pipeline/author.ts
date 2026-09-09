@@ -4,9 +4,9 @@
 import { and, count, eq, gte, isNull, lt } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import type { PipelineDeps } from "./index";
-import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, type Draft } from "./draft";
+import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, checkFastRound, type Draft } from "./draft";
 import { upsertDraft } from "./draft";
-import { addDays, noonET } from "./clock";
+import { addDays, noonET, fastResolveBy, voidDeadline } from "./clock";
 import { fetchMarketSignals, type MarketSignal } from "./feeds";
 import { loadQualityRows, qualityReport, questionQuality } from "./quality";
 
@@ -264,6 +264,19 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
     throw new Error("weather must lock before noon");
   }
 
+  if ((roundRules?.rulesVersion ?? 1) >= 2) {
+    // The rule is round-level: check the round as it would stand with this
+    // replacement in place, not the replacement alone.
+    const siblings = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
+    const merged = siblings.map((s) =>
+      s.slot === slot
+        ? { slot, is_big_one: q.is_big_one, resolves_at: q.resolves_at }
+        : { slot: s.slot, is_big_one: s.isBigOne, resolves_at: s.resolvesAt ? s.resolvesAt.toISOString() : RESOLVES_AFTER_LOCK },
+    );
+    const fast = checkFastRound(merged, { lockAt: locksAtDefault, fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
+    if (fast) throw new Error(`reroll: ${fast}`);
+  }
+
   // The Claude call above takes real time; re-check right before writing so
   // a publish that happened while we were waiting on Claude can't be
   // clobbered by this reroll landing late.
@@ -293,6 +306,7 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
       // subject's up to repeat immediately.
       topicKey: q.topic_key ?? null,
       locksAt,
+      resolvesAt: q.resolves_at === RESOLVES_AFTER_LOCK ? null : new Date(q.resolves_at),
     })
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
 
