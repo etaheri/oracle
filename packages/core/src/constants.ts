@@ -11,6 +11,12 @@ export const CONSTANTS = {
   CONTRARIAN_CROWD_PCT: 40,  // your side's final crowd % must be strictly below this
   SHIELD_MIN_STREAK: 3,      // shields (free or paid) only defend a vigil this long
   VERDICT_MIN_CALLS: 20,     // calibration verdict / gap epithets need this many resolved calls
+  // The fast-round rule (design 2026-09-09 §1.2). A v2 round may carry at
+  // most one question that resolves later than this many hours after the
+  // lock, and that one must be the Big One. Everything else decides the
+  // same evening, so the verdict trickles in tonight instead of arriving
+  // batched two days later. ⚙ tunable.
+  EVENING_RESOLVE_LAG_HOURS: 4,
   // The first hour weighs the day. ⚙ tunable.
   // SYMMETRIC BY LAW, on the vigil's terms: applied to losing days exactly as
   // to winning ones, through the same weighDay. It is fixed before any of

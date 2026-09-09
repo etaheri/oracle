@@ -51,6 +51,12 @@ export const RoundTodaySchema = z.object({
       // answer appeared. An AUTHORED early lock is false: both produce a lock
       // before noon, and only this one is the machine catching a leak live.
       lock_healed: z.boolean(),
+      // Struck from the round for everyone (v2): either the probe healed a
+      // leaked lock or the operator withdrew it. The client gates the
+      // required set on THIS, not on lock_healed, which stays probe-only.
+      struck: z.boolean().default(false),
+      // The printable reason when struck; null otherwise. Rendered verbatim.
+      struck_reason: z.string().nullable().default(null),
     }),
   ),
 });

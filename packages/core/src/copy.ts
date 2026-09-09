@@ -268,6 +268,12 @@ export const SUMMONS_LINES = [
 export const PIPELINE_LINES = Object.freeze({
   lockHealed: "THE ANSWER EXISTS. THIS ONE IS CLOSED.",
   voidDisagreement: "THE READERS DID NOT AGREE. THIS ONE IS STRUCK.",
+  // Editorial withdrawal (design 2026-09-09 §1.4): the operator struck a
+  // question that should never have run. Distinct from the leak line above,
+  // because "we mis-wrote it" and "the answer leaked" are different facts and
+  // the reveal prints whichever one is true.
+  withdrawnMisauthored: "THIS QUESTION WAS WITHDRAWN. IT COUNTS FOR NO ONE.",
+  withdrawnUnresolvable: "THIS QUESTION CANNOT BE SETTLED IN TIME. IT COUNTS FOR NO ONE.",
 } as const);
 
 // What the gauntlet cost, in candidates. Null below one written candidate, so
