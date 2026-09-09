@@ -181,6 +181,14 @@ export const ConfidenceHistorySchema = z.object({
 export const MeLedgerSchema = z.object({
   confidence_history: ConfidenceHistorySchema.optional(),
   milestones: z.array(z.enum(["first_round", "first_result", "first_oracle_win", "three_rounds", "seven_rounds"])).default([]),
+  // The player's reading round (design 2026-09-09 §2.2, §3.1): the latest
+  // locked-or-settled round they answered, with how much of it is decided.
+  // Null until they have answered a round that has locked. Defaulted so a
+  // client ahead of the server still parses.
+  reading: z
+    .object({ date: z.string(), settled: z.boolean(), decided: z.number().int().min(0), total: z.number().int().min(0) })
+    .nullable()
+    .default(null),
   oracle_score: z.number().int().nullable(),
   // Where this record stands among every written Oracle Score. Null until the
   // caller's own score exists AND the cohort is worth comparing against.

@@ -5,11 +5,11 @@ import { CURRENT_GAME_COPY } from "./gameCopy";
 // Hand-written, linted, versioned. No generated copy — the meme value of a
 // voice comes from one unmistakable register sustained for years.
 
-export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed" | "wrong" | "partial";
+export type Requirement = "results" | "tideWin" | "streak" | "players" | "lapsed" | "wrong" | "partial" | "outcome" | "call" | "points";
 
 export interface CopyLine {
   id: string;
-  pool: "noon" | "closing" | "streak" | "system" | "paywall";
+  pool: "noon" | "closing" | "streak" | "system" | "paywall" | "resolve";
   text: string;
   requires?: ReadonlyArray<Requirement>;
 }
@@ -20,10 +20,16 @@ export const LITURGY_LINES = [
 ] as const;
 export const LITURGY = LITURGY_LINES.join(" ");
 
-export function fillSlots(text: string, slots: { n?: number; streak?: number }): string {
+export function fillSlots(
+  text: string,
+  slots: { n?: number; streak?: number; outcome?: string; call?: string; points?: string },
+): string {
   return text
     .replace(/\{n\}/g, slots.n === undefined ? "{n}" : String(slots.n))
-    .replace(/\{streak\}/g, slots.streak === undefined ? "{streak}" : String(slots.streak));
+    .replace(/\{streak\}/g, slots.streak === undefined ? "{streak}" : String(slots.streak))
+    .replace(/\{outcome\}/g, slots.outcome === undefined ? "{outcome}" : slots.outcome)
+    .replace(/\{call\}/g, slots.call === undefined ? "{call}" : slots.call)
+    .replace(/\{points\}/g, slots.points === undefined ? "{points}" : slots.points);
 }
 
 export const COPY_BANK: ReadonlyArray<CopyLine> = [
@@ -53,6 +59,17 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.vigil-2", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
   { id: "noon.vigil-3", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
   { id: "noon.vigil-4", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
+  // ── resolve: the resolution push. A trickle that replaces the batched
+  // result (design 2026-09-09 §2.1) — one push per question as it settles,
+  // carrying the outcome, the player's call, and the signed points it paid. ──
+  { id: "resolve.plain-1", pool: "resolve", text: "IT CAME {outcome}. YOU CALLED {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-2", pool: "resolve", text: "THE ANSWER WAS {outcome}. YOUR CALL: {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-3", pool: "resolve", text: "{outcome}, AS IT HAPPENED. YOU SAID {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-4", pool: "resolve", text: "ONE IS DECIDED: {outcome}. YOU STOOD AT {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-5", pool: "resolve", text: "THE LEDGER READS {outcome}. YOU CALLED {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-6", pool: "resolve", text: "DECIDED: {outcome}. YOUR SEAL SAID {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-7", pool: "resolve", text: "{outcome} IT IS. YOU HELD {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-8", pool: "resolve", text: "THE WORLD ANSWERED {outcome}. YOU ANSWERED {call}. {points}.", requires: ["outcome", "call", "points"] },
   // ── closing: the call. Unsealed players only, hours before lock. ──
   { id: "closing.call-1", pool: "closing", text: "WHAT DO YOU SEE COMING?" },
   { id: "closing.call-2", pool: "closing", text: "A HUNCH IS A START. HOW SURE ARE YOU?" },
@@ -286,6 +303,19 @@ export const PIPELINE_LINES = Object.freeze({
   // The v2 fallback when a struck question carries no server-stated reason.
   struck: "STRUCK · VOID FOR EVERYONE",
 } as const);
+
+// The home call slot's lines for the reading round (design 2026-09-09 §2.2,
+// §3.1). Short by law: they share the single-row slot with the day's CTA.
+export const READING_LINES = Object.freeze({
+  inPlayCta: "SEE WHAT IS DECIDED",
+  settled: "THE LEDGER IS READ",
+  settledCta: "READ THE LEDGER",
+  rail: "LEDGER",
+} as const);
+
+export function inPlayLine(decided: number, pending: number): string {
+  return `IN PLAY · ${decided} DECIDED · ${pending} PENDING`;
+}
 
 // What the gauntlet cost, in candidates. Null below one written candidate, so
 // a bank drop — and every round authored before migration 0007 — stays silent

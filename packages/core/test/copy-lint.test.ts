@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { COPY_BANK, PLUS_CREED_LINES, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, PIPELINE_LINES, provenanceLine, fillSlots, type CopyLine } from "../src/copy";
+import { COPY_BANK, PLUS_CREED_LINES, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, PIPELINE_LINES, provenanceLine, fillSlots, inPlayLine, READING_LINES, type CopyLine } from "../src/copy";
 import { CONSTANTS } from "../src/constants";
 
 const BANNED = ["CHECK", "TAP", "CLICK", "VISIT", "RESULTS", "DON'T MISS"];
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
-const worst = (l: CopyLine) => fillSlots(l.text, { n: 99, streak: 999 });
+const worst = (l: CopyLine) => fillSlots(l.text, { n: 99, streak: 999, outcome: "YES", call: "YES AT 95%", points: "-261" });
 
 describe("the liturgy", () => {
   it("is frozen, verbatim", () => {
@@ -46,6 +46,9 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
         }
       }
       if (l.text.includes("{streak}")) expect(l.requires ?? [], l.id).toContain("streak");
+      if (l.text.includes("{outcome}")) expect(l.requires ?? [], l.id).toContain("outcome");
+      if (l.text.includes("{call}")) expect(l.requires ?? [], l.id).toContain("call");
+      if (l.text.includes("{points}")) expect(l.requires ?? [], l.id).toContain("points");
       expect(worst(l), l.id).not.toMatch(/[{}]/);
     }
   });
@@ -66,6 +69,7 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
     // in the bank is the paywall's machine voice: the rescue offer Home
     // prints and the terms line. The creed's own floor is asserted below.
     expect(count("paywall")).toBeGreaterThanOrEqual(2);
+    expect(count("resolve")).toBeGreaterThanOrEqual(8);
   });
   it("carries the streak-at-risk and partial-closing lines", () => {
     expect(COPY_BANK.find((l) => l.id === "streak.risk-1")?.requires).toContain("streak");
@@ -343,6 +347,50 @@ describe("the pipeline's own lines (design 2026-09-04 §11)", () => {
     // line; a longer one wraps and pushes the layout around it.
     for (const key of ["answerLeaked", "withdrawnMisauthored", "withdrawnUnresolvable", "struck"] as const) {
       expect(PIPELINE_LINES[key].length, key).toBeLessThanOrEqual(40);
+    }
+  });
+});
+
+describe("the resolve pool (design 2026-09-09 §2.1)", () => {
+  const RESOLVE = COPY_BANK.filter((l) => l.pool === "resolve");
+  it("has at least eight lines, every one carrying all three slots and requiring them", () => {
+    expect(RESOLVE.length).toBeGreaterThanOrEqual(8);
+    for (const l of RESOLVE) {
+      expect(l.text, l.id).toContain("{outcome}");
+      expect(l.text, l.id).toContain("{call}");
+      expect(l.text, l.id).toContain("{points}");
+      expect(l.requires ?? [], l.id).toEqual(expect.arrayContaining(["outcome", "call", "points"]));
+    }
+  });
+  it("expands cleanly and fits a push at worst case", () => {
+    for (const l of RESOLVE) {
+      const filled = fillSlots(l.text, { outcome: "NO", call: "YES AT 95%", points: "-261" });
+      expect(filled, l.id).not.toMatch(/[{}]/);
+      expect(filled.length, l.id).toBeLessThanOrEqual(140);
+    }
+  });
+  it("holds the register", () => {
+    for (const l of RESOLVE) {
+      // Stripped of its lowercase slot tokens first, as every other register
+      // check in this file does (see "register: mono caps..." above) — the
+      // tokens themselves are required to be lowercase by the test above.
+      expect(l.text.replace(/\{[a-z]+\}/g, ""), l.id).toBe(l.text.replace(/\{[a-z]+\}/g, "").toUpperCase());
+      expect(l.text, l.id).not.toContain("!");
+      for (const b of BANNED) expect(l.text, l.id).not.toContain(b);
+    }
+  });
+});
+
+describe("the reading lines (design 2026-09-09 §2.2, §3.1)", () => {
+  it("inPlayLine prints both counts", () => {
+    expect(inPlayLine(3, 2)).toBe("IN PLAY · 3 DECIDED · 2 PENDING");
+    expect(inPlayLine(1, 4)).toBe("IN PLAY · 1 DECIDED · 4 PENDING");
+  });
+  it("every reading line holds the register and fits the home slot", () => {
+    for (const l of [inPlayLine(5, 0), ...Object.values(READING_LINES)]) {
+      expect(l).toBe(l.toUpperCase());
+      expect(l).not.toContain("!");
+      expect(l.length).toBeLessThanOrEqual(40);
     }
   });
 });
