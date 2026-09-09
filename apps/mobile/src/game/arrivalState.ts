@@ -21,7 +21,7 @@ export type ArrivalState = {
 export type ArrivalQuestion = {
   id: string;
   locks_at: string;
-  lock_healed?: boolean;
+  struck?: boolean;
 };
 
 export type ArrivalRound = {
@@ -55,7 +55,7 @@ export function arrivalInputForRound(
   }
 
   const availability = roundAvailability(round.questions, sealedIds, nowMs, round.rules_version);
-  const required = round.questions.filter((question) => !(round.rules_version >= 2 && question.lock_healed));
+  const required = round.questions.filter((question) => !(round.rules_version >= 2 && question.struck));
   return {
     ...snapshot,
     hasRound: true,

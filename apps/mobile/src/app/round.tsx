@@ -163,19 +163,28 @@ export default function Round() {
         )}
       </View>
       {current && (lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
-      {/* A healed lock is the most dramatic thing this system does, and without
+      {/* A struck question is the most dramatic thing this system does, and without
           this line it happens in silence: the numeral is simply struck, the same
-          as a slot the player let expire. Shown only for a healed question the
+          as a slot the player let expire. Shown only for a struck question the
           player never sealed — that is exactly the strike that needs explaining,
-          and a player who sealed in time has nothing to be told. Fixed height so
-          the layout does not jump when a probe lands mid-session. */}
+          and a player who sealed in time has nothing to be told. The line printed
+          is whatever reason the server stored: a leak reads as a leak, a
+          withdrawal reads as a withdrawal — never a fixed cover story. Fixed
+          height so the layout does not jump when a probe lands mid-session. */}
       {current && <>
       <View style={{ minHeight: scaledRow(16, chromeScale), justifyContent: "center" }}>
-        {qs.some((q) => q.lock_healed && ((today.data?.rules_version ?? 1) >= 2 || !answers[q.id]?.sealed)) && (
-          <Mono {...role.meta} color={colors.mutedInk} style={{ textAlign: "center" }}>
-            {today.data.rules_version >= 2 ? "EARLY ANSWER · VOID FOR EVERYONE" : PIPELINE_LINES.lockHealed}
-          </Mono>
-        )}
+        {(() => {
+          const struckQ = qs.find((q) => q.struck && ((today.data?.rules_version ?? 1) >= 2 || !answers[q.id]?.sealed));
+          if (!struckQ) return null;
+          const line = (today.data?.rules_version ?? 1) >= 2
+            ? (struckQ.struck_reason ?? "STRUCK · VOID FOR EVERYONE")
+            : PIPELINE_LINES.lockHealed;
+          return (
+            <Mono {...role.meta} color={colors.mutedInk} style={{ textAlign: "center" }}>
+              {line}
+            </Mono>
+          );
+        })()}
       </View>
       <View style={{ flexDirection: "row", gap: space(4), justifyContent: "center", paddingTop: space(2) }}>
         {qs.map((q) => {

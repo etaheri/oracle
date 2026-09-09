@@ -51,10 +51,10 @@ describe("arrivalInputForRound", () => {
   const round: ArrivalRound = {
     rules_version: 2,
     questions: [
-      { id: "sealed", locks_at: "2026-09-08T15:00:00Z", lock_healed: false },
-      { id: "void", locks_at: "2026-09-08T14:00:00Z", lock_healed: true },
-      { id: "missed", locks_at: "2026-09-08T14:00:00Z", lock_healed: false },
-      { id: "open", locks_at: "2026-09-08T16:00:00Z", lock_healed: false },
+      { id: "sealed", locks_at: "2026-09-08T15:00:00Z", struck: false },
+      { id: "void", locks_at: "2026-09-08T14:00:00Z", struck: true },
+      { id: "missed", locks_at: "2026-09-08T14:00:00Z", struck: false },
+      { id: "open", locks_at: "2026-09-08T16:00:00Z", struck: false },
     ],
   };
 

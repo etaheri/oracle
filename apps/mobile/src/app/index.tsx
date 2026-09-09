@@ -98,7 +98,7 @@ export default function Index() {
   const hydration = useHydratePlayedState(!!round, round?.date ?? null);
   const sealedIds = new Set([...localSealedIds, ...hydration.sealedQuestionIds]);
   const availability = round ? roundAvailability(round.questions, sealedIds, availabilityNow, round.rules_version) : null;
-  const requiredQuestions = round?.questions.filter((question) => !(round.rules_version >= 2 && question.lock_healed)) ?? [];
+  const requiredQuestions = round?.questions.filter((question) => !(round.rules_version >= 2 && question.struck)) ?? [];
   const submittedFromData = requiredQuestions.length > 0 && requiredQuestions.every((question) => sealedIds.has(question.id));
   const needsNext = !round || (availability?.openCount === 0 && !submittedFromData);
   const sealedCount = round ? round.questions.filter((q) => answers[q.id]?.sealed).length : 0;
