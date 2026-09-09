@@ -337,4 +337,12 @@ describe("the pipeline's own lines (design 2026-09-04 §11)", () => {
     const rite = RITES_LINES.find((l) => l.includes("PUT TO THE MACHINE"))!;
     expect(OPENING_RITES_LINES).not.toContain(rite);
   });
+
+  it("the four banner-bound lines fit the round screen's single-row banner", () => {
+    // round.tsx renders these into a minHeight slot sized for one short
+    // line; a longer one wraps and pushes the layout around it.
+    for (const key of ["answerLeaked", "withdrawnMisauthored", "withdrawnUnresolvable", "struck"] as const) {
+      expect(PIPELINE_LINES[key].length, key).toBeLessThanOrEqual(40);
+    }
+  });
 });

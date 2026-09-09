@@ -21,7 +21,7 @@ export async function resolveQuestion(
   // A healed v2 lock is an immutable global void, including resolver retries.
   if ((round?.rulesVersion ?? 1) >= 2 && q.lockHealedAt) {
     outcome = "void";
-    evidence = { reason: "THE ANSWER APPEARED EARLY. THIS QUESTION IS VOID FOR EVERYONE." };
+    evidence = { reason: PIPELINE_LINES.answerLeaked };
     opts = { force: true };
   }
   const allowed = FRESH.has(q.status) || (opts.force === true && JUDGED.has(q.status));

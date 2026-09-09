@@ -268,12 +268,23 @@ export const SUMMONS_LINES = [
 export const PIPELINE_LINES = Object.freeze({
   lockHealed: "THE ANSWER EXISTS. THIS ONE IS CLOSED.",
   voidDisagreement: "THE READERS DID NOT AGREE. THIS ONE IS STRUCK.",
+  // The leak line: an early lock that got healed too late to save the
+  // question, forced to void instead (probe.ts, resolution.ts's healed-lock
+  // path). Kept here, not as a literal at either call site, so both stay in
+  // step and the copy lint governs it.
+  answerLeaked: "THE ANSWER LEAKED. VOID FOR EVERYONE.",
   // Editorial withdrawal (design 2026-09-09 §1.4): the operator struck a
   // question that should never have run. Distinct from the leak line above,
   // because "we mis-wrote it" and "the answer leaked" are different facts and
   // the reveal prints whichever one is true.
-  withdrawnMisauthored: "THIS QUESTION WAS WITHDRAWN. IT COUNTS FOR NO ONE.",
-  withdrawnUnresolvable: "THIS QUESTION CANNOT BE SETTLED IN TIME. IT COUNTS FOR NO ONE.",
+  //
+  // All four of these render into the round screen's single-row banner
+  // (round.tsx), a min-height slot sized for one short line — see the ≤40
+  // character rule in test/copy-lint.test.ts.
+  withdrawnMisauthored: "WITHDRAWN. IT COUNTS FOR NO ONE.",
+  withdrawnUnresolvable: "CANNOT SETTLE IN TIME. VOID FOR EVERYONE",
+  // The v2 fallback when a struck question carries no server-stated reason.
+  struck: "STRUCK · VOID FOR EVERYONE",
 } as const);
 
 // What the gauntlet cost, in candidates. Null below one written candidate, so

@@ -1,3 +1,4 @@
+import { PIPELINE_LINES } from "@oracle/core";
 import { resolveQuestion } from "../resolution";
 // In-window lock healing (design 2026-09-04 §5).
 //
@@ -22,7 +23,7 @@ export async function probeQuestion(deps: PipelineDeps, questionId: string): Pro
   const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q) throw new Error(`probe: question not found: ${questionId}`);
   const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
-  const voidHealed = async () => resolveQuestion(deps.db, questionId, "void", { reason: "THE ANSWER APPEARED EARLY. THIS QUESTION IS VOID FOR EVERYONE." }, { force: true });
+  const voidHealed = async () => resolveQuestion(deps.db, questionId, "void", { reason: PIPELINE_LINES.answerLeaked }, { force: true });
   // Repair a crash after the lock write but before all prediction scores were cleared.
   if ((round?.rulesVersion ?? 1) >= 2 && q.lockHealedAt) { await voidHealed(); return false; }
   if (q.status !== "open") return false;

@@ -169,15 +169,15 @@ export default function Round() {
           player never sealed — that is exactly the strike that needs explaining,
           and a player who sealed in time has nothing to be told. The line printed
           is whatever reason the server stored: a leak reads as a leak, a
-          withdrawal reads as a withdrawal — never a fixed cover story. Fixed
-          height so the layout does not jump when a probe lands mid-session. */}
+          withdrawal reads as a withdrawal — never a fixed cover story. min-height,
+          so the line must stay short — see the ≤40 rule in copy-lint. */}
       {current && <>
       <View style={{ minHeight: scaledRow(16, chromeScale), justifyContent: "center" }}>
         {(() => {
           const struckQ = qs.find((q) => q.struck && ((today.data?.rules_version ?? 1) >= 2 || !answers[q.id]?.sealed));
           if (!struckQ) return null;
           const line = (today.data?.rules_version ?? 1) >= 2
-            ? (struckQ.struck_reason ?? "STRUCK · VOID FOR EVERYONE")
+            ? (struckQ.struck_reason ?? PIPELINE_LINES.struck)
             : PIPELINE_LINES.lockHealed;
           return (
             <Mono {...role.meta} color={colors.mutedInk} style={{ textAlign: "center" }}>
