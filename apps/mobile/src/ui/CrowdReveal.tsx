@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { useRouter } from "expo-router";
-import { colors, space } from "../theme";
-import { Serif, Mono, Eyebrow } from "./Text";
+import { scaledLines } from "../game/typeScaling";
+import { colors, space, displayScale } from "../theme";
+import { Serif, Mono, Eyebrow, role } from "./Text";
 import { GoldButton } from "./Button";
 import { GoldFrame } from "./GoldFrame";
 import { useCrowdSoFar } from "../api/hooks";
@@ -45,6 +46,7 @@ export function CrowdBar({ pct }: { pct: number }) {
 
 export function CrowdReveal({ round }: { round: RoundToday }) {
   const router = useRouter();
+  const { fontScale } = useWindowDimensions();
   const crowd = useCrowdSoFar(true);
   const answers = useRoundStore((s) => s.answers);
   const byId = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
@@ -82,13 +84,13 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               const gathering = !c || c.player_count < VERDICT_MIN_PLAYERS;
               return (
                 <View key={q.id} style={{ gap: space(2) }}>
-                  <Serif size={15} color={colors.ink} numberOfLines={2}>{q.text}</Serif>
+                  <Serif size={displayScale.inline} color={colors.ink} numberOfLines={scaledLines(2, fontScale)}>{q.text}</Serif>
                   {!gathering && c && (
                     <CrowdBar pct={c.crowd_yes_pct} />
                   )}
                   <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
-                    {!gathering && <Mono size={10} color={colors.goldText}>{c!.crowd_yes_pct}% SAY YES</Mono>}
-                    <Mono size={10} color={against ? colors.goldText : colors.mutedInk}>
+                    {!gathering && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "left" }]}>{c!.crowd_yes_pct}% SAY YES</Mono>}
+                    <Mono {...role.caption} color={against ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
                       {mine.answer ? "YOU: YES" : "YOU: NO"} @ {mine.confidence}%{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>
                   </View>
@@ -98,10 +100,10 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
           </ScrollView>
           <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
           <View style={{ gap: space(1) }}>
-            <Mono size={11} color={colors.goldText} style={{ textAlign: "center" }} letterSpacing={2}>
+            <Mono {...role.line} color={colors.goldText} style={{ textAlign: "center" }}>
               {playerCount < VERDICT_MIN_PLAYERS ? GATHERING_LINE : `UP TO ${playerCount} PLAYERS PER SHOWN QUESTION`}
             </Mono>
-            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={1}>
+            <Mono {...role.caption} color={colors.mutedInk} style={{ textAlign: "center" }}>
               THE LEDGER IS READ AFTER THE QUESTIONS CLOSE
             </Mono>
           </View>

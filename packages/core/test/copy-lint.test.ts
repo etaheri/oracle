@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COPY_BANK, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, PIPELINE_LINES, provenanceLine, fillSlots, type CopyLine } from "../src/copy";
+import { COPY_BANK, PLUS_CREED_LINES, LITURGY, LITURGY_LINES, RITES_LINES, OPENING_RITES, OPENING_RITES_LINES, SCORE_GLOSS, PARTIAL_LINE, SUMMONS_LINES, PAYWALL_CTA_LINES, PUSH_CAMPAIGN_LINES, PIPELINE_LINES, provenanceLine, fillSlots, type CopyLine } from "../src/copy";
 import { CONSTANTS } from "../src/constants";
 
 const BANNED = ["CHECK", "TAP", "CLICK", "VISIT", "RESULTS", "DON'T MISS"];
@@ -62,7 +62,10 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
     expect(count("closing")).toBeGreaterThanOrEqual(20);
     expect(count("streak")).toBeGreaterThanOrEqual(10);
     expect(count("system")).toBeGreaterThanOrEqual(5);
-    expect(count("paywall")).toBeGreaterThanOrEqual(5);
+    // The creed moved to PLUS_CREED_LINES (reading register) — what stays
+    // in the bank is the paywall's machine voice: the rescue offer Home
+    // prints and the terms line. The creed's own floor is asserted below.
+    expect(count("paywall")).toBeGreaterThanOrEqual(2);
   });
   it("carries the streak-at-risk and partial-closing lines", () => {
     expect(COPY_BANK.find((l) => l.id === "streak.risk-1")?.requires).toContain("streak");
@@ -196,13 +199,18 @@ describe("the rites", () => {
   it("scale every cumulative number against the daily one", () => {
     // "0 OF 50" on a screen whose every other surface says five is the honest
     // question a player actually asked. Anywhere the lifetime count appears,
-    // the per-day rate appears with it.
+    // the per-day rate appears with it. Case-insensitive since the score
+    // gloss moved to the reading register and is no longer shouted.
     for (const line of [...RITES_LINES, ...Object.values(SCORE_GLOSS)]) {
-      if (/FIFTY/.test(line)) expect(line, line).toMatch(/FIVE (A DAY|CALLS A DAY)/);
+      if (/fifty/i.test(line)) expect(line, line).toMatch(/five (a day|calls a day)/i);
     }
   });
-  it("partial, summons and score-gloss lines hold the register", () => {
-    for (const l of [PARTIAL_LINE, ...SUMMONS_LINES, ...Object.values(SCORE_GLOSS)]) {
+  it("partial and summons lines hold the machine register", () => {
+    // SCORE_GLOSS is no longer here. A gloss is a sentence explaining the row
+    // above it — read, not recognised — so it is governed by the reading
+    // register in test/reading-register.test.ts instead. Everything that
+    // remains in this list is a line the machine says about itself.
+    for (const l of [PARTIAL_LINE, ...SUMMONS_LINES]) {
       expect(l, l).toBe(l.toUpperCase());
       expect(l, l).not.toMatch(EMOJI);
       expect(l, l).not.toContain("!");
@@ -241,8 +249,10 @@ describe("the calling", () => {
 
 describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, campaign copy)", () => {
   it("every paywall-pool line in the bank holds the standard register", () => {
+    // Two, since the creed left for the reading register: the rescue offer
+    // and the terms line. Both are still machine voice and still held to it.
     const paywall = COPY_BANK.filter((l) => l.pool === "paywall");
-    expect(paywall.length).toBeGreaterThanOrEqual(5);
+    expect(paywall.length).toBeGreaterThanOrEqual(2);
     for (const l of paywall) {
       expect(l.text.replace(/\{[a-z]+\}/g, ""), l.id).toBe(l.text.replace(/\{[a-z]+\}/g, "").toUpperCase());
       expect(l.text, l.id).not.toMatch(EMOJI);
@@ -255,16 +265,21 @@ describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, ca
   });
 
   it("the paywall states the mechanic it charges for", () => {
-    // The whole pool, not just the creed: the Oracle Score clause lives in
-    // paywall.terms-1, and `plus.tsx` renders creed lines while the terms line
-    // is the one that has to stay true about what money cannot buy.
-    const creed = COPY_BANK.filter((l) => l.pool === "paywall").map((l) => l.text).join(" ");
+    // Everything the paywall screen prints, wherever it now lives: the creed
+    // is reading copy in PLUS_CREED_LINES, and the Oracle Score clause is
+    // still paywall.terms-1 in the bank. Matched case-insensitively because
+    // the two halves are deliberately in different registers now.
+    expect(PLUS_CREED_LINES.length).toBeGreaterThanOrEqual(4);
+    const shown = [
+      ...PLUS_CREED_LINES,
+      ...COPY_BANK.filter((l) => l.pool === "paywall").map((l) => l.text),
+    ].join(" ").toUpperCase();
     expect(CONSTANTS.SHIELD_MIN_STREAK).toBe(3);
-    expect(creed).toContain("THREE DAYS OR MORE");
+    expect(shown).toContain("THREE DAYS OR MORE");
     // What the subscription actually grants, in the player's words.
-    expect(creed).toContain("THREE SHIELDS");
+    expect(shown).toContain("THREE SHIELDS");
     // The wall that makes the whole economy honest, said at the till.
-    expect(creed).toContain("FORECAST RATING");
+    expect(shown).toContain("FORECAST RATING");
   });
 
   it("CTA labels are quarantined: caps, no emoji, no exclamation, short enough for a button", () => {

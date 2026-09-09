@@ -1,6 +1,9 @@
 export type MilestoneId = "first_round" | "first_result" | "first_oracle_win" | "three_rounds" | "seven_rounds";
 export const MILESTONE_COPY: Record<MilestoneId, string> = {
-  first_round: "YOUR FIRST ROUND IS SEALED",
+  // Two different moments — sealing a round, and that round being read a
+  // day later — and they used to share six of seven words, so the plaque
+  // stacked them and they looked like one line rendered twice.
+  first_round: "YOUR FIRST CALLS ARE SEALED",
   first_result: "YOUR FIRST ROUND IS READ",
   first_oracle_win: "YOUR FIRST VICTORY OVER THE ORACLE",
   three_rounds: "THREE ROUNDS. A RECORD TAKES SHAPE.",

@@ -2,8 +2,8 @@ import { View } from "react-native";
 import { colors, space } from "../theme";
 import { DecodeLine } from "./DecodeText";
 import { OracleClock } from "./OracleClock";
-import { role } from "./Text";
-import { GoldButton, QuietLink } from "./Button";
+import { Mono, role } from "./Text";
+import { GoldButton } from "./Button";
 
 // Between rounds the machine is not dead, it is waiting: one line, one
 // countdown to the next noon. Home says this in its own call slot (its clock
@@ -12,12 +12,10 @@ import { GoldButton, QuietLink } from "./Button";
 export function SleepsPanel({
   active = true,
   failed = false,
-  onHome,
   onExhibition,
 }: {
   active?: boolean;
   failed?: boolean;
-  onHome: () => void;
   onExhibition: () => void;
 }) {
   return (
@@ -30,8 +28,15 @@ export function SleepsPanel({
         color={colors.mutedInk}
       />
       {!failed && <OracleClock round={undefined} allSealed={false} loading={false} active={active} />}
-      <GoldButton title="CHALLENGE THE ORACLE" onPress={onExhibition} />
-      <QuietLink title="RETURN HOME" onPress={onHome} />
+      {/* An empty state should teach the interface rather than only report
+          that there is nothing here. This was one line floating in a screen
+          of white above a button labelled CHALLENGE THE ORACLE — Home's word
+          for the real round, pointing at a practice question instead. */}
+      <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "center" }]}>
+        An exhibition is one practice question with a known answer. It scores
+        nothing and changes no record — a way to meet the call while you wait.
+      </Mono>
+      <GoldButton title="TRY AN EXHIBITION" onPress={onExhibition} />
     </View>
   );
 }

@@ -7,7 +7,7 @@ import * as Notifications from "expo-notifications";
 import { SUMMONS_LINES } from "@oracle/core";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
-import { Mono } from "../ui/Text";
+import { Mono, role } from "../ui/Text";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
 import { appleRestore } from "../api/identity";
@@ -51,7 +51,7 @@ function SummonsContent() {
         <GoldButton title="ALLOW REMINDERS" onPress={onSpeak} />
         <QuietLink title="Not now" onPress={leave} />
         {restoreState === "none" && (
-          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
+          <Mono {...role.meta} color={colors.mutedInk} style={{ textAlign: "center" }}>
             NO RECORD BEARS THIS NAME.
           </Mono>
         )}

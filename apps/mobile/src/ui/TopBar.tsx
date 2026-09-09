@@ -22,7 +22,7 @@ export function TopBar({ label, showReturn = true }: { label?: string; showRetur
         // when the only way forward is BEGIN.
         <View style={{ minHeight: 44 }} />
       )}
-      {label ? <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ flexShrink: 1, textAlign: "right", marginLeft: 12 }}>{label}</Mono> : null}
+      {label ? <Mono {...role.meta} color={colors.mutedInk} style={{ flexShrink: 1, textAlign: "right", marginLeft: 12 }}>{label}</Mono> : null}
     </View>
   );
 }

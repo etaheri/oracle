@@ -1,8 +1,8 @@
 import { Modal, ScrollView, View, Pressable, StyleSheet } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 import { useScreenInset } from "./Screen";
-import { colors, space } from "../theme";
-import { Mono, Ritual } from "./Text";
+import { colors, space, displayScale } from "../theme";
+import { Mono, Ritual, role } from "./Text";
 import { GoldButton, QuietLink } from "./Button";
 
 // The app asked its two most dramatic questions — striking the record, and a
@@ -49,9 +49,9 @@ export function RiteConfirm({ visible, title, body, confirmLabel, destructive = 
         style={{ maxHeight: "100%", flexShrink: 1, backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: tone, padding: space(5), gap: space(4) }}
       >
         <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: space(4) }} alwaysBounceVertical={false} contentInsetAdjustmentBehavior="never">
-        <Ritual bold size={16} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{title}</Ritual>
+        <Ritual bold size={displayScale.inline} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{title}</Ritual>
         {body ? (
-          <Mono size={11} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: 18 }}>{body}</Mono>
+          <Mono {...role.line} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: 18 }}>{body}</Mono>
         ) : null}
         </ScrollView>
         <View style={{ gap: space(2) }}>

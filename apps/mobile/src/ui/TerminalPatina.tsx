@@ -311,3 +311,67 @@ export function AsciiActivation({
     </Canvas>
   );
 }
+
+// The reading-surface material (brief §4 "digital shadow", §5 Atmospheric
+// Dust). Every other mode here is an annulus around something — an orb, a
+// card, a seal. A page of rules has no such centre, so this one runs the same
+// shader with the mask opened out: a negative inner radius makes the first
+// smoothstep saturate at 1 for every cell, and an outer radius past the far
+// corner keeps the second from ever falling off. Band is 1 everywhere and the
+// gate alone decides how much shows.
+//
+// It is deliberately quieter than every other mode: DEFAULT_FIELD_GATE shows
+// ~6% of cells against AsciiDust's 22%, at roughly half the intensity, on a
+// dwell measured in seconds. The brief's ceiling is 20% of a composition and
+// "discovered as a detail" -- a reading page is the one surface where the
+// patina must lose an argument with the words, so it is pinned to the margin
+// by its consumer and never laid over a text column.
+const FIELD_HOLD: readonly [number, number] = [6, 14];
+const DEFAULT_FIELD_GATE = 0.06;
+
+export function AsciiField({
+  width,
+  height,
+  color = GOLD,
+  intensity = 0.13,
+  gate = DEFAULT_FIELD_GATE,
+  hold = FIELD_HOLD,
+}: {
+  width: number;
+  height: number;
+  color?: readonly [number, number, number];
+  intensity?: number;
+  gate?: number;
+  hold?: readonly [number, number];
+}) {
+  const atlas = useImage(ATLAS);
+  const clock = useClock();
+  const reducedMotion = useReducedMotion();
+
+  const uniforms = useDerivedValue(() => ({
+    atlasSize: [ATLAS_W, ATLAS_H],
+    glyphCount: GLYPH_COUNT,
+    cell: [CELL_W, CELL_H],
+    intensity,
+    // Reduced motion freezes the pattern rather than removing it (brief §5):
+    // a fixed tick still yields a full, static Terminal Patina.
+    t: reducedMotion ? 1 : clock.value / 1000,
+    tint: tintOf(color),
+    center: [width / 2, height / 2],
+    innerR: -CELL_H * 2,
+    outerR: Math.hypot(width, height),
+    gate,
+    hold: reducedMotion ? [0, 0] : [hold[0], hold[1]],
+  }), [width, height, color, intensity, gate, hold, reducedMotion]);
+
+  if (!effect || !atlas || width <= 0 || height <= 0) return null;
+  return (
+    <Canvas style={{ width, height }} pointerEvents="none">
+      <Fill>
+        <Shader source={effect} uniforms={uniforms}>
+          <ImageShader image={atlas} rect={{ x: 0, y: 0, width: ATLAS_W, height: ATLAS_H }} />
+        </Shader>
+      </Fill>
+    </Canvas>
+  );
+}

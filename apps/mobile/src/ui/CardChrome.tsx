@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { colors, space } from "../theme";
+import { colors, space, displayScale } from "../theme";
 import { Ritual, Mono, Eyebrow } from "./Text";
 import { NUMERALS, numeral } from "../game/numerals";
 import { useChromeScale } from "./useChromeScale";
@@ -17,7 +17,7 @@ const MARK_BOX = 14; // the glyph's centring box at 1x, straddling the rule's co
 // than as rectangles (refinement spec §1.1). Same silhouette as the antique
 // card-printing / technical-drawing mark they replace, but now the frame is
 // type — it belongs to the same alphabet as the coordinate and the status.
-function RegisterMarks() {
+export function RegisterMarks() {
   // The box scales with the '+' inside it. The mark is type now, so it grows
   // with the reader's text size like the rest of the chrome — and a fixed box
   // would stop containing its own glyph's line box at the cap, decentring the
@@ -71,7 +71,7 @@ export function CardChrome({ slot, title, modifiers, coordinate, status, big = f
     >
       <RegisterMarks />
       <View style={{ alignItems: "center", gap: space(2) }}>
-        <Ritual bold size={18} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(slot)}</Ritual>
+        <Ritual bold size={displayScale.stamp} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(slot)}</Ritual>
         {/* Brackets are the app's terminal signature (they frame the footer
             rail's controls). On an undealt card the contents are static and
             the brackets stay solid — the frame is known, the prophecy is not. */}

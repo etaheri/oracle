@@ -1,4 +1,4 @@
-import { MILESTONE_COPY } from "@oracle/core";
+import { GAME_TERMS, MILESTONE_COPY } from "@oracle/core";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
@@ -7,7 +7,7 @@ import { useCanvasRef } from "@shopify/react-native-skia";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Screen } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
-import { Eyebrow, Mono, Ritual } from "../ui/Text";
+import { Eyebrow, Mono, Ritual, role } from "../ui/Text";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { GoldButton, QuietLink } from "../ui/Button";
@@ -17,7 +17,7 @@ import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
 import { appleClaim, appleRestore, strikeRecord } from "../api/identity";
 import { usePlusStore } from "../monetization/plusState";
-import { colors, space } from "../theme";
+import { colors, space, displayScale } from "../theme";
 import { LITURGY_LINES, SCORE_GLOSS } from "@oracle/core";
 import { ConfidenceHistory } from "../ui/ConfidenceHistory";
 import { shieldStat } from "../game/shieldStat";
@@ -42,28 +42,34 @@ const PLAQUE_MIN_H = 420;
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
-      <Mono size={11} color={colors.mutedInk} letterSpacing={2} style={{ flexShrink: 1 }}>{label}</Mono>
-      <Mono size={11} color={colors.ink} letterSpacing={2} style={{ flexShrink: 1, textAlign: "right" }}>{value}</Mono>
+      <Mono {...role.line} color={colors.mutedInk} style={[role.line.style, { flexShrink: 1, textAlign: "left" }]}>{label}</Mono>
+      <Mono {...role.line} color={colors.ink} style={[role.line.style, { flexShrink: 1, textAlign: "right" }]}>{value}</Mono>
     </View>
   );
 }
 
 // The lead treatment celebrates a number you have earned, so it only applies
-// to one. Before fifty calls are rated `scoreValue` returns a progress
-// sentence — "UNWRITTEN · 0 OF 50" — and at Ritual 20 that ran straight
-// through its own label and off the plaque's edge. A sentence is not a
-// headline: unearned, the row keeps the machine voice the six stats below it
-// use, and only the real score gets carved.
+// to one. An earned score is a row: the label left, the carved number right.
+// An unearned one is NOT — "UNWRITTEN · 0 OF 50" is a progress reading, and set
+// opposite a label in a space-between row both halves wrapped and their
+// second lines landed beside each other, so "ORACLE RATING" against its own
+// value read as four fragments in two ragged columns. Stacked, the pair reads
+// as one fact at any width and at any text size, which is what the row could
+// never promise.
 function LeadStat({ label, value }: { label: string; value: string }) {
   const earned = /^\d+$/.test(value);
+  if (!earned) {
+    return (
+      <View style={{ gap: space(1) }}>
+        <Mono {...role.line} color={colors.goldText} style={[role.line.style, { textAlign: "left" }]}>{label}</Mono>
+        <Mono {...role.line} color={colors.goldText} style={[role.line.style, { textAlign: "left" }]}>{value}</Mono>
+      </View>
+    );
+  }
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
-      <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ flexShrink: 1 }}>{label}</Mono>
-      {earned ? (
-        <Ritual bold size={20} color={colors.ink} letterSpacing={1}>{value}</Ritual>
-      ) : (
-        <Mono size={11} color={colors.goldText} letterSpacing={2} style={{ flexShrink: 1, textAlign: "right" }}>{value}</Mono>
-      )}
+      <Mono {...role.line} color={colors.goldText} style={[role.line.style, { flexShrink: 1, textAlign: "left" }]}>{label}</Mono>
+      <Ritual bold size={displayScale.lead} color={colors.ink} letterSpacing={1}>{value}</Ritual>
     </View>
   );
 }
@@ -148,11 +154,11 @@ export default function Ledger() {
     // over ‹ RETURN and dropped STRIKE THE RECORD off the bottom. Screen's
     // scroll variant keeps the centring for a short record and grows for a
     // long one; see its own note for why flexGrow is the load-bearing part.
-    <Screen scroll overlayHeader header={<TopBar />}>
+    <Screen scroll overlayHeader patina header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>Your ledger</Eyebrow>
-        <Mono size={12}>Your predictions and results</Mono>
-        <QuietLink title="HOW TO PLAY" onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })} />
+        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your predictions and results</Mono>
+        <QuietLink title={GAME_TERMS.rulesNav} onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })} />
         {/* One column in both states. The frame used to be the only thing
             held steady while the six children below it did not exist yet —
             so the plaque itself stayed the right size and still jumped
@@ -164,12 +170,12 @@ export default function Ledger() {
             <>
               <Eyebrow>Epithet of the last 28 days</Eyebrow>
               <View style={{ alignItems: "center", gap: space(2) }}>
-                <Ritual bold size={24} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
-                <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>{d.epithet.receipt}</Mono>
+                <Ritual bold size={displayScale.epithet} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
+                <Mono {...role.meta} color={colors.goldText}>{d.epithet.receipt}</Mono>
               </View>
               <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
               <View style={{ gap: space(2) }}>
-                {d.milestones.map(id => <Mono key={id} size={11} style={{ textAlign: "center" }}>{MILESTONE_COPY[id]}</Mono>)}
+                {d.milestones.map(id => <Mono key={id} {...role.line} color={colors.mutedInk}>{MILESTONE_COPY[id]}</Mono>)}
                 <LeadStat label="YOUR FORECAST RATING" value={scoreValue(d.oracle_score, d.calls_rated)} />
                 {/* The machine's own plaque row, on the same fifty-call floor
                     the player meets -- so for its first ten days it too reads
@@ -182,23 +188,34 @@ export default function Ledger() {
                     how it is earned while it is unwritten, what it measures once
                     it is. The second half is also the legal wall, stated to the
                     player rather than only to the spec. */}
-                <Mono size={10} color={colors.mutedInk} letterSpacing={1} style={{ lineHeight: 16 }}>
-                  {d.oracle_score === null ? "FIFTY RATED CALLS WRITE YOUR SCORE. COMPLETE EVERY NON-VOID QUESTION; AT LEAST THREE MUST RESOLVE. OLDER ROUNDS REQUIRED ALL FIVE." : SCORE_GLOSS.written}
+                {/* One gloss register on this plaque. This row used to be
+                    tracked caps at role.caption while the vigil's gloss eight
+                    rows below was sentence case at role.supporting — the same
+                    job, in two voices, inside one screenful. Its unwritten
+                    copy also lived here as a call-site literal, which is how
+                    it came to name the fifty without ever scaling it against
+                    the five a day the rest of the app says. */}
+                <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "left" }]}>
+                  {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
                 </Mono>
                 {standingLine(d.percentile, d.cohort_size) && (
-                  <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ lineHeight: 16 }}>
+                  <Mono {...role.meta} color={colors.goldText} style={[role.meta.style, { textAlign: "left" }]}>
                     {standingLine(d.percentile, d.cohort_size)}
                   </Mono>
                 )}
                 {d.oracle.days_compared > 0 && (
-                  <Mono size={10} color={colors.goldText} letterSpacing={2} style={{ textAlign: "center" }}>
+                  <Mono {...role.meta} color={colors.goldText}>
                     {`YOU HAVE OUTSEEN THE ORACLE ON ${d.oracle.days_outseen} OF ${d.oracle.days_compared} DAYS`}
                   </Mono>
                 )}
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
                 <Stat label="ROUNDS PLAYED" value={String(d.days_consulted)} />
-                <Mono size={12}>Your vigil is your playing streak: a reason to make one call each day. The count updates when the round settles. Shields can hold it through a missed round. Your rating comes from your forecasts; your streak adds no points.</Mono>
                 <Stat label="STREAK" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
+                {/* A gloss on the row above it, in the register a gloss is
+                    written in. It used to sit two rows higher, sentence case
+                    and size 12, between tracked-caps stat rows that gave the
+                    eye no signal that the voice had changed. */}
+                <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { paddingBottom: space(1) }]}>Your vigil is your playing streak: a reason to make one call each day. The count updates when the round settles. Shields can hold it through a missed round. Your rating comes from your forecasts; your streak adds no points.</Mono>
                 <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
                 <Stat label="AVG CONFIDENCE" value={pct(d.avg_confidence)} />
                 <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
@@ -207,9 +224,7 @@ export default function Ledger() {
               </View>
               <View style={{ minHeight: 78, justifyContent: "center", marginTop: space(2) }}>
                 {d.claimed ? (
-                  <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
-                    THE RECORD IS CLAIMED
-                  </Mono>
+                  <Mono {...role.meta} color={colors.mutedInk}>THE RECORD IS CLAIMED</Mono>
                 ) : appleAvailable ? (
                   <View style={{ alignItems: "center", gap: space(2) }}>
                     <Eyebrow>Claim your record</Eyebrow>
@@ -227,19 +242,19 @@ export default function Ledger() {
           ) : (
             <>
               <AsciiDust />
-              <DecodeLine text="THE LEDGER IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+              <DecodeLine text="THE LEDGER IS CONSULTED" cursor {...role.eyebrow} color={colors.goldText} />
             </>
           )}
         </View>
         {!plusActive && <QuietLink title="Outseen Plus" onPress={() => router.push("/plus")} />}
         <View style={{ gap: space(1) }}>
           {LITURGY_LINES.map((line) => (
-            <Mono key={line} size={10} color={colors.mutedInk} letterSpacing={1} style={{ textAlign: "center" }}>{line}</Mono>
+            <Mono key={line} {...role.meta} color={colors.mutedInk}>{line}</Mono>
           ))}
         </View>
         <GoldButton title={sharing ? "PREPARING…" : "DECLARE YOURSELF"} onPress={handleShare} disabled={!d} />
         {shareError && (
-          <Mono size={10} color={colors.vermilion} letterSpacing={2} style={{ textAlign: "center" }}>{shareError}</Mono>
+          <Mono {...role.meta} color={colors.vermilion} accessibilityRole="alert">{shareError}</Mono>
         )}
         <QuietLink title="Strike the record" onPress={() => setRite("strike")} />
         {d && <PlaqueShareCanvas canvasRef={canvasRef} data={d} />}

@@ -1,7 +1,7 @@
 import { claimFirstLiveSeal } from "../api/flags";
 import { capture as captureGameplay } from "../analytics/analytics";
 import { useEffect, useRef, useState } from "react";
-import { View, Pressable, StyleSheet, Dimensions, Linking } from "react-native";
+import { View, Pressable, StyleSheet, useWindowDimensions, Linking } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector, ScrollView } from "react-native-gesture-handler";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,7 +28,6 @@ import type { RoundToday } from "@oracle/core";
 // card deals in under it; the crowd's verdict prints in the stationary
 // footer. If the oracle refuses the prophecy, the card flies back in.
 const THROW_MS = 320;
-const SCREEN_W = Dimensions.get("window").width;
 
 // The uncovered card's prophecy materializes IN PLACE and in ONE face: the
 // exact static it wore in the stack (same seed, same serif, muted ink)
@@ -74,6 +73,12 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
   onLean?: (conf: number | null, side: boolean, active: boolean) => void;
 }) {
   const { answers, setAnswer, setConfidence, markSealed } = useRoundStore();
+  // The throw distance, read live. This was a module-scope
+  // Dimensions.get("window").width, captured once at import and never
+  // updated — so after a rotation, in an iPad split view or under Stage
+  // Manager the card was thrown the previous layout's width and either
+  // stopped on screen or flew far past the edge.
+  const { width: screenW } = useWindowDimensions();
   const entry = practice ? undefined : answers[q.id];
   const submit = useSubmit();
   const qc = useQueryClient();
@@ -283,7 +288,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
       setThrown(true);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       flight = new Promise<void>((resolve) => {
-        dragX.value = withTiming((answer ? 1 : -1) * SCREEN_W * 1.2, { duration: THROW_MS, easing: Easing.in(Easing.poly(3)) }, () => {
+        dragX.value = withTiming((answer ? 1 : -1) * screenW * 1.2, { duration: THROW_MS, easing: Easing.in(Easing.poly(3)) }, () => {
           runOnJS(resolve)();
         });
       });
@@ -357,7 +362,7 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
               {practice?.context && <Mono size={11} style={{ textAlign: "center" }}>{practice.context}</Mono>}
               {q.context && <View style={{ gap: space(1) }}>
                 <Pressable accessibilityRole="button" onPress={() => setShowContext(!showContext)} style={{ minHeight: 44, justifyContent: "center" }}><Mono size={11}>{showContext ? "CLOSE CONTEXT" : "CONTEXT"}</Mono></Pressable>
-                {showContext && <><Mono size={11}>{q.context.text}</Mono><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(q.context!.sourceUrl); }} style={{ minHeight: 44 }}><Mono size={9}>SOURCE · AS OF {new Date(q.context.asOf).toLocaleString()}</Mono></Pressable></>}
+                {showContext && <><Mono size={11}>{q.context.text}</Mono><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(q.context!.sourceUrl); }} style={{ minHeight: 44 }}><Mono size={10}>SOURCE · AS OF {new Date(q.context.asOf).toLocaleString()}</Mono></Pressable></>}
               </View>}
               {q.is_big_one && <Mono size={10} style={{ textAlign: "center" }}>DOUBLE POINTS · RIGHT OR WRONG</Mono>}
               </ScrollView>

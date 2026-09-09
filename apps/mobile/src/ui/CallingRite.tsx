@@ -130,7 +130,7 @@ export function CallingRite() {
               onPress={() => setDone(true)}
               style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", opacity: pressed ? 0.5 : 1 })}
             >
-              <Mono size={9} color={colors.mutedInk} letterSpacing={4} style={{ marginRight: -4 }}>{SKIP_LABEL}</Mono>
+              <Mono size={10} color={colors.mutedInk} letterSpacing={4} style={{ marginRight: -4 }}>{SKIP_LABEL}</Mono>
             </Pressable>
           </Animated.View>
         )}

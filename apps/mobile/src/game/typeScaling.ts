@@ -19,3 +19,20 @@ export function cappedScale(fontScale: number, cap: number = CHROME_CAP): number
 export function scaledRow(base: number, fontScale: number, cap: number = CHROME_CAP): number {
   return Math.ceil(base * cappedScale(fontScale, cap));
 }
+
+// How many lines of CONTENT to allow at the current text size.
+//
+// The counterpart to scaledRow, and the fix for its blind spot. Chrome is
+// capped and its reserved rows grow with it; content scales freely — but
+// content clamped with a fixed `numberOfLines` gets worse as the reader turns
+// their text size up, because each line then holds fewer words while the line
+// budget stays put. The reveal's question rows and the crowd finale both did
+// this, so the accessibility setting that exists to make text readable was
+// quietly deleting the end of every long question.
+//
+// Uncapped on purpose: both surfaces are inside scrollers, so the cost of a
+// taller row is a scroll, and the cost of a short one is a truncated question.
+export function scaledLines(base: number, fontScale: number): number {
+  if (!Number.isFinite(fontScale) || fontScale <= 1) return base;
+  return Math.max(base, Math.round(base * fontScale));
+}

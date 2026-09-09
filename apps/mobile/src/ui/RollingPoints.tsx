@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "react-native-reanimated";
-import { colors } from "../theme";
+import { colors, displayScale } from "../theme";
 import { Ritual } from "./Text";
 
 // Day points roll up to their final value before the haptic lands. JS-driven
@@ -30,7 +30,7 @@ export function RollingPoints({ value, delayMs }: { value: number; delayMs: numb
 
   const pos = value >= 0;
   return (
-    <Ritual bold size={54} color={pos ? colors.goldText : colors.vermilion} letterSpacing={2}>
+    <Ritual bold size={displayScale.points} color={pos ? colors.goldText : colors.vermilion} letterSpacing={2}>
       {pos ? `+${shown}` : String(shown)}
     </Ritual>
   );

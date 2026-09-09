@@ -96,10 +96,6 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
   // ── paywall: the shield offer. Protection, never pressure. No CTA verbs here —
   // button labels live in PAYWALL_CTA_LINES by construction. ──
-  { id: "paywall.creed-1", pool: "paywall", text: "A SHIELD PROTECTS A STREAK OF THREE DAYS OR MORE THROUGH ONE MISSED ROUND." },
-  { id: "paywall.creed-2", pool: "paywall", text: "ONE FREE SHIELD EACH MONTH. PLUS ADDS THREE SHIELDS PER BILLING PERIOD, CAPPED AT FIVE PAID SHIELDS PER GRANT." },
-  { id: "paywall.creed-3", pool: "paywall", text: "SHIELDS PROTECT YOUR STREAK, NOT YOUR SCORE. NO CALLS OR WINS ARE ADDED." },
-  { id: "paywall.creed-4", pool: "paywall", text: "PROTECTION REQUIRES AN ELIGIBLE STREAK AND AN AVAILABLE SHIELD." },
   { id: "paywall.rescue-1", pool: "paywall", text: "A SHIELD MAY PROTECT AN ELIGIBLE STREAK THROUGH A MISSED ROUND.", requires: ["streak"] },
   { id: "paywall.terms-1", pool: "paywall", text: "EVERY ROUND IS FREE TO PLAY. YOUR CALLS EARN YOUR RANK AND FORECAST RATING." },
 ] as const;
@@ -215,9 +211,37 @@ export const OPENING_RITES_LINES = RITES_LINES.slice(0, OPENING_RITES);
 // the ledger naming who can actually see — and until now no screen in the app
 // said what it was, what "rates" meant, or what fifty was fifty OF (audit
 // 2026-09-02 §1.1). Two states: how it is earned, then what it is.
+// The rating's gloss, in the register a gloss is written in.
+//
+// These are sentences explaining the stat above them, which is the definition
+// of reading copy — and the plaque already sets the vigil's gloss in sentence
+// case eight rows below. Holding these two to tracked caps put the same job
+// in two opposite voices on one surface. Governed by
+// test/reading-register.test.ts rather than by the machine-voice lint.
+//
+// `unwritten` was also being bypassed entirely: the ledger printed a 130-
+// character literal at the call site, which is how it came to state the fifty
+// without ever scaling it against the five a day.
+// What Plus actually grants, in the register an argument is written in.
+//
+// These four lines are the case for spending money, and they lived in the
+// ambient COPY_BANK — which holds every line to tracked caps, correctly,
+// because the bank exists for lines the machine says in passing. Rendered
+// through role.supporting on the paywall they became four caps paragraphs in
+// the reading register: no tracking to be recognised by, no sentence case to
+// be read by. They are read, so they are written to be. Governed by
+// test/reading-register.test.ts; the pool's remaining lines (the rescue
+// offer, the terms line) stay in the bank because they stay machine voice.
+export const PLUS_CREED_LINES = [
+  "A shield protects a streak of three days or more through one missed round.",
+  "One free shield each month. Plus adds three shields per billing period, capped at five paid shields per grant.",
+  "Shields protect your streak, not your score. No calls or wins are added.",
+  "Protection requires an eligible streak and an available shield.",
+] as const;
+
 export const SCORE_GLOSS = Object.freeze({
-  unwritten: "YOUR RATING BEGINS AT 50 QUALIFYING CALLS. BUILD IT ACROSS ROUNDS, AT YOUR OWN PACE.",
-  written: "HOW WELL YOUR CONFIDENCE MATCHES WHAT HAPPENS. BASED ON YOUR LATEST QUALIFYING CALLS.",
+  unwritten: "Fifty qualifying calls write your rating — five calls a day, at your own pace. A round qualifies when you complete every non-void question and at least three resolve.",
+  written: "How well your confidence matches what happens, across your latest qualifying calls.",
 } as const);
 
 // The Calling: the one-time cinematic on the app's very first open — the
@@ -255,20 +279,146 @@ export function provenanceLine(written: number, rejected: number): string | null
 }
 
 // Introduction is intentionally separate from the reference rulebook.
+// The opening rites: the only rules screen a first-time player is guaranteed
+// to see, and therefore the one that has to be READ rather than recognised.
+// It was set in tracked caps while the reference canon below it was converted
+// to sentence case — the register work applied to the screen players skip and
+// not to the screen they cannot. See test/reading-register.test.ts.
+//
+// The second rite also carries the gesture now. It used to ask "how sure are
+// you?" and never answer how confidence is set, so a first-time player met
+// the swipe with nothing but the one-time nudge animation to explain it; the
+// sentence that does explain it lived only in the reference rites.
 export const INTRO_LINES = [
-  "CHOOSE YES OR NO. CALL WHAT HAPPENS NEXT.",
-  "HOW SURE ARE YOU? MORE CONFIDENCE MEANS MORE TO GAIN AND MORE TO LOSE.",
-  "SEAL YOUR CALL. RETURN TO FACE THE ORACLE AND FIND YOUR PLACE AMONG OTHER PLAYERS.",
+  "Choose yes or no. Call what happens next.",
+  "Pull the card toward your answer, then release to seal it. The further you pull, the more confident the call — and the more it gains or costs.",
+  "Return to face the Oracle and find your place among other players.",
 ] as const;
 
 // RITES_LINES and OPENING_RITES_LINES above are the archived version-1 canon.
 // Current rules are explicit data, never substitutions on historical prose.
+//
+// Each rite is a list of CLAIMS, not a paragraph. The wording is unchanged
+// from the paragraph form — these are the sentence boundaries that were
+// already in it. Prose fused six short, scannable statements into a wall the
+// eye cannot enter; splitting on the boundaries the copy already had restores
+// the scan without costing a word of the clarity the rewrite bought. `text`
+// rejoins them, so anything reading the canon as one string (the copy lint,
+// RITES_V2_LINES, the push bank) sees exactly what it saw before.
+//
+// `defines` names the terms this rite is the definition of. The screen sets a
+// term in tracked caps on its FIRST appearance — in the rite that defines it —
+// and plainly everywhere after, so jargon announces itself as jargon once and
+// then gets out of the way. Terms are matched against the claims at render
+// time rather than baked into the strings, which is what keeps the copy tests
+// asserting on ordinary prose.
+function rite(title: string, defines: readonly string[], claims: readonly string[]) {
+  return { title, defines, claims, text: claims.join(" ") };
+}
+
 export const RITES_V2_SECTIONS = [
-  { title: "The challenge", text: `Five questions about what happens next. Make your calls, then find out whether you outscored the Oracle and other players. ${CURRENT_GAME_COPY.oracleIdentity} The DAILY BOARD ranks players. THE CROWD shows which way they lean.` },
-  { title: "Make a call", text: "Your prediction is a call. Choose yes or no and set confidence from 55% to 95%. Pull toward your answer; a longer pull means greater confidence. Release to seal. Sealing locks your answer and confidence. The crowd is hidden until you commit; the Oracle forecast stays hidden until reveal." },
-  { title: "Face the result", text: `Choose the confidence you can stand behind. Higher confidence earns more when right and loses more when wrong. The Big One counts double in both directions. Your duel and daily board use the same scoring formula for your calls and the Oracle's. These base points include the Big One, but no crowd bonus. A correct call on a side below ${CONSTANTS.CONTRARIAN_CROWD_PCT}% earns a separate crowd bounty when at least ${CONSTANTS.CONTRARIAN_MIN_CROWD} players answered. The bounty does not affect duel or board.` },
-  { title: "Build your record", text: `A single round settles a challenge. Your record shows how your judgment holds up over time. Your forecast rating measures performance over qualifying calls and appears after ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} cumulative qualifying calls, not consecutive days. A competitive round requires every non-void question sealed and at least three resolved, non-void questions. Only calls from eligible rounds count toward that rating. Daily board placing does not require 50 calls; a placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison. Confidence history also includes resolved calls from incomplete rounds, showing how your confidence matched outcomes.` },
-  { title: "Keep a vigil", text: `Your vigil is your playing streak. Seal at least one call in a daily round to keep it going; the count updates when that round settles. ${CURRENT_GAME_COPY.streakMeaning} A shield can preserve a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through a missed round, without incrementing it or adding calls. One free shield is available each calendar month; available paid shields are used after it. ${CURRENT_GAME_COPY.lapse} Exhibitions do not count. Streaks and early marks do not multiply current points.` },
-  { title: "Timing and fairness", text: "Each question has its own deadline. If an answer appears early, the question closes and is void for everyone. Results follow verification, not a guaranteed time. Unresolved outcomes are pending, never losses; void questions score nothing. Incomplete rounds still keep the results of your calls. An outcome correction or void can update your record. The Oracle can report any chance of YES from 0% to 100%; 50% is an abstention. Players choose a side at 55% to 95% confidence. Both use the same points formula. Older rounds retain their versioned rules." },
-] as const;
+  // Terms are named without their article: `Term` uppercases the match, so
+  // "the crowd" and "daily board" started the emphasis in a different place
+  // each time and the rite disagreed with itself one line apart. The claims
+  // are plain sentences for the same reason — encoding the caps in the source
+  // AND in `defines` says the same thing twice, and the two drift.
+  rite("The challenge", ["daily board", "crowd"], [
+    "Five questions about what happens next.",
+    "Make your calls, then find out whether you outscored the Oracle and other players.",
+    CURRENT_GAME_COPY.oracleIdentity,
+    "The daily board ranks players.",
+    "The crowd shows which way they lean.",
+  ]),
+  rite("Make a call", ["call", "seal"], [
+    "Your prediction is a call.",
+    "Choose yes or no and set confidence from 55% to 95%.",
+    "Pull toward your answer; a longer pull means greater confidence.",
+    "Release to seal.",
+    "Sealing locks your answer and confidence.",
+    "The crowd is hidden until you commit; the Oracle forecast stays hidden until reveal.",
+  ]),
+  rite("Face the result", ["big one", "crowd bounty"], [
+    "Choose the confidence you can stand behind.",
+    "Higher confidence earns more when right and loses more when wrong.",
+    "The Big One counts double in both directions.",
+    "Your duel and daily board use the same scoring formula for your calls and the Oracle's.",
+    "These base points include the Big One, but no crowd bonus.",
+    `A correct call on a side below ${CONSTANTS.CONTRARIAN_CROWD_PCT}% earns a separate crowd bounty when at least ${CONSTANTS.CONTRARIAN_MIN_CROWD} players answered.`,
+    "The bounty does not affect duel or board.",
+  ]),
+  rite("Build your record", ["forecast rating", "competitive round"], [
+    "A single round settles a challenge.",
+    "Your record shows how your judgment holds up over time.",
+    `Your forecast rating measures performance over qualifying calls and appears after ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} cumulative qualifying calls, not consecutive days.`,
+    "A competitive round requires every non-void question sealed and at least three resolved, non-void questions.",
+    "Only calls from eligible rounds count toward that rating.",
+    `Daily board placing does not require 50 calls; a placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison.`,
+    "Confidence history also includes resolved calls from incomplete rounds, showing how your confidence matched outcomes.",
+  ]),
+  rite("Keep a vigil", ["vigil", "shield", "exhibitions"], [
+    "Your vigil is your playing streak.",
+    "Seal at least one call in a daily round to keep it going; the count updates when that round settles.",
+    CURRENT_GAME_COPY.streakMeaning,
+    `A shield can preserve a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through a missed round, without incrementing it or adding calls.`,
+    "One free shield is available each calendar month; available paid shields are used after it.",
+    CURRENT_GAME_COPY.lapse,
+    "Exhibitions do not count.",
+    "Streaks and early marks do not multiply current points.",
+  ]),
+  rite("Timing and fairness", ["void", "abstention"], [
+    "Each question has its own deadline.",
+    "If an answer appears early, the question closes and is void for everyone.",
+    "Results follow verification, not a guaranteed time.",
+    "Unresolved outcomes are pending, never losses; void questions score nothing.",
+    "Incomplete rounds still keep the results of your calls.",
+    "An outcome correction or void can update your record.",
+    "The Oracle can report any chance of YES from 0% to 100%; 50% is an abstention.",
+    "Players choose a side at 55% to 95% confidence.",
+    "Both use the same points formula.",
+    "Older rounds retain their versioned rules.",
+  ]),
+];
 export const RITES_V2_LINES = RITES_V2_SECTIONS.map(section => `${section.title.toUpperCase()}: ${section.text}`);
+
+// One claim, split into the run that is a defined term and the runs that are
+// not. The screen sets `term` segments in the machine's tracked caps and the
+// rest in ordinary reading text: the jargon announces itself exactly once,
+// where it is defined, and reads as a plain word every time after.
+export type ClaimSegment = { text: string; term: boolean };
+
+const WORD = /[A-Za-z0-9]/;
+const boundedAt = (haystack: string, needle: string, from: number): number => {
+  for (let i = haystack.toLowerCase().indexOf(needle, from); i !== -1; i = haystack.toLowerCase().indexOf(needle, i + 1)) {
+    const before = i === 0 || !WORD.test(haystack[i - 1]!);
+    const after = i + needle.length >= haystack.length || !WORD.test(haystack[i + needle.length]!);
+    if (before && after) return i;
+  }
+  return -1;
+};
+
+// First use only, and first use is scoped to the rite that DEFINES the term —
+// which is why this walks a whole section rather than a line. "The crowd is
+// hidden until you commit" in `Make a call` is prose; THE CROWD in
+// `The challenge` is a definition, and only the definition is set as one.
+export function emphasizeClaims(claims: readonly string[], defines: readonly string[]): ClaimSegment[][] {
+  const pending = defines.map(t => t.toLowerCase());
+  return claims.map(claim => {
+    const out: ClaimSegment[] = [];
+    let rest = claim;
+    for (;;) {
+      let best = -1;
+      let bestTerm = "";
+      for (const term of pending) {
+        const at = boundedAt(rest, term, 0);
+        if (at !== -1 && (best === -1 || at < best)) { best = at; bestTerm = term; }
+      }
+      if (best === -1) break;
+      pending.splice(pending.indexOf(bestTerm), 1);
+      if (best > 0) out.push({ text: rest.slice(0, best), term: false });
+      out.push({ text: rest.slice(best, best + bestTerm.length), term: true });
+      rest = rest.slice(best + bestTerm.length);
+    }
+    if (rest) out.push({ text: rest, term: false });
+    return out;
+  });
+}

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { ReadingHeader } from "./ReadingHeader";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, space } from "../theme";
 import { Grain } from "./Grain";
+import { AsciiField } from "./TerminalPatina";
 
 // The device's safe inset and the design's gutter are the same margin, not two
 // stacked ones. `SafeAreaView` insets its children by the full safe area and
@@ -32,15 +33,23 @@ export function useScreenInset() {
 }
 
 // Header and footer own their safe edges; the body pays only the remaining ones.
-export function Screen({ children, scroll = false, bleed = false, header, footer, overlayHeader = false }: {
+export function Screen({ children, scroll = false, bleed = false, header, footer, overlayHeader = false, patina = false }: {
   children: React.ReactNode;
   scroll?: boolean;
   bleed?: boolean;
   header?: React.ReactNode;
   footer?: React.ReactNode;
   overlayHeader?: boolean;
+  // Terminal Patina down the page's own margin. Opt-in, and only on reading
+  // surfaces: the band is exactly the gutter the content is already padded
+  // by, so a glyph can never land under a word. The brief asks for ASCII in
+  // 20-30% of compositions at 5-20% coverage -- a two-column trickle at the
+  // edge of a museum-white page is what "discovered as a detail" means when
+  // the composition is a page of text rather than an artwork.
+  patina?: boolean;
 }) {
   const i = useScreenInset();
+  const { height } = useWindowDimensions();
   const [headerHeight, setHeaderHeight] = useState(i.top + 44);
   const [scrolled, setScrolled] = useState(false);
   const overlay = scroll && overlayHeader && !!header;
@@ -50,6 +59,9 @@ export function Screen({ children, scroll = false, bleed = false, header, footer
     paddingLeft: i.left, paddingRight: i.right,
   };
   return <View style={{ flex: 1, backgroundColor: colors.museumWhite }}>
+    {patina && <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, opacity: 0.6 }} pointerEvents="none">
+      <AsciiField width={i.left} height={height} gate={0.12} />
+    </View>}
     {header && !overlay && <View style={{ paddingTop: i.top, paddingLeft: i.left, paddingRight: i.right }}>{header}</View>}
     {scroll ? <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, ...padding }}
       contentInsetAdjustmentBehavior="never" automaticallyAdjustsScrollIndicatorInsets={false}

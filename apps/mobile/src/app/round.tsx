@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
-import { Mono, Ritual } from "../ui/Text";
+import { Mono, Ritual, role } from "../ui/Text";
 import { TopBar } from "../ui/TopBar";
 import { CardStage } from "../ui/CardStage";
 import { OracleCard } from "../ui/OracleCard";
@@ -107,7 +107,7 @@ export default function Round() {
       <TopBar />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
-        <DecodeLine text="THE ORACLE IS CONSULTED" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+        <DecodeLine {...role.eyebrow} text="THE ORACLE IS CONSULTED" cursor color={colors.goldText} style={{ textAlign: "center" }}/>
       </View>
     </Screen>
   );
@@ -117,7 +117,6 @@ export default function Round() {
       <View style={{ flex: 1, justifyContent: "center" }}>
         <SleepsPanel
           failed={today.isError}
-          onHome={() => router.dismissTo("/")}
           onExhibition={() => router.replace({ pathname: "/practice", params: { opening: "0", entry_point: "waiting_home" } })}
         />
       </View>
@@ -158,7 +157,7 @@ export default function Round() {
           </View>}</CardStage>
         ) : (
           <View style={{ flex: 1, gap: space(2) }}>
-            {anticipation && <Mono size={10} color={colors.goldText} style={{ textAlign: "center" }}>{anticipation}</Mono>}
+            {anticipation && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "center" }]}>{anticipation}</Mono>}
             <CrowdReveal round={today.data} />
           </View>
         )}
@@ -173,7 +172,7 @@ export default function Round() {
       {current && <>
       <View style={{ minHeight: scaledRow(16, chromeScale), justifyContent: "center" }}>
         {qs.some((q) => q.lock_healed && ((today.data?.rules_version ?? 1) >= 2 || !answers[q.id]?.sealed)) && (
-          <Mono size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>
+          <Mono {...role.meta} color={colors.mutedInk} style={{ textAlign: "center" }}>
             {today.data.rules_version >= 2 ? "EARLY ANSWER · VOID FOR EVERYONE" : PIPELINE_LINES.lockHealed}
           </Mono>
         )}
@@ -188,7 +187,7 @@ export default function Round() {
             <Ritual
               key={q.id}
               size={12}
-              color={struck ? colors.mutedInk : sealed ? colors.goldText : "rgba(23,25,31,0.22)"}
+              color={struck ? colors.mutedInk : sealed ? colors.goldText : colors.unwritten}
               letterSpacing={1}
               style={struck ? { textDecorationLine: "line-through" } : undefined}
               accessibilityLabel={`question ${q.slot}: ${struck ? "closed" : answers[q.id]?.sealed ? "sealed" : "open"}`}
@@ -209,7 +208,7 @@ export default function Round() {
             <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>
               {floorSeen ? confidenceMeaning(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
             </Mono>
-            <Mono size={10} color={colors.mutedInk} letterSpacing={1}>
+            <Mono {...role.caption} color={colors.mutedInk}>
               {payoffLine(lean.conf, current?.is_big_one ?? false)}
             </Mono>
           </View>
@@ -220,13 +219,13 @@ export default function Round() {
           verdict && lastCrowd ? (
             <View key={lastSealedId} style={{ flexDirection: "row", gap: space(2), justifyContent: "center", alignItems: "center" }}>
               <CrowdBar pct={lastCrowd.crowd_yes_pct} />
-              <DecodeLine text={verdict.line} size={10} color={verdict.against ? colors.goldText : colors.mutedInk} letterSpacing={1} />
+              <DecodeLine {...role.caption} text={verdict.line} color={verdict.against ? colors.goldText : colors.mutedInk}/>
             </View>
           ) : (
-            <DecodeLine text="CONSULTING THE CROWD…" cursor size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
+            <DecodeLine {...role.meta} text="CONSULTING THE CROWD…" cursor color={colors.mutedInk} style={{ textAlign: "center" }}/>
           )
         ) : current ? (
-          <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>
+          <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "center" }]}>
             The crowd's leaning is hidden until you commit.
           </Mono>
         ) : null}

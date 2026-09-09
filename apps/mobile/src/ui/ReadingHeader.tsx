@@ -31,7 +31,7 @@ export function ReadingHeader({ children, inset, scrolled, onLayout }: {
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
       {solid ? <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.museumWhite }]} /> : <>
         <BlurView tint="light" intensity={45} style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(247,246,242,0.72)" }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} />
       </>}
       <Canvas style={{ position: "absolute", left: 0, right: 0, bottom: -16, height: 16 }}>
         <Rect x={0} y={0} width={width} height={16}>

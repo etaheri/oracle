@@ -12,7 +12,7 @@ import { confidenceMeaning } from "../game/confidence";
 import { payoffLine } from "../game/payoffLine";
 import { Mono, Serif, Ritual, role } from "./Text";
 import { GoldButton, QuietLink } from "./Button";
-import { colors, space } from "../theme";
+import { colors, space, displayScale } from "../theme";
 
 function exhibitionQuestion(exhibition: Exhibition): RoundToday["questions"][number] {
   return {
@@ -38,18 +38,24 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
   const question = exhibitionQuestion(exhibition);
 
   return <View style={{ flex: 1, minHeight: 0, gap: space(3) }}>
-    <View style={{ gap: space(1) }}>
-      <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{provenance}</Mono>
-      <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>
-        {exhibition.kind === "historical" ? "CONTEXT RECORDED BEFORE THE OUTCOME" : "FICTIONAL EXAMPLE · NO REAL DRAW OCCURRED"}
-      </Mono>
-    </View>
+    {/* One line, and it teaches rather than disclaims.
+        This screen declared itself an unranked practice question five times
+        before the question: the screen's eyebrow, a provenance caption, this
+        line, the card's own [ EXHIBITION ] head and its margin status. The
+        card carries its own provenance the way every other card does, so
+        what is left here is the thing a first-time player actually needs to
+        know — what this is, and that it is free to get wrong. */}
+    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>
+      {exhibition.kind === "historical"
+        ? "A real question from a past round, with its context as it stood. Nothing here touches your record."
+        : "A made-up example — no real draw occurred. Nothing here touches your record."}
+    </Mono>
     <CardStage>{height => <View>
       {receipt ? <CardChrome height={height} slot={1} title={revealed ? "EXHIBITION RESULT" : "CALL SEALED"} status={provenance}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: space(3) }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
-          <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>YOUR CALL · {receipt.answer ? "YES" : "NO"} · {receipt.confidence}%</Mono>
+          <Mono {...role.line} color={colors.mutedInk}>YOUR CALL · {receipt.answer ? "YES" : "NO"} · {receipt.confidence}%</Mono>
           {revealed ? <PracticeResult prediction={receipt} exhibition={exhibition} previous={previous} /> : <>
-            <Serif size={22} style={{ textAlign: "center", lineHeight: 32 }}>Your call is sealed.</Serif>
+            <Serif size={displayScale.lead} style={{ textAlign: "center", lineHeight: 32 }}>Your call is sealed.</Serif>
             <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>You made your call. Now see how it compares.</Mono>
           </>}
         </ScrollView>
@@ -65,10 +71,10 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
     </View>}</CardStage>
     <View style={{ minHeight: 48, gap: space(1), justifyContent: "center" }}>
       {lean.conf !== null ? <>
-        <Mono size={10} color={colors.goldText} style={{ textAlign: "center" }}>{confidenceMeaning(lean.conf)}</Mono>
+        <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "center" }]}>{confidenceMeaning(lean.conf)}</Mono>
         <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{payoffLine(lean.conf, false)}</Mono>
       </> : receipt ? <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>UNRANKED · YOUR RECORD AND STREAK ARE UNCHANGED.</Mono> :
-        <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{previous ? "THE OUTCOME IS KNOWN. COMPARE THE POINTS AT A DIFFERENT CONFIDENCE." : "PULL TO ADJUST. RETURN TO CENTER TO CANCEL. RELEASE TO SEAL."}</Mono>}
+        <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{previous ? "THE OUTCOME IS KNOWN. COMPARE THE POINTS AT A DIFFERENT CONFIDENCE." : "RETURN TO CENTER TO CANCEL"}</Mono>}
     </View>
     {receipt ? revealed && <QuietLink title="EXPLORE THE SCORING" onPress={() => {
       setPrevious(receipt); setFlow(current => retryExhibition(current)); setAttempt(n => n + 1);
@@ -96,10 +102,10 @@ function PracticeResult({ prediction, exhibition, previous }: { prediction: Prac
       {result.oracleAbstained ? `${oracleLabel} · ABSTAINED · 50%` : `${oracleLabel} · ${call(result.oracleAnswer!)} · ${result.oracleConfidence}%`}
     </Mono>
     <View style={{ flexDirection: "row", justifyContent: "space-around", gap: space(2) }}>
-      <View style={{ flex: 1, alignItems: "center" }}><Mono {...role.caption}>YOUR BASE POINTS</Mono><Ritual size={22} bold>{signed(result.youPoints)}</Ritual></View>
-      <View style={{ flex: 1, alignItems: "center" }}><Mono {...role.caption}>ORACLE BASE POINTS</Mono><Ritual size={22} bold>{signed(result.oraclePoints)}</Ritual></View>
+      <View style={{ flex: 1, alignItems: "center" }}><Mono {...role.caption}>YOUR BASE POINTS</Mono><Ritual size={displayScale.lead} bold>{signed(result.youPoints)}</Ritual></View>
+      <View style={{ flex: 1, alignItems: "center" }}><Mono {...role.caption}>ORACLE BASE POINTS</Mono><Ritual size={displayScale.lead} bold>{signed(result.oraclePoints)}</Ritual></View>
     </View>
-    <Serif size={20} style={{ textAlign: "center", lineHeight: 28 }}>{winner}</Serif>
+    <Serif size={displayScale.lead} style={{ textAlign: "center", lineHeight: 28 }}>{winner}</Serif>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{result.explanation}</Mono>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>If the outcome had been {call(!outcome)}, your same call would score {signed(result.oppositePoints)} points.</Mono>
     {previous && <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Previous try: {call(previous.answer)} at {previous.confidence}% → {signed(practiceResult(previous, exhibition).youPoints)} points. Same example and result.</Mono>}

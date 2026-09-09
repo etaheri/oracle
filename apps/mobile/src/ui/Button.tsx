@@ -44,3 +44,28 @@ export function QuietLink({ title, onPress }: { title: string; onPress: () => vo
     </Pressable>
   );
 }
+
+// The second offer. One gold frame per screen is the rule the whole app is
+// held to, and a paywall with two identical gold buttons breaks it twice
+// over: it spends the screen's one emphatic element on nothing, and it asks
+// the player to choose between two things that look equally chosen-for.
+// Same frame, same press, ink instead of gilt.
+export function QuietButton({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      style={({ pressed }) => ({
+        borderWidth: 1, borderColor: colors.line,
+        minHeight: 48, justifyContent: "center", alignItems: "center",
+        paddingVertical: space(3), paddingHorizontal: space(4),
+        opacity: pressed ? 0.7 : disabled ? 0.4 : 1,
+        backgroundColor: pressed ? colors.lineSoft : "transparent",
+      })}
+    >
+      <Mono {...role.action} color={disabled ? colors.mutedInk : colors.ink} style={[role.action.style, { textTransform: "uppercase" }]}>{title}</Mono>
+    </Pressable>
+  );
+}

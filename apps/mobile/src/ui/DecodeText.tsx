@@ -77,11 +77,18 @@ export function DecodeLine({
   const revealed = step >= totalSteps ? text.length : Math.floor((text.length * Math.max(0, step)) / totalSteps);
   const Face = serif ? Serif : Mono;
   return (
-    <Face size={size} color={color} {...(serif ? {} : { letterSpacing })} style={style} {...rest}>
+    // The label is the finished line, always. What this node CONTAINS mid-print
+    // is noise from the pool — and a screen reader reads the node, so without
+    // this every printed line in the app is announced as punctuation. Reduced
+    // motion is not the guard for it: VoiceOver and Reduce Motion are separate
+    // iOS settings, and a line held at `active={false}` never leaves step 0 at
+    // all. The blink cursor is dropped from the tree for the same reason — it
+    // would otherwise be read as "underscore" every 530ms.
+    <Face size={size} color={color} accessibilityLabel={text} {...(serif ? {} : { letterSpacing })} style={style} {...rest}>
       {dimColor ? shown.slice(0, revealed) : shown}
       {dimColor && <Text style={{ color: dimColor }}>{shown.slice(revealed)}</Text>}
       {cursor && (
-        <Text style={{ color: blinkOn || reducedMotion ? (color ?? colors.mutedInk) : "transparent" }}>_</Text>
+        <Text accessible={false} style={{ color: blinkOn || reducedMotion ? (color ?? colors.mutedInk) : "transparent" }}>_</Text>
       )}
     </Face>
   );

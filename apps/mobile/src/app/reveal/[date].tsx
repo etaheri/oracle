@@ -6,14 +6,14 @@ import { useMeLedger } from "../../api/hooks";
 import { QuietLink } from "../../ui/Button";
 import { ResolutionEvidence } from "../../ui/ResolutionEvidence";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
+import { View, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Canvas, Fill, LinearGradient, useCanvasRef, vec } from "@shopify/react-native-skia";
 import { Screen, useScreenInset } from "../../ui/Screen";
-import { Serif, Mono, Ritual, Eyebrow } from "../../ui/Text";
+import { Serif, Mono, Ritual, Eyebrow, role } from "../../ui/Text";
 import { GoldButton } from "../../ui/Button";
 import { GoldFrame } from "../../ui/GoldFrame";
 import { TopBar } from "../../ui/TopBar";
@@ -27,10 +27,11 @@ import { payoff, oracleCallRight, dayCallCounts, CONSTANTS, provenanceLine } fro
 import { useReveal, useRoundBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
+import { scaledLines } from "../../game/typeScaling";
 import { boardLines, boardSupportingLines, boardRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { rivalryMoment } from "../../game/rivalryMoment";
 import { capture } from "../../analytics/analytics";
-import { colors, space } from "../../theme";
+import { colors, space, displayScale } from "../../theme";
 
 const easeOut = Easing.out(Easing.poly(4));
 const ROW_DELAY = 0;
@@ -80,6 +81,7 @@ export default function RevealScreen() {
   const router = useRouter();
   const reveal = useReveal(date ?? null);
   const reducedMotion = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
   const inset = useScreenInset();
   const [headerHeight, setHeaderHeight] = useState(inset.top + 44);
   const [headerScrolled, setHeaderScrolled] = useState(false);
@@ -181,21 +183,21 @@ export default function RevealScreen() {
       <TopBar label="OUTSEEN" />
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: space(3) }}>
         <AsciiDust />
-        <DecodeLine text="CONSULTING THE VOID…" cursor size={10} color={colors.goldText} letterSpacing={4} style={{ textAlign: "center" }} />
+        <DecodeLine {...role.eyebrow} text="CONSULTING THE VOID…" cursor color={colors.goldText} style={{ textAlign: "center" }}/>
       </View>
     </Screen>
   );
   if (reveal.isError) return (
     <Screen><TopBar label="OUTSEEN" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
-      <DecodeLine text="THE ORB IS BEYOND REACH. IT WILL RETURN." size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
+      <DecodeLine {...role.line} text="THE ORB IS BEYOND REACH. IT WILL RETURN." color={colors.mutedInk} style={{ textAlign: "center" }}/>
     </View></Screen>
   );
   if (!reveal.data || "pending" in reveal.data) {
     return <Screen><TopBar label="OUTSEEN" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
-      <Serif size={22} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
-      <DecodeLine text={pendingLine(date ?? "", new Date().toISOString().slice(0, 10))} cursor size={11} color={colors.mutedInk} style={{ textAlign: "center" }} letterSpacing={2} />
+      <Serif size={displayScale.lead} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
+      <DecodeLine {...role.line} text={pendingLine(date ?? "", new Date().toISOString().slice(0, 10))} cursor color={colors.mutedInk} style={{ textAlign: "center" }}/>
     </View></Screen>;
   }
 
@@ -290,56 +292,19 @@ export default function RevealScreen() {
               ? `Day ${d.date}`
               : `Day ${d.date} · the ledger is read`}
         </Eyebrow>
-        <Eyebrow>Outseen · You vs the Oracle</Eyebrow>
+        {/* "Outseen · You vs the Oracle" used to print here as a second
+            eyebrow. It is the app's own name and premise, identical on every
+            reveal ever rendered, stacked under the line that says which day
+            this is — a banner inside the building it names. */}
         <RevealSummary data={d} milestone={milestone ? MILESTONE_COPY[milestone] : null} />
         {rivalry && (
           <View style={{ alignItems: "center", gap: space(1) }}>
             <Eyebrow>Largest points gap</Eyebrow>
-            <Mono size={10} color={colors.mutedInk} style={{ textAlign: "center" }}>{rivalry.line}</Mono>
+            <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "center" }]}>{rivalry.line}</Mono>
           </View>
         )}
-        {!allSpectator && (
-          <View style={{ alignItems: "center", gap: space(1) }}>
-            <Eyebrow>Daily board</Eyebrow>
-            {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
-              <Mono key={`board-summary-${i}`} size={10} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }}>{line}</Mono>
-            ))}
-          </View>
-        )}
-        {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "PREPARING…" : "SHARE YOUR RESULT"} onPress={onShare} disabled={sharing} />}
-        {shareError && <Mono color={colors.vermilion}>{shareError}</Mono>}
-        <QuietLink
-          title={details ? "CLOSE THE DETAILS" : "VIEW DAILY BOARD"}
-          onPress={() => {
-            if (details) setDetails(false);
-            else { boardScrollRequested.current = true; setDetails(true); }
-          }}
-        />
-        <QuietLink title="SHOW RULES" onPress={() => router.push({ pathname: "/rites", params: { all: "1", rules_version: String(d.rules_version) } })} />
-        {details && <>
         {allSpectator && !anyPending && (
-          <DecodeLine text={lapsedLine(d.date)} size={10} color={colors.mutedInk} letterSpacing={2} style={{ textAlign: "center" }} />
-        )}
-        {!allSpectator && (
-          <View
-            onLayout={(event) => {
-              if (!boardScrollRequested.current) return;
-              boardScrollRequested.current = false;
-              scrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - headerHeight - space(2)), animated: !reducedMotion });
-            }}
-            style={{ minHeight: BOARD_SLOT_H, alignItems: "center", justifyContent: "center", gap: space(1) }}
-          >
-            <Eyebrow>Daily board</Eyebrow>
-            {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
-              <Mono key={i} size={10} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} letterSpacing={3} style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}>{line}</Mono>
-            ))}
-            {boardSupportingLines(board.data ?? undefined, d.rules_version).map((line, i) => (
-              <Mono key={`support-${i}`} size={10} color={colors.mutedInk} style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}>{line}</Mono>
-            ))}
-            {!!board.data?.rows?.length && boardRowLines(board.data.rows).map((line, i) => (
-              <Mono key={`row-${i}`} size={10} color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk} letterSpacing={2} style={{ textAlign: "center", lineHeight: BOARD_LINE_H }}>{line}</Mono>
-            ))}
-          </View>
+          <DecodeLine text={lapsedLine(d.date)} {...role.meta} color={colors.mutedInk} />
         )}
         <Animated.View
           entering={FadeIn.delay(POINTS_DELAY).duration(500).easing(easeOut)}
@@ -360,14 +325,14 @@ export default function RevealScreen() {
               how much has been read instead, and the number arrives once. */}
           {!allSpectator && (pointsWithheld(d) ? (
             <>
-              <Ritual bold size={24} color={colors.mutedInk} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{readingLine(d.questions)}</Ritual>
+              <Ritual bold size={displayScale.epithet} color={colors.mutedInk} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{readingLine(d.questions)}</Ritual>
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS WITHHELD</Mono>
             </>
           ) : (
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
-              {d.rules_version >= 2 && d.bonus_points !== 0 && <Mono size={10}>CROWD BONUS {d.bonus_points} · EXCLUDED FROM DUEL AND RANK</Mono>}
+              {d.rules_version >= 2 && d.bonus_points !== 0 && <Mono {...role.caption} color={colors.mutedInk}>CROWD BONUS {d.bonus_points} · EXCLUDED FROM DUEL AND RANK</Mono>}
               {/* Both weights on one line. The first hour is not gated on a
                   winning day any more — the bonus is symmetric (design
                   2026-09-03 §2), so gating it on day_points > 0 hid it on
@@ -416,21 +381,21 @@ export default function RevealScreen() {
                 entering={FadeInDown.delay(ROW_DELAY + i * ROW_STAGGER).duration(400).easing(easeOut)}
                 style={{ flexDirection: "row", gap: space(3), paddingVertical: space(3), alignItems: "flex-start" }}
               >
-                <Ritual size={13} color={color} letterSpacing={1} style={{ width: 22, textAlign: "center" }}>
+                <Ritual size={displayScale.slot} color={color} letterSpacing={1} style={{ width: 22, textAlign: "center" }}>
                   {numeral(q.slot)}
                 </Ritual>
                 <View style={{ flex: 1, gap: space(1) }}>
-                  <Serif size={15} color={colors.ink} numberOfLines={3} style={{ lineHeight: 21 }}>{q.text}</Serif>
+                  <Serif size={displayScale.inline} color={colors.ink} numberOfLines={scaledLines(3, fontScale)} style={{ lineHeight: 21 }}>{q.text}</Serif>
                   {/* What you said, and what the crowd said — the Big One's
                       block has always read both back; the four ordinary calls
                       showed only their points, so a day later the ledger could
                       not tell you what you had answered. */}
                   {call ? (
-                    <Mono size={10} color={colors.mutedInk} style={{ lineHeight: 15 }}>{call}</Mono>
+                    <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{call}</Mono>
                   ) : null}
                   <ResolutionEvidence question={q} />
                   {receipt ? (
-                    <Mono size={10} color={colors.mutedInk} numberOfLines={2} style={{ lineHeight: 15 }}>{receipt}</Mono>
+                    <Mono {...role.caption} color={colors.mutedInk} numberOfLines={2} style={[role.caption.style, { textAlign: "left" }]}>{receipt}</Mono>
                   ) : null}
                 </View>
                 {/* The mark rides with the value: outcome must never be
@@ -456,23 +421,23 @@ export default function RevealScreen() {
                 picture to say it twice. */}
             <View style={{ padding: space(5), paddingBottom: space(3), gap: space(3) }}>
               <View style={{ alignItems: "center", gap: space(2) }}>
-                <Ritual bold size={18} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(big.slot)}</Ritual>
-                <Ritual bold size={11} letterSpacing={4}>[ ✶ THE BIG ONE ]</Ritual>
+                <Ritual bold size={displayScale.stamp} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{numeral(big.slot)}</Ritual>
+                <Ritual bold size={displayScale.slot} letterSpacing={4}>[ ✶ THE BIG ONE ]</Ritual>
               </View>
-              <Serif size={17}>{big.text}</Serif>
+              <Serif size={displayScale.inline}>{big.text}</Serif>
               <ResolutionEvidence question={big} />
               {bigState === "pending" && (
-                <Mono size={11} color={colors.mutedInk}>{receiptLine(big)}</Mono>
+                <Mono {...role.supporting} color={colors.mutedInk}>{receiptLine(big)}</Mono>
               )}
               {bigState === "void" && (
-                <Mono size={11} color={colors.mutedInk}>{receiptLine(big)}</Mono>
+                <Mono {...role.supporting} color={colors.mutedInk}>{receiptLine(big)}</Mono>
               )}
               {bigState !== "pending" && bigState !== "void" && big.crowd_yes_pct !== null && (
                 <View style={{ gap: space(1) }}>
                   {big.my && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Mono size={11}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
-                      <Mono size={11} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
+                      <Mono {...role.supporting} color={colors.ink}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
+                      <Mono {...role.supporting} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
                         {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
                       </Mono>
                     </View>
@@ -480,12 +445,12 @@ export default function RevealScreen() {
                   {/* Same floor as the round footer and the finale: over a
                       handful of players the percentage is mostly the reader,
                       and this frame is the one people screenshot. */}
-                  <Mono size={10} color={colors.mutedInk}>{crowdReadable(big) ? `CROWD SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>
+                  <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{crowdReadable(big) ? `CROWD SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>
                   {big.market_prob != null && (
-                    <Mono size={10} color={colors.mutedInk}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
+                    <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
                   )}
                   {big.oracle_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
-                    <Mono size={10} color={colors.mutedInk}>
+                    <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
                       THE ORACLE FORESAW {Math.round(big.oracle_p_yes * 100)}% YES{" "}
                       {oracleCallRight(big.oracle_p_yes, big.outcome) === null
                         ? ""
@@ -494,11 +459,11 @@ export default function RevealScreen() {
                           : "✗"}
                     </Mono>
                   )}
-                  <Mono size={10} color={colors.mutedInk} numberOfLines={2}>{receiptLine(big)}</Mono>
+                  <Mono {...role.caption} color={colors.mutedInk} numberOfLines={2} style={[role.caption.style, { textAlign: "left" }]}>{receiptLine(big)}</Mono>
                   {contrarianWin && (
                     <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
-                      <Ritual bold size={14} letterSpacing={3}>AGAINST THE TIDE</Ritual>
-                      <Ritual bold size={22} color={colors.agedGold} letterSpacing={1}>+40</Ritual>
+                      <Ritual bold size={displayScale.slot} letterSpacing={3}>AGAINST THE TIDE</Ritual>
+                      <Ritual bold size={displayScale.lead} color={colors.agedGold} letterSpacing={1}>+40</Ritual>
                     </Animated.View>
                   )}
                 </View>
@@ -513,17 +478,58 @@ export default function RevealScreen() {
             the register the standing lines already use. */}
         {d.rules_version < 2 && oracleLine !== null && (
           <Animated.View entering={FadeInDown.delay(BIG_ONE_DELAY + 260).duration(400).easing(easeOut)}>
-            <Mono
-              size={11}
-              letterSpacing={2}
+            <Mono {...role.line}
               color={oracleCounts!.you > oracleCounts!.oracle ? colors.goldText : colors.mutedInk}
-              style={{ textAlign: "center" }}
             >
               {oracleLine}
             </Mono>
           </Animated.View>
         )}
-        </>}
+        {/* Where the day stood.
+            This block used to be printed twice — once above the fold and once
+            again inside the collapsed section — and the link that opened the
+            second copy was labelled VIEW DAILY BOARD while actually hiding
+            the entire ledger behind it: the day's points, all five call rows
+            and the Big One. The rank is part of the reveal and reads with it;
+            the link now opens only the thing it names, the field itself. */}
+        {!allSpectator && (
+          <View
+            onLayout={(event) => {
+              if (!boardScrollRequested.current) return;
+              boardScrollRequested.current = false;
+              scrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - headerHeight - space(2)), animated: !reducedMotion });
+            }}
+            style={{ alignItems: "center", gap: space(1) }}
+          >
+            <Eyebrow>Daily board</Eyebrow>
+            {/* The board rides a SECOND query, later than the reveal. Collapsed
+                it reserves its one summary line; expanded it reserves the whole
+                field, so neither arrival shoves the share button below it. */}
+            <View style={{ minHeight: details ? BOARD_SLOT_H : BOARD_MAX_LINES * BOARD_LINE_H, alignItems: "center", justifyContent: "center", gap: space(1) }}>
+              {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+                <Mono key={`board-${i}`} {...role.meta} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+              ))}
+              {details && <>
+                {boardSupportingLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+                  <Mono key={`support-${i}`} {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "center", lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+                ))}
+                {boardRowLines(board.data?.rows ?? []).map((line, i) => (
+                  <Mono key={`row-${i}`} {...role.meta} color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+                ))}
+              </>}
+            </View>
+            <QuietLink
+              title={details ? "HIDE THE FIELD" : "SEE THE FIELD"}
+              onPress={() => {
+                if (details) setDetails(false);
+                else { boardScrollRequested.current = true; setDetails(true); }
+              }}
+            />
+          </View>
+        )}
+        {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "PREPARING…" : "SHARE YOUR RESULT"} onPress={onShare} disabled={sharing} />}
+        {shareError && <Mono {...role.meta} color={colors.vermilion} accessibilityRole="alert">{shareError}</Mono>}
+        <QuietLink title="SHOW RULES" onPress={() => router.push({ pathname: "/rites", params: { all: "1", rules_version: String(d.rules_version) } })} />
       </ScrollView>
       <ReadingHeader inset={inset} scrolled={headerScrolled} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}><TopBar /></ReadingHeader>
       {overflows && !atBottom && (

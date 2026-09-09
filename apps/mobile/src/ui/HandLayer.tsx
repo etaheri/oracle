@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Image } from "expo-image";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { handOffscreenX, type Rect } from "../game/heroStage";
 
 // One hand slot. Placeholder behavior: the idle loop slides in from its own
@@ -27,12 +27,18 @@ export function HandLayer({
   stageWidth: number;
   delayMs?: number;
 }) {
+  // The one animating component that had no reduced-motion path: the hands
+  // slid in over 700ms regardless. They are the hero's own composition, so
+  // the fallback is to be already in place rather than to fade.
+  const reducedMotion = useReducedMotion();
   const off = handOffscreenX(stageWidth, side);
-  const tx = useSharedValue(enter ? 0 : off);
+  const tx = useSharedValue(enter || reducedMotion ? 0 : off);
 
   useEffect(() => {
-    if (enter) tx.value = withDelay(delayMs, withTiming(0, { duration: HAND_ENTER_MS, easing: Easing.out(Easing.cubic) }));
-  }, [enter, delayMs, tx]);
+    if (!enter) return;
+    if (reducedMotion) { tx.value = 0; return; }
+    tx.value = withDelay(delayMs, withTiming(0, { duration: HAND_ENTER_MS, easing: Easing.out(Easing.cubic) }));
+  }, [enter, delayMs, reducedMotion, tx]);
 
   const style = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
 
