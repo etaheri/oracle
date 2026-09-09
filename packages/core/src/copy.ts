@@ -65,7 +65,7 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "resolve.plain-1", pool: "resolve", text: "IT CAME {outcome}. YOU CALLED {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-2", pool: "resolve", text: "THE ANSWER WAS {outcome}. YOUR CALL: {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-3", pool: "resolve", text: "{outcome}, AS IT HAPPENED. YOU SAID {call}. {points}.", requires: ["outcome", "call", "points"] },
-  { id: "resolve.plain-4", pool: "resolve", text: "ONE IS DECIDED: {outcome}. YOU STOOD AT {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-4", pool: "resolve", text: "ONE IS DECIDED: {outcome}. YOUR STAND: {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-5", pool: "resolve", text: "THE LEDGER READS {outcome}. YOU CALLED {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-6", pool: "resolve", text: "DECIDED: {outcome}. YOUR SEAL SAID {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-7", pool: "resolve", text: "{outcome} IT IS. YOU HELD {call}. {points}.", requires: ["outcome", "call", "points"] },
