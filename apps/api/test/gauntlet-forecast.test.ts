@@ -44,6 +44,13 @@ describe("gatherForecasts (design 2026-09-09 §1.3)", () => {
     await gatherForecasts(f, [weather()]).catch(() => {});
     expect(ua).toContain("oracle");
   });
+  it("leaves the index absent when the points response names an off-host forecast URL", async () => {
+    const offHost = { properties: { forecast: "https://evil.example.com/gridpoints/OKX/33,37/forecast" } };
+    const calls: string[] = [];
+    const f = fakeFetch({ "https://api.weather.gov/points/40.78,-73.97": offHost, "https://evil.example.com/gridpoints/OKX/33,37/forecast": forecast }, calls);
+    const out = await gatherForecasts(f, [weather()]);
+    expect(out).toEqual({});
+  });
   it("leaves the index absent when the fetch fails, and never throws", async () => {
     const out = await gatherForecasts(fakeFetch({}), [weather()]);
     expect(out).toEqual({});

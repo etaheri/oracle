@@ -36,6 +36,11 @@ async function fetchForecast(fetchFn: typeof fetch, lat: number, lon: number): P
   const points = (await pointsRes.json()) as { properties?: { forecast?: string } };
   const url = points.properties?.forecast;
   if (!url) throw new Error("no forecast url");
+  // The points response names its own forecast URL; a compromised or
+  // misbehaving upstream could point that field anywhere. Never fetch
+  // off-host — the whole point of naming api.weather.gov as the source is
+  // that it is the only place this data is allowed to come from.
+  if (!url.startsWith("https://api.weather.gov/")) throw new Error("forecast url is not on api.weather.gov");
   const fRes = await fetchFn(url, { headers: HEADERS, signal: AbortSignal.timeout(FORECAST_TIMEOUT_MS) });
   if (!fRes.ok) throw new Error(`forecast ${fRes.status}`);
   const f = (await fRes.json()) as { properties?: { periods?: Period[] } };
