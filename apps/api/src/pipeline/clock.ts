@@ -1,3 +1,5 @@
+import { CONSTANTS } from "@oracle/core";
+
 // ET wall-clock helpers. The cron is UTC and dumb; ALL schedule intelligence
 // derives from these (spec §2-3). Intl only — never hard-coded offsets.
 const ET = "America/New_York";
@@ -23,4 +25,17 @@ export function noonET(date: string): Date {
 
 export function addDays(date: string, n: number): string {
   return new Date(new Date(`${date}T00:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
+}
+
+// The fast-round rule's threshold (design 2026-09-09 §1.2): the lock plus the
+// evening lag. At most one question in a v2 round may resolve after this.
+export function fastResolveBy(date: string): Date {
+  return new Date(noonET(addDays(date, 1)).getTime() + CONSTANTS.EVENING_RESOLVE_LAG_HOURS * 3_600_000);
+}
+
+// The void deadline: noon ET two days after the round date. This is the same
+// instant decideActions (state.ts) voids unresolved questions at; it lives
+// here so authoring can refuse a question that would void unseen.
+export function voidDeadline(date: string): Date {
+  return noonET(addDays(date, 2));
 }
