@@ -78,17 +78,28 @@ const WITHDRAWAL_LINE: Record<WithdrawalReason, string> = {
 // land, withdrawn_at marks it (distinct from lock_healed_at, which only the
 // probe writes when an answer leaked), and the void goes through
 // resolveQuestion so every prediction is zeroed exactly the way any other
-// void is. Idempotent by the status guard: a retry after the write sees
-// "already withdrawn".
+// void is.
+//
+// Idempotent across a crash between the two writes, the same shape
+// probeQuestion repairs (pipeline/probe.ts): withdrawn_at set but status
+// still open/locked means the first write landed and the second (the void)
+// did not. A retry must finish that void rather than sticking forever behind
+// "already withdrawn" — the round can never settle otherwise, since
+// settleRound requires every question resolved or void. Only a
+// withdrawn_at + status:"void" pair is a genuine repeat.
 export async function withdrawQuestion(db: Db, questionId: string, reason: WithdrawalReason, now: Date): Promise<{ remaining: number }> {
   const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q) throw new Error("question not found");
-  if (q.withdrawnAt) throw new Error("already withdrawn");
-  if (!FRESH.has(q.status)) throw new Error("not withdrawable");
+  if (q.withdrawnAt && !FRESH.has(q.status)) throw new Error("already withdrawn");
+  if (!q.withdrawnAt && !FRESH.has(q.status)) throw new Error("not withdrawable");
 
-  await db.update(schema.questions)
-    .set({ locksAt: q.locksAt.getTime() < now.getTime() ? q.locksAt : now, withdrawnAt: now })
-    .where(eq(schema.questions.id, questionId));
+  // A crashed half-withdrawal already has withdrawn_at (and locks_at) set —
+  // leave both alone and only finish the void below.
+  if (!q.withdrawnAt) {
+    await db.update(schema.questions)
+      .set({ locksAt: q.locksAt.getTime() < now.getTime() ? q.locksAt : now, withdrawnAt: now })
+      .where(eq(schema.questions.id, questionId));
+  }
   await resolveQuestion(db, questionId, "void", { reason: WITHDRAWAL_LINE[reason], withdrawn: true, checked_at: now.toISOString() });
 
   const siblings = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, q.roundDate) });

@@ -70,4 +70,24 @@ describe("withdrawQuestion (design 2026-09-09 §1.4)", () => {
     await resolveQuestion(db, qs[1]!.id, "yes");
     await expect(withdrawQuestion(db, qs[1]!.id, "misauthored", new Date())).rejects.toThrow("not withdrawable");
   });
+  it("finishes a crashed half-withdrawal on retry instead of sticking behind 'already withdrawn'", async () => {
+    const { db } = await makeTestDb();
+    const qs = await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ userId: u!.id, questionId: qs[2]!.id, answer: true, confidence: 70 });
+    // Simulate a crash between the two writes: withdrawn_at/locks_at landed,
+    // the void through resolveQuestion never ran.
+    const crashedAt = new Date("2026-09-09T20:00:00Z");
+    await db.update(schema.questions).set({ withdrawnAt: crashedAt, locksAt: crashedAt }).where(eq(schema.questions.id, qs[2]!.id));
+    const { remaining } = await withdrawQuestion(db, qs[2]!.id, "misauthored", new Date("2026-09-09T20:05:00Z"));
+    expect(remaining).toBe(4);
+    const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, qs[2]!.id) });
+    expect(q!.status).toBe("void");
+    expect(q!.withdrawnAt?.toISOString()).toBe(crashedAt.toISOString());
+    expect(q!.locksAt.toISOString()).toBe(crashedAt.toISOString());
+    const p = await db.query.predictions.findFirst({ where: eq(schema.predictions.questionId, qs[2]!.id) });
+    expect(p!.points).toBe(0);
+    expect(p!.brier).toBeNull();
+    await expect(withdrawQuestion(db, qs[2]!.id, "misauthored", new Date())).rejects.toThrow("already withdrawn");
+  });
 });
