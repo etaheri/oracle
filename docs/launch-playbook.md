@@ -140,6 +140,14 @@ curl -s https://<worker-url>/v1/round/today | head
 curl -s -H "x-admin-secret: $ADMIN_SECRET" https://<worker-url>/admin/rounds/$(date +%F)
 ```
 
+```bash
+# Strike a mis-authored question from a live round with an honest reason.
+# reason: "misauthored" | "unresolvable". Day still rates on the remaining
+# non-void questions if at least three remain.
+curl -s -X POST -H "x-admin-secret: $ADMIN_SECRET" -H "content-type: application/json" \
+  -d '{"reason":"misauthored"}' https://<worker-url>/admin/questions/<question-id>/withdraw
+```
+
 ### 2.5 Wire the URL back out
 
 The deployed origin is now an input to three other systems:
