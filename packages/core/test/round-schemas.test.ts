@@ -15,6 +15,8 @@ export const validToday = {
       source_name: "S&P",
       resolution_criteria: "close",
       locks_at: "2026-08-21T16:00:00.000Z",
+      struck: false,
+      struck_reason: null,
     },
   ],
 };
