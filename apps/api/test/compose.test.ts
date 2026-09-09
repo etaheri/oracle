@@ -285,6 +285,21 @@ describe("claimResolutionPushes (design 2026-09-09 §2.1)", () => {
     const second = await claimResolutionPushes(db, qs[0]!.id, new Date());
     expect(second.map((p) => p.lineId)).toEqual(first.map((p) => p.lineId));
   });
+
+  it("waits for the row's points, not only the question's outcome, since resolveQuestion writes them separately", async () => {
+    const { db, qs } = await seeded();
+    // Simulate the mid-flight state: outcome written, per-row points not yet
+    // scored (resolveQuestion has no transaction across those two writes).
+    await db.update(schema.questions).set({ outcome: "yes", status: "resolved" }).where(eq(schema.questions.id, qs[0]!.id));
+    expect(await claimResolutionPushes(db, qs[0]!.id, new Date())).toEqual([]);
+    const rows = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, qs[0]!.id) });
+    expect(rows.every((r) => r.resolvePushedAt === null)).toBe(true);
+
+    await db.update(schema.predictions).set({ points: 10 }).where(eq(schema.predictions.questionId, qs[0]!.id));
+    const pushes = await claimResolutionPushes(db, qs[0]!.id, new Date());
+    expect(pushes).toHaveLength(2);
+    for (const p of pushes) expect(p.text).toMatch(/\+10\./);
+  });
 });
 
 describe("sendPushes", () => {

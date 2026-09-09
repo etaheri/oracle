@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { COPY_BANK, CONSTANTS, fillSlots, selectLine, type Requirement } from "@oracle/core";
 import { schema, type Db } from "../db/client";
 
@@ -157,6 +157,14 @@ function signed(points: number | null): string {
 // purpose: it reads the question's outcome, not a caller's "I just resolved
 // it" flag, so a resolve whose step never checkpointed still gets its push
 // on the next pass.
+//
+// The claim requires BOTH the question's outcome AND the row's points to be
+// written. resolveQuestion sets questions.outcome first, then loops separate
+// per-row UPDATEs writing predictions.points/brier — neon-http has no
+// transaction, so a tick can land between those two writes. Claiming on
+// outcome alone would grab a row whose points are still null and push "0"
+// forever; requiring isNotNull(points) leaves such a row unclaimed for the
+// next pass, once resolveQuestion's per-row loop has caught up.
 export async function claimResolutionPushes(db: Db, questionId: string, now: Date): Promise<ResolutionPush[]> {
   const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q || q.outcome === null || q.outcome === "void") return [];
@@ -164,7 +172,13 @@ export async function claimResolutionPushes(db: Db, questionId: string, now: Dat
   const claimed = await db
     .update(schema.predictions)
     .set({ resolvePushedAt: now })
-    .where(and(eq(schema.predictions.questionId, questionId), isNull(schema.predictions.resolvePushedAt)))
+    .where(
+      and(
+        eq(schema.predictions.questionId, questionId),
+        isNull(schema.predictions.resolvePushedAt),
+        isNotNull(schema.predictions.points),
+      ),
+    )
     .returning();
   if (claimed.length === 0) return [];
 
