@@ -114,6 +114,8 @@ wrangler secret put ONESIGNAL_APP_ID
 wrangler secret put ONESIGNAL_API_KEY
 ```
 
+**Question resolution pushes:** Each question now pushes its players the moment it resolves (yes/no). One push per player per question, composed from the `resolve` copy pool. The claim is idempotent — a single `UPDATE predictions SET resolve_pushed_at = now() WHERE resolve_pushed_at IS NULL AND points IS NOT NULL RETURNING` — so the hourly re-dispatch never double-sends. Admin resolves, withdrawals, and voids never trigger push. The settle-time hinge push (published round announcement) is unchanged. `GET /v1/me/ledger` now also returns `reading` — the player's latest locked-or-settled round with decided/total counts — which home uses for the IN PLAY line and the ledger CTA.
+
 Leave `PIPELINE_ENABLED` unset for the first deploy. Arm it deliberately in §3.
 
 ### 2.4 Deploy
