@@ -444,7 +444,10 @@ describe("resolveOne and narrateResolution (design 2026-09-08 §3.2, §5.2)", ()
     const qid = await lockedQuestion(db);
 
     const out = await resolveOne(deps, qid);
-    expect(out).toEqual({ questionId: qid, resolved: false, error: "upstream 503" });
+    // The push claim now runs on every pass regardless of how the resolve
+    // attempt finished (audit finding D) — this question was never resolved,
+    // so the claim finds nothing to push, but `pushed: 0` is still reported.
+    expect(out).toEqual({ questionId: qid, resolved: false, pushed: 0, error: "upstream 503" });
     // A step returns a SUMMARY. Narration is a separate, terminal step, so
     // resolveOne must not send anything itself.
     expect(sent).toEqual([]);
@@ -523,6 +526,20 @@ describe("resolveOne sends the resolution push (design 2026-09-09 §2.1)", () =>
     expect(again.pushed).toBe(0);
   });
 
+  it("still runs the claim when resolveWithClaude itself throws (audit finding D)", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ questionId: q.id, userId: u!.id, answer: true, confidence: 70 });
+    // The question is already resolved by an earlier attempt (so the claim
+    // has something to find); this call's own resolveWithClaude throws.
+    await resolveQuestion(db, q.id, "yes");
+    const { deps } = fakeDeps(db, { structured: async () => { throw new Error("boom"); } });
+    const out = await resolveOne(deps, q.id);
+    expect(out.error).toBeDefined();
+    expect(out.pushed).toBe(1);
+  });
+
   it("a push failure never fails the resolve", async () => {
     const { db } = await makeTestDb();
     const [q] = await seedOneLockedQuestion(db);
@@ -544,5 +561,35 @@ describe("resolveOne sends the resolution push (design 2026-09-09 §2.1)", () =>
     } finally {
       globalThis.fetch = realFetch;
     }
+  });
+});
+
+describe("narrateResolution's push summary (audit finding B)", () => {
+  it("sends exactly one line summing sent/skipped/composed when any outcome pushed", async () => {
+    const { db } = await makeTestDb();
+    const { deps, sent } = fakeDeps(db, null);
+    await narrateResolution(deps, "2026-09-09", [
+      { questionId: "q1", resolved: true, pushed: 2, sent: 2, skipped: 0 },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("push: 2 sent");
+  });
+
+  it("reports a resolution push failure without calling it a resolve failure", async () => {
+    const { db } = await makeTestDb();
+    const { deps, sent } = fakeDeps(db, null);
+    await narrateResolution(deps, "2026-09-09", [
+      { questionId: "q1", resolved: true, pushError: "boom" },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain("resolution push failed");
+    expect(sent.some((t) => t.includes("resolve failed"))).toBe(false);
+  });
+
+  it("stays silent when nothing was composed and nothing failed", async () => {
+    const { db } = await makeTestDb();
+    const { deps, sent } = fakeDeps(db, null);
+    await narrateResolution(deps, "2026-09-09", [{ questionId: "q1", resolved: true }]);
+    expect(sent).toEqual([]);
   });
 });

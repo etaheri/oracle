@@ -95,6 +95,10 @@ export interface ResolveOutcome {
   error?: string;
   /** Resolution pushes composed on this pass (design 2026-09-09 §2.1). */
   pushed?: number;
+  /** How many of `pushed` actually went out vs. were skipped (no reachable
+   *  device, or OneSignal unconfigured) — set only when a push was attempted. */
+  sent?: number;
+  skipped?: number;
   pushError?: string;
 }
 
@@ -109,27 +113,43 @@ export interface ResolveOutcome {
  */
 export async function resolveOne(deps: PipelineDeps, questionId: string): Promise<ResolveOutcome> {
   let resolved = false;
+  let error: string | undefined;
   try {
     resolved = await resolveWithClaude(deps, questionId);
   } catch (err) {
     if (err instanceof BudgetExhausted) throw err;
-    return { questionId, resolved: false, error: err instanceof Error ? err.message : String(err) };
+    error = err instanceof Error ? err.message : String(err);
   }
-  // The trickle (design 2026-09-09 §2.1). State-based and after EVERY
-  // attempt, not only a successful one: an attempt whose write landed but
-  // whose step never checkpointed returns resolved=false on replay, and its
+  // The trickle (design 2026-09-09 §2.1). State-based and run after EVERY
+  // attempt — including one that just threw above — not only a successful
+  // one: an attempt whose write landed but whose step then failed (or never
+  // checkpointed) returns resolved=false (or throws) on replay, and its
   // players still deserve their push. The claim inside makes this safe to
-  // run on every pass.
+  // run on every pass regardless of how resolveWithClaude finished.
   let pushed = 0;
+  let sent: number | undefined;
+  let skipped: number | undefined;
   let pushError: string | undefined;
   try {
     const pushes = await claimResolutionPushes(deps.db, questionId, deps.now());
     pushed = pushes.length;
-    if (pushed > 0) await sendPushes(deps.push ?? {}, pushes);
+    if (pushed > 0) {
+      const result = await sendPushes(deps.push ?? {}, pushes);
+      sent = result.sent;
+      skipped = result.skipped;
+    }
   } catch (err) {
     pushError = err instanceof Error ? err.message : String(err);
   }
-  return { questionId, resolved, pushed, ...(pushError ? { pushError } : {}) };
+  return {
+    questionId,
+    resolved,
+    pushed,
+    ...(error ? { error } : {}),
+    ...(sent !== undefined ? { sent } : {}),
+    ...(skipped !== undefined ? { skipped } : {}),
+    ...(pushError ? { pushError } : {}),
+  };
 }
 
 /**
@@ -147,6 +167,16 @@ export async function narrateResolution(
     await deps.telegram.send(
       `⚠ resolve failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
     );
+  }
+  // The trickle's own summary (audit finding B): resolveOne discarded
+  // sendPushes's sent/skipped, so this channel reported failures but never a
+  // single success. Same shape as settle()'s hinge-push line in
+  // pipeline/actions.ts, and equally silent when nothing was composed.
+  if (outcomes.some((o) => (o.pushed ?? 0) > 0)) {
+    const sent = outcomes.reduce((sum, o) => sum + (o.sent ?? 0), 0);
+    const skipped = outcomes.reduce((sum, o) => sum + (o.skipped ?? 0), 0);
+    const composed = outcomes.reduce((sum, o) => sum + (o.pushed ?? 0), 0);
+    await deps.telegram.send(`push: ${sent} sent, ${skipped} skipped (${composed} composed)`);
   }
   const pushFailed = outcomes.filter((o) => o.pushError);
   if (pushFailed.length > 0) {

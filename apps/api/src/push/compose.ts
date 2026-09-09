@@ -158,6 +158,15 @@ function signed(points: number | null): string {
 // it" flag, so a resolve whose step never checkpointed still gets its push
 // on the next pass.
 //
+// Precisely what the claim guarantees, and what it does not: it is
+// AT-MOST-ONCE, not exactly-once. A crash after this UPDATE commits but
+// before the send loop finishes loses those pushes for good — accepted, on
+// purpose, over the alternative of double-sending them. A crash after
+// resolveQuestion's write but before this claim runs is fully recovered on
+// the next pass, because the claim is state-based (it reads the question's
+// own outcome and the row's own points) rather than driven by a caller's
+// one-shot "I just resolved it" signal.
+//
 // The claim requires BOTH the question's outcome AND the row's points to be
 // written. resolveQuestion sets questions.outcome first, then loops separate
 // per-row UPDATEs writing predictions.points/brier — neon-http has no
