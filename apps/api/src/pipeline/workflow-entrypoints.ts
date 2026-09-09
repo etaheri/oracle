@@ -137,6 +137,7 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
     const locksAtDefault = noonET(addDays(date, 1));
 
     // Tier 0 — free.
+    // Mirror of gauntlet/index.ts's tier-0 call — keep the two runners in lockstep.
     const tier0 = await durableStep(step, "screen", POLICY.pure, deps, async () =>
       screenCandidates(raw, {
         rulesVersion: 2,

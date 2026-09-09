@@ -99,6 +99,7 @@ export async function runAuthoringGauntlet(deps: PipelineDeps, date: string): Pr
   const locksAtDefault = noonET(addDays(date, 1));
 
   // Tier 0 — free.
+  // Mirror of workflow-entrypoints.ts's tier-0 call — keep the two runners in lockstep.
   const tier0 = screenCandidates(raw, { rulesVersion: 2, opensAt, locksAtDefault, voidAt: voidDeadline(date), recentTopicKeys: new Set(ctx.recentTopicKeys) });
   count(tier0.rejected);
 
