@@ -89,6 +89,7 @@ describe("GET /v1/me/ledger", () => {
     const out = (await (await a("/v1/me/ledger")).json()) as Record<string, unknown>;
     // incomplete round (3 of 5 answered) does not rate, but every resolved call still counts as answered
     expect(out).toMatchObject({ calls_answered: 3, calls_rated: 0 });
+    expect(out.reading).toEqual({ date: "2026-08-20", settled: true, decided: 5, total: 5 });
   });
 
   it("void outcomes are excluded; a fresh player gets the null shape", async () => {
@@ -107,6 +108,7 @@ describe("GET /v1/me/ledger", () => {
     const outF = (await (await fresh("/v1/me/ledger")).json()) as Record<string, unknown>;
     expect(outF).toMatchObject({ days_consulted: 0, accuracy_pct: null, streak: 0, claimed: false });
     expect((outF.epithet as { id: string }).id).toBe("unread");
+    expect(outF.reading).toBeNull();
   });
 
   it("reports shield state: monthly free shield, paid reserve, last hold date", async () => {

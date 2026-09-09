@@ -4,6 +4,7 @@ import { confidenceHistory, calculateDuel, ratingEligible, earnedMilestones, ass
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
+import { readingRoundFor } from "../reading";
 
 const WINDOW_MS = 28 * 86_400_000;
 
@@ -176,7 +177,10 @@ export const meRoutes = new Hono<AppContext>()
       if (you > machine) daysOutseen += 1;
     }
 
+    const reading = await readingRoundFor(db, userId);
+
     return c.json({
+      reading,
       milestones: earnedMilestones({ completedRounds: completeDates.size,
         resolvedCompletedRounds: playedRounds.filter(r => r.status === "resolved" && completeDates.has(r.date)).length,
         oracleWins: daysOutseen }),
