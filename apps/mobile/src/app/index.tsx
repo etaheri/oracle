@@ -22,7 +22,7 @@ import { isBootDone, isOrbLanded, onBootDone, onOrbLanded } from "../game/bootGa
 import { useHeroCues } from "../ui/useHeroCues";
 import { shieldNotice } from "../game/shieldNotice";
 import { rescueOffered } from "../game/rescueOffer";
-import { revealReady } from "../game/revealReady";
+import { readingSlot } from "../game/readingSlot";
 import { riskLine, lapseNotice } from "../game/homeLines";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
 import { beginHomeAction, invalidateHomeAction, ownsHomeAction, type HomeActionGate } from "../game/homeActionGate";
@@ -34,7 +34,7 @@ import { maybeSummon, summonNow } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
-import { vigilLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, REMINDER_CTA_LINES, type MeLedger } from "@oracle/core";
+import { vigilLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, READING_LINES, REMINDER_CTA_LINES, type MeLedger } from "@oracle/core";
 import { colors, space, ROW_H } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -105,7 +105,8 @@ export default function Index() {
   // Fires once per day's round, the moment it first renders live (still
   // open) here — not on every 30s re-render from the risk-line clock below.
   const openedFor = useRef<string | null>(null);
-  const yesterday = yesterdayOf(round?.date);
+  const ledger = useMeLedger();
+  const yesterday = ledger.data?.reading?.date ?? yesterdayOf(round?.date);
   const reveal = useReveal(yesterday);
   const playedYesterday = reveal.data && !("pending" in reveal.data) ? reveal.data.questions.some((q) => q.my !== null) : null;
   const [revealSeen, setRevealSeen] = useState<string | null>(null);
@@ -144,7 +145,8 @@ export default function Index() {
       return () => invalidateArrivalAction(false);
     }, [invalidateArrivalAction])
   );
-  const showLedgerCta = revealReady(reveal.data) && playedYesterday === true && revealSeen !== yesterday;
+  const slot = readingSlot(ledger.data?.reading, revealSeen);
+  const showLedgerCta = slot.kind !== "none";
   const crowd = useCrowdSoFar(anySealed);
   const lean = crowdLean(crowd.data?.questions ?? []);
   const next = useNextRound(!today.isLoading && needsNext);
@@ -163,7 +165,6 @@ export default function Index() {
       capture("round_opened", { date: round.date });
     }
   }, [arrival.kind, round]);
-  const ledger = useMeLedger();
   const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
   const shield = shieldNotice(ledger.data?.shield_used_on ?? null, yesterday);
   // Re-evaluated every 30s so the risk line can appear without a remount —
@@ -309,11 +310,11 @@ export default function Index() {
   useEffect(() => { void getOrbGreeted().then(setGreetedOn); }, []);
   const greetOrb = greetedOn !== undefined && greetedOn !== stampDate;
   useEffect(() => { if (greetOrb) void markOrbGreeted(stampDate); }, [greetOrb, stampDate]);
-  // Yesterday's ledger keeps a rail slot only while it is not already the
-  // screen's headline action.
+  // The reading round's ledger keeps a rail slot only while it is not
+  // already the screen's headline action.
   const navItems: NavItem[] = [
     { label: "YOUR LEDGER", a11yLabel: "The forecaster's ledger", onPress: () => leaveHome(() => router.push("/ledger")) },
-    ...(showLedgerCta ? [] : [{ label: "YESTERDAY", a11yLabel: "Yesterday's ledger", onPress: () => leaveHome(() => router.push(`/reveal/${yesterday}`)) }]),
+    ...(showLedgerCta ? [] : [{ label: READING_LINES.rail, a11yLabel: "Your latest ledger", onPress: () => leaveHome(() => router.push(`/reveal/${yesterday}`)) }]),
     { label: GAME_TERMS.rulesNav.toUpperCase(), a11yLabel: GAME_TERMS.rulesNav, onPress: () => leaveHome(() => router.push({ pathname: "/rites", params: { all: "1" } })) },
   ];
 
@@ -335,10 +336,10 @@ export default function Index() {
       </View>
       <View style={{ gap: space(3) }}>
         <View style={{ minHeight: callSlotHeight(chromeScale), justifyContent: "flex-end", gap: space(3) }}>
-          {showLedgerCta && (
+          {slot.kind !== "none" && (
             <>
-              <DecodeLine active={booted} text="YESTERDAY'S LEDGER IS READ" {...role.line} color={colors.goldText} />
-              <GoldButton title="READ THE LEDGER" onPress={() => leaveHome(() => router.push(`/reveal/${yesterday}`))} />
+              <DecodeLine active={booted} text={slot.line} {...role.line} color={colors.goldText} />
+              <GoldButton title={slot.cta} onPress={() => leaveHome(() => router.push(`/reveal/${slot.date}`))} />
             </>
           )}
           <HomeChallenge
