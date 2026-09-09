@@ -96,6 +96,20 @@ describe("migration 0007", () => {
     expect(q!.topicKey).toBeNull();
   });
 
+  it("leaves resolves_at and withdrawn_at null on an ordinary question (design 2026-09-09 §1)", async () => {
+    const { db } = await makeTestDb();
+    await db.insert(schema.rounds).values({ date: "2026-09-10" });
+    const [q] = await db.insert(schema.questions).values({
+      roundDate: "2026-09-10", slot: 1, text: "Will it?", category: "news",
+      resolutionCriteria: "per test", sourceName: "SRC",
+      opensAt: new Date("2026-09-10T16:00:00Z"),
+      locksAt: new Date("2026-09-11T16:00:00Z"),
+      resolveBy: new Date("2026-09-11T17:00:00Z"),
+    }).returning();
+    expect(q!.resolvesAt).toBeNull();
+    expect(q!.withdrawnAt).toBeNull();
+  });
+
   it("holds a spend row per date", async () => {
     const { db } = await makeTestDb();
     await db.insert(schema.pipelineSpend).values({ date: "2026-09-04", calls: 3 });

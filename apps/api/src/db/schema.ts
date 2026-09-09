@@ -89,6 +89,15 @@ export const questions = pgTable("questions", {
   // both produce locks_at < noon, and only the second is the machine catching
   // a leak in real time (design 2026-09-04 §11.2).
   lockHealedAt: timestamp("lock_healed_at", { withTimezone: true }),
+  // The author's own honest instant: when the outcome first becomes publicly
+  // determinable (design 2026-09-09 §1.1). Null when the draft said
+  // "after-lock". Unlike resolve_by above, this IS read: the fast-round rule
+  // validates against it, and the in-play surface will print it.
+  resolvesAt: timestamp("resolves_at", { withTimezone: true }),
+  // Editorial withdrawal (design 2026-09-09 §1.4): the operator struck this
+  // question from a live round with an honest reason. Distinct from
+  // lock_healed_at, which only the probe writes when an answer leaked.
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
   // The normalized subject of the question ("btc-close-above-threshold"), as
   // stated by the author. The gauntlet's tier-0 dedupe compares against the
   // last TOPIC_KEY_DAYS of these; the text dedupe it replaces let "will BTC
