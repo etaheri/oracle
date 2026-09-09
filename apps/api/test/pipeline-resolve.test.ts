@@ -26,7 +26,12 @@ function fakeClaude(responses: unknown[]) {
   return { claude, calls };
 }
 
-function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso = "2026-08-27T16:05:00Z") {
+function fakeDeps(
+  db: PipelineDeps["db"],
+  claude: ClaudeClient | null,
+  nowIso = "2026-08-27T16:05:00Z",
+  extra: Partial<PipelineDeps> = {},
+) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
     workflows: inlineStarter(),
@@ -35,6 +40,7 @@ function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso = 
     models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
+    ...extra,
   };
   return { deps, sent };
 }
@@ -465,5 +471,78 @@ describe("resolveOne and narrateResolution (design 2026-09-08 §3.2, §5.2)", ()
     expect(sent).toHaveLength(1);
     expect(sent[0]).toContain("upstream 503");
     expect(sent[0]).toContain("2026-09-08");
+  });
+});
+
+describe("resolveOne sends the resolution push (design 2026-09-09 §2.1)", () => {
+  // Two entries per resolveOne call (one per resolver model) — a test that
+  // drives resolveOne more than once must ask for that many pairs.
+  const agreeingYes = (pairs = 1) =>
+    Array.from({ length: pairs * 2 }, () => ({
+      outcome: "yes",
+      quotes: [{ url: "https://example.com/x", quote: "it happened" }],
+      reasoning: "r",
+    }));
+
+  it("claims and composes one push per answering player after a successful resolve", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ questionId: q.id, userId: u!.id, answer: true, confidence: 70 });
+    const { claude } = fakeClaude(agreeingYes());
+    const { deps } = fakeDeps(db, claude);
+    const out = await resolveOne(deps, q.id);
+    expect(out.resolved).toBe(true);
+    expect(out.pushed).toBe(1);
+    const p = await db.query.predictions.findFirst({ where: eq(schema.predictions.questionId, q.id) });
+    expect(p!.resolvePushedAt).not.toBeNull();
+  });
+
+  it("still pushes when the question was resolved by an earlier, un-checkpointed attempt (state-based, not flag-based)", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ questionId: q.id, userId: u!.id, answer: false, confidence: 60 });
+    await resolveQuestion(db, q.id, "no");
+    const { claude } = fakeClaude(agreeingYes());
+    const { deps } = fakeDeps(db, claude);
+    const out = await resolveOne(deps, q.id);
+    expect(out.resolved).toBe(false);
+    expect(out.pushed).toBe(1);
+  });
+
+  it("composes nothing on a second pass", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ questionId: q.id, userId: u!.id, answer: true, confidence: 70 });
+    const { claude } = fakeClaude(agreeingYes(2));
+    const { deps } = fakeDeps(db, claude);
+    await resolveOne(deps, q.id);
+    const again = await resolveOne(deps, q.id);
+    expect(again.pushed).toBe(0);
+  });
+
+  it("a push failure never fails the resolve", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await seedOneLockedQuestion(db);
+    const [u] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({ questionId: q.id, userId: u!.id, answer: true, confidence: 70 });
+    const { claude } = fakeClaude(agreeingYes());
+    const { deps } = fakeDeps(db, claude, undefined, {
+      push: { ONESIGNAL_APP_ID: "x", ONESIGNAL_API_KEY: "y" },
+    });
+    // sendPushes will try fetch — stub global fetch to throw for this test.
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new Error("network down");
+    }) as typeof fetch;
+    try {
+      const out = await resolveOne(deps, q.id);
+      expect(out.resolved).toBe(true);
+      expect(out.error).toBeUndefined();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });

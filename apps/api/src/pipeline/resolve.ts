@@ -23,6 +23,8 @@ import type { PipelineDeps } from "./index";
 import { resolveQuestion } from "../resolution";
 import { askResolver, settled, type ResolverVerdict } from "./resolver";
 import { BudgetExhausted } from "./spend";
+import { claimResolutionPushes } from "../push/compose";
+import { sendPushes } from "../push/onesignal";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -91,6 +93,9 @@ export interface ResolveOutcome {
   questionId: string;
   resolved: boolean;
   error?: string;
+  /** Resolution pushes composed on this pass (design 2026-09-09 §2.1). */
+  pushed?: number;
+  pushError?: string;
 }
 
 /**
@@ -103,13 +108,28 @@ export interface ResolveOutcome {
  * that returns a summary is one a later step can narrate.
  */
 export async function resolveOne(deps: PipelineDeps, questionId: string): Promise<ResolveOutcome> {
+  let resolved = false;
   try {
-    const resolved = await resolveWithClaude(deps, questionId);
-    return { questionId, resolved };
+    resolved = await resolveWithClaude(deps, questionId);
   } catch (err) {
     if (err instanceof BudgetExhausted) throw err;
     return { questionId, resolved: false, error: err instanceof Error ? err.message : String(err) };
   }
+  // The trickle (design 2026-09-09 §2.1). State-based and after EVERY
+  // attempt, not only a successful one: an attempt whose write landed but
+  // whose step never checkpointed returns resolved=false on replay, and its
+  // players still deserve their push. The claim inside makes this safe to
+  // run on every pass.
+  let pushed = 0;
+  let pushError: string | undefined;
+  try {
+    const pushes = await claimResolutionPushes(deps.db, questionId, deps.now());
+    pushed = pushes.length;
+    if (pushed > 0) await sendPushes(deps.push ?? {}, pushes);
+  } catch (err) {
+    pushError = err instanceof Error ? err.message : String(err);
+  }
+  return { questionId, resolved, pushed, ...(pushError ? { pushError } : {}) };
 }
 
 /**
@@ -123,10 +143,17 @@ export async function narrateResolution(
   outcomes: ResolveOutcome[],
 ): Promise<void> {
   const failed = outcomes.filter((o) => o.error);
-  if (failed.length === 0) return;
-  await deps.telegram.send(
-    `⚠ resolve failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
-  );
+  if (failed.length > 0) {
+    await deps.telegram.send(
+      `⚠ resolve failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
+    );
+  }
+  const pushFailed = outcomes.filter((o) => o.pushError);
+  if (pushFailed.length > 0) {
+    await deps.telegram.send(
+      `⚠ resolution push failed (${date}): ${pushFailed.map((f) => `${f.questionId}: ${f.pushError}`).join(" · ")}`,
+    );
+  }
 }
 
 /**
