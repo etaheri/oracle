@@ -6,7 +6,7 @@ import { resolveQuestion } from "../src/resolution";
 import { settleRound } from "../src/settlement";
 import { COPY_BANK as COPY } from "@oracle/core";
 import { schema } from "../src/db/client";
-import { composeHingePushes, claimResolutionPushes } from "../src/push/compose";
+import { composeHingePushes, claimResolutionPushes, headline } from "../src/push/compose";
 import { sendPushes } from "../src/push/onesignal";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
@@ -299,6 +299,19 @@ describe("claimResolutionPushes (design 2026-09-09 §2.1)", () => {
     const pushes = await claimResolutionPushes(db, qs[0]!.id, new Date());
     expect(pushes).toHaveLength(2);
     for (const p of pushes) expect(p.text).toMatch(/\+10\./);
+  });
+});
+
+describe("headline (audit finding G)", () => {
+  it("never splits a surrogate pair when truncating an emoji-bearing question", () => {
+    // 80 code points total, with the emoji sitting right at the UTF-16
+    // truncation boundary (index 68) a code-unit-based slice(0, 69) would cut
+    // through — the emoji is two UTF-16 units, so that slice keeps its high
+    // surrogate and drops its low surrogate, leaving a lone surrogate behind.
+    const text = `${"a".repeat(68)}😀${"a".repeat(11)}`;
+    const result = headline(text);
+    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(result.endsWith("…")).toBe(true);
   });
 });
 

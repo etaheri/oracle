@@ -139,9 +139,16 @@ export interface ResolutionPush {
 
 // The question, in the reader's register (sentence case, as authored), cut
 // to a headline. The caps line that follows is the push's own voice.
+//
+// Sliced by code point, not by UTF-16 code unit: `.length` and `.slice`
+// count the two-unit halves of a surrogate pair as one each, so a question
+// containing an emoji or other astral character could be cut mid-pair,
+// leaving a lone surrogate — an invalid string a push provider can mangle
+// or reject. Array.from splits on code points instead.
 export function headline(text: string): string {
   const t = text.trim();
-  return t.length <= HEADLINE_MAX ? t : `${t.slice(0, HEADLINE_MAX - 1).trimEnd()}…`;
+  const chars = Array.from(t);
+  return chars.length <= HEADLINE_MAX ? t : `${chars.slice(0, HEADLINE_MAX - 1).join("").trimEnd()}…`;
 }
 
 function signed(points: number | null): string {
