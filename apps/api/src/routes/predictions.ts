@@ -2,8 +2,21 @@ import { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import { PredictionSubmitSchema } from "@oracle/core";
 import type { AppContext } from "../app";
-import { schema } from "../db/client";
+import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
+
+// The crowd at the instant this player sealed, sealer included (design
+// 2026-09-09 §4.1). Best-effort: a DB hiccup here must leave the snapshot
+// null, never fail a seal that already landed durably -- callers wrap this
+// in try/catch and ignore its rejection.
+export async function snapshotCrowdAtSeal(db: Db, questionId: string, predictionId: string) {
+  const all = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, questionId), columns: { answer: true } });
+  const count = all.length;
+  const yes = all.filter((p) => p.answer).length;
+  await db.update(schema.predictions)
+    .set({ crowdYesPctAtSeal: String(Math.round((100 * yes) / count)), crowdCountAtSeal: count })
+    .where(eq(schema.predictions.id, predictionId));
+}
 
 export const predictionRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
@@ -36,12 +49,12 @@ export const predictionRoutes = new Hono<AppContext>()
       .returning({ id: schema.predictions.id, firstHour: schema.predictions.firstHour });
 
     if (inserted.length > 0) {
-      const all = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, q.id), columns: { answer: true } });
-      const count = all.length;
-      const yes = all.filter((p) => p.answer).length;
-      await db.update(schema.predictions)
-        .set({ crowdYesPctAtSeal: String(Math.round((100 * yes) / count)), crowdCountAtSeal: count })
-        .where(eq(schema.predictions.id, inserted[0]!.id));
+      try {
+        await snapshotCrowdAtSeal(db, q.id, inserted[0]!.id);
+      } catch {
+        // Best-effort: a missing snapshot is honest, a failed seal is not.
+        // The row already landed durably -- report success regardless.
+      }
       return c.json({ id: inserted[0]!.id, first_hour: inserted[0]!.firstHour });
     }
     const existing = await db.query.predictions.findFirst({

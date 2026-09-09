@@ -152,4 +152,44 @@ describe("POST /v1/predictions", () => {
     expect(rowA?.crowdYesPctAtSeal).toBe("100");
     expect(rowA?.crowdCountAtSeal).toBe(1);
   });
+
+  it("still returns 200 with an id when the crowd snapshot write fails -- a failed snapshot must never fail a seal", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db, qs, submit } = await setup();
+    // Player A seals normally, before the spy is installed -- the snapshot
+    // write succeeds and this row is unaffected by the failure below.
+    await submit(body(qs[0]!.id));
+
+    const app2 = createApp({ db, env });
+    const res2 = await app2.request("/v1/auth/device", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ platform: "ios" }),
+    });
+    const { token: tokenB } = (await res2.json()) as { token: string };
+    const submitB = (b: object) =>
+      app2.request("/v1/predictions", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${tokenB}` },
+        body: JSON.stringify(b),
+      });
+
+    // Force the snapshot's UPDATE to throw once, simulating a DB hiccup after
+    // player B's row has already landed durably.
+    const updateSpy = vi.spyOn(db, "update").mockImplementationOnce(() => {
+      throw new Error("simulated DB failure");
+    });
+    const resB = await submitB({ question_id: qs[0]!.id, answer: false, confidence: 75, idempotency_key: "b" });
+    expect(resB.status).toBe(200);
+    const { id: idB } = (await resB.json()) as { id: string };
+    expect(idB).toBeTruthy();
+    updateSpy.mockRestore();
+
+    // The row landed (this IS the seal), but its snapshot stayed null --
+    // honest about what failed, rather than lying about the seal itself.
+    const rowB = await db.query.predictions.findFirst({ where: eq(schema.predictions.id, idB) });
+    expect(rowB).toBeTruthy();
+    expect(rowB?.crowdCountAtSeal).toBeNull();
+    expect(rowB?.crowdYesPctAtSeal).toBeNull();
+  });
 });
