@@ -317,6 +317,47 @@ design may weaken it.
 This is an instrument. It answers "is the call-count proxy drifting?" and it is
 the natural event shape for PostHog later (§8). It does not gate anything.
 
+### 4.7 The client streams, because the edge times the turn out
+
+Observed 2026-09-08, `author-2026-09-09-2026090817` through `…20`: every hourly
+authoring instance failed, six attempts each, all of them
+`claude: 524 error code: 524`, every attempt dying between 2m06s and 2m08s.
+
+Two seconds of spread across six attempts is not model variance. It is a wall.
+`claude.ts` POSTed **non-streaming**, holding one response open for the whole
+turn, and the authoring call — Opus 5, adaptive thinking, twelve candidates,
+eight web searches — runs past two minutes. Anthropic's edge closes the
+connection first and returns 524. The generation was performed and billed; the
+bytes were never delivered.
+
+**The retry policies of §4.1–4.2 do not touch this.** They bound how many times
+a doomed call repeats; they cannot make it succeed. A shallower limit turns six
+wasted Opus 5 generations an hour into three.
+
+`stream: true` is therefore not an optimisation and not optional. Bytes move
+continuously, so no intermediary can time the turn out, and `max_tokens` stops
+being a latency risk. The client assembles the event stream back into the exact
+message shape the non-streaming endpoint returned, so `pause_turn` continuation
+(§4.1), structured extraction, and §4.6's instrument are unchanged by the
+switch — the streaming is confined to the transport.
+
+Two consequences worth stating rather than discovering:
+
+- **`onUsage` only ever fired on `res.ok`.** Every 524 charged
+  `pipeline_spend` and recorded nothing in `pipeline_usage`, so the instrument
+  under-reported precisely the tokens being wasted. Streaming does not fix that
+  asymmetry; it removes the failure that exposed it.
+- **A stream can fail after the 200.** An in-band `error` event, or a body that
+  ends mid-`input_json_delta`, must throw. A truncated tool input is not a
+  partial answer — returning the half-built block would hand unvalidated
+  candidates to the screen as though the model had produced them.
+
+Two work caps ride along, both narrower than a model swap. The authoring call
+drops `max_uses` from 8 to 5 and sets `output_config: { effort: "medium" }`.
+`effort` is **opt-in per call**, never a client default: `PIPELINE_TASTE_MODEL`
+is Haiku 4.5, which rejects `output_config.effort` with a 400, and a default
+would take the fail-closed taste gate (§5.1) down on every round.
+
 ---
 
 ## 5. Behaviour changes, stated rather than discovered

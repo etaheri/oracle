@@ -3,6 +3,7 @@ import { makeTestDb } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import { recordUsage } from "../src/pipeline/usage";
 import { makeClaudeClient } from "../src/pipeline/claude";
+import { toolStream } from "./helpers/sse";
 
 describe("recordUsage", () => {
   it("accumulates per (date, model) in one atomic statement", async () => {
@@ -25,14 +26,7 @@ describe("makeClaudeClient onUsage", () => {
   it("reports usage without changing what structured() returns", async () => {
     const seen: unknown[] = [];
     const fakeFetch = (async () =>
-      new Response(
-        JSON.stringify({
-          stop_reason: "tool_use",
-          content: [{ type: "tool_use", name: "s", input: { ok: true } }],
-          usage: { input_tokens: 100, output_tokens: 20, server_tool_use: { web_search_requests: 2 } },
-        }),
-        { status: 200 },
-      )) as unknown as typeof fetch;
+      toolStream("s", { ok: true }, { inputTokens: 100, outputTokens: 20, webSearches: 2 })) as unknown as typeof fetch;
 
     const client = makeClaudeClient("k", fakeFetch, async (u) => void seen.push(u));
     const out = await client.structured({ model: "m", system: "", user: "", schemaName: "s", schema: {} });
@@ -44,11 +38,7 @@ describe("makeClaudeClient onUsage", () => {
   });
 
   it("never lets a usage-recording failure break the model call", async () => {
-    const fakeFetch = (async () =>
-      new Response(
-        JSON.stringify({ stop_reason: "tool_use", content: [{ type: "tool_use", name: "s", input: { ok: true } }] }),
-        { status: 200 },
-      )) as unknown as typeof fetch;
+    const fakeFetch = (async () => toolStream("s", { ok: true })) as unknown as typeof fetch;
 
     const client = makeClaudeClient("k", fakeFetch, async () => { throw new Error("db down"); });
     // An instrument must never take down the thing it measures.

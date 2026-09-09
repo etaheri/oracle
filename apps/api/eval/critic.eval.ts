@@ -5,7 +5,7 @@
 // compound clause the gate should catch even though screenCandidates()
 // normally catches it first. This is the gate the author gets prosecuted by,
 // scored the only way it CAN be scored hermetically — it runs with
-// `models.critic` (Opus 5, no search — critic.ts), so nothing it reads
+// `models.critic` (Sonnet 5, no search — critic.ts), so nothing it reads
 // depends on the live web the way the resolver and pre-flight do.
 //
 // Run with: ANTHROPIC_API_KEY=... npx tsx eval/critic.eval.ts
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
       resolve: "unused",
       resolveB: "unused",
       forecast: "unused",
-      critic: process.env.PIPELINE_CRITIC_MODEL ?? "claude-opus-5",
+      critic: process.env.PIPELINE_CRITIC_MODEL ?? "claude-sonnet-5",
       preflight: "unused",
       probe: "unused",
       taste: "unused",

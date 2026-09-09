@@ -15,7 +15,12 @@
     "PIPELINE_RESOLVE_MODEL": "claude-sonnet-5",
     "PIPELINE_RESOLVE_MODEL_B": "claude-opus-5",
     "PIPELINE_FORECAST_MODEL": "claude-sonnet-5",
-    "PIPELINE_CRITIC_MODEL": "claude-opus-5",
+    // Drives BOTH criticize() and assessEditorial(). Editorial is 0/1/2 scoring
+    // on three stated axes and the critic works from a fixed rubric — neither
+    // is the open-ended judgement the author model does, so Sonnet 5 carries
+    // them. Unlike RESOLVE_MODEL_B below, nothing here depends on this model
+    // differing from any other.
+    "PIPELINE_CRITIC_MODEL": "claude-sonnet-5",
     "PIPELINE_PREFLIGHT_MODEL": "claude-sonnet-5",
     "PIPELINE_PROBE_MODEL": "claude-sonnet-5",
     "PIPELINE_TASTE_MODEL": "claude-haiku-4-5-20251001"

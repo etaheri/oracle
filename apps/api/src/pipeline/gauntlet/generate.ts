@@ -136,7 +136,13 @@ export async function generateCandidates(
     user: `Produce ${CANDIDATE_TARGET} candidate questions for ${date} now.`,
     schemaName: "candidate_round",
     schema: candidateSetJsonSchema,
-    webSearch: { maxUses: 8 },
+    // Eight searches was the ceiling that made this the longest call in the
+    // pipeline; five is enough to ground twelve candidates and bills four
+    // fewer searches a night. `effort` trades thinking depth for a turn that
+    // finishes — the same lever as the model swap, without the quality loss,
+    // and safe here because the author model is Opus 5 (design 2026-09-08 §4.7).
+    webSearch: { maxUses: 5 },
+    effort: "medium",
   });
 
   const list = (response as { candidates?: unknown }).candidates;
