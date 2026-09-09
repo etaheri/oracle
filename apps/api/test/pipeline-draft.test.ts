@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, upsertDraft, type Draft } from "../src/pipeline/draft";
-import { noonET } from "../src/pipeline/clock";
+import { DraftSchema, DraftQuestionSchema, lockFromResolvesAt, RESOLVES_AFTER_LOCK, upsertDraft, checkFastRound, type Draft, type FastRoundWindow } from "../src/pipeline/draft";
+import { noonET, fastResolveBy, voidDeadline } from "../src/pipeline/clock";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
 import * as schema from "../src/db/schema";
@@ -214,5 +214,61 @@ describe("lockFromResolvesAt across a DST boundary (design 2026-09-04 §10)", ()
     expect(springOpens.toISOString()).toBe("2026-03-07T17:00:00.000Z");
     expect(springLocks.toISOString()).toBe("2026-03-08T16:00:00.000Z");
     expect(lockFromResolvesAt("2026-03-08T20:00:00Z", springOpens, springLocks).toISOString()).toBe(springLocks.toISOString());
+  });
+});
+
+// Round 2026-08-27: lock 08-28 16:00Z, fast-by 20:00Z, void 08-29 16:00Z.
+const WINDOW: FastRoundWindow = { lockAt: LOCKS, fastBy: fastResolveBy("2026-08-27"), voidAt: voidDeadline("2026-08-27") };
+const q = (slot: number, resolves_at: string) => ({ slot, is_big_one: slot === 5, resolves_at });
+
+describe("checkFastRound (design 2026-09-09 §1.1-1.2)", () => {
+  it("accepts five after-lock questions", () => {
+    expect(checkFastRound([1, 2, 3, 4, 5].map((s) => q(s, RESOLVES_AFTER_LOCK)), WINDOW)).toBeNull();
+  });
+  it("accepts five same-evening instants", () => {
+    expect(checkFastRound([1, 2, 3, 4, 5].map((s) => q(s, "2026-08-28T19:00:00Z")), WINDOW)).toBeNull();
+  });
+  it("accepts a slow Big One when the other four are fast", () => {
+    const qs = [q(1, "2026-08-28T18:00:00Z"), q(2, RESOLVES_AFTER_LOCK), q(3, "2026-08-28T19:59:00Z"), q(4, "2026-08-28T20:00:00Z"), q(5, "2026-08-29T12:30:00Z")];
+    expect(checkFastRound(qs, WINDOW)).toBeNull();
+  });
+  it("rejects a slow question that is not the Big One", () => {
+    const qs = [q(1, "2026-08-28T18:00:00Z"), q(2, "2026-08-29T12:30:00Z"), q(3, RESOLVES_AFTER_LOCK), q(4, RESOLVES_AFTER_LOCK), q(5, RESOLVES_AFTER_LOCK)];
+    expect(checkFastRound(qs, WINDOW)).toBe("only the big one may resolve after the evening");
+  });
+  it("rejects two slow questions even when one is the Big One", () => {
+    const qs = [q(1, "2026-08-28T18:00:00Z"), q(2, "2026-08-29T01:00:00Z"), q(3, RESOLVES_AFTER_LOCK), q(4, RESOLVES_AFTER_LOCK), q(5, "2026-08-29T12:30:00Z")];
+    expect(checkFastRound(qs, WINDOW)).toBe("only the big one may resolve after the evening");
+  });
+  it("rejects any instant past the void deadline, Big One included", () => {
+    const qs = [q(1, RESOLVES_AFTER_LOCK), q(2, RESOLVES_AFTER_LOCK), q(3, RESOLVES_AFTER_LOCK), q(4, RESOLVES_AFTER_LOCK), q(5, "2026-08-30T16:00:00Z")];
+    expect(checkFastRound(qs, WINDOW)).toBe("resolves_at is past the void deadline");
+  });
+});
+
+describe("upsertDraft enforces the fast-round rule at v2", () => {
+  it("stores the honest instant in resolves_at and null for after-lock", async () => {
+    const { db } = await makeTestDb();
+    const draft = withQuestions((qs) => { qs[0]!.resolves_at = "2026-08-28T19:00:00Z"; return qs; });
+    await upsertDraft(db, "2026-08-27", draft, 2);
+    const rows = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-27") });
+    const one = rows.find((r) => r.slot === 1)!;
+    expect(one.resolvesAt?.toISOString()).toBe("2026-08-28T19:00:00.000Z");
+    expect(rows.find((r) => r.slot === 2)!.resolvesAt).toBeNull();
+  });
+  it("refuses a v2 draft with a non-Big-One that resolves after the evening", async () => {
+    const { db } = await makeTestDb();
+    const draft = withQuestions((qs) => { qs[1]!.resolves_at = "2026-08-29T12:30:00Z"; return qs; });
+    await expect(upsertDraft(db, "2026-08-27", draft, 2)).rejects.toThrow("only the big one may resolve after the evening");
+  });
+  it("refuses a v2 draft whose Big One resolves past the void deadline", async () => {
+    const { db } = await makeTestDb();
+    const draft = withQuestions((qs) => { qs[4]!.resolves_at = "2026-08-30T16:00:00Z"; return qs; });
+    await expect(upsertDraft(db, "2026-08-27", draft, 2)).rejects.toThrow("resolves_at is past the void deadline");
+  });
+  it("leaves v1 drafts alone (prospective rule)", async () => {
+    const { db } = await makeTestDb();
+    const draft = withQuestions((qs) => { qs[1]!.resolves_at = "2026-08-28T15:00:00Z"; return qs; }); // an early lock, legal at v1
+    await expect(upsertDraft(db, "2026-08-27", draft, 1)).resolves.toBeUndefined();
   });
 });

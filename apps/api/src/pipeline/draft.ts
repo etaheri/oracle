@@ -10,7 +10,7 @@ import { QuestionContextSchema } from "@oracle/core";
 // is simply retried by re-posting the same draft.
 import { eq } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
-import { addDays, noonET } from "./clock";
+import { addDays, fastResolveBy, noonET, voidDeadline } from "./clock";
 import { z } from "zod";
 
 // The outcome's own clock. The model states a FACT — when does this become
@@ -91,6 +91,31 @@ export function lockFromResolvesAt(resolvesAt: string, opensAt: Date, defaultLoc
   return t.getTime() < defaultLocksAt.getTime() ? t : defaultLocksAt;
 }
 
+export interface FastRoundWindow { lockAt: Date; fastBy: Date; voidAt: Date }
+
+// The fast-round rule (design 2026-09-09 §1.1-1.2). A v2 round settles only
+// when its slowest question does, so one Sunday question holds the whole
+// verdict two days. Every concrete instant must land before the void
+// deadline, and at most one may land after the evening — and that one must be
+// the Big One. "after-lock" carries no instant and counts as fast: it is a
+// claim that nothing is knowable before the lock, not a claim of lateness.
+export function checkFastRound(
+  questions: ReadonlyArray<{ slot: number; is_big_one: boolean; resolves_at: string }>,
+  window: FastRoundWindow,
+): string | null {
+  let slow = 0;
+  for (const q of questions) {
+    if (q.resolves_at === RESOLVES_AFTER_LOCK) continue;
+    const t = new Date(q.resolves_at).getTime();
+    if (t > window.voidAt.getTime()) return "resolves_at is past the void deadline";
+    if (t > window.fastBy.getTime()) {
+      slow += 1;
+      if (!q.is_big_one || slow > 1) return "only the big one may resolve after the evening";
+    }
+  }
+  return null;
+}
+
 export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersion = 1): Promise<void> {
   const existing = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (existing && (existing.status !== "scheduled" || existing.oracleCommittedAt !== null)) throw new Error("round not editable");
@@ -98,6 +123,11 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
   const opensAt = noonET(date);
   const locksAtDefault = noonET(addDays(date, 1));
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
+
+  if (rulesVersion >= 2) {
+    const fast = checkFastRound(draft.questions, { lockAt: locksAtDefault, fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
+    if (fast) throw new Error(fast);
+  }
 
   // Validate ALL rows (including each question's resolves_at) before any
   // write — this map throws on the first "resolves_at out of range" or
@@ -131,6 +161,7 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
       topicKey: q.topic_key,
       opensAt,
       locksAt,
+      resolvesAt: q.resolves_at === RESOLVES_AFTER_LOCK ? null : new Date(q.resolves_at),
       resolveBy,
       status: "scheduled" as const,
     };

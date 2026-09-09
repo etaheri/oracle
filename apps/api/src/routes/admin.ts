@@ -118,6 +118,8 @@ export const adminRoutes = new Hono<AppContext>()
         "resolves_at out of range",
         "weather must lock before noon",
         "new rounds require the full common answering window",
+        "resolves_at is past the void deadline",
+        "only the big one may resolve after the evening",
       ]);
       if (BAD_DRAFT.has(msg)) return c.json({ error: msg }, 400);
       return c.json({ error: "upsert failed" }, 500);
