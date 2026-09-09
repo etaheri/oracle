@@ -224,6 +224,25 @@ Set per profile (development / preview / production) in the EAS dashboard:
 Every native key is optional by design: an absent key means that SDK stays
 dark and the app still runs. Absent is safe; wrong is not.
 
+### 4.1b Share links
+
+**Set the share URL and deployment path.** This controls the fallback the app shows when installed (a web link) and the smart link the share card opens.
+
+- EAS environment: set `EXPO_PUBLIC_SHARE_URL=https://outseen-site.etaheri.workers.dev/play`.
+  This is the `/play` smart link on the site — it opens the app when installed and
+  otherwise shows a truthful fallback (web board).
+- When a registered domain exists, set `EXPO_PUBLIC_SHARE_HANDLE` (a short ASCII
+  display string printed on the share cards) and move `EXPO_PUBLIC_SHARE_URL` to that
+  domain.
+- In `apps/site/public/play.html`, fill `APP_STORE_URL` once the App Store listing
+  is live (`https://apps.apple.com/app/id<ASC id>`).
+- Deploy the site: `cd apps/site && npx wrangler deploy`.
+
+**Snapshot and reminders.** Migration `0013` adds `predictions.crowd_yes_pct_at_seal`
+and `predictions.crowd_count_at_seal` — a snapshot of crowd prediction and count
+written at each seal, shown to the sealer only. The closing reminder follows the
+device's habitual first-seal hour after three days of history (noon reminder unchanged).
+
 ### 4.2 App Store Connect
 
 - App record, bundle id `com.erikt.oracle`.
