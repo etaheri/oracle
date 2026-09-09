@@ -35,7 +35,15 @@ export const predictionRoutes = new Hono<AppContext>()
       .onConflictDoNothing({ target: [schema.predictions.questionId, schema.predictions.userId] })
       .returning({ id: schema.predictions.id, firstHour: schema.predictions.firstHour });
 
-    if (inserted.length > 0) return c.json({ id: inserted[0]!.id, first_hour: inserted[0]!.firstHour });
+    if (inserted.length > 0) {
+      const all = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, q.id), columns: { answer: true } });
+      const count = all.length;
+      const yes = all.filter((p) => p.answer).length;
+      await db.update(schema.predictions)
+        .set({ crowdYesPctAtSeal: String(Math.round((100 * yes) / count)), crowdCountAtSeal: count })
+        .where(eq(schema.predictions.id, inserted[0]!.id));
+      return c.json({ id: inserted[0]!.id, first_hour: inserted[0]!.firstHour });
+    }
     const existing = await db.query.predictions.findFirst({
       where: and(eq(schema.predictions.questionId, q.id), eq(schema.predictions.userId, userId)),
     });

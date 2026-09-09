@@ -27,7 +27,30 @@ describe("GET /v1/round/today/mine", () => {
     const res = await a("/v1/round/today/mine");
     expect(res.status).toBe(200);
     const out = (await res.json()) as { predictions: Array<{ question_id: string; answer: boolean; confidence: number }> };
-    expect(out.predictions).toEqual([{ question_id: qs[0]!.id, answer: true, confidence: 85 }]);
+    expect(out.predictions).toEqual([{ question_id: qs[0]!.id, answer: true, confidence: 85, crowd_yes_pct_at_seal: 100, crowd_count_at_seal: 1 }]);
+  });
+
+  it("carries the crowd snapshot taken at the seal (design 2026-09-09 §4.1)", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    const a = await player(app);
+    await a("/v1/predictions", { method: "POST", body: body(qs[0]!.id, true) });
+
+    const res = await a("/v1/round/today/mine");
+    const out = (await res.json()) as {
+      predictions: Array<{
+        question_id: string;
+        answer: boolean;
+        confidence: number;
+        crowd_yes_pct_at_seal: number | null;
+        crowd_count_at_seal: number | null;
+      }>;
+    };
+    expect(out.predictions).toEqual([
+      { question_id: qs[0]!.id, answer: true, confidence: 85, crowd_yes_pct_at_seal: 100, crowd_count_at_seal: 1 },
+    ]);
   });
 
   it("empty when the caller sealed nothing; 404 with no open round", async () => {

@@ -121,6 +121,11 @@ export const predictions = pgTable("predictions", {
   // Null forever for predictions on void questions and on rounds that
   // predate the column.
   resolvePushedAt: timestamp("resolve_pushed_at", { withTimezone: true }),
+  // The crowd at the instant this player sealed, sealer included (design
+  // 2026-09-09 §4.1). Written once by the seal handler, never before the
+  // seal is accepted, never rewritten. Null on rows that predate the column.
+  crowdYesPctAtSeal: numeric("crowd_yes_pct_at_seal"),
+  crowdCountAtSeal: integer("crowd_count_at_seal"),
 }, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId), index("predictions_user_idx").on(t.userId)]);
 
 // Oracle Plus entitlements (backend spec L55). Written by the RevenueCat

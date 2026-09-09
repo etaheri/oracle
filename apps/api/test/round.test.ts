@@ -475,6 +475,45 @@ describe("the reveal carries what the gauntlet cost (design 2026-09-04 §11.1)",
   });
 });
 
+describe("the reveal carries the crowd snapshot taken at the seal (design 2026-09-09 §4.1)", () => {
+  it("reports my.crowd_yes_pct_at_seal and my.crowd_count_at_seal, present through the sealer's own seal", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedOpenRoundNow(db);
+    const call = await player(app);
+    await call("/v1/predictions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "k" }) });
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+
+    const body = (await (await call("/v1/round/2026-08-20/reveal")).json()) as {
+      questions: Array<{ id: string; my: { crowd_yes_pct_at_seal: number | null; crowd_count_at_seal: number | null } | null }>;
+    };
+    const mine = body.questions.find((q) => q.id === qs[0]!.id)!;
+    expect(mine.my!.crowd_yes_pct_at_seal).toBe(100);
+    expect(mine.my!.crowd_count_at_seal).toBe(1);
+  });
+
+  it("reports null for a row that predates the column", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const authRes = await app.request("/v1/auth/device", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ platform: "ios" }) });
+    const { token, user_id } = (await authRes.json()) as { token: string; user_id: string };
+    const call = (path: string, init: RequestInit = {}) => app.request(path, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${token}` } });
+
+    const qs = await seedSettledRound(db, "2026-09-02");
+    // Seeded directly, with no snapshot fields, to model a row that predates
+    // migration 0013.
+    await db.insert(schema.predictions).values({ questionId: qs[0]!.id, userId: user_id, answer: true, confidence: 75 });
+
+    const body = (await (await call("/v1/round/2026-09-02/reveal")).json()) as {
+      questions: Array<{ id: string; my: { crowd_yes_pct_at_seal: number | null; crowd_count_at_seal: number | null } | null }>;
+    };
+    const mine = body.questions.find((q) => q.id === qs[0]!.id)!;
+    expect(mine.my!.crowd_yes_pct_at_seal).toBeNull();
+    expect(mine.my!.crowd_count_at_seal).toBeNull();
+  });
+});
+
 describe("/today says which locks were healed (design 2026-09-04 §11.2)", () => {
   it("is false for an ordinary question and for an authored early lock", async () => {
     const { db } = await makeTestDb();

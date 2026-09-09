@@ -81,4 +81,75 @@ describe("POST /v1/predictions", () => {
     expect((await submit(body("3f0d8c1e-2b4a-4c6d-9e8f-1a2b3c4d5e6f"))).status).toBe(404);
     expect((await submit({ ...body(qs[0]!.id), confidence: 72 })).status).toBe(400);
   });
+
+  it("snapshots the crowd at the instant of the seal, including the sealer (design 2026-09-09 §4.1)", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db, qs } = await setup();
+    const app = createApp({ db, env });
+    const mint = async () => {
+      const res = await app.request("/v1/auth/device", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ platform: "ios" }),
+      });
+      const { token } = (await res.json()) as { token: string };
+      return (b: object) =>
+        app.request("/v1/predictions", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify(b),
+        });
+    };
+    const [submitA, submitB, submitC] = [await mint(), await mint(), await mint()];
+
+    const resA = await submitA({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "a" });
+    const { id: idA } = (await resA.json()) as { id: string };
+    const rowA = await db.query.predictions.findFirst({ where: eq(schema.predictions.id, idA) });
+    expect(rowA?.crowdYesPctAtSeal).toBe("100");
+    expect(rowA?.crowdCountAtSeal).toBe(1);
+
+    const resB = await submitB({ question_id: qs[0]!.id, answer: false, confidence: 75, idempotency_key: "b" });
+    const { id: idB } = (await resB.json()) as { id: string };
+    const rowB = await db.query.predictions.findFirst({ where: eq(schema.predictions.id, idB) });
+    expect(rowB?.crowdYesPctAtSeal).toBe("50");
+    expect(rowB?.crowdCountAtSeal).toBe(2);
+
+    const resC = await submitC({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "c" });
+    const { id: idC } = (await resC.json()) as { id: string };
+    const rowC = await db.query.predictions.findFirst({ where: eq(schema.predictions.id, idC) });
+    expect(rowC?.crowdYesPctAtSeal).toBe("67");
+    expect(rowC?.crowdCountAtSeal).toBe(3);
+  });
+
+  it("does not rewrite the snapshot on a duplicate seal", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db, qs } = await setup();
+    const app = createApp({ db, env });
+    const mint = async () => {
+      const res = await app.request("/v1/auth/device", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ platform: "ios" }),
+      });
+      const { token } = (await res.json()) as { token: string };
+      return (b: object) =>
+        app.request("/v1/predictions", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify(b),
+        });
+    };
+    const [submitA, submitB] = [await mint(), await mint()];
+
+    const resA = await submitA({ question_id: qs[0]!.id, answer: true, confidence: 75, idempotency_key: "a" });
+    const { id: idA } = (await resA.json()) as { id: string };
+    await submitB({ question_id: qs[0]!.id, answer: false, confidence: 75, idempotency_key: "b" });
+    // A seals again (duplicate) -- must not rewrite A's snapshot even though
+    // the crowd has grown since A's original seal.
+    await submitA({ question_id: qs[0]!.id, answer: false, confidence: 95, idempotency_key: "a2" });
+
+    const rowA = await db.query.predictions.findFirst({ where: eq(schema.predictions.id, idA) });
+    expect(rowA?.crowdYesPctAtSeal).toBe("100");
+    expect(rowA?.crowdCountAtSeal).toBe(1);
+  });
 });

@@ -71,6 +71,10 @@ export const MineTodaySchema = z.object({
       question_id: z.string().uuid(),
       answer: z.boolean(),
       confidence: z.number().int(),
+      // The crowd at the instant this player sealed, sealer included (design
+      // 2026-09-09 §4.1). Null on rows that predate the column.
+      crowd_yes_pct_at_seal: z.number().int().min(0).max(100).nullable().default(null),
+      crowd_count_at_seal: z.number().int().min(0).nullable().default(null),
     }),
   ),
 });
@@ -109,6 +113,10 @@ export const RevealSchema = z.object({
           confidence: z.number().int(),
           points: z.number().int().nullable(),
           brier: z.number().nullable(),
+          // The crowd at the instant this player sealed, sealer included
+          // (design 2026-09-09 §4.1). Null on rows that predate the column.
+          crowd_yes_pct_at_seal: z.number().int().min(0).max(100).nullable().default(null),
+          crowd_count_at_seal: z.number().int().min(0).nullable().default(null),
         })
         .nullable(),
       source_name: z.string(),

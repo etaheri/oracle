@@ -88,7 +88,13 @@ export const roundRoutes = new Hono<AppContext>()
         })
       : [];
     return c.json({
-      predictions: mine.map((p) => ({ question_id: p.questionId, answer: p.answer, confidence: p.confidence })),
+      predictions: mine.map((p) => ({
+        question_id: p.questionId,
+        answer: p.answer,
+        confidence: p.confidence,
+        crowd_yes_pct_at_seal: p.crowdYesPctAtSeal === null ? null : Number(p.crowdYesPctAtSeal),
+        crowd_count_at_seal: p.crowdCountAtSeal,
+      })),
     });
   })
   .get("/next", async (c) => {
@@ -162,7 +168,16 @@ export const roundRoutes = new Hono<AppContext>()
           // three players is mostly the reader.
           crowd_count: q.crowdCount,
           market_prob: q.marketProb === null ? null : Number(q.marketProb),
-          my: p ? { answer: p.answer, confidence: p.confidence, points: p.points, brier: p.brier === null ? null : Number(p.brier) } : null,
+          my: p
+            ? {
+                answer: p.answer,
+                confidence: p.confidence,
+                points: p.points,
+                brier: p.brier === null ? null : Number(p.brier),
+                crowd_yes_pct_at_seal: p.crowdYesPctAtSeal === null ? null : Number(p.crowdYesPctAtSeal),
+                crowd_count_at_seal: p.crowdCountAtSeal,
+              }
+            : null,
           source_name: q.sourceName,
           source_url: q.sourceUrl,
           evidence_quote: ev.quote,
