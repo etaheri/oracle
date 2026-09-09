@@ -99,13 +99,25 @@ export const adminRoutes = new Hono<AppContext>()
   .post("/rounds/:date", async (c) => {
     const parsed = DraftSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    // Which rules the seeded round plays by. upsertDraft's own default is 1
+    // and this route never overrode it, so every hand-seeded round was legacy
+    // — and a legacy reveal has no duel, which is the app's whole premise. The
+    // default stays 1 so nothing already posting drafts shifts underneath
+    // itself; v2 is opt-in, and brings the full-window rule with it.
+    const rv = c.req.query("rules_version");
+    if (rv !== undefined && rv !== "1" && rv !== "2") return c.json({ error: "rules_version must be 1 or 2" }, 400);
+    const rulesVersion = rv === "2" ? 2 : 1;
     try {
-      await upsertDraft(c.get("deps").db, c.req.param("date"), parsed.data);
+      await upsertDraft(c.get("deps").db, c.req.param("date"), parsed.data, rulesVersion);
       return c.json({ ok: true });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "upsert failed";
       if (msg === "round not editable") return c.json({ error: msg }, 409);
-      const BAD_DRAFT = new Set(["resolves_at out of range", "weather must lock before noon"]);
+      const BAD_DRAFT = new Set([
+        "resolves_at out of range",
+        "weather must lock before noon",
+        "new rounds require the full common answering window",
+      ]);
       if (BAD_DRAFT.has(msg)) return c.json({ error: msg }, 400);
       return c.json({ error: "upsert failed" }, 500);
     }
@@ -123,6 +135,28 @@ export const adminRoutes = new Hono<AppContext>()
       round: { date: round.date, status: round.status },
       questions: questions.map((q) => ({ id: q.id, slot: q.slot, status: q.status, text: q.text, category: q.category, outcome: q.outcome })),
     });
+  })
+  // Author a round for a named date, through the same gauntlet the cron runs.
+  //
+  // decideActions only ever authors TOMORROW, and only in the 17:00 ET window
+  // — so there was no way to ask for a specific date. The gap mattered: the
+  // only other way to seed a round is POST /admin/rounds/:date, and that goes
+  // through upsertDraft at rules_version 1, which renders the legacy reveal
+  // with no duel. This dispatches the real thing (gauntlet → commitRound →
+  // upsertDraft at v2), so a hand-triggered round is indistinguishable from a
+  // scheduled one.
+  //
+  // Refuses a date that already has a round rather than clobbering it: the
+  // gauntlet ends in upsertDraft, which would throw "round not editable" deep
+  // inside a Workflow where the caller never sees it.
+  .post("/rounds/:date/author", async (c) => {
+    const pipeline = c.get("deps").pipeline;
+    if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
+    const date = c.req.param("date");
+    const existing = await c.get("deps").db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+    if (existing) return c.json({ error: "round already exists" }, 409);
+    await pipeline.workflows.start(pipeline, "author", `author-${date}-manual-${Date.now()}`, { date });
+    return c.json({ ok: true, date });
   })
   .post("/rounds/:date/publish", async (c) => {
     const db = c.get("deps").db;

@@ -269,3 +269,73 @@ describe("GET /admin/analytics/leak", () => {
     expect(body.rounds.every((r) => r.date >= "2026-08-25")).toBe(true);
   });
 });
+
+describe("POST /admin/rounds/:date/author", () => {
+  // The nightly cron only ever authors TOMORROW (decideActions gates AUTHOR on
+  // hour >= 17 and hardcodes the date). There was no way to ask the gauntlet
+  // for a specific date — so seeding a round by hand meant POSTing a draft,
+  // which upsertDraft writes at rules_version 1: the legacy reveal, no duel.
+  // This runs the SAME path the cron runs, at v2, for a date you name.
+  it("503s when the pipeline isn't configured", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-09/author", { method: "POST" });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "pipeline not configured" });
+  });
+
+  it("refuses a date that already has a round, rather than clobbering it", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    const app = createApp({ db, env, pipeline: fakePipeline(db, "2026-09-09T14:00:00Z") });
+    const res = await admin(app)("/admin/rounds/2026-09-09/author", { method: "POST" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "round already exists" });
+  });
+
+  it("dispatches authoring for the named date", async () => {
+    const { db } = await makeTestDb();
+    const started: { kind: string; date: string }[] = [];
+    const pipeline = {
+      ...fakePipeline(db, "2026-09-09T14:00:00Z"),
+      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string }) => { started.push({ kind, date: params.date }); } },
+    } as unknown as PipelineDeps;
+    const app = createApp({ db, env, pipeline });
+    const res = await admin(app)("/admin/rounds/2026-09-09/author", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, date: "2026-09-09" });
+    expect(started).toEqual([{ kind: "author", date: "2026-09-09" }]);
+  });
+});
+
+describe("POST /admin/rounds/:date?rules_version=2", () => {
+  // upsertDraft's own default is 1, and the route never passed anything — so
+  // every hand-seeded round was legacy, and its reveal showed "N RIGHT · M
+  // CALLS READ" with no duel portrait. The default stays 1 so nothing that
+  // already posts drafts shifts underneath itself.
+  it("seeds at rules_version 1 by default", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-09", { method: "POST", body: JSON.stringify(validDraft) });
+    expect(res.status).toBe(200);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-09-09") });
+    expect(round?.rulesVersion).toBe(1);
+  });
+
+  it("seeds at rules_version 2 when asked", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-09?rules_version=2", { method: "POST", body: JSON.stringify(validDraft) });
+    expect(res.status).toBe(200);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-09-09") });
+    expect(round?.rulesVersion).toBe(2);
+  });
+
+  it("rejects a rules_version that is neither 1 nor 2", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-09?rules_version=7", { method: "POST", body: JSON.stringify(validDraft) });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "rules_version must be 1 or 2" });
+  });
+});
