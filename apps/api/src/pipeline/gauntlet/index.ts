@@ -16,7 +16,7 @@
 import { eq } from "drizzle-orm";
 import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
-import { addDays, noonET, voidDeadline } from "../clock";
+import { addDays, fastResolveBy, noonET, voidDeadline } from "../clock";
 import { upsertDraft } from "../draft";
 import { emptyTally, screenCandidates, type RejectReason, type Rejection } from "../candidate";
 import { assessEditorial, type Edited } from "../editorial";
@@ -70,7 +70,7 @@ export async function commitRound(
   edited: Edited[],
 ): Promise<GauntletResult> {
   const rejected = Object.values(tally).reduce((a, b) => a + b, 0);
-  const selection = selectRound(edited);
+  const selection = selectRound(edited, { fastBy: fastResolveBy(date) });
   if (!selection) return { written, rejected, tally, published: false, relaxed: false };
 
   await upsertDraft(deps.db, date, selection.draft, 2);

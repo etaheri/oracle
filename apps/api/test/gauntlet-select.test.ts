@@ -81,3 +81,38 @@ describe("selectRound", () => {
     expect(JSON.stringify(selectRound(five))).toBe(JSON.stringify(selectRound(five)));
   });
 });
+
+describe("selectRound composes a fast slate (design 2026-09-09 §1.2)", () => {
+  const fastBy = new Date("2026-09-05T20:00:00Z");
+  const at = (n: number, category: Candidate["category"], p: number, resolves_at: string): Judged => ({ ...j(category, p, n), candidate: { ...j(category, p, n).candidate, resolves_at } });
+
+  it("with only fast candidates, behaves as before", () => {
+    const s = selectRound(five, { fastBy })!;
+    expect(s.draft.questions).toHaveLength(5);
+  });
+  it("takes at most one slow candidate and makes it the Big One", () => {
+    const pool = [
+      at(1, "markets", 0.55, "2026-09-05T18:00:00Z"),
+      at(2, "sports", 0.45, "2026-09-05T19:00:00Z"),
+      at(3, "culture", 0.60, "2026-09-05T19:30:00Z"),
+      at(4, "news", 0.50, "2026-09-06T12:30:00Z"),   // slow, and the most contested
+      at(5, "news", 0.52, "2026-09-06T13:00:00Z"),   // slow, second most contested — must NOT be chosen
+      at(6, "weather", 0.40, "2026-09-05T18:30:00Z"),
+    ];
+    const s = selectRound(pool, { fastBy })!;
+    const texts = s.draft.questions.map((q) => q.text);
+    expect(texts).not.toContain("Will thing 5 happen?");
+    const big = s.draft.questions.find((q) => q.is_big_one)!;
+    expect(big.text).toBe("Will thing 4 happen?");
+  });
+  it("returns null when fewer than four fast candidates survive", () => {
+    const pool = [
+      at(1, "markets", 0.55, "2026-09-05T18:00:00Z"),
+      at(2, "sports", 0.45, "2026-09-05T19:00:00Z"),
+      at(3, "culture", 0.60, "2026-09-06T12:00:00Z"),
+      at(4, "news", 0.50, "2026-09-06T12:30:00Z"),
+      at(5, "weather", 0.52, "2026-09-06T13:00:00Z"),
+    ];
+    expect(selectRound(pool, { fastBy })).toBeNull();
+  });
+});
