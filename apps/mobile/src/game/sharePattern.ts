@@ -21,3 +21,11 @@ export function shareMessage(
   const body = `🔮 OUTSEEN ${d.date} — ${patternLine(d.results)} · ${points}${d.duelText ? ` · ${d.duelText}` : ""} · can you outsee me?`;
   return url ? `${body} ${url}` : body;
 }
+
+// The plaque's own share text (design 2026-09-09 §3.2): unlike the daily
+// round, there is no pattern line to fall back on — the plaque IS the
+// challenge, so the epithet carries it.
+export function plaqueMessage(epithetTitle: string, url: string | null = SHARE_URL): string {
+  const body = `🔮 OUTSEEN — ${epithetTitle} · can you outsee me?`;
+  return url ? `${body} ${url}` : body;
+}

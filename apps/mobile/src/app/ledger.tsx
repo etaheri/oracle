@@ -15,6 +15,7 @@ import { RiteConfirm } from "../ui/RiteConfirm";
 import { PlaqueShareCanvas } from "../ui/PlaqueShareCard";
 import { shareSnapshot } from "../ui/ShareCard";
 import { useMeLedger } from "../api/hooks";
+import { plaqueMessage } from "../game/sharePattern";
 import { appleClaim, appleRestore, strikeRecord } from "../api/identity";
 import { usePlusStore } from "../monetization/plusState";
 import { colors, space, displayScale } from "../theme";
@@ -139,7 +140,7 @@ export default function Ledger() {
     setSharing(true);
     setShareError(null);
     try {
-      await shareSnapshot(canvasRef, "oracle-plaque.png", d.epithet.title);
+      await shareSnapshot(canvasRef, "oracle-plaque.png", plaqueMessage(d.epithet.title));
     } catch {
       setShareError("THE PLAQUE WOULD NOT LEAVE. TRY AGAIN.");
     } finally {

@@ -1,5 +1,6 @@
 import { RefObject } from "react";
-import { Canvas, Rect, Circle, Line, Fill, vec, Text as SkText, Image as SkImage, RadialGradient, useCanvasRef, useFont, useImage } from "@shopify/react-native-skia";
+import { Platform, Share } from "react-native";
+import { Canvas, Rect, Circle, Line, Fill, vec, Text as SkText, Image as SkImage, RadialGradient, useCanvasRef, useFont, useImage, type SkFont } from "@shopify/react-native-skia";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { colors } from "../theme";
@@ -8,6 +9,7 @@ import { shareMessage, type QuestionResult } from "../game/sharePattern";
 import { capture } from "../analytics/analytics";
 import { DUEL_ART } from "./DuelPortrait";
 import { LITURGY_LINES } from "@oracle/core";
+import { SHARE_HANDLE } from "../config/links";
 
 // Offscreen Skia surface (design spec §7) shaped as a literal oracle card
 // (5:8, frame + register marks). The app lives in the museum by day; the
@@ -38,18 +40,25 @@ export interface ShareCardData {
   oracleDayCounts?: { you: number; oracle: number };
 }
 
-export async function shareSnapshot(ref: RefObject<any>, filename: string, dialogTitle: string): Promise<void> {
+export async function shareSnapshot(ref: RefObject<any>, filename: string, message: string): Promise<void> {
   const image = ref.current?.makeImageSnapshot();
   if (!image) throw new Error("card not ready");
   const bytes = image.encodeToBytes();
   const file = new File(Paths.cache, filename);
   if (file.exists) file.delete();
   file.write(bytes);
-  const sharing = Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle });
   // Shared home for both share surfaces (round spread + plaque) — one
-  // capture covers both call sites.
+  // capture covers both call sites, before the platform branch below.
   capture("share_sheet_opened", { filename });
-  await sharing;
+  if (Platform.OS === "ios") {
+    // expo-sharing puts only the file in activityItems and maps its
+    // dialogTitle to UIActivityViewController.title, which Messages and
+    // the social targets ignore — so the challenge line and the link never
+    // travelled (design 2026-09-09 §3.2). React Native's Share sends both.
+    await Share.share({ url: file.uri, message }, { dialogTitle: message });
+    return;
+  }
+  await Sharing.shareAsync(file.uri, { mimeType: "image/png", dialogTitle: message });
 }
 
 export async function shareCard(ref: RefObject<any>, data: ShareCardData): Promise<void> {
@@ -66,6 +75,28 @@ function ellipsize(text: string, font: { measureText(t: string): { width: number
 
 function centered(font: { measureText(t: string): { width: number } } | null, text: string): number {
   return font ? (CARD_W - font.measureText(text).width) / 2 : CARD_W / 2;
+}
+
+// The handle sits 66px below the footer's y (18px past the second liturgy
+// line, the same rhythm as the 30/18 gaps above it). At the card's own
+// unshifted y this would land past CARD_H/PLAQUE_H − INSET (994) on both
+// cards, so each call site shifts its own y up when SHARE_HANDLE is set —
+// only far enough to clear the boundary with a margin, never when unset.
+const HANDLE_OFFSET = 66;
+
+// Shared by both share surfaces (round spread + plaque). `centered` above is
+// CARD_W-specific; the plaque is the same width today but this takes its own
+// `width` so it centers correctly if the two ever diverge.
+export function ShareFooter({ mono, monoSmall, y, width }: { mono: SkFont | null; monoSmall: SkFont | null; y: number; width: number }) {
+  const centeredIn = (font: SkFont, text: string) => (width - font.measureText(text).width) / 2;
+  return (
+    <>
+      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centeredIn(mono, "CAN YOU OUTSEE ME?")} y={y} color={colors.agedGold} />}
+      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centeredIn(monoSmall, LITURGY_LINES[0])} y={y + 30} color={NIGHT_DIM} />}
+      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[1]} x={centeredIn(monoSmall, LITURGY_LINES[1])} y={y + 48} color={NIGHT_DIM} />}
+      {mono && SHARE_HANDLE && <SkText font={mono} text={SHARE_HANDLE} x={centeredIn(mono, SHARE_HANDLE)} y={y + HANDLE_OFFSET} color={colors.agedGold} />}
+    </>
+  );
 }
 
 export function RegisterMarks() {
@@ -182,9 +213,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
         />
       )}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
-      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centered(mono, "CAN YOU OUTSEE ME?")} y={938} color={colors.agedGold} />}
-      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centered(monoSmall, LITURGY_LINES[0])} y={968} color={NIGHT_DIM} />}
-      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[1]} x={centered(monoSmall, LITURGY_LINES[1])} y={986} color={NIGHT_DIM} />}
+      <ShareFooter mono={mono} monoSmall={monoSmall} y={SHARE_HANDLE ? 914 : 938} width={CARD_W} />
     </Canvas>
   );
 }

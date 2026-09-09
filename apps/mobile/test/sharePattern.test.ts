@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { patternLine, shareMessage } from "../src/game/sharePattern";
+import { patternLine, shareMessage, plaqueMessage } from "../src/game/sharePattern";
 
 describe("patternLine", () => {
   it("pairs Roman numerals with result marks", () => {
@@ -27,5 +27,14 @@ describe("shareMessage", () => {
 
   it("never emits a trailing space when there is no link", () => {
     expect(shareMessage({ ...day, results: [...day.results] }, null).endsWith("?")).toBe(true);
+  });
+});
+
+describe("plaqueMessage (design 2026-09-09 §3.2)", () => {
+  it("carries the epithet, the challenge and the link", () => {
+    expect(plaqueMessage("THE STEADY HAND", "https://x.test/play")).toBe("🔮 OUTSEEN — THE STEADY HAND · can you outsee me? https://x.test/play");
+  });
+  it("omits the link when none is configured", () => {
+    expect(plaqueMessage("THE STEADY HAND", null)).toBe("🔮 OUTSEEN — THE STEADY HAND · can you outsee me?");
   });
 });

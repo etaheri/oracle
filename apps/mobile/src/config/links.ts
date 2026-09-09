@@ -15,3 +15,10 @@ export const SHARE_URL: string | null = raw && raw.length > 0 ? raw : null;
 // link in front of App Review is worse than an absent one.
 const rawPrivacy = process.env.EXPO_PUBLIC_PRIVACY_URL?.trim();
 export const PRIVACY_URL: string | null = rawPrivacy && rawPrivacy.length > 0 ? rawPrivacy : null;
+
+// The handle printed on the share cards themselves (design 2026-09-09
+// §3.2) — a screenshot loses the share text, the pixels do not. A short
+// display string, never a full URL: set EXPO_PUBLIC_SHARE_HANDLE once a
+// registered domain exists. Absent → the card prints nothing extra.
+const rawHandle = process.env.EXPO_PUBLIC_SHARE_HANDLE?.trim();
+export const SHARE_HANDLE: string | null = rawHandle && rawHandle.length > 0 ? rawHandle.toUpperCase() : null;

@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OUTSEEN</title><link rel="stylesheet" href="/style.css">
+<meta name="robots" content="noindex">
+</head><body>
+<main>
+  <h1>OUTSEEN</h1>
+  <p>Five questions about tomorrow. Choose your answer and how sure you are. Return to see whether you beat the Oracle.</p>
+  <p id="open"><a href="oracle://round">Open in the app</a></p>
+  <p id="store" hidden><a id="storeLink" href="/">Get OUTSEEN on the App Store</a></p>
+</main>
+<script>
+  // Smart link: try the app's scheme; if we are still here after a beat,
+  // offer the store. APP_STORE_URL is empty until the listing is live.
+  var APP_STORE_URL = "";
+  var t = setTimeout(function () {
+    if (APP_STORE_URL) { document.getElementById("storeLink").href = APP_STORE_URL; }
+    document.getElementById("store").hidden = false;
+  }, 1200);
+  window.addEventListener("pagehide", function () { clearTimeout(t); });
+  location.href = "oracle://round";
+</script>
+</body></html>
