@@ -95,7 +95,10 @@ export async function criticize(
   const judgeableIndex: number[] = [];
   candidates.forEach((c, i) => {
     if (c.category === "weather" && !forecasts[String(i)]) {
-      blindRejected.push({ text: c.text, reason: "uncontested", detail: "no public forecast could be fetched, so contestedness cannot be judged" });
+      // The forecast source was unreachable — an infrastructure fact, not an
+      // editorial one. "uncontested" would blame the question for something
+      // the network did.
+      blindRejected.push({ text: c.text, reason: "dead-source", detail: "no public forecast could be fetched, so contestedness cannot be judged" });
     } else {
       judgeable.push(c);
       judgeableIndex.push(i);

@@ -129,7 +129,8 @@ describe("criticize reads the public forecast (design 2026-09-09 §1.3)", () => 
     d.claude = { structured: async () => { called = true; return { verdicts: [] }; } };
     const r = await criticize(d, [weather()], {});
     expect(called).toBe(false);
-    expect(r.rejected[0]).toMatchObject({ reason: "uncontested" });
+    // The forecast source was unreachable — infrastructure, not editorial.
+    expect(r.rejected[0]).toMatchObject({ reason: "dead-source" });
     expect(r.rejected[0]!.detail).toContain("forecast");
   });
   it("does not require a forecast for a non-weather candidate", async () => {
