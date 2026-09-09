@@ -19,6 +19,8 @@ export const PRIVACY_URL: string | null = rawPrivacy && rawPrivacy.length > 0 ? 
 // The handle printed on the share cards themselves (design 2026-09-09
 // §3.2) — a screenshot loses the share text, the pixels do not. A short
 // display string, never a full URL: set EXPO_PUBLIC_SHARE_HANDLE once a
-// registered domain exists. Absent → the card prints nothing extra.
+// registered domain exists. Absent → the card prints nothing extra. Must be
+// ASCII: Skia's Plex Mono has no glyph fallback, and the card would render
+// tofu for anything outside it.
 const rawHandle = process.env.EXPO_PUBLIC_SHARE_HANDLE?.trim();
 export const SHARE_HANDLE: string | null = rawHandle && rawHandle.length > 0 ? rawHandle.toUpperCase() : null;
