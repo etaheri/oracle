@@ -1,4 +1,4 @@
-import { claimFirstLiveSeal } from "../api/flags";
+import { claimFirstLiveSeal, recordSealHour } from "../api/flags";
 import { capture as captureGameplay } from "../analytics/analytics";
 import { useEffect, useRef, useState } from "react";
 import { View, Pressable, StyleSheet, useWindowDimensions, Linking } from "react-native";
@@ -267,6 +267,9 @@ export function OracleCard({ q, roundLocksAt, onSealed, onLean, practice, forceB
   function finishSeal() {
     markSealed(q.id);
     capture("question_answered", { question_id: q.id, is_big_one: q.is_big_one });
+    // Habitual-hour history (design 2026-09-09 §4.2): fire-and-forget —
+    // withSealHour already no-ops repeat seals on the same local day.
+    void recordSealHour(new Date());
     onSealed();
   }
 

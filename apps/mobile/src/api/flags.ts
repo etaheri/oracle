@@ -1,3 +1,5 @@
+import { withSealHour, type SealHour } from "../game/habit";
+
 // Small persisted flags (SecureStore, same store as the device token).
 // Failures degrade to the flag's zero value — never throw for a flag.
 async function store() {
@@ -94,4 +96,27 @@ export async function getSeenMilestones(): Promise<string[]> {
 }
 export async function markMilestoneSeen(id: string): Promise<void> {
   try { const ids = await getSeenMilestones(); await (await store()).setItemAsync("oracle.milestones_seen", JSON.stringify([...new Set([...ids, id])])); } catch {}
+}
+
+const SEAL_HOURS_KEY = "oracle.seal_hours";
+
+// The habitual-hour history (design 2026-09-09 §4.2): one (date, hour) per
+// local calendar day, first seal wins, newest HABIT_KEEP kept. Pure logic
+// lives in game/habit.ts — this is just the persisted store.
+export async function getSealHours(): Promise<SealHour[]> {
+  try {
+    const value: unknown = JSON.parse((await (await store()).getItemAsync(SEAL_HOURS_KEY)) ?? "[]");
+    return Array.isArray(value)
+      ? value.filter((x): x is SealHour => !!x && typeof x === "object" && typeof (x as SealHour).date === "string" && typeof (x as SealHour).hour === "number")
+      : [];
+  } catch { return []; }
+}
+export async function recordSealHour(now: Date): Promise<void> {
+  try {
+    const local = {
+      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+      hour: now.getHours(),
+    };
+    await (await store()).setItemAsync(SEAL_HOURS_KEY, JSON.stringify(withSealHour(await getSealHours(), local)));
+  } catch {}
 }

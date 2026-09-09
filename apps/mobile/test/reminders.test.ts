@@ -43,6 +43,51 @@ describe("planReminders", () => {
   });
 });
 
+describe("planReminders with a habitual hour (design 2026-09-09 §4.2)", () => {
+  // Pretend the device is in UTC so localHourOf is the UTC hour.
+  const utcHour = (ms: number) => new Date(ms).getUTCHours();
+  const lock = "2026-09-11T16:00:00Z"; // noon ET
+  it("moves each closing reminder to the habitual hour inside that round's window", () => {
+    const out = planReminders(lock, "2026-09-10", 0, 5, { hour: 20, localHourOf: utcHour });
+    const closing = out.filter((r) => r.kind === "closing");
+    expect(closing[0]!.at.toISOString()).toBe("2026-09-10T20:00:00.000Z"); // day 0's window is 09-10 16:00Z → 09-11 15:30Z
+    expect(closing[1]!.at.toISOString()).toBe("2026-09-11T20:00:00.000Z");
+  });
+  // Day 0's window is [lock0 − 24h, lock0 − 30min] = [2026-09-10T16:00Z, 2026-09-11T15:30Z],
+  // sampled hourly from the start. That is exactly 23.5h / 1h = 24 samples,
+  // one for every hour-of-day 0..23 — so every *valid* habitual hour lands
+  // somewhere in the window; there is no hour value for which the window
+  // arithmetic itself excludes a match. What's worth pinning down instead is
+  // where in the window the boundary hours resolve to, and that a hour which
+  // truly never recurs (never returned by localHourOf) still falls back.
+  it("resolves the window's boundary hours to its first and last sampled instants", () => {
+    // Hour 16 is the window's very first sampled instant (the start itself).
+    const edge = planReminders(lock, "2026-09-10", 0, 5, { hour: 16, localHourOf: utcHour });
+    expect(edge.filter((r) => r.kind === "closing")[0]!.at.toISOString()).toBe("2026-09-10T16:00:00.000Z");
+    // Hour 15 is the window's last sampled instant: 2026-09-11T15:00Z, which
+    // is 30 minutes before the 15:30Z cutoff — inside the window, not past it.
+    const out = planReminders(lock, "2026-09-10", 0, 5, { hour: 15, localHourOf: utcHour });
+    expect(out.filter((r) => r.kind === "closing")[0]!.at.toISOString()).toBe("2026-09-11T15:00:00.000Z");
+  });
+  it("falls back to the default lead when the habitual hour never recurs in the window", () => {
+    // 99 is never returned by localHourOf, so no sampled instant can match —
+    // the closing reminder must sit at the plain default lead time.
+    const withHabit = planReminders(lock, "2026-09-10", 0, 5, { hour: 99, localHourOf: utcHour });
+    const withoutHabit = planReminders(lock, "2026-09-10", 0);
+    const a = withHabit.filter((r) => r.kind === "closing").map((r) => r.at.toISOString());
+    const b = withoutHabit.filter((r) => r.kind === "closing").map((r) => r.at.toISOString());
+    expect(a).toEqual(b);
+  });
+  it("is byte-identical to the default plan when habit is null", () => {
+    expect(planReminders(lock, "2026-09-10", 2, 5, null)).toEqual(planReminders(lock, "2026-09-10", 2));
+  });
+  it("never moves the noon reminder", () => {
+    const withHabit = planReminders(lock, "2026-09-10", 1, 5, { hour: 20, localHourOf: utcHour }).find((r) => r.kind === "noon")!;
+    const without = planReminders(lock, "2026-09-10", 1).find((r) => r.kind === "noon")!;
+    expect(withHabit.at.toISOString()).toBe(without.at.toISOString());
+  });
+});
+
 it("never invents future settlement, deadlines, or crowd activity", () => {
   for (let day = 1; day <= 28; day++) {
     for (const count of [0, 1, 5]) {

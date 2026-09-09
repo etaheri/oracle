@@ -14,10 +14,33 @@ const NOON_LINE = "RETURN TO OUTSEEN TO CHECK YOUR PREDICTIONS AND THE NEXT CHAL
 export const REMINDER_LEAD_MS = 3 * 3_600_000;
 export const NOON_LAG_MS = 45 * 60_000;
 export const REMINDER_DAYS = 7;
+const HABIT_WINDOW_MS = 86_400_000;
+const HABIT_TAIL_MS = 30 * 60_000;
 
 export interface Reminder { kind: "closing" | "noon"; date: string; at: Date; body: string }
 
-export function planReminders(locksAt: string, roundDate: string, sealedCount: number, total = 5): Reminder[] {
+// A device's habitual hour (design 2026-09-09 §4.2): the closing reminder
+// for round k moves into [lock_k − 24h, lock_k − 30min] if a top-of-hour
+// instant there matches the hour this device usually plays; otherwise the
+// plain lead time stands. localHourOf is injected so this stays pure.
+export interface Habit { hour: number; localHourOf: (ms: number) => number }
+
+// Scans hourly from the start of the window; the first instant whose local
+// hour matches is snapped to the top of that hour (UTC minutes, which is
+// also local minutes for any whole-hour-offset timezone) before use.
+function habitualInstant(lockMs: number, habit: Habit): Date | null {
+  const start = lockMs - HABIT_WINDOW_MS;
+  const end = lockMs - HABIT_TAIL_MS;
+  for (let t = start; t <= end; t += 3_600_000) {
+    if (habit.localHourOf(t) !== habit.hour) continue;
+    const snapped = new Date(t);
+    snapped.setUTCMinutes(0, 0, 0);
+    if (snapped.getTime() >= start && snapped.getTime() <= end) return snapped;
+  }
+  return null;
+}
+
+export function planReminders(locksAt: string, roundDate: string, sealedCount: number, total = 5, habit?: Habit | null): Reminder[] {
   const lock0 = new Date(locksAt).getTime();
   const day0 = new Date(`${roundDate}T00:00:00Z`).getTime();
   const out: Reminder[] = [];
@@ -30,7 +53,9 @@ export function planReminders(locksAt: string, roundDate: string, sealedCount: n
     const pool = partial ? CLOSING.filter((l) => (l.requires ?? []).includes("partial")) : CLOSING;
     const line = selectLine(pool, `closing:${date}`, partial ? ["partial"] : []);
     if (!line) continue;
-    out.push({ kind: "closing", date, at: new Date(lock0 + k * 86_400_000 - REMINDER_LEAD_MS), body: line.text });
+    const lockK = lock0 + k * 86_400_000;
+    const at = (habit && habitualInstant(lockK, habit)) ?? new Date(lockK - REMINDER_LEAD_MS);
+    out.push({ kind: "closing", date, at, body: line.text });
   }
   return out;
 }
