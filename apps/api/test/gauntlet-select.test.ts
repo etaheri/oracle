@@ -115,4 +115,33 @@ describe("selectRound composes a fast slate (design 2026-09-09 §1.2)", () => {
     ];
     expect(selectRound(pool, { fastBy })).toBeNull();
   });
+
+  it("the fill pass also enforces the one-slow limit, even when the second slow candidate sits in its own otherwise-unused category", () => {
+    // Two slow candidates in DIFFERENT, otherwise-unused categories: weather
+    // and culture each hold exactly one candidate, and it is slow. Without
+    // the fill pass's `isSlow(j, w) && slowTaken` guard, the spread pass
+    // takes the first slow one (weather, most contested) and skips the
+    // second (culture) only because a category was already used by then —
+    // but the fill pass would then pick culture right back up, since it was
+    // never chosen and no category constraint applies there. A spare fast
+    // candidate in an already-used category (markets, again) is what the
+    // fill pass should choose instead.
+    const pool = [
+      at(1, "weather", 0.50, "2026-09-06T12:30:00Z"), // slow, most contested — becomes the Big One
+      at(2, "culture", 0.52, "2026-09-06T13:00:00Z"), // slow, otherwise-unused category — must be excluded
+      at(3, "markets", 0.55, "2026-09-05T18:00:00Z"), // fast
+      at(4, "sports", 0.60, "2026-09-05T19:00:00Z"), // fast
+      at(5, "news", 0.65, "2026-09-05T19:30:00Z"), // fast
+      at(6, "markets", 0.70, "2026-09-05T18:30:00Z"), // fast, spare — fills the last slot in the fill pass
+    ];
+    const s = selectRound(pool, { fastBy })!;
+    expect(s.draft.questions).toHaveLength(5);
+    const texts = s.draft.questions.map((q) => q.text);
+    expect(texts).not.toContain("Will thing 2 happen?");
+    expect(texts).toContain("Will thing 6 happen?");
+    const slowChosen = s.draft.questions.filter((q) => new Date(q.resolves_at).getTime() > fastBy.getTime());
+    expect(slowChosen).toHaveLength(1);
+    expect(slowChosen[0]!.is_big_one).toBe(true);
+    expect(slowChosen[0]!.text).toBe("Will thing 1 happen?");
+  });
 });
