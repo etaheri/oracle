@@ -117,7 +117,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               {playerCount < VERDICT_MIN_PLAYERS ? GATHERING_LINE : `UP TO ${playerCount} PLAYERS PER SHOWN QUESTION`}
             </Mono>
             <Mono {...role.caption} color={colors.mutedInk} style={{ textAlign: "center" }}>
-              THE LEDGER IS READ AFTER THE QUESTIONS CLOSE
+              THE ROUND SETTLES AFTER THE QUESTIONS CLOSE
             </Mono>
           </View>
         </View>

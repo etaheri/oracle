@@ -6,6 +6,8 @@ import * as Sharing from "expo-sharing";
 import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { shareMessage, type QuestionResult } from "../game/sharePattern";
+import { splitShareLine } from "../game/shareLines";
+import { formatFortune, signedFortune } from "../game/fortuneText";
 import { capture } from "../analytics/analytics";
 import { DUEL_ART } from "./DuelPortrait";
 import { LITURGY_LINES } from "@oracle/core";
@@ -38,6 +40,13 @@ export interface ShareCardData {
   // forecast for the day, so the line below simply does not render. The
   // canvas renders this prop; it must never derive it from `results`.
   oracleDayCounts?: { you: number; oracle: number };
+  // The night in money (design §8.3). PRESENCE is the switch: a version 3
+  // caller sets `fortuneDelta`, and the canvas then prints the delta and the
+  // fortune after it in place of the duel portrait and the three tide lines.
+  // A version 1 or 2 caller must omit the key rather than pass undefined.
+  fortuneDelta?: number;
+  fortuneAfter?: number;
+  bigOneLine?: string | null;
 }
 
 export async function shareSnapshot(ref: RefObject<any>, filename: string, message: string): Promise<void> {
@@ -94,13 +103,13 @@ const LITURGY_GAP_2 = 48;
 // Shared by both share surfaces (round spread + plaque). `centered` above is
 // CARD_W-specific; the plaque is the same width today but this takes its own
 // `width` so it centers correctly if the two ever diverge.
-export function ShareFooter({ mono, monoSmall, y, width }: { mono: SkFont | null; monoSmall: SkFont | null; y: number; width: number }) {
+export function ShareFooter({ mono, monoSmall, y, width, challenge = "CAN YOU OUTSEE ME?" }: { mono: SkFont | null; monoSmall: SkFont | null; y: number; width: number; challenge?: string }) {
   const centeredIn = (font: SkFont, text: string) => (width - font.measureText(text).width) / 2;
   const gap1 = SHARE_HANDLE ? HANDLE_LITURGY_GAP_1 : LITURGY_GAP_1;
   const gap2 = SHARE_HANDLE ? HANDLE_LITURGY_GAP_2 : LITURGY_GAP_2;
   return (
     <>
-      {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centeredIn(mono, "CAN YOU OUTSEE ME?")} y={y} color={colors.agedGold} />}
+      {mono && <SkText font={mono} text={challenge} x={centeredIn(mono, challenge)} y={y} color={colors.agedGold} />}
       {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centeredIn(monoSmall, LITURGY_LINES[0])} y={y + gap1} color={NIGHT_DIM} />}
       {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[1]} x={centeredIn(monoSmall, LITURGY_LINES[1])} y={y + gap2} color={NIGHT_DIM} />}
       {mono && SHARE_HANDLE && <SkText font={mono} text={SHARE_HANDLE} x={centeredIn(mono, SHARE_HANDLE)} y={y + HANDLE_OFFSET} color={colors.agedGold} />}
@@ -135,19 +144,26 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const mono = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 18);
   const monoSmall = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 12);
 
+  // A version 3 night has no duel in it -- the portrait, its two scores and
+  // the three tide lines below all belong to the points game. `fortune` gates
+  // every one of them from the single prop the caller sets.
+  const fortune = data.fortuneDelta !== undefined;
+  const duelScores = fortune ? undefined : data.duelScores;
   const points = data.dayPoints >= 0 ? `+${data.dayPoints}` : String(data.dayPoints);
   const wins = data.results.filter((r) => r === "win").length;
   const answered = data.results.filter((r) => r !== "none").length;
-  const scoreLine = data.duelScores ? "CONFIDENCE POINTS" : `${wins}/${answered} · ${points}`;
+  const scoreLine = duelScores ? "CONFIDENCE POINTS" : fortune ? signedFortune(data.fortuneDelta!) : `${wins}/${answered} · ${points}`;
+  const fortuneAfterLine = fortune && data.fortuneAfter !== undefined ? `FORTUNE ${formatFortune(data.fortuneAfter)}` : null;
+  const [bigOneHead, bigOneTail] = data.bigOneLine ? splitShareLine(data.bigOneLine) : [null, null];
   const bigOne = data.bigOneText ? ellipsize(data.bigOneText, display, CARD_W - 130) : null;
   // No "✶" here: Skia text has no font fallback and Plex Mono lacks the glyph.
-  const crowdLine = data.bigOneCrowdPct !== null ? `THE BIG ONE · CROWD SAID ${data.bigOneCrowdPct}% YES` : null;
+  const crowdLine = data.bigOneCrowdPct !== null ? `THE BIG ONE · PLAYERS SAID ${data.bigOneCrowdPct}% YES` : null;
   // Phase 2 market display: only when the question was adapted from a live market.
   const marketLine = data.bigOneMarketPct !== null ? `THE MARKET SAID ${data.bigOneMarketPct}% YES` : null;
   // The machine's own count against the day (design's Oracle-record beat).
   // Omitted by the caller -- not merely null -- on a day it never forecast,
   // so there is nothing to check for beyond the prop's own presence.
-  const oracleLine = data.duelScores ? (data.duelScores.you > data.duelScores.oracle ? "YOU OUTSAW THE ORACLE" : data.duelScores.you < data.duelScores.oracle ? "THE ORACLE SAW FURTHER" : "YOU AND THE ORACLE STAND LEVEL") : data.duelText ?? (data.oracleDayCounts
+  const oracleLine = duelScores ? (duelScores.you > duelScores.oracle ? "YOU OUTSAW THE ORACLE" : duelScores.you < duelScores.oracle ? "THE ORACLE SAW FURTHER" : "YOU AND THE ORACLE STAND LEVEL") : data.duelText ?? (data.oracleDayCounts
     ? `THE ORACLE ${data.oracleDayCounts.oracle} · YOU ${data.oracleDayCounts.you}`
     : null);
 
@@ -160,11 +176,11 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
       {ritual && <SkText font={ritual} text="OUTSEEN" x={centered(ritual, "OUTSEEN")} y={152} color={colors.museumWhite} />}
       {mono && <SkText font={mono} text={`DAY ${data.date}`} x={centered(mono, `DAY ${data.date}`)} y={192} color={colors.agedGold} />}
       <Line p1={vec(INSET + 40, 218)} p2={vec(CARD_W - INSET - 40, 218)} color={NIGHT_LINE} strokeWidth={1} />
-      {data.duelScores && portrait ? <>
+      {duelScores && portrait ? <>
         <SkImage image={portrait} x={INSET + 1} y={246} width={CARD_W - 2 * INSET - 2} height={316} fit="contain" />
         {mono && ["YOU", "THE ORACLE"].map((label, index) => <SkText key={label} font={mono} text={label}
           x={(index === 0 ? 180 : 460) - mono.measureText(label).width / 2} y={582} color={colors.agedGold} />)}
-        {score && [data.duelScores.you, data.duelScores.oracle].map((value, index) => <SkText key={index} font={score} text={String(value)}
+        {score && [duelScores.you, duelScores.oracle].map((value, index) => <SkText key={index} font={score} text={String(value)}
           x={(index === 0 ? 180 : 460) - score.measureText(String(value)).width / 2} y={626} color={colors.museumWhite} />)}
       </> : <>
       <Circle cx={CARD_W / 2} cy={432} r={280}>
@@ -198,31 +214,40 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
         return nums.map((n, i) => {
           const r = data.results[i] ?? "none";
           const color = r === "win" ? colors.agedGold : r === "loss" ? NIGHT_LOSS : NIGHT_DIM;
-          const el = <SkText key={n} font={numeralFont} text={n} x={x} y={data.duelScores ? 724 : 672} color={color} />;
+          const el = <SkText key={n} font={numeralFont} text={n} x={x} y={duelScores ? 724 : 672} color={color} />;
           x += widths[i] + gap;
           return el;
         });
       })()}
-      {(data.duelScores ? mono : score) && <SkText font={(data.duelScores ? mono : score)!} text={scoreLine} x={centered(data.duelScores ? mono : score, scoreLine)} y={data.duelScores ? 660 : 724} color={colors.warmCenter} />}
+      {(duelScores ? mono : score) && <SkText font={(duelScores ? mono : score)!} text={scoreLine} x={centered(duelScores ? mono : score, scoreLine)} y={duelScores ? 660 : 724} color={fortune ? (data.fortuneDelta! >= 0 ? colors.agedGold : NIGHT_LOSS) : colors.warmCenter} />}
+      {/* What the night left behind, under the night's own figure. */}
+      {mono && fortuneAfterLine && <SkText font={mono} text={fortuneAfterLine} x={centered(mono, fortuneAfterLine)} y={754} color={NIGHT_DIM} />}
       {display && bigOne && <SkText font={display} text={bigOne} x={centered(display, bigOne)} y={802} color={colors.museumWhite} />}
-      {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
-      {monoSmall && marketLine && <SkText font={monoSmall} text={marketLine} x={centered(monoSmall, marketLine)} y={866} color={NIGHT_DIM} />}
-      {/* Below the crowd line, in the same register the market line uses --
-          the market line (added since this row was specced) already sits at
-          the crowd-line-plus-26 slot this was to occupy, so this holds the
-          next one down, still clear of the divider. Gold only when the
-          player actually outdid the machine today. */}
-      {monoSmall && oracleLine && (
-        <SkText
-          font={monoSmall}
-          text={oracleLine}
-          x={centered(monoSmall, oracleLine)}
-          y={892}
-          color={data.oracleDayCounts && data.oracleDayCounts.you > data.oracleDayCounts.oracle ? colors.warmCenter : NIGHT_DIM}
-        />
-      )}
+      {fortune ? <>
+        {/* One line in place of the three: the Oracle's line on the Big One and
+            what the player did about it, hand-wrapped onto the second slot. */}
+        {monoSmall && bigOneHead && <SkText font={monoSmall} text={bigOneHead} x={centered(monoSmall, bigOneHead)} y={840} color={NIGHT_DIM} />}
+        {monoSmall && bigOneTail && <SkText font={monoSmall} text={bigOneTail} x={centered(monoSmall, bigOneTail)} y={866} color={NIGHT_DIM} />}
+      </> : <>
+        {mono && crowdLine && <SkText font={mono} text={crowdLine} x={centered(mono, crowdLine)} y={840} color={NIGHT_DIM} />}
+        {monoSmall && marketLine && <SkText font={monoSmall} text={marketLine} x={centered(monoSmall, marketLine)} y={866} color={NIGHT_DIM} />}
+        {/* Below the players' line, in the same register the market line uses --
+            the market line (added since this row was specced) already sits at
+            the plus-26 slot this was to occupy, so this holds the next one
+            down, still clear of the divider. Gold only when the player
+            actually outdid the machine today. */}
+        {monoSmall && oracleLine && (
+          <SkText
+            font={monoSmall}
+            text={oracleLine}
+            x={centered(monoSmall, oracleLine)}
+            y={892}
+            color={data.oracleDayCounts && data.oracleDayCounts.you > data.oracleDayCounts.oracle ? colors.warmCenter : NIGHT_DIM}
+          />
+        )}
+      </>}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
-      <ShareFooter mono={mono} monoSmall={monoSmall} y={SHARE_HANDLE ? 934 : 938} width={CARD_W} />
+      <ShareFooter mono={mono} monoSmall={monoSmall} y={SHARE_HANDLE ? 934 : 938} width={CARD_W} challenge={fortune ? "CAN YOU BEAT THE HOUSE?" : undefined} />
     </Canvas>
   );
 }

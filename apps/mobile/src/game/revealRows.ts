@@ -107,10 +107,10 @@ export function crowdReadable(q: Question): boolean {
   return q.crowd_yes_pct !== null && q.crowd_count !== null && q.crowd_count >= VERDICT_MIN_PLAYERS;
 }
 
-// Said in the crowd's place on the Big One, where a silent hole in a gilded
-// frame reads as a rendering fault. Past tense: by reveal time the crowd is
+// Said in the field's place on the Big One, where a silent hole in a gilded
+// frame reads as a rendering fault. Past tense: by reveal time the field is
 // not still gathering, there simply were not enough of them.
-export const TOO_FEW_LINE = "TOO FEW SPOKE TO READ THE CROWD";
+export const TOO_FEW_LINE = "TOO FEW PLAYED TO READ THE PLAYERS";
 
 // The ordinary rows' missing half (audit 2026-09-02 §3.1). The reveal printed
 // the question, the source and the points, and nothing else — so the app whose
@@ -120,7 +120,7 @@ export const TOO_FEW_LINE = "TOO FEW SPOKE TO READ THE CROWD";
 // along. Null for a row the player never answered — the outcome column
 // already speaks for those.
 export function callLine(q: Question): string | null {
-  const crowd = crowdReadable(q) ? `CROWD ${q.crowd_yes_pct}% YES` : null;
+  const crowd = crowdReadable(q) ? `PLAYERS ${q.crowd_yes_pct}% YES` : null;
   // A row the player never answered still has something to say: what the
   // crowd made of it. On a lapsed day that IS the page — four outcomes and
   // four sources, and no sense of what was missed.

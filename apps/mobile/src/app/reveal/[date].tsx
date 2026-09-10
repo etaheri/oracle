@@ -19,19 +19,21 @@ import { GoldFrame } from "../../ui/GoldFrame";
 import { TopBar } from "../../ui/TopBar";
 import { AsciiDust } from "../../ui/TerminalPatina";
 import { DecodeLine } from "../../ui/DecodeText";
-import { ShareCardCanvas, shareCard, type ShareCardData } from "../../ui/ShareCard";
+import { ShareCardCanvas, shareCard, shareSnapshot, type ShareCardData } from "../../ui/ShareCard";
 import { numeral } from "../../ui/CardChrome";
 import { RollingPoints, ROLL_MS } from "../../ui/RollingPoints";
 import type { QuestionResult } from "../../game/sharePattern";
 import { payoff, oracleCallRight, dayCallCounts, CONSTANTS, provenanceLine } from "@oracle/core";
-import { useReveal, useRoundBoard } from "../../api/hooks";
+import { useReveal, useRoundBoard, useAllTimeBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
-import { scaledLines } from "../../game/typeScaling";
-import { boardLines, boardSupportingLines, boardRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
+import { scaledLines, scaledRow } from "../../game/typeScaling";
+import { isFortuneRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark } from "../../game/revealFortune";
+import { shareBigOneLine, fortuneShareMessage } from "../../game/shareLines";
+import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { rivalryMoment } from "../../game/rivalryMoment";
 import { capture } from "../../analytics/analytics";
-import { colors, space, displayScale } from "../../theme";
+import { colors, space, displayScale, ROW_H } from "../../theme";
 
 const easeOut = Easing.out(Easing.poly(4));
 const ROW_DELAY = 0;
@@ -87,6 +89,12 @@ export default function RevealScreen() {
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const canvasRef = useCanvasRef();
   const [details, setDetails] = useState(false);
+  // The board reads two ways at version 3: this round's field, and the
+  // all-time table of fortunes. One slot, one mode switch under it.
+  const [boardMode, setBoardMode] = useState<"daily" | "all-time">("daily");
+  // The standing lines are not the round's news at version 3 -- they sit
+  // behind SHOW DETAILS so the delta stands alone under the headline.
+  const [standing, setStanding] = useState(false);
   const [milestone, setMilestone] = useState<MilestoneId | null>(null);
   const milestonePicked = useRef(false);
   const history = useMeLedger();
@@ -134,6 +142,7 @@ export default function RevealScreen() {
   // 409s before that, for the same reason the day's number is withheld.
   const dayRead = !!reveal.data && !("pending" in reveal.data) && reveal.data.questions.every((q) => q.outcome !== null);
   const board = useRoundBoard(date ?? null, dayRead);
+  const allTime = useAllTimeBoard(dayRead && boardMode === "all-time");
 
   // The day-points landing is the ceremony's beat — the number finishes its
   // roll, THEN the haptic lands. A contrarian big-one win gets a double
@@ -196,7 +205,7 @@ export default function RevealScreen() {
     return <Screen><TopBar label="OUTSEEN" /><View style={{ flex: 1, justifyContent: "center", gap: space(3) }}>
       <View style={{ alignItems: "center" }}><AsciiDust /></View>
       <Eyebrow>{`Day ${date ?? ""}`}</Eyebrow>
-      <Serif size={displayScale.lead} style={{ textAlign: "center" }}>The ledger is not yet read.</Serif>
+      <Serif size={displayScale.lead} style={{ textAlign: "center" }}>Not yet settled.</Serif>
       <DecodeLine {...role.line} text={pendingLine(date ?? "", new Date().toISOString().slice(0, 10))} cursor color={colors.mutedInk} style={{ textAlign: "center" }}/>
     </View></Screen>;
   }
@@ -207,6 +216,9 @@ export default function RevealScreen() {
   const contrarianWin = !!big?.my && (big.my.points ?? 0) > payoff(big.my.confidence, true).win;
   const anyPending = d.questions.some((q) => rowState(q) === "pending");
   const allSpectator = d.questions.every((q) => q.my === null);
+  // Version 3 reads the whole page in money: the headline is a delta, the
+  // rows are stakes, and the duel -- which had no money in it -- is gone.
+  const fortuneRound = isFortuneRound(d);
   const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult => {
     const st = rowState(q);
     return st === "win" ? "win" : st === "loss" ? "loss" : st === "void" ? "void" : "none"; // pending, spectator → none
@@ -227,13 +239,48 @@ export default function RevealScreen() {
     results,
     ...(d.rules_version >= 2 && duel.status === "complete" ? { duelScores: { you: duel.youPoints, oracle: duel.oraclePoints } } : {}),
     ...(d.rules_version >= 2 ? { duelText: duelLine(duel) ?? undefined } : oracleCounts ? { oracleDayCounts: oracleCounts } : null),
+    // The night card in money (design §8.3). Set ONLY on a fortune round --
+    // the canvas branches on `fortuneDelta !== undefined`, so a version 1 or 2
+    // card must not carry the key at all.
+    ...(fortuneRound
+      ? {
+          fortuneDelta: d.delta ?? undefined,
+          fortuneAfter: d.fortune_after ?? undefined,
+          bigOneLine: shareBigOneLine({
+            line: big?.line_p_yes ?? null,
+            answer: big?.my?.answer ?? null,
+            stake: big?.my?.stake ?? null,
+            delta: big?.my?.delta ?? null,
+          }),
+        }
+      : {}),
   };
+  // Your standing, which is NOT this round's news. Rendered inline under the
+  // day's number at versions 1 and 2; folded behind SHOW DETAILS at version 3.
+  const standingLines = (
+    <>
+      {ledgerLines(d.ledger, d.rules_version).map((line, i) => (
+        <Mono key={i} size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
+      ))}
+      {/* What the night cost, in candidates. It belongs with the standing
+          lines rather than the day's headline: it is a fact about the
+          machine, not about this player's day. Null — and therefore absent —
+          for a bank drop and for every round authored before migration 0007. */}
+      {provenanceLine(d.candidates_written, d.candidates_rejected) && (
+        <Mono size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>
+          {provenanceLine(d.candidates_written, d.candidates_rejected)}
+        </Mono>
+      )}
+    </>
+  );
 
   async function onShare() {
     setSharing(true);
     setShareError(null);
     try {
-      await shareCard(canvasRef, cardData);
+      await (fortuneRound
+        ? shareSnapshot(canvasRef, `oracle-${d.date}.png`, fortuneShareMessage({ date: d.date, delta: d.delta!, fortuneAfter: d.fortune_after!, results }))
+        : shareCard(canvasRef, cardData));
     } catch {
       // Every other failure in this app has a written line; this one used to
       // be swallowed whole, so a failed share simply did nothing.
@@ -284,20 +331,23 @@ export default function RevealScreen() {
       >
         <Eyebrow>
           {anyPending
-            ? `Day ${d.date} · the ledger is still being read`
+            ? `Day ${d.date} · still settling`
             : allSpectator
-              // The lapsed line directly below says "the ledger was read
-              // without you" in full, and with more feeling. Saying it in the
+              // The lapsed line directly below says the round was settled
+              // without you in full, and with more feeling. Saying it in the
               // eyebrow too printed the same sentence twice, stacked.
               ? `Day ${d.date}`
-              : `Day ${d.date} · the ledger is read`}
+              : `Day ${d.date} · settled`}
         </Eyebrow>
         {/* "Outseen · You vs the Oracle" used to print here as a second
             eyebrow. It is the app's own name and premise, identical on every
             reveal ever rendered, stacked under the line that says which day
             this is — a banner inside the building it names. */}
-        <RevealSummary data={d} milestone={milestone ? MILESTONE_COPY[milestone] : null} />
-        {rivalry && (
+        {/* The duel headline and the rivalry moment are both scored in
+            points, and version 3 has no points to score them with — the
+            fortune headline below IS the summary there. */}
+        {!fortuneRound && <RevealSummary data={d} milestone={milestone ? MILESTONE_COPY[milestone] : null} />}
+        {!fortuneRound && rivalry && (
           <View style={{ alignItems: "center", gap: space(1) }}>
             <Eyebrow>Largest points gap</Eyebrow>
             <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "center" }]}>{rivalry.line}</Mono>
@@ -323,7 +373,28 @@ export default function RevealScreen() {
               on the next refresh. In an app whose liturgy is "NOTHING IS
               REVISED", a provisional score is the wrong trade: the slot says
               how much has been read instead, and the number arrives once. */}
-          {!allSpectator && (pointsWithheld(d) ? (
+          {/* Version 3's headline is the round's delta and the fortune it
+              leaves behind (design §8.3). Both figures are withheld by the
+              route until every card is decided, so the slot holds the read
+              count in the meantime — the same promise the day's number keeps
+              below, made in money. */}
+          {!allSpectator && (fortuneRound ? (() => {
+            const h = fortuneHeadline(d);
+            if (h.kind === "none") return null;
+            if (h.kind === "withheld") return (
+              <>
+                <Ritual bold size={displayScale.epithet} color={colors.mutedInk} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{h.read}</Ritual>
+                <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>FORTUNE WITHHELD</Mono>
+              </>
+            );
+            return (
+              <>
+                <Ritual bold size={displayScale.points} color={d.delta! >= 0 ? colors.goldText : colors.vermilion} letterSpacing={2} style={{ marginRight: -2 }}>{h.delta}</Ritual>
+                <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>{h.fortune}</Mono>
+                {houseNightLine(d.house_delta) && <Mono {...role.caption} color={colors.mutedInk}>{houseNightLine(d.house_delta)}</Mono>}
+              </>
+            );
+          })() : (pointsWithheld(d) ? (
             <>
               <Ritual bold size={displayScale.epithet} color={colors.mutedInk} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{readingLine(d.questions)}</Ritual>
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS WITHHELD</Mono>
@@ -332,7 +403,7 @@ export default function RevealScreen() {
             <>
               <RollingPoints value={d.day_points} delayMs={POINTS_DELAY} />
               <Mono size={10} color={colors.mutedInk} letterSpacing={5} style={{ marginRight: -5 }}>DAY POINTS</Mono>
-              {d.rules_version >= 2 && d.bonus_points !== 0 && <Mono {...role.caption} color={colors.mutedInk}>CROWD BONUS {d.bonus_points} · EXCLUDED FROM DUEL AND RANK</Mono>}
+              {d.rules_version >= 2 && d.bonus_points !== 0 && <Mono {...role.caption} color={colors.mutedInk}>PLAYERS BONUS {d.bonus_points} · EXCLUDED FROM DUEL AND RANK</Mono>}
               {/* Both weights on one line. The first hour is not gated on a
                   winning day any more — the bonus is symmetric (design
                   2026-09-03 §2), so gating it on day_points > 0 hid it on
@@ -342,27 +413,18 @@ export default function RevealScreen() {
                 <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{weightLine(d)}</Mono>
               )}
             </>
-          ))}
-          {/* Your standing, which is NOT this day's news — the vigil's count
-              and the score are true before the page loads and stay true after
-              it. They were gold, which put four gold lines under one number
-              and made the block read as four headlines instead of one. Muted
-              and set apart, they subordinate to the day without leaving it. */}
-          <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
-            {ledgerLines(d.ledger, d.rules_version).map((line, i) => (
-              <Mono key={i} size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>{line}</Mono>
-            ))}
-            {/* What the night cost, in candidates. It belongs with the standing
-                lines rather than the day's headline: it is a fact about the
-                machine, not about this player's day. Null — and therefore
-                absent — for a bank drop and for every round authored before
-                migration 0007. */}
-            {provenanceLine(d.candidates_written, d.candidates_rejected) && (
-              <Mono size={10} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }}>
-                {provenanceLine(d.candidates_written, d.candidates_rejected)}
-              </Mono>
-            )}
-          </View>
+          )))}
+          {/* Your standing, which is NOT this day's news — the count and the
+              score are true before the page loads and stay true after it. They
+              were gold, which put four gold lines under one number and made the
+              block read as four headlines instead of one. Muted and set apart,
+              they subordinate to the day without leaving it. Version 3 folds
+              them behind SHOW DETAILS above the board instead. */}
+          {!fortuneRound && (
+            <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
+              {standingLines}
+            </View>
+          )}
         </Animated.View>
         {/* The day's four ordinary calls, in the card's vocabulary rather
             than a settings list (refinement spec §2): the slot numeral is
@@ -372,9 +434,17 @@ export default function RevealScreen() {
         <View style={{ borderBottomWidth: 1, borderBottomColor: colors.line }}>
           {d.questions.filter((q) => q.slot !== 5).map((q, i) => {
             const st = rowState(q);
-            const color = st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
+            // At version 3 a row's fortune is its own verdict: the sign of the
+            // delta, not the win/loss the points ladder used to hand out.
+            const money = fortuneRound;
+            const color = money
+              ? (q.my?.delta == null ? colors.mutedInk : q.my.delta > 0 ? colors.goldText : q.my.delta < 0 ? colors.vermilion : colors.mutedInk)
+              : st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
             const receipt = receiptLine(q);
-            const call = callLine(q);
+            const call = money ? stakeReceipt(q) : callLine(q);
+            const take = money ? oracleTake(q) : null;
+            const context = money ? lineContext(q) : null;
+            const right = money ? fortuneRowRight(q) : rowRight(q);
             const movement = movementLine(q);
             return (
               <Animated.View
@@ -394,6 +464,17 @@ export default function RevealScreen() {
                   {call ? (
                     <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{call}</Mono>
                   ) : null}
+                  {/* Who took whom on this card (design §8.3). Gold only when
+                      it was the player — the machine's wins stay in the
+                      register every other muted line uses. */}
+                  {take ? (
+                    <Mono {...role.caption} color={take.startsWith("YOU") ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{take}</Mono>
+                  ) : null}
+                  {context ? (
+                    <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{context}</Mono>
+                  ) : null}
+                  {/* Council split lands here (spec §13.3, Plan 3). */}
+                  {money && <View style={{ minHeight: 0 }} accessibilityElementsHidden />}
                   {/* How the tide moved after this player sealed (design
                       2026-09-09 §4.1) — no reserved space: rows are already
                       variable height, and most days say nothing here. */}
@@ -407,7 +488,7 @@ export default function RevealScreen() {
                 </View>
                 {/* The mark rides with the value: outcome must never be
                     carried by colour alone (brief §11). */}
-                <Mono size={12} color={color} letterSpacing={1}>{`${rowMark(st)} ${rowRight(q)}`}</Mono>
+                <Mono size={12} color={color} letterSpacing={1}>{`${money ? moneyMark(q) : rowMark(st)} ${right}`}</Mono>
               </Animated.View>
             );
           })}
@@ -443,31 +524,63 @@ export default function RevealScreen() {
                 <View style={{ gap: space(1) }}>
                   {big.my && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Mono {...role.supporting} color={colors.ink}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
-                      <Mono {...role.supporting} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
-                        {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
-                      </Mono>
+                      {fortuneRound ? (
+                        <Mono {...role.supporting} color={colors.ink}>{stakeReceipt(big)}</Mono>
+                      ) : (
+                        <Mono {...role.supporting} color={colors.ink}>YOU: {big.my.answer ? "YES" : "NO"} @ {big.my.confidence}%</Mono>
+                      )}
+                      {fortuneRound ? (
+                        <Mono {...role.supporting} color={big.my.delta == null ? colors.mutedInk : big.my.delta > 0 ? colors.goldText : big.my.delta < 0 ? colors.vermilion : colors.mutedInk}>
+                          {fortuneRowRight(big)}
+                        </Mono>
+                      ) : (
+                        <Mono {...role.supporting} color={(big.my.points ?? 0) >= 0 ? colors.goldText : colors.vermilion}>
+                          {(big.my.points ?? 0) > 0 ? `+${big.my.points}` : String(big.my.points ?? "—")}
+                        </Mono>
+                      )}
                     </View>
                   )}
                   {/* Same floor as the round footer and the finale: over a
                       handful of players the percentage is mostly the reader,
                       and this frame is the one people screenshot. */}
-                  <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{crowdReadable(big) ? `CROWD SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>
+                  <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{crowdReadable(big) ? `PLAYERS SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>
                   {big.market_prob != null && (
                     <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
                   )}
-                  {big.oracle_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
-                    <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
-                      THE ORACLE FORESAW {Math.round(big.oracle_p_yes * 100)}% YES{" "}
-                      {oracleCallRight(big.oracle_p_yes, big.outcome) === null
-                        ? ""
-                        : oracleCallRight(big.oracle_p_yes, big.outcome)
-                          ? "✓"
-                          : "✗"}
-                    </Mono>
+                  {/* Version 3 quotes the LINE the stake was priced against,
+                      not the forecast behind it — the line is the number the
+                      player actually played, and the only one they can check
+                      the payout against. */}
+                  {fortuneRound ? (
+                    big.line_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
+                      <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
+                        THE ORACLE'S LINE {Math.round(big.line_p_yes * 100)}% YES{" "}
+                        {oracleCallRight(big.line_p_yes, big.outcome) === null
+                          ? ""
+                          : oracleCallRight(big.line_p_yes, big.outcome)
+                            ? "✓"
+                            : "✗"}
+                      </Mono>
+                    )
+                  ) : (
+                    big.oracle_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
+                      <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
+                        THE ORACLE FORESAW {Math.round(big.oracle_p_yes * 100)}% YES{" "}
+                        {oracleCallRight(big.oracle_p_yes, big.outcome) === null
+                          ? ""
+                          : oracleCallRight(big.oracle_p_yes, big.outcome)
+                            ? "✓"
+                            : "✗"}
+                      </Mono>
+                    )
+                  )}
+                  {fortuneRound && oracleTake(big) && (
+                    <Mono {...role.caption} color={(big.my?.delta ?? 0) > 0 ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{oracleTake(big)}</Mono>
                   )}
                   <Mono {...role.caption} color={colors.mutedInk} numberOfLines={2} style={[role.caption.style, { textAlign: "left" }]}>{receiptLine(big)}</Mono>
-                  {contrarianWin && (
+                  {/* There is no bounty at version 3 (design D8): the odds
+                      already paid for standing against the field. */}
+                  {!fortuneRound && contrarianWin && (
                     <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
                       <Ritual bold size={displayScale.slot} letterSpacing={3}>AGAINST THE TIDE</Ritual>
                       <Ritual bold size={displayScale.lead} color={colors.agedGold} letterSpacing={1}>+40</Ritual>
@@ -492,6 +605,21 @@ export default function RevealScreen() {
             </Mono>
           </Animated.View>
         )}
+        {/* Version 3's standing lines, folded away. The delta is the round's
+            one piece of news; the streak, the rating and the night's
+            provenance are all true before the page loads and stay true after
+            it, so they open only when asked for. */}
+        {fortuneRound && !allSpectator && (
+          <View style={{ alignItems: "center", gap: space(1) }}>
+            <View style={{ minHeight: standing ? scaledRow(ROW_H.meta, fontScale) * 3 : 0, alignItems: "center", justifyContent: "center", gap: space(1) }}>
+              {standing && <>
+                {standingLines}
+                {milestone && <Mono {...role.line} color={colors.goldText}>{MILESTONE_COPY[milestone]}</Mono>}
+              </>}
+            </View>
+            <QuietLink title={standing ? "HIDE DETAILS" : "SHOW DETAILS"} onPress={() => setStanding((open) => !open)} />
+          </View>
+        )}
         {/* Where the day stood.
             This block used to be printed twice — once above the fold and once
             again inside the collapsed section — and the link that opened the
@@ -508,20 +636,31 @@ export default function RevealScreen() {
             }}
             style={{ alignItems: "center", gap: space(1) }}
           >
-            <Eyebrow>Daily board</Eyebrow>
+            <Eyebrow>{boardMode === "daily" ? "Daily board" : "All-time board"}</Eyebrow>
             {/* The board rides a SECOND query, later than the reveal. Collapsed
                 it reserves its one summary line; expanded it reserves the whole
                 field, so neither arrival shoves the share button below it. */}
             <View style={{ minHeight: details ? BOARD_SLOT_H : BOARD_MAX_LINES * BOARD_LINE_H, alignItems: "center", justifyContent: "center", gap: space(1) }}>
-              {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
-                <Mono key={`board-${i}`} {...role.meta} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
-              ))}
-              {details && <>
-                {boardSupportingLines(board.data ?? undefined, d.rules_version).map((line, i) => (
-                  <Mono key={`support-${i}`} {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "center", lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+              {boardMode === "daily" ? <>
+                {boardLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+                  <Mono key={`board-${i}`} {...role.meta} color={board.data?.your_rank != null ? colors.goldText : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
                 ))}
-                {boardRowLines(board.data?.rows ?? []).map((line, i) => (
-                  <Mono key={`row-${i}`} {...role.meta} color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+                {details && <>
+                  {boardSupportingLines(board.data ?? undefined, d.rules_version).map((line, i) => (
+                    <Mono key={`support-${i}`} {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "center", lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+                  ))}
+                  {boardRowLines(board.data?.rows ?? [], board.data?.metric ?? "points").map((line, i) => (
+                    <Mono key={`row-${i}`} {...role.meta} color={board.data!.rows[i]!.is_you ? colors.goldText : board.data!.rows[i]!.is_oracle ? colors.ink : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+                  ))}
+                </>}
+              </> : <>
+                {/* The all-time table (design §7): fortune, not points, and no
+                    machine standing in it — the house is not a player. */}
+                {allTimeLines(allTime.data).map((line, i) => (
+                  <Mono key={`all-${i}`} {...role.meta} color={allTime.data?.your_rank != null ? colors.goldText : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
+                ))}
+                {details && allTimeRowLines(allTime.data?.rows ?? []).map((line, i) => (
+                  <Mono key={`all-row-${i}`} {...role.meta} color={allTime.data!.rows[i]!.is_you ? colors.goldText : colors.mutedInk} style={[role.meta.style, { lineHeight: BOARD_LINE_H }]}>{line}</Mono>
                 ))}
               </>}
             </View>
@@ -532,9 +671,15 @@ export default function RevealScreen() {
                 else { boardScrollRequested.current = true; setDetails(true); }
               }}
             />
+            <QuietLink
+              title={boardMode === "daily" ? "SEE THE ALL-TIME BOARD" : "SEE THE DAILY BOARD"}
+              onPress={() => setBoardMode((mode) => (mode === "daily" ? "all-time" : "daily"))}
+            />
           </View>
         )}
-        {!pointsWithheld(d) && results.some(r => r !== "none") && <GoldButton title={sharing ? "PREPARING…" : "SHARE YOUR RESULT"} onPress={onShare} disabled={sharing} />}
+        {/* Version 3 shares the delta, so it waits on the same figure the
+            headline waits on rather than on the day's weighed points. */}
+        {(fortuneRound ? fortuneHeadline(d).kind === "settled" : !pointsWithheld(d) && results.some(r => r !== "none")) && <GoldButton title={sharing ? "PREPARING…" : "SHARE YOUR RESULT"} onPress={onShare} disabled={sharing} />}
         {shareError && <Mono {...role.meta} color={colors.vermilion} accessibilityRole="alert">{shareError}</Mono>}
         <QuietLink title="SHOW RULES" onPress={() => router.push({ pathname: "/rites", params: { all: "1", rules_version: String(d.rules_version) } })} />
       </ScrollView>

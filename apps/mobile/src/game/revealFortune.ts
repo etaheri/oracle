@@ -62,3 +62,12 @@ export function houseNightLine(houseDelta: number | null): string | null {
   if (houseDelta < 0) return `THE HOUSE LOST ${formatFortune(-houseDelta)} LAST NIGHT`;
   return "THE HOUSE BROKE EVEN LAST NIGHT";
 }
+
+// The row's mark at version 3, from the delta's sign -- outcome must never be
+// carried by colour alone (brief §11).
+export function moneyMark(q: Question): string {
+  if (!q.my) return "·";
+  if (q.outcome === null || q.my.delta === null) return "…";
+  if (q.outcome === "void") return "∅";
+  return q.my.delta > 0 ? "✓" : q.my.delta < 0 ? "✗" : "∅";
+}

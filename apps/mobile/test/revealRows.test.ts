@@ -194,20 +194,20 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
   describe("callLine", () => {
     it("prints the call and the crowd when the crowd was big enough to read", () => {
       expect(callLine(question({ my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null }, crowd_yes_pct: 62, crowd_count: 40 })))
-        .toBe("YOU: YES @ 75% · CROWD 62% YES");
+        .toBe("YOU: YES @ 75% · PLAYERS 62% YES");
       expect(callLine(question({ my: { answer: false, confidence: 55, points: -10, brier: 0.3, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null }, crowd_yes_pct: 62, crowd_count: 40 })))
-        .toBe("YOU: NO @ 55% · CROWD 62% YES");
+        .toBe("YOU: NO @ 55% · PLAYERS 62% YES");
     });
     it("drops the crowd clause rather than reading a crowd of three", () => {
       expect(callLine(question({ crowd_yes_pct: 100, crowd_count: 1 }))).toBe("YOU: YES @ 75%");
       expect(callLine(question({ crowd_yes_pct: 50, crowd_count: 4 }))).toBe("YOU: YES @ 75%");
-      expect(callLine(question({ crowd_yes_pct: 50, crowd_count: 5 }))).toBe("YOU: YES @ 75% · CROWD 50% YES");
+      expect(callLine(question({ crowd_yes_pct: 50, crowd_count: 5 }))).toBe("YOU: YES @ 75% · PLAYERS 50% YES");
     });
     it("drops the crowd clause on a row the crowd was never counted for", () => {
       expect(callLine(question({ outcome: null, crowd_yes_pct: null, crowd_count: null }))).toBe("YOU: YES @ 75%");
     });
     it("gives a row the player never answered the crowd, which is what they missed", () => {
-      expect(callLine(question({ my: null, crowd_yes_pct: 62, crowd_count: 40 }))).toBe("CROWD 62% YES");
+      expect(callLine(question({ my: null, crowd_yes_pct: 62, crowd_count: 40 }))).toBe("PLAYERS 62% YES");
     });
     it("says nothing at all when there is neither a call nor a readable crowd", () => {
       expect(callLine(question({ my: null, crowd_yes_pct: 100, crowd_count: 1 }))).toBeNull();
@@ -215,7 +215,7 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
     });
     it("still reads back a call the ledger refused to score", () => {
       expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } })))
-        .toBe("YOU: YES @ 90% · CROWD 60% YES");
+        .toBe("YOU: YES @ 90% · PLAYERS 60% YES");
     });
   });
 

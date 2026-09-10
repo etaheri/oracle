@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Reveal } from "@oracle/core";
-import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound } from "../src/game/revealFortune";
+import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, moneyMark } from "../src/game/revealFortune";
 
 type Q = Reveal["questions"][number];
 const q = (over: Omit<Partial<Q>, "my"> & { my?: Partial<NonNullable<Q["my"]>> | null }): Q => ({
@@ -60,6 +60,14 @@ describe("the version 3 reveal (design §8.3)", () => {
     expect(fortuneRowRight(q({ outcome: "void", my: { payout: 50, delta: 0 } }))).toBe("0");
     expect(fortuneRowRight(q({ outcome: null, my: { payout: null, delta: null } }))).toBe("—");
     expect(fortuneRowRight(q({ my: null }))).toBe("YES");
+  });
+
+  it("marks a money row by the delta's sign", () => {
+    expect(moneyMark(q({}))).toBe("✓");
+    expect(moneyMark(q({ outcome: "no", my: { payout: 0, delta: -50 } }))).toBe("✗");
+    expect(moneyMark(q({ outcome: "void", my: { payout: 50, delta: 0 } }))).toBe("∅");
+    expect(moneyMark(q({ outcome: null, my: { payout: null, delta: null } }))).toBe("…");
+    expect(moneyMark(q({ my: null }))).toBe("·");
   });
 
   it("names the house's night", () => {

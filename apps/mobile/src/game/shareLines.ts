@@ -19,3 +19,14 @@ export function fortuneShareMessage(
   const body = `🔮 OUTSEEN ${d.date} — ${patternLine(d.results)} · ${signedFortune(d.delta)} · FORTUNE ${formatFortune(d.fortuneAfter)} · can you beat the house?`;
   return url ? `${body} ${url}` : body;
 }
+
+// Skia text does not wrap, and the Big One's money line runs past the card at
+// its full length. Broken by hand on the last " · " that still leaves the head
+// inside the measure; a line with no separator in reach is left whole.
+export const SHARE_LINE_MAX = 44;
+export function splitShareLine(line: string, max = SHARE_LINE_MAX): [string, string | null] {
+  if (line.length <= max) return [line, null];
+  const cut = line.lastIndexOf(" · ", max);
+  if (cut < 0) return [line, null];
+  return [line.slice(0, cut), line.slice(cut + 3)];
+}

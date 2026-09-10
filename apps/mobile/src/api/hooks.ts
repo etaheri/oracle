@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, AllTimeBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -135,6 +135,25 @@ export function useSubmit() {
       // The seal spent fortune, and an earlier round settling mid-window moves
       // it too — refetch so the next card's ladder is priced at the real one.
       qc.invalidateQueries({ queryKey: ["round", "today"] });
+    },
+  });
+}
+
+// The all-time board (design §7): every player who has settled a stake,
+// ranked by fortune. 404 means the route is not deployed yet -- an empty slot.
+export function useAllTimeBoard(enabled: boolean) {
+  return useQuery({
+    queryKey: ["board", "all-time"],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      try {
+        return await api("/v1/board/all-time", AllTimeBoardSchema, { token });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
     },
   });
 }
