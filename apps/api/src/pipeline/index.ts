@@ -10,6 +10,7 @@ import { decideActions, loadPipelineState } from "./state";
 import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
 import { authorBankEntry } from "./author";
 import { stampOracleForecast } from "./forecast";
+import { commitLine } from "./line";
 import { hourBucket, type WorkflowStarter } from "./workflows";
 import { meterClaude, reportBudgetExhaustion } from "./spend";
 import type { TelegramClient } from "./telegram";
@@ -113,6 +114,9 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
 
         case "forecast":
           await stampOracleForecast(metered, action.date);
+          // The line follows the commit on the same tick (design 2026-09-10 §5.5)
+          // and on every later forecast tick until every question carries one.
+          await commitLine(deps.db, action.date);
           done.push(`forecast:${action.date}`);
           break;
 

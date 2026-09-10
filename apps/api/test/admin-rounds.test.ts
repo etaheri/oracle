@@ -374,6 +374,25 @@ describe("POST /admin/rounds/:date/forecast", () => {
   });
 });
 
+describe("POST /admin/rounds/:date/line", () => {
+  it("writes the house line with the admin secret and returns the written count", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const date = "2026-09-09";
+    const rows = await seedRound(db, { date, opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    // Migration 0009's commitment guard makes oracle_p_yes immutable once the
+    // round carries oracle_committed_at, so probabilities are written FIRST
+    // and the round is marked committed LAST — same order as pipeline-line.test.ts.
+    for (const r of rows) {
+      await db.update(schema.questions).set({ oracleProbYes: "0.5", marketProb: "0.5" }).where(eq(schema.questions.id, r.id));
+    }
+    await db.update(schema.rounds).set({ rulesVersion: 3, status: "scheduled", oracleCommittedAt: new Date("2026-09-09T14:00:00Z") }).where(eq(schema.rounds.date, date));
+    const res = await admin(app)(`/admin/rounds/${date}/line`, { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ written: 5 });
+  });
+});
+
 describe("POST /admin/questions/:id/withdraw (design 2026-09-09 §1.4)", () => {
   it("withdraws with the admin secret and returns the remaining count", async () => {
     const { db } = await makeTestDb();

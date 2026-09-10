@@ -8,6 +8,7 @@ import { schema } from "../db/client";
 import { DraftSchema, RESOLVES_AFTER_LOCK, upsertDraft, FAST_ROUND_ERRORS } from "../pipeline/draft";
 import { publish } from "../pipeline/actions";
 import { stampOracleForecast } from "../pipeline/forecast";
+import { commitLine } from "../pipeline/line";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
 import { pooledLeak, loadLeakRows, type SealRow } from "../pipeline/leak";
@@ -205,6 +206,11 @@ export const adminRoutes = new Hono<AppContext>()
       // on all of them. A 500 would say only that something went wrong.
       return c.json({ error: e instanceof Error ? e.message : "forecast failed" }, 409);
     }
+  })
+  .post("/rounds/:date/line", async (c) => {
+    const { db } = c.get("deps");
+    const r = await commitLine(db, c.req.param("date"));
+    return c.json(r);
   })
   .post("/rounds/:date/publish", async (c) => {
     const db = c.get("deps").db;
