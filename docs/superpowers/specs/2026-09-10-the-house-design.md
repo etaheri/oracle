@@ -144,7 +144,7 @@ The lower bound on `closesAt` is the leak rule. A market whose trading closes at
 
 ### 5.3 Selection
 
-Pure code, the same greedy spread as `gauntlet/select.ts`: walk candidates by volume, take the highest-volume candidate of each category first, then fill. Five distinct categories preferred, three accepted, fewer than five candidates falls to the bank. The Big One is the highest-volume selected market. Slots 1 to 4 in volume order.
+Pure code, the same greedy spread as `gauntlet/select.ts`: walk candidates by volume, take the highest-volume candidate of each category first, then fill. Four distinct categories required, which is the draft validator's own rule; fewer than five candidates or fewer than four categories falls to the bank. The Big One is the highest-volume selected market. Slots 1 to 4 in volume order.
 
 ### 5.4 Voice
 
