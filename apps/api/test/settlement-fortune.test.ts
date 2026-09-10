@@ -90,3 +90,40 @@ describe("settleRound writes the house delta", () => {
     expect(ur!.fortuneAtOpen).toBe(1000);
   });
 });
+
+describe("settlement recovers a crashed fortune pass", () => {
+  // Stage a fully resolved round, then rewind ONE prediction to the state a
+  // crash between the claim and the credit would leave behind: payout and
+  // settled_at cleared, and the credit taken back out of the fortune.
+  async function crashedRound() {
+    const staged = await stagedRound();
+    const { db, rows, alice } = staged;
+    for (const r of rows) await resolveQuestion(db, r.id, r.slot === 5 ? "no" : "yes");
+    // alice: +74 on each of slots 1-4, −80 on the Big One → 1216.
+    expect((await db.query.users.findFirst({ where: eq(schema.users.id, alice.id) }))!.fortune).toBe(1216);
+    await db.update(schema.predictions).set({ payout: null, settledAt: null })
+      .where(and(eq(schema.predictions.questionId, rows[0]!.id), eq(schema.predictions.userId, alice.id)));
+    await db.update(schema.users).set({ fortune: 1216 - 74 }).where(eq(schema.users.id, alice.id));
+    return staged;
+  }
+
+  it("settleRound pays what a crashed resolve left unpaid", async () => {
+    const { db, rows, alice } = await crashedRound();
+    await settleRound(db, DATE);
+    expect((await db.query.users.findFirst({ where: eq(schema.users.id, alice.id) }))!.fortune).toBe(1216);
+    const pa = await db.query.predictions.findFirst({ where: and(eq(schema.predictions.questionId, rows[0]!.id), eq(schema.predictions.userId, alice.id)) });
+    expect(pa!.payout).toBe(114);
+    expect(pa!.settledAt).not.toBeNull();
+    // The sweep runs before the house delta, so the recovered stake is in it.
+    expect((await db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) }))!.houseDelta).toBe(-187);
+  });
+
+  it("payFortune is one statement: payout and settled_at always move together", async () => {
+    const { db, rows } = await crashedRound();
+    await settleRound(db, DATE);
+    const all = await db.query.predictions.findMany();
+    expect(all.length).toBe(rows.length * 2);
+    expect(all.filter((p) => p.settledAt !== null && p.payout === null)).toEqual([]);
+    expect(all.filter((p) => p.payout !== null && p.settledAt === null)).toEqual([]);
+  });
+});

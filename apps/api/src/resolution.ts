@@ -50,6 +50,14 @@ export async function resolveQuestion(
  * claimed WHERE settled_at IS NULL, so a retried resolve, a forced
  * re-resolution or an overlapping tick pays nobody twice. users.fortune is
  * written here and nowhere else.
+ *
+ * The claim and the credit are ONE statement: a data-modifying CTE stamps
+ * payout + settled_at and feeds the claimed user_id straight into the fortune
+ * update. Two statements would leave a crash window in which a prediction
+ * reads as paid while the player never got the money — unrecoverable, since
+ * the claim predicate would exclude the row forever after. Here the pair is
+ * atomic, so a row is either wholly paid or wholly unpaid, and settleRound's
+ * sweep can finish anything a crash interrupted.
  */
 export async function payFortune(db: Db, questionId: string, outcome: "yes" | "no" | "void", now: Date): Promise<{ paid: number }> {
   const staked = await db.query.predictions.findMany({
@@ -59,17 +67,28 @@ export async function payFortune(db: Db, questionId: string, outcome: "yes" | "n
   for (const p of staked) {
     if (p.stake === null || p.linePYes === null) continue;
     const pay = fortunePayout({ stake: p.stake, answer: p.answer, line: Number(p.linePYes), outcome });
-    const claimed = await db.update(schema.predictions)
-      .set({ payout: pay, settledAt: now })
-      .where(and(eq(schema.predictions.id, p.id), isNull(schema.predictions.settledAt)))
-      .returning({ id: schema.predictions.id });
-    if (claimed.length === 0) continue;
-    await db.update(schema.users)
-      .set({ fortune: sql`${schema.users.fortune} + ${pay - p.stake}` })
-      .where(eq(schema.users.id, p.userId));
-    paid++;
+    const res = await db.execute(sql`
+      WITH claimed AS (
+        UPDATE predictions SET payout = ${pay}, settled_at = ${now.toISOString()}::timestamptz
+        WHERE id = ${p.id}::uuid AND settled_at IS NULL
+        RETURNING user_id
+      )
+      UPDATE users SET fortune = fortune + ${pay - p.stake} FROM claimed
+      WHERE users.id = claimed.user_id
+      RETURNING users.id
+    `);
+    if (executeRows(res).length > 0) paid++;
   }
   return { paid };
+}
+
+// db.execute returns a driver-shaped result: neon-http gives { rows }, PGlite
+// gives { rows } too, but the widened PgDatabase type promises neither, and
+// some drivers hand back a bare array. Read it defensively.
+function executeRows(res: unknown): unknown[] {
+  const rows = (res as { rows?: unknown[] } | null)?.rows;
+  if (Array.isArray(rows)) return rows;
+  return Array.isArray(res) ? res : [];
 }
 
 // The reveal's receipt: one quote and/or one reason lifted from whatever

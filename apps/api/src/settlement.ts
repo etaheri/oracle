@@ -1,6 +1,7 @@
 import { and, count, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { oracleScore, settleStreak, vigilMultiplier, ratingEligible } from "@oracle/core";
 import { schema, type Db } from "./db/client";
+import { payFortune } from "./resolution";
 
 // Round settlement (backend spec L73/L79/L119): streak + shield settlement for
 // every affected user, complete-round scoring, then the round flips to
@@ -72,6 +73,18 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
         .where(eq(schema.entitlements.userId, u.id));
     }
     settled++;
+  }
+
+  // The fortune backstop. resolveQuestion pays each question as it resolves,
+  // so on a normal night every row is already claimed and this sweep pays
+  // nothing. It exists for the crash: a resolver that died partway through
+  // its loop leaves stakes unpaid, and nothing else would ever finish them.
+  // payFortune's claim is idempotent, so running it again is free. This must
+  // precede the house delta below, which sums only settled rows.
+  for (const q of qs) {
+    const outcome = q.outcome ?? (q.status === "void" ? "void" : null);
+    if (outcome === null) continue;
+    await payFortune(db, q.id, outcome, new Date());
   }
 
   // The house delta (design 2026-09-10 §4.4): Σ(stake − payout) over the
