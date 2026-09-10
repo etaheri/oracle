@@ -176,6 +176,9 @@ export default function RevealScreen() {
       void markRevealSeen(d2.date);
     } else {
       const big2 = d2.questions.find((q) => q.slot === 5);
+      // Version 1 only: every later version returned above. Which is what
+      // keeps the bounty's double strike off a version 3 reveal, where the
+      // bounty itself no longer exists (design D8).
       const tide = !!big2?.my && (big2.my.points ?? 0) > payoff(big2.my.confidence, true).win;
       timers.push(setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
       timers.push(setTimeout(() => markRevealSeen(d2.date), reducedMotion ? 0 : POINTS_DELAY + ROLL_MS));
@@ -213,12 +216,15 @@ export default function RevealScreen() {
   const d = reveal.data;
   const big = d.questions.find((q) => q.slot === 5);
   const bigState = big ? rowState(big) : null;
-  const contrarianWin = !!big?.my && (big.my.points ?? 0) > payoff(big.my.confidence, true).win;
-  const anyPending = d.questions.some((q) => rowState(q) === "pending");
-  const allSpectator = d.questions.every((q) => q.my === null);
   // Version 3 reads the whole page in money: the headline is a delta, the
   // rows are stakes, and the duel -- which had no money in it -- is gone.
   const fortuneRound = isFortuneRound(d);
+  // There is no bounty at version 3 (design D8): the odds already paid for
+  // standing against the field. Gated here rather than at each consumer so the
+  // gold surge over the frame cannot outlive the line it celebrates.
+  const contrarianWin = !fortuneRound && !!big?.my && (big.my.points ?? 0) > payoff(big.my.confidence, true).win;
+  const anyPending = d.questions.some((q) => rowState(q) === "pending");
+  const allSpectator = d.questions.every((q) => q.my === null);
   const results = [...d.questions].sort((a, b) => a.slot - b.slot).map((q): QuestionResult => {
     const st = rowState(q);
     return st === "win" ? "win" : st === "loss" ? "loss" : st === "void" ? "void" : "none"; // pending, spectator → none
@@ -420,6 +426,14 @@ export default function RevealScreen() {
               block read as four headlines instead of one. Muted and set apart,
               they subordinate to the day without leaving it. Version 3 folds
               them behind SHOW DETAILS above the board instead. */}
+          {/* A milestone is marked seen the instant it is picked, so it has to
+              be SHOWN the instant it is picked. At versions 1 and 2
+              RevealSummary prints it; version 3 has no summary, and the
+              details fold below can stay closed forever — so it stands here,
+              under the round's own figure. */}
+          {fortuneRound && milestone && (
+            <Mono {...role.line} color={colors.mutedInk} style={[role.line.style, { marginTop: space(2) }]}>{MILESTONE_COPY[milestone]}</Mono>
+          )}
           {!fortuneRound && (
             <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
               {standingLines}
@@ -520,7 +534,11 @@ export default function RevealScreen() {
               {bigState === "void" && (
                 <Mono {...role.supporting} color={colors.mutedInk}>{receiptLine(big)}</Mono>
               )}
-              {bigState !== "pending" && bigState !== "void" && big.crowd_yes_pct !== null && (
+              {/* Version 3's money lines do not depend on the field having
+                  left a percentage behind -- a stake, its payout and the line
+                  it was priced against are true on their own. The PLAYERS
+                  line inside is still gated on `crowdReadable`. */}
+              {bigState !== "pending" && bigState !== "void" && (fortuneRound || big.crowd_yes_pct !== null) && (
                 <View style={{ gap: space(1) }}>
                   {big.my && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -578,9 +596,9 @@ export default function RevealScreen() {
                     <Mono {...role.caption} color={(big.my?.delta ?? 0) > 0 ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{oracleTake(big)}</Mono>
                   )}
                   <Mono {...role.caption} color={colors.mutedInk} numberOfLines={2} style={[role.caption.style, { textAlign: "left" }]}>{receiptLine(big)}</Mono>
-                  {/* There is no bounty at version 3 (design D8): the odds
-                      already paid for standing against the field. */}
-                  {!fortuneRound && contrarianWin && (
+                  {/* `contrarianWin` is already false at version 3 -- there is
+                      no bounty there (design D8). */}
+                  {contrarianWin && (
                     <Animated.View entering={FadeIn.delay(BIG_ONE_DELAY + 600).duration(400).easing(easeOut)} style={{ flexDirection: "row", alignItems: "baseline", gap: space(2), justifyContent: "center" }}>
                       <Ritual bold size={displayScale.slot} letterSpacing={3}>AGAINST THE TIDE</Ritual>
                       <Ritual bold size={displayScale.lead} color={colors.agedGold} letterSpacing={1}>+40</Ritual>
@@ -612,10 +630,7 @@ export default function RevealScreen() {
         {fortuneRound && !allSpectator && (
           <View style={{ alignItems: "center", gap: space(1) }}>
             <View style={{ minHeight: standing ? scaledRow(ROW_H.meta, fontScale) * 3 : 0, alignItems: "center", justifyContent: "center", gap: space(1) }}>
-              {standing && <>
-                {standingLines}
-                {milestone && <Mono {...role.line} color={colors.goldText}>{MILESTONE_COPY[milestone]}</Mono>}
-              </>}
+              {standing && standingLines}
             </View>
             <QuietLink title={standing ? "HIDE DETAILS" : "SHOW DETAILS"} onPress={() => setStanding((open) => !open)} />
           </View>
