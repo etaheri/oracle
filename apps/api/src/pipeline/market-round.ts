@@ -20,28 +20,78 @@ export interface MarketRoundResult { published: boolean; fetched: number; eligib
 const SOURCE_NAME = { kalshi: "Kalshi", polymarket: "Polymarket" } as const;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
-export async function fetchCandidates(deps: PipelineDeps, date: string): Promise<MarketCandidate[]> {
+/** The under-five line, in one place: runMarketRound and the Workflow both say it. */
+export function tooFewReason(n: number): string {
+  return `${n} eligible market${n === 1 ? "" : "s"}, ${SELECT.ROUND_SIZE} needed`;
+}
+
+/**
+ * `fetched` is the POOLED count, before eligibility — what the exchanges
+ * actually returned. The narration needs both numbers: "300 fetched, 6
+ * eligible" is a night the window was tight, and "6 fetched, 6 eligible" is a
+ * night an exchange was down, and a single count cannot tell them apart.
+ */
+export async function fetchCandidates(deps: PipelineDeps, date: string): Promise<{ fetched: number; candidates: MarketCandidate[] }> {
   const locksAt = noonET(addDays(date, 1));
   const fetchFn = deps.marketFetch ?? fetch;
   const feeds = deps.exchangeFeeds ?? DEFAULT_EXCHANGES;
   const window = eligibilityWindow(locksAt);
   const pooled: MarketCandidate[] = [];
-  for (const feed of feeds) pooled.push(...(await feed.list(fetchFn, window)));
-  return eligible(pooled, locksAt).sort((a, b) => b.volume - a.volume);
+  for (const feed of feeds) {
+    // PER-FEED ISOLATION, as feeds.ts does it: one exchange being down must
+    // not throw away the other's markets. A failed feed contributes zero rows
+    // and says so on the console.
+    try {
+      pooled.push(...(await feed.list(fetchFn, window)));
+    } catch (e) {
+      console.error(`[market-round] ${feed.source} feed failed:`, e instanceof Error ? e.message : e);
+    }
+  }
+  return { fetched: pooled.length, candidates: eligible(pooled, locksAt).sort((a, b) => b.volume - a.volume) };
 }
 
-async function enrich(deps: PipelineDeps, c: MarketCandidate): Promise<MarketCandidate> {
-  // Five event reads at most, for the category the series table could not
-  // know and the exchange's own settlement source. Best-effort: a failed read
-  // keeps the candidate as it was.
+function usableUrl(u: string | undefined): u is string {
+  if (!u) return false;
+  try {
+    new URL(u);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function enrichOne(deps: PipelineDeps, c: MarketCandidate): Promise<MarketCandidate> {
+  // One event read, for the category the series table could not know and the
+  // exchange's own settlement source. Best-effort: a failed read keeps the
+  // candidate as it was, and a settlement URL is taken only when it actually
+  // parses — `source_url` is a `z.string().url()` in DraftSchema, so an
+  // exchange that answers with a bare hostname must not reach it.
   if (c.source !== "kalshi") return c;
   try {
     const ev = await kalshiEvent(deps.marketFetch ?? fetch, c.eventKey);
-    const url = ev.settlementSources.find((s) => s.url)?.url;
+    const url = ev.settlementSources.map((s) => s.url).find(usableUrl);
     return { ...c, category: kalshiCategory(c.seriesKey, ev.category), url: url ?? c.url };
   } catch {
     return c;
   }
+}
+
+/**
+ * ENRICHMENT MAY NOT INVALIDATE THE SELECTION. selectFive has already proved
+ * these five span at least MIN_DISTINCT_CATEGORIES; re-categorising them from
+ * their event records can collapse that spread, and DraftSchema would then
+ * throw inside toDraft — which on the Workflow path fails the `draft` step
+ * before anything narrates, so the night ends silently instead of handing
+ * noon to the bank. So the category rewrite is all-or-nothing: applied to the
+ * five only when the enriched spread still holds, otherwise every candidate
+ * keeps the category it was selected under. URLs are per-candidate and carry
+ * no such cross-question rule.
+ */
+async function enrichFive(deps: PipelineDeps, five: MarketCandidate[]): Promise<MarketCandidate[]> {
+  const enriched: MarketCandidate[] = [];
+  for (const c of five) enriched.push(await enrichOne(deps, c));
+  if (new Set(enriched.map((c) => c.category)).size >= SELECT.MIN_DISTINCT_CATEGORIES) return enriched;
+  return enriched.map((c, i) => ({ ...c, category: five[i]!.category }));
 }
 
 function toDraft(five: MarketCandidate[], voiced: Array<{ slot: number; text: string; context: string }>, now: Date): Draft {
@@ -81,8 +131,7 @@ export async function buildMarketDraft(deps: PipelineDeps, date: string, pool: M
           : `${remaining.length} eligible market${remaining.length === 1 ? "" : "s"} across too few categories`,
       };
     }
-    const enriched: MarketCandidate[] = [];
-    for (const c of five) enriched.push(await enrich(deps, c));
+    const enriched = await enrichFive(deps, five);
     const voiced = await voiceQuestions(deps, date, enriched.map((c, i) => ({ slot: i + 1, title: c.title, rules: c.rules, category: c.category, isBigOne: i === 4 })));
     const taste = await tasteTexts(deps, voiced.map((v) => v.text));
     if (taste.detail !== null) return { draft: null, reason: taste.detail };
@@ -113,11 +162,10 @@ export async function runMarketRound(deps: PipelineDeps, date: string): Promise<
     const r = { published: false, fetched: 0, eligible: 0, reason: "round not editable" };
     return r;
   }
-  const candidates = await fetchCandidates(deps, date);
-  const fetched = candidates.length;
+  const { fetched, candidates } = await fetchCandidates(deps, date);
   let result: MarketRoundResult;
   if (candidates.length < SELECT.ROUND_SIZE) {
-    result = { published: false, fetched, eligible: candidates.length, reason: `${candidates.length} eligible market${candidates.length === 1 ? "" : "s"}, five needed` };
+    result = { published: false, fetched, eligible: candidates.length, reason: tooFewReason(candidates.length) };
   } else {
     const { draft, reason } = await buildMarketDraft(deps, date, candidates);
     if (draft) {

@@ -33,7 +33,8 @@ import { preflightOne, assemblePreflight } from "./gauntlet/preflight";
 import { tasteCheck } from "./gauntlet/taste";
 import { assessEditorial } from "./editorial";
 import { commitRound, narrateGauntlet } from "./gauntlet";
-import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound } from "./market-round";
+import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound, tooFewReason } from "./market-round";
+import { SELECT } from "./exchanges/select";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
 import { probeOne, narrateProbe, type ProbeOutcome } from "./probe";
 import type { PipelineDeps } from "./index";
@@ -122,15 +123,15 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
       return !(r && (r.status !== "scheduled" || r.oracleCommittedAt !== null));
     });
     if (!editable) return;
-    const candidates = await durableStep(step, "candidates", POLICY.sourceFetch, deps, () => fetchCandidates(deps, date));
+    const { fetched, candidates } = await durableStep(step, "candidates", POLICY.sourceFetch, deps, () => fetchCandidates(deps, date));
     const built = await durableStep(step, "draft", POLICY.model, deps, async () => {
-      if (candidates.length < 5) return { draft: null, reason: `${candidates.length} eligible markets, five needed` };
+      if (candidates.length < SELECT.ROUND_SIZE) return { draft: null, reason: tooFewReason(candidates.length) };
       return buildMarketDraft(deps, date, candidates);
     });
     const result = await durableStep(step, "commit", POLICY.db, deps, async () => {
-      if (!built.draft) return { published: false, fetched: candidates.length, eligible: candidates.length, reason: built.reason };
+      if (!built.draft) return { published: false, fetched, eligible: candidates.length, reason: built.reason };
       await commitMarketDraft(deps, date, built.draft);
-      return { published: true, fetched: candidates.length, eligible: candidates.length, reason: null };
+      return { published: true, fetched, eligible: candidates.length, reason: null };
     });
     await durableStep(step, "narrate", POLICY.narrate, deps, () => narrateMarketRound(deps, date, result));
   }

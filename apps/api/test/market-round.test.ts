@@ -47,6 +47,15 @@ function claudeWith(opts: { refuse?: string[]; calls: string[] }): NonNullable<P
   };
 }
 
+// A marketFetch that answers only Kalshi's /events/ reads, which is every
+// network call the round makes once its feeds are canned.
+function eventFetch(event: { category?: string | null; settlement_sources?: Array<{ url?: string }> }): typeof fetch {
+  return (async (url: string) => {
+    if (!String(url).includes("/events/")) throw new Error("no network in tests");
+    return new Response(JSON.stringify({ event }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as unknown as typeof fetch;
+}
+
 async function depsWith(feeds: ExchangeFeed[], claude: PipelineDeps["claude"], sent: string[]): Promise<PipelineDeps> {
   const { db } = await makeTestDb();
   return {
@@ -63,7 +72,16 @@ describe("fetchCandidates", () => {
   it("pools every feed and applies eligibility against tomorrow's lock", async () => {
     const deps = await depsWith([feedOf(SEVEN), feedOf([cand("poly", "news", 50_000, { source: "polymarket", closesAt: h(1) })], "polymarket")], claudeWith({ calls: [] }), []);
     const out = await fetchCandidates(deps, DATE);
-    expect(out.map((c) => c.marketId)).toEqual(["nfl", "btc", "kbo", "bb", "cpi", "eth", "nyc"]); // poly closes inside the window
+    expect(out.candidates.map((c) => c.marketId)).toEqual(["nfl", "btc", "kbo", "bb", "cpi", "eth", "nyc"]); // poly closes inside the window
+    expect(out.fetched).toBe(8); // the pooled count, before eligibility
+  });
+
+  it("keeps one exchange's markets when the other one is down", async () => {
+    const down: ExchangeFeed = { source: "polymarket", list: async () => { throw new Error("gamma is down"); }, read: async () => ({ settled: false, outcome: null, raw: null }) };
+    const deps = await depsWith([down, feedOf(SEVEN)], claudeWith({ calls: [] }), []);
+    const out = await fetchCandidates(deps, DATE);
+    expect(out.candidates).toHaveLength(7);
+    expect(out.fetched).toBe(7);
   });
 });
 
@@ -98,9 +116,12 @@ describe("runMarketRound", () => {
   });
   it("falls to the bank (publishes nothing) under five eligible markets, and says so", async () => {
     const sent: string[] = [];
-    const deps = await depsWith([feedOf(SEVEN.slice(0, 4))], claudeWith({ calls: [] }), sent);
+    // Four eligible rows and two the window refuses, so `fetched` and
+    // `eligible` cannot be the same number by accident.
+    const ineligible = [cand("early", "news", 90_000, { closesAt: h(1) }), cand("late", "news", 90_000, { closesAt: h(40) })];
+    const deps = await depsWith([feedOf([...SEVEN.slice(0, 4), ...ineligible])], claudeWith({ calls: [] }), sent);
     const r = await runMarketRound(deps, DATE);
-    expect(r).toMatchObject({ published: false, eligible: 4 });
+    expect(r).toMatchObject({ published: false, fetched: 6, eligible: 4 });
     expect(r.reason).toMatch(/4 eligible/);
     expect(await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) })).toBeUndefined();
     expect(sent[0]).toContain("bank covers noon");
@@ -120,6 +141,39 @@ describe("runMarketRound", () => {
     const r = await runMarketRound(deps, DATE);
     expect(r.published).toBe(false);
     expect(r.reason).toMatch(/not editable/);
+  });
+});
+
+describe("enrichment cannot invalidate the selection", () => {
+  it("keeps the selected categories when the event records would collapse the spread", async () => {
+    const sent: string[] = [];
+    const deps = await depsWith([feedOf(SEVEN)], claudeWith({ calls: [] }), sent);
+    // Every event answers "Economics", which maps to news: enriching would
+    // leave the five spanning ONE category and DraftSchema would refuse them.
+    deps.marketFetch = eventFetch({ category: "Economics" });
+    const r = await runMarketRound(deps, DATE);
+    expect(r.published).toBe(true);
+    const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE), orderBy: (q, { asc }) => [asc(q.slot)] });
+    expect(qs.map((q) => q.category)).toEqual(["markets", "culture", "news", "weather", "sports"]);
+  });
+
+  it("ignores a settlement source whose url is not a url", async () => {
+    const sent: string[] = [];
+    const deps = await depsWith([feedOf(SEVEN)], claudeWith({ calls: [] }), sent);
+    deps.marketFetch = eventFetch({ category: null, settlement_sources: [{ url: "kalshi.com/not-a-url" }] });
+    const r = await runMarketRound(deps, DATE);
+    expect(r.published).toBe(true);
+    const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE) });
+    expect(qs.every((q) => q.sourceUrl === "https://kalshi.com/markets/kxt")).toBe(true);
+  });
+
+  it("takes a settlement source that IS a url", async () => {
+    const sent: string[] = [];
+    const deps = await depsWith([feedOf(SEVEN)], claudeWith({ calls: [] }), sent);
+    deps.marketFetch = eventFetch({ category: null, settlement_sources: [{ url: "https://www.bls.gov/cpi/" }] });
+    await runMarketRound(deps, DATE);
+    const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE) });
+    expect(qs.every((q) => q.sourceUrl === "https://www.bls.gov/cpi/")).toBe(true);
   });
 });
 

@@ -167,9 +167,10 @@ describe("runTick", () => {
   it("author failure becomes a WARN, not a crash", async () => {
     const { db } = await makeTestDb();
     const { deps, sent } = fakeDeps(db, "2026-08-27T21:05:00Z"); // 17:05 ET
-    // An exchange that cannot be reached is the failure the market round
-    // raises before it ever gets to a model call.
-    deps.marketFetch = (async () => { throw new Error("exchange unreachable"); }) as unknown as typeof fetch;
+    // Five markets to deal and no Claude to voice them with: `fetchCandidates`
+    // isolates a dead feed, so the failure this test is about now has to come
+    // from the round's own model call.
+    deps.exchangeFeeds = [fiveMarkets("2026-08-28")];
     const done = await runTick(deps);
     expect(done.some((d) => d.startsWith("author"))).toBe(false);
     expect(sent.some((t) => t.includes("author failed"))).toBe(true);
