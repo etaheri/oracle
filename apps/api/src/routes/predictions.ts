@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { PredictionSubmitSchema } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
@@ -8,13 +8,17 @@ import { deviceAuth } from "./auth";
 // The crowd at the instant this player sealed, sealer included (design
 // 2026-09-09 §4.1). Best-effort: a DB hiccup here must leave the snapshot
 // null, never fail a seal that already landed durably -- callers wrap this
-// in try/catch and ignore its rejection.
+// in try/catch and ignore its rejection. One aggregate query rather than
+// pulling every prediction row for the question just to count them.
 export async function snapshotCrowdAtSeal(db: Db, questionId: string, predictionId: string) {
-  const all = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, questionId), columns: { answer: true } });
-  const count = all.length;
-  const yes = all.filter((p) => p.answer).length;
+  const [agg] = await db
+    .select({ count: count(), yes: sql<number>`count(*) filter (where ${schema.predictions.answer})` })
+    .from(schema.predictions)
+    .where(eq(schema.predictions.questionId, questionId));
+  const total = Number(agg!.count);
+  const yes = Number(agg!.yes);
   await db.update(schema.predictions)
-    .set({ crowdYesPctAtSeal: String(Math.round((100 * yes) / count)), crowdCountAtSeal: count })
+    .set({ crowdYesPctAtSeal: String(Math.round((100 * yes) / total)), crowdCountAtSeal: total })
     .where(eq(schema.predictions.id, predictionId));
 }
 
