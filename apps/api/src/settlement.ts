@@ -89,7 +89,13 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
 
   // The house delta (design 2026-09-10 §4.4): Σ(stake − payout) over the
   // round's staked predictions. Written once; a resettle never revises it.
-  if (round.houseDelta === null) {
+  //
+  // VERSION 3 ONLY. Fortune is a version 3 rule, so a version 1 or 2 round has
+  // no staked predictions and this aggregate would sum to 0 — writing a
+  // truthful-looking 0 where the honest answer is "the house did not play".
+  // The ledger reads a null as "no house line for this round"; it must stay
+  // null on the older rounds.
+  if (round.houseDelta === null && round.rulesVersion >= 3) {
     const [agg] = await db
       .select({ delta: sql<number>`coalesce(sum(${schema.predictions.stake} - ${schema.predictions.payout}), 0)` })
       .from(schema.predictions)

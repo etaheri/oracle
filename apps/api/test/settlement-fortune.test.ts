@@ -81,6 +81,19 @@ describe("settleRound writes the house delta", () => {
     await settleRound(db, DATE); // idempotent
     expect((await db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) }))!.houseDelta).toBe(-187);
   });
+  it("leaves house_delta null on a version 2 round", async () => {
+    // Fortune is a version 3 rule. An older round has no staked predictions,
+    // so the aggregate would sum to a truthful-looking 0 where the honest
+    // answer is that the house never played.
+    const { db, rows } = await stagedRound();
+    await db.update(schema.rounds).set({ rulesVersion: 2 }).where(eq(schema.rounds.date, DATE));
+    await db.update(schema.predictions).set({ stake: null, linePYes: null, payout: null });
+    for (const r of rows) await resolveQuestion(db, r.id, "yes");
+    await settleRound(db, DATE);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) });
+    expect(round!.status).toBe("resolved");
+    expect(round!.houseDelta).toBeNull();
+  });
   it("keeps a version 3 user_rounds row written at the first seal", async () => {
     const { db, rows, alice } = await stagedRound();
     await db.insert(schema.userRounds).values({ userId: alice.id, date: DATE, vigilMult: "1", fortuneAtOpen: 1000 });
