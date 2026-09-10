@@ -1,0 +1,20 @@
+{
+ "id": "3244610",
+ "question": "Will Andrew Bailey be the next Attorney General?",
+ "description": "This market will resolve according to the next individual to formally assume the position of Attorney General of the United States between market creation and January 19, 2029, 11:59 PM ET.\n\nA person will be considered to formally assume the position of Attorney General of the United States if they are appointed to the position by the President and confirmed by the Senate, or if they assume the position through a recess appointment. Acting or interim holders of the specified position do not qualify.\n\nIf no individual assumes the position by January 19, 2029 at 11:59PM ET, this market will resolve to \"Other\". \n\nThe resolution source for this market will be official information from the White House or United States Senate; however, a consensus of credible reporting may also be used.",
+ "slug": "will-andrew-bailey-be-the-next-attorney-general-20260731142118983",
+ "outcomes": "[\"Yes\", \"No\"]",
+ "outcomePrices": "[\"0\", \"1\"]",
+ "closed": true,
+ "active": true,
+ "umaResolutionStatus": "resolved",
+ "endDate": "2029-01-19T23:59:00Z",
+ "volumeNum": 591.944575,
+ "events": [
+  {
+   "slug": "who-will-be-trumps-next-attorney-general-20260731141822084",
+   "title": "Who will be Trump's next Attorney General?",
+   "tags": []
+  }
+ ]
+}

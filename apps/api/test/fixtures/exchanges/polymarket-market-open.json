@@ -1,0 +1,20 @@
+{
+ "id": "2661522",
+ "question": "Will the Bank of Russia decrease the key rate after the September Meeting?",
+ "description": "This market will resolve according to the change in the key rate resulting from the Bank of Russia\u2019s September meeting, relative to the level it was prior to this meeting.\n\nThe resolution source for this market is information released by the Bank of Russia after its September 11, 2026 meeting as listed on the official Bank of Russia calendar: https://www.cbr.ru/eng/dkp/cal_mp/#t13\n\nThis market may resolve as soon as the Bank of Russia\u2019s press release for their September 11, 2026 meeting with relevant data is issued. If no decision on the key rate is issued by the end date of the next scheduled meeting, this market will resolve to the \"No change\" bracket.",
+ "slug": "will-the-bank-of-russia-decrease-the-key-rate-after-the-september-meeting-20260623013926067",
+ "outcomes": "[\"Yes\", \"No\"]",
+ "outcomePrices": "[\"0.185\", \"0.815\"]",
+ "closed": false,
+ "active": true,
+ "umaResolutionStatus": null,
+ "endDate": "2026-09-11T23:59:00Z",
+ "volumeNum": 67170.75179000001,
+ "events": [
+  {
+   "slug": "bank-of-russia-decision-in-september-20260623013858993",
+   "title": "Bank of Russia decision in September?",
+   "tags": []
+  }
+ ]
+}

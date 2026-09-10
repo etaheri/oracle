@@ -1,0 +1,802 @@
+[
+ {
+  "id": "2661522",
+  "question": "Will the Bank of Russia decrease the key rate after the September Meeting?",
+  "description": "This market will resolve according to the change in the key rate resulting from the Bank of Russia\u2019s September meeting, relative to the level it was prior to this meeting.\n\nThe resolution source for this market is information released by the Bank of Russia after its September 11, 2026 meeting as listed on the official Bank of Russia calendar: https://www.cbr.ru/eng/dkp/cal_mp/#t13\n\nThis market may resolve as soon as the Bank of Russia\u2019s press release for their September 11, 2026 meeting with relevant data is issued. If no decision on the key rate is issued by the end date of the next scheduled meeting, this market will resolve to the \"No change\" bracket.",
+  "slug": "will-the-bank-of-russia-decrease-the-key-rate-after-the-september-meeting-20260623013926067",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.185\", \"0.815\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T23:59:00Z",
+  "volumeNum": 67170.75179000001,
+  "events": [
+   {
+    "slug": "bank-of-russia-decision-in-september-20260623013858993",
+    "title": "Bank of Russia decision in September?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "2661523",
+  "question": "Will the Bank of Russia make no change to the key rate after the September Meeting?",
+  "description": "This market will resolve according to the change in the key rate resulting from the Bank of Russia\u2019s September meeting, relative to the level it was prior to this meeting.\n\nThe resolution source for this market is information released by the Bank of Russia after its September 11, 2026 meeting as listed on the official Bank of Russia calendar: https://www.cbr.ru/eng/dkp/cal_mp/#t13\n\nThis market may resolve as soon as the Bank of Russia\u2019s press release for their September 11, 2026 meeting with relevant data is issued. If no decision on the key rate is issued by the end date of the next scheduled meeting, this market will resolve to the \"No change\" bracket.",
+  "slug": "will-the-bank-of-russia-make-no-change-to-the-key-rate-after-the-september-meeting-20260623013926068",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.795\", \"0.205\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T23:59:00Z",
+  "volumeNum": 89623.456572,
+  "events": [
+   {
+    "slug": "bank-of-russia-decision-in-september-20260623013858993",
+    "title": "Bank of Russia decision in September?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "2661524",
+  "question": "Will the Bank of Russia increase the key rate after the September Meeting?",
+  "description": "This market will resolve according to the change in the key rate resulting from the Bank of Russia\u2019s September meeting, relative to the level it was prior to this meeting.\n\nThe resolution source for this market is information released by the Bank of Russia after its September 11, 2026 meeting as listed on the official Bank of Russia calendar: https://www.cbr.ru/eng/dkp/cal_mp/#t13\n\nThis market may resolve as soon as the Bank of Russia\u2019s press release for their September 11, 2026 meeting with relevant data is issued. If no decision on the key rate is issued by the end date of the next scheduled meeting, this market will resolve to the \"No change\" bracket.",
+  "slug": "will-the-bank-of-russia-increase-the-key-rate-after-the-september-meeting-20260623013926069",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0245\", \"0.9755\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T23:59:00Z",
+  "volumeNum": 214472.95826399996,
+  "events": [
+   {
+    "slug": "bank-of-russia-decision-in-september-20260623013858993",
+    "title": "Bank of Russia decision in September?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "2723702",
+  "question": "Will Tianjin Jinmen Hu FC win on 2026-07-12?",
+  "description": "In the upcoming game, scheduled for July 12, 2026\nIf Tianjin Jinmen Hu FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.\n\nThe primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
+  "slug": "chi-jin-tie-2026-07-12-jin",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.485\", \"0.515\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-12T11:00:00Z",
+  "volumeNum": 7543.468746999998,
+  "events": [
+   {
+    "slug": "chi-jin-tie-2026-07-12",
+    "title": "Tianjin Jinmen Hu FC vs. Liaoning Tieren FC",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3239630",
+  "question": "49ers vs. Rams",
+  "description": "In the upcoming NFL game, scheduled for September 10 at 8:35PM ET:\nIf 49ers wins, the market will resolve to \"49ers\".\nIf Rams wins, the market will resolve to \"Rams\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely or ends in a tie, with no make-up game, this market will resolve 50-50.",
+  "slug": "nfl-sf-la-2026-09-11",
+  "outcomes": "[\"49ers\", \"Rams\"]",
+  "outcomePrices": "[\"0.355\", \"0.645\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T00:35:00Z",
+  "volumeNum": 203822.58492700002,
+  "events": [
+   {
+    "slug": "nfl-sf-la-2026-09-11",
+    "title": "49ers vs. Rams",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3340157",
+  "question": "Spread: Rams (-3.5)",
+  "description": "In the upcoming NFL game, scheduled for September 10 at 8:35 PM ET:\n\nThis market will resolve to \"Rams\" if the Rams win the game by 4 or more points.\n\nOtherwise, this market will resolve to \"49ers\". If the game ends in a tie, this market will resolve to \"49ers\".\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50-50.",
+  "slug": "nfl-sf-la-2026-09-11-spread-home-3pt5",
+  "outcomes": "[\"Rams\", \"49ers\"]",
+  "outcomePrices": "[\"0.505\", \"0.495\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T00:35:00Z",
+  "volumeNum": 243867.92482200003,
+  "events": [
+   {
+    "slug": "nfl-sf-la-2026-09-11",
+    "title": "49ers vs. Rams",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3340158",
+  "question": "Spread: Rams (-4.5)",
+  "description": "In the upcoming NFL game, scheduled for September 10 at 8:35 PM ET:\n\nThis market will resolve to \"Rams\" if the Rams win the game by 5 or more points.\n\nOtherwise, this market will resolve to \"49ers\". If the game ends in a tie, this market will resolve to \"49ers\".\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50-50.",
+  "slug": "nfl-sf-la-2026-09-11-spread-home-4pt5",
+  "outcomes": "[\"Rams\", \"49ers\"]",
+  "outcomePrices": "[\"0.465\", \"0.535\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T00:35:00Z",
+  "volumeNum": 33260.301696999995,
+  "events": [
+   {
+    "slug": "nfl-sf-la-2026-09-11",
+    "title": "49ers vs. Rams",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3340159",
+  "question": "Spread: Rams (-6.5)",
+  "description": "In the upcoming NFL game, scheduled for September 10 at 8:35 PM ET:\n\nThis market will resolve to \"Rams\" if the Rams win the game by 7 or more points.\n\nOtherwise, this market will resolve to \"49ers\". If the game ends in a tie, this market will resolve to \"49ers\".\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50-50.",
+  "slug": "nfl-sf-la-2026-09-11-spread-home-6pt5",
+  "outcomes": "[\"Rams\", \"49ers\"]",
+  "outcomePrices": "[\"0.425\", \"0.575\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T00:35:00Z",
+  "volumeNum": 5585.049228999999,
+  "events": [
+   {
+    "slug": "nfl-sf-la-2026-09-11",
+    "title": "49ers vs. Rams",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3340162",
+  "question": "49ers vs. Rams: O/U 48.5",
+  "description": "In the upcoming NFL game, scheduled for September 10 at 8:35 PM ET:\n\nThis market will resolve to \"Over\" if the 49ers and Rams combine to score 49 or more points in this game.\n\nIf the combined total is less than 49, this market will resolve to \"Under\".\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50-50.",
+  "slug": "nfl-sf-la-2026-09-11-total-48pt5",
+  "outcomes": "[\"Over\", \"Under\"]",
+  "outcomePrices": "[\"0.465\", \"0.535\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T00:35:00Z",
+  "volumeNum": 14383.341640999999,
+  "events": [
+   {
+    "slug": "nfl-sf-la-2026-09-11",
+    "title": "49ers vs. Rams",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3340164",
+  "question": "49ers vs. Rams: O/U 52.5",
+  "description": "In the upcoming NFL game, scheduled for September 10 at 8:35 PM ET:\n\nThis market will resolve to \"Over\" if the 49ers and Rams combine to score 53 or more points in this game.\n\nIf the combined total is less than 53, this market will resolve to \"Under\".\n\nIf the game is postponed, this market will remain open until the game has been completed. If the game is canceled entirely, with no make-up game, this market will resolve 50-50.",
+  "slug": "nfl-sf-la-2026-09-11-total-52pt5",
+  "outcomes": "[\"Over\", \"Under\"]",
+  "outcomePrices": "[\"0.345\", \"0.655\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T00:35:00Z",
+  "volumeNum": 3223.4500000000003,
+  "events": [
+   {
+    "slug": "nfl-sf-la-2026-09-11",
+    "title": "49ers vs. Rams",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539664",
+  "question": "Will monthly inflation increase by 0.1% in August?",
+  "description": "This is a market about the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) published by the Bureau of Labor Statistics (BLS).\n\nThis market will resolve to the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) in August 2026 according to the monthly BLS report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly Consumer Price Index for All Urban Consumers (CPI-U) which BLS reports to one decimal point (e.g. 0.4%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-monthly-inflation-increase-by-0pt1-in-august-1786475169284",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.002\", \"0.998\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 3252.768134,
+  "events": [
+   {
+    "slug": "august-inflation-us-monthly-1786474662954",
+    "title": "August Inflation US - Monthly",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539665",
+  "question": "Will monthly inflation increase by 0.2% in August?",
+  "description": "This is a market about the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) published by the Bureau of Labor Statistics (BLS).\n\nThis market will resolve to the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) in August 2026 according to the monthly BLS report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly Consumer Price Index for All Urban Consumers (CPI-U) which BLS reports to one decimal point (e.g. 0.4%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-monthly-inflation-increase-by-0pt2-in-august-1786475169285",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0325\", \"0.9675\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 5445.198478,
+  "events": [
+   {
+    "slug": "august-inflation-us-monthly-1786474662954",
+    "title": "August Inflation US - Monthly",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539666",
+  "question": "Will monthly inflation increase by 0.3% in August?",
+  "description": "This is a market about the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) published by the Bureau of Labor Statistics (BLS).\n\nThis market will resolve to the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) in August 2026 according to the monthly BLS report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly Consumer Price Index for All Urban Consumers (CPI-U) which BLS reports to one decimal point (e.g. 0.4%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-monthly-inflation-increase-by-0pt3-in-august-1786475169286",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.36\", \"0.64\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 7873.586355000001,
+  "events": [
+   {
+    "slug": "august-inflation-us-monthly-1786474662954",
+    "title": "August Inflation US - Monthly",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539667",
+  "question": "Will monthly inflation increase by 0.4% in August?",
+  "description": "This is a market about the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) published by the Bureau of Labor Statistics (BLS).\n\nThis market will resolve to the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) in August 2026 according to the monthly BLS report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly Consumer Price Index for All Urban Consumers (CPI-U) which BLS reports to one decimal point (e.g. 0.4%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-monthly-inflation-increase-by-0pt4-in-august-1786475169287",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.5\", \"0.5\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 13059.828184999997,
+  "events": [
+   {
+    "slug": "august-inflation-us-monthly-1786474662954",
+    "title": "August Inflation US - Monthly",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539668",
+  "question": "Will monthly inflation increase by 0.5% or more in August?",
+  "description": "This is a market about the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) published by the Bureau of Labor Statistics (BLS).\n\nThis market will resolve to the one-month percent change in the seasonally adjusted Consumer Price Index for All Urban Consumers (CPI-U) in August 2026 according to the monthly BLS report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly Consumer Price Index for All Urban Consumers (CPI-U) which BLS reports to one decimal point (e.g. 0.4%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-monthly-inflation-increase-by-0pt5-or-more-in-august-1786475169288",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.125\", \"0.875\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 26169.63581,
+  "events": [
+   {
+    "slug": "august-inflation-us-monthly-1786474662954",
+    "title": "August Inflation US - Monthly",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539672",
+  "question": "Will annual inflation be 3.2% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt2-in-august-1786474663057",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0395\", \"0.9605\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 4617.329237000001,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539673",
+  "question": "Will annual inflation be 3.3% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt3-in-august-1786474663058",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.31\", \"0.69\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 19195.780411,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539674",
+  "question": "Will annual inflation be 3.4% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt4-in-august-1786474663059",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.465\", \"0.535\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 35952.119685,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539675",
+  "question": "Will annual inflation be 3.5% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt5-in-august-1786474663060",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.165\", \"0.835\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 14457.836815999999,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539676",
+  "question": "Will annual inflation be 3.6% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt6-in-august-1786474663061",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0385\", \"0.9615\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 3935.6422179999995,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539677",
+  "question": "Will annual inflation be 3.7% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt7-in-august-1786474663062",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.018\", \"0.982\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 3099.7398930000004,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539678",
+  "question": "Will annual inflation be 3.8% in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-3pt8-in-august-1786474663063",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.012\", \"0.988\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 3295.400759,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539680",
+  "question": "Will annual inflation be 4.0% or more in August?",
+  "description": "This is a market about inflation over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index (CPI) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports inflation over 12-month periods to only one decimal point (e.g., 2.9%). Thus, this is the level of precision that will be used when resolving the market.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-annual-inflation-be-4pt0-or-more-in-august-1786474663065",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0005\", \"0.9995\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 4031.8613010000004,
+  "events": [
+   {
+    "slug": "august-inflation-us-annual-1786474662954",
+    "title": "August Inflation US - Annual",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539685",
+  "question": "Will Core CPI MoM be 0.0% or less in August?",
+  "description": "This is a market about the one-month percent change in the Consumer Price Index for All Urban Consumers excluding food and energy in August 2026 as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the one-month percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report (seasonally adjusted change from the preceding month).\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 1-month periods to only one decimal point (e.g., 0.3%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-mom-be-0pt0-or-less-in-august-1786474663154",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0175\", \"0.9825\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 4442.803779,
+  "events": [
+   {
+    "slug": "core-cpi-mom-august-2026-1786474662954",
+    "title": "Core CPI MoM - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539686",
+  "question": "Will Core CPI MoM be 0.1% in August?",
+  "description": "This is a market about the one-month percent change in the Consumer Price Index for All Urban Consumers excluding food and energy in August 2026 as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the one-month percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report (seasonally adjusted change from the preceding month).\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 1-month periods to only one decimal point (e.g., 0.3%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-mom-be-0pt1-in-august-1786474663155",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.07\", \"0.93\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 5574.069535,
+  "events": [
+   {
+    "slug": "core-cpi-mom-august-2026-1786474662954",
+    "title": "Core CPI MoM - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539687",
+  "question": "Will Core CPI MoM be 0.2% in August?",
+  "description": "This is a market about the one-month percent change in the Consumer Price Index for All Urban Consumers excluding food and energy in August 2026 as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the one-month percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report (seasonally adjusted change from the preceding month).\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 1-month periods to only one decimal point (e.g., 0.3%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-mom-be-0pt2-in-august-1786474663156",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.675\", \"0.325\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 11289.921558000002,
+  "events": [
+   {
+    "slug": "core-cpi-mom-august-2026-1786474662954",
+    "title": "Core CPI MoM - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539688",
+  "question": "Will Core CPI MoM be 0.3% in August?",
+  "description": "This is a market about the one-month percent change in the Consumer Price Index for All Urban Consumers excluding food and energy in August 2026 as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the one-month percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report (seasonally adjusted change from the preceding month).\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 1-month periods to only one decimal point (e.g., 0.3%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-mom-be-0pt3-in-august-1786474663157",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.24\", \"0.76\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 8754.570011000002,
+  "events": [
+   {
+    "slug": "core-cpi-mom-august-2026-1786474662954",
+    "title": "Core CPI MoM - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539689",
+  "question": "Will Core CPI MoM be 0.4% in August?",
+  "description": "This is a market about the one-month percent change in the Consumer Price Index for All Urban Consumers excluding food and energy in August 2026 as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the one-month percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report (seasonally adjusted change from the preceding month).\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 1-month periods to only one decimal point (e.g., 0.3%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-mom-be-0pt4-in-august-1786474663158",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.03\", \"0.97\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 3770.5561549999993,
+  "events": [
+   {
+    "slug": "core-cpi-mom-august-2026-1786474662954",
+    "title": "Core CPI MoM - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539696",
+  "question": "Will Core CPI YoY be 2.4% in August?",
+  "description": "This is a market about core inflation (excluding food and energy) over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 12-month periods to only one decimal point (e.g., 2.8%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-yoy-be-2pt4-in-august-1786474663258",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.475\", \"0.525\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 13313.837766,
+  "events": [
+   {
+    "slug": "core-cpi-yoy-august-2026-1786474662954",
+    "title": "Core CPI YoY - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539697",
+  "question": "Will Core CPI YoY be 2.5% in August?",
+  "description": "This is a market about core inflation (excluding food and energy) over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Consumer Price Index for All Urban Consumers excluding food and energy (Core CPI-U) over the 12-month period ending in August 2026 according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Consumer Price Index report released for August 2026 (https://www.bls.gov/bls/news-release/cpi.htm), currently scheduled to be released on September 11, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS CPI news release, which reports core inflation (all items less food and energy) over 12-month periods to only one decimal point (e.g., 2.8%). Thus, this is the level of precision that will be used when resolving the market. For the avoidance of doubt, this market resolves on the core CPI figure \u2014 the all items index excluding food and energy \u2014 not the headline all items CPI figure.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next CPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-core-cpi-yoy-be-2pt5-in-august-1786474663259",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.12\", \"0.88\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 3678.874681999999,
+  "events": [
+   {
+    "slug": "core-cpi-yoy-august-2026-1786474662954",
+    "title": "Core CPI YoY - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539706",
+  "question": "Will a dozen eggs cost between $2.10\u2013$2.20 in August?",
+  "description": "This market will resolve to the bracket within which the price for \"Eggs, Grade A, Large (Cost per Dozen) in U.S. City Average\" lies when the August data point is published by the St. Louis Fed (https://fred.stlouisfed.org/series/APU0000708111).\n\nThe St. Louis Fed bases its numbers for egg prices on the BLS's CPI release. The August release is presently scheduled for September 11, 2026. Resolution of this market will take place upon the update of the St. Louis Fed's chart. If no data for the specified month is released by the date the next month's data is scheduled to be released, this market will resolve based on data from the last available month.\n\nThe resolution source for this market measures prices to the third decimal place. Thus, this is the level of precision that will be used when resolving the market.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.",
+  "slug": "will-a-dozen-eggs-cost-between-2pt10-2pt20-in-august-1786474663358",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.3415\", \"0.6585\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 15750.310991000002,
+  "events": [
+   {
+    "slug": "price-of-dozen-eggs-in-august-1786474662954",
+    "title": "Price of Dozen Eggs in August?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539707",
+  "question": "Will a dozen eggs cost between $2.20\u2013$2.30 in August?",
+  "description": "This market will resolve to the bracket within which the price for \"Eggs, Grade A, Large (Cost per Dozen) in U.S. City Average\" lies when the August data point is published by the St. Louis Fed (https://fred.stlouisfed.org/series/APU0000708111).\n\nThe St. Louis Fed bases its numbers for egg prices on the BLS's CPI release. The August release is presently scheduled for September 11, 2026. Resolution of this market will take place upon the update of the St. Louis Fed's chart. If no data for the specified month is released by the date the next month's data is scheduled to be released, this market will resolve based on data from the last available month.\n\nThe resolution source for this market measures prices to the third decimal place. Thus, this is the level of precision that will be used when resolving the market.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.",
+  "slug": "will-a-dozen-eggs-cost-between-2pt20-2pt30-in-august-1786474663359",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.391\", \"0.609\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 9371.577115,
+  "events": [
+   {
+    "slug": "price-of-dozen-eggs-in-august-1786474662954",
+    "title": "Price of Dozen Eggs in August?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3539708",
+  "question": "Will a dozen eggs cost between $2.30\u2013$2.40 in August?",
+  "description": "This market will resolve to the bracket within which the price for \"Eggs, Grade A, Large (Cost per Dozen) in U.S. City Average\" lies when the August data point is published by the St. Louis Fed (https://fred.stlouisfed.org/series/APU0000708111).\n\nThe St. Louis Fed bases its numbers for egg prices on the BLS's CPI release. The August release is presently scheduled for September 11, 2026. Resolution of this market will take place upon the update of the St. Louis Fed's chart. If no data for the specified month is released by the date the next month's data is scheduled to be released, this market will resolve based on data from the last available month.\n\nThe resolution source for this market measures prices to the third decimal place. Thus, this is the level of precision that will be used when resolving the market.\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.",
+  "slug": "will-a-dozen-eggs-cost-between-2pt30-2pt40-in-august-1786474663360",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.12\", \"0.88\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:59:00Z",
+  "volumeNum": 7315.824465999998,
+  "events": [
+   {
+    "slug": "price-of-dozen-eggs-in-august-1786474662954",
+    "title": "Price of Dozen Eggs in August?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3566687",
+  "question": "Will PPI YoY be 5.0% in August?",
+  "description": "This is a market about the Producer Price Index (PPI) for final demand over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Producer Price Index (PPI) for final demand over the 12-month period ending in August 2026, before seasonal adjustment, according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Producer Price Index report released for August 2026 (https://www.bls.gov/ppi/), currently scheduled to be released on September 10, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS PPI news release, which reports PPI over 12-month periods to only one decimal point (e.g., 6.0%). Thus, this is the level of precision that will be used when resolving the market. This market resolves on the total PPI for final demand figure, not the core PPI figure excluding food and energy.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next PPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-ppi-yoy-be-5-in-august-1786642620439",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0005\", \"0.9995\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": "proposed",
+  "endDate": "2026-09-10T23:59:00Z",
+  "volumeNum": 3591.1021680000003,
+  "events": [
+   {
+    "slug": "ppi-yoy-august-2026",
+    "title": "PPI YoY - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3566688",
+  "question": "Will PPI YoY be 5.1% or more in August?",
+  "description": "This is a market about the Producer Price Index (PPI) for final demand over the 12-month period ending August 2026, before seasonal adjustment, as reported by the Bureau of Labor Statistics.\n\nThis market will resolve to the percentage change in the Producer Price Index (PPI) for final demand over the 12-month period ending in August 2026, before seasonal adjustment, according to the monthly Bureau of Labor Statistics (BLS) report.\n\nThe resolution source for this market will be the BLS Producer Price Index report released for August 2026 (https://www.bls.gov/ppi/), currently scheduled to be released on September 10, 2026, at 8:30 AM ET. Resolution of this market will take place upon release of the aforementioned data.\n\nNote: the resolution source for this market will be the official monthly BLS PPI news release, which reports PPI over 12-month periods to only one decimal point (e.g., 6.0%). Thus, this is the level of precision that will be used when resolving the market. This market resolves on the total PPI for final demand figure, not the core PPI figure excluding food and energy.\n\nIf the BLS does not release the relevant figures on the scheduled date, this market may remain open up until the scheduled release time of the next PPI report (https://www.bls.gov/schedule). If the information is not released by that time, this market will resolve according to the figures of the most recent previous month with available data.",
+  "slug": "will-ppi-yoy-be-5pt1-or-more-in-august-1786642620440",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.9995\", \"0.0005\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": "proposed",
+  "endDate": "2026-09-10T23:59:00Z",
+  "volumeNum": 15259.121949999997,
+  "events": [
+   {
+    "slug": "ppi-yoy-august-2026",
+    "title": "PPI YoY - August 2026",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3586723",
+  "question": "Will Argentina's monthly inflation in August 2026 be between 1.2% and 1.4%?",
+  "description": "This is a market about the monthly variation of consumer prices in Argentina, before seasonal adjustment, as reported by the National Institute of Statistics and Census (INDEC) of Argentina.\n\nThis market will resolve according to the monthly percentage change in the Consumer Price Index (CPI / IPC) in August 2026 (Variaci\u00f3n % mensual Total nacional), according to the monthly INDEC report.\n\nThe resolution source for this market will be the INDEC Consumer Price Index report released for August 2026 (https://www.indec.gob.ar/), currently scheduled to be released on September 10, 2026.\n\nResolution of this market will take place upon release of the aforementioned data. If no data for the specified month is released by the date the next month's data is scheduled to be released, this market will resolve based on data from the last available month.\n\nYou can find this report by clicking on the \"Precios al Consumidor\" option on the home page of https://www.indec.gob.ar/, and searching the PDF for the figure under \"Variaci\u00f3n % mensual Total nacional\".\n\nNote: the resolution source for this market will be the official monthly INDEC CPI (IPC) news release, which reports monthly inflation change to only one decimal point (e.g., 1.9%). Thus, this is the level of precision that will be used when resolving the market.",
+  "slug": "will-argentinas-monthly-inflation-in-august-2026-be-between-1pt2-and-1pt4-20260814110157102",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.094\", \"0.906\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-10T15:59:00Z",
+  "volumeNum": 3015.5089879999996,
+  "events": [
+   {
+    "slug": "argentina-monthly-inflation-august-20260814110157100",
+    "title": "Argentina Monthly Inflation - August",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3586724",
+  "question": "Will Argentina's monthly inflation in August 2026 be between 1.5% and 1.7%?",
+  "description": "This is a market about the monthly variation of consumer prices in Argentina, before seasonal adjustment, as reported by the National Institute of Statistics and Census (INDEC) of Argentina.\n\nThis market will resolve according to the monthly percentage change in the Consumer Price Index (CPI / IPC) in August 2026 (Variaci\u00f3n % mensual Total nacional), according to the monthly INDEC report.\n\nThe resolution source for this market will be the INDEC Consumer Price Index report released for August 2026 (https://www.indec.gob.ar/), currently scheduled to be released on September 10, 2026.\n\nResolution of this market will take place upon release of the aforementioned data. If no data for the specified month is released by the date the next month's data is scheduled to be released, this market will resolve based on data from the last available month.\n\nYou can find this report by clicking on the \"Precios al Consumidor\" option on the home page of https://www.indec.gob.ar/, and searching the PDF for the figure under \"Variaci\u00f3n % mensual Total nacional\".\n\nNote: the resolution source for this market will be the official monthly INDEC CPI (IPC) news release, which reports monthly inflation change to only one decimal point (e.g., 1.9%). Thus, this is the level of precision that will be used when resolving the market.",
+  "slug": "will-argentinas-monthly-inflation-in-august-2026-be-between-1pt5-and-1pt7-20260814110157103",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.738\", \"0.262\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-10T15:59:00Z",
+  "volumeNum": 10012.456382,
+  "events": [
+   {
+    "slug": "argentina-monthly-inflation-august-20260814110157100",
+    "title": "Argentina Monthly Inflation - August",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3586725",
+  "question": "Will Argentina's monthly inflation in August 2026 be between 1.8% and 2.0%?",
+  "description": "This is a market about the monthly variation of consumer prices in Argentina, before seasonal adjustment, as reported by the National Institute of Statistics and Census (INDEC) of Argentina.\n\nThis market will resolve according to the monthly percentage change in the Consumer Price Index (CPI / IPC) in August 2026 (Variaci\u00f3n % mensual Total nacional), according to the monthly INDEC report.\n\nThe resolution source for this market will be the INDEC Consumer Price Index report released for August 2026 (https://www.indec.gob.ar/), currently scheduled to be released on September 10, 2026.\n\nResolution of this market will take place upon release of the aforementioned data. If no data for the specified month is released by the date the next month's data is scheduled to be released, this market will resolve based on data from the last available month.\n\nYou can find this report by clicking on the \"Precios al Consumidor\" option on the home page of https://www.indec.gob.ar/, and searching the PDF for the figure under \"Variaci\u00f3n % mensual Total nacional\".\n\nNote: the resolution source for this market will be the official monthly INDEC CPI (IPC) news release, which reports monthly inflation change to only one decimal point (e.g., 1.9%). Thus, this is the level of precision that will be used when resolving the market.",
+  "slug": "will-argentinas-monthly-inflation-in-august-2026-be-between-1pt8-and-2pt0-20260814110157104",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.1465\", \"0.8535\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-10T15:59:00Z",
+  "volumeNum": 12093.963062,
+  "events": [
+   {
+    "slug": "argentina-monthly-inflation-august-20260814110157100",
+    "title": "Argentina Monthly Inflation - August",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3701624",
+  "question": "Next White House Press Secretary announced by September 11, 2026?",
+  "description": "This market will resolve to \"Yes\" if Donald Trump or the Trump administration announces a new White House Press Secretary to replace Karoline Leavitt between market creation and the specified date at 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nAn individual announced as an acting or interim Press Secretary will not qualify toward this market's resolution.\n\nAny qualifying announcement made within this market's time frame will count, regardless of when the new Press Secretary is sworn in or begins serving.\n\nThis market's primary resolution source will be official information from the Trump administration; however, a consensus of credible reporting may also be used.",
+  "slug": "next-white-house-press-secretary-announced-by-september-11-2026",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.0275\", \"0.9725\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-12T03:59:00Z",
+  "volumeNum": 43339.364142,
+  "events": [
+   {
+    "slug": "when-will-trump-announce-a-new-white-house-press-secretary",
+    "title": "When will Trump announce a new White House Press Secretary?",
+    "tags": []
+   }
+  ]
+ },
+ {
+  "id": "3849974",
+  "question": "Will Club Le\u00f3n FC win on 2026-09-06?",
+  "description": "In the upcoming game, scheduled for September 6, 2026\nIf Club Le\u00f3n FC wins, this market will resolve to \"Yes\".\nOtherwise, this market will resolve to \"No\".\nIf the game is postponed, this market will remain open until the game has been completed.\nIf the game is canceled entirely, with no make-up game, this market will resolve \"No\".\nThis market refers only to the outcome within the first 90 minutes of regular play plus stoppage time.\n\nThe primary resolution source for this market is the official statistics of the event as recognized by the governing body or event organizers. However, if the governing body or event organizers have not published final match statistics within 2 hours after the event's conclusion, data from Flashscore may be used; if Flashscore data is unavailable, data from Sofascore may be used; if neither is available, a consensus of credible reporting may be used instead. All markets will settle based on the official final result as recognized by the governing body or event organizers. Revisions to officially declared final scores made after market resolution will not be accounted for in determining the outcome.",
+  "slug": "mex-pum-leo-2026-09-06-leo",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "outcomePrices": "[\"0.285\", \"0.715\"]",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "endDate": "2026-09-11T03:00:00Z",
+  "volumeNum": 5320.26854,
+  "events": [
+   {
+    "slug": "mex-pum-leo-2026-09-06",
+    "title": "Pumas de la UNAM vs. Club Le\u00f3n FC",
+    "tags": []
+   }
+  ]
+ }
+]
