@@ -48,8 +48,10 @@ Confidence `c` is the existing grid, 55 to 95 in steps of 5.
 
 ```
 fraction(c, isBigOne) = ((c − 50) / 50) × STAKE_FRACTION_MAX × (isBigOne ? 2 : 1)
-stake(fortune, c, isBigOne) = max(1, round(fortune × fraction(c, isBigOne)))
+stake(fortune, c, isBigOne) = fortune ≥ 10 ? max(1, round(fortune × fraction)) : max(0, round(fortune × fraction))
 ```
+
+The floor of one applies from a fortune of ten upward. Below ten the floor is dropped and a zero stake is a valid, unpaid call. Without that rule five floored stakes could sum to a fortune of five and take it to zero.
 
 So 55 stakes one percent, 75 stakes five, 95 stakes nine, and the Big One doubles each. A round with every call at 95 and every call wrong loses 54 percent of the fortune. That is the point.
 
