@@ -1,15 +1,12 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { ScrollView, View } from "react-native";
-import type { Exhibition, RoundToday } from "@oracle/core";
+import { PRACTICE_FORTUNE, practiceLine, type Exhibition, type RoundToday } from "@oracle/core";
 import { CardChrome } from "./CardChrome";
 import { DecodeLine } from "./DecodeText";
 import { practiceResult, type PracticePrediction } from "../game/practiceResult";
 import { beginExhibition, revealExhibition, retryExhibition, sealExhibition } from "../game/exhibitionFlow";
 import { CardStage } from "./CardStage";
 import { OracleCard } from "./OracleCard";
-import { ConvictionColumn } from "./ConvictionColumn";
-import { confidenceMeaning } from "../game/confidence";
-import { payoffLine } from "../game/payoffLine";
 import { Mono, Serif, Ritual, role } from "./Text";
 import { GoldButton, QuietLink } from "./Button";
 import { colors, space, displayScale } from "../theme";
@@ -19,19 +16,14 @@ function exhibitionQuestion(exhibition: Exhibition): RoundToday["questions"][num
     id: exhibition.id, slot: 1, is_big_one: false, text: exhibition.question,
     category: "EXHIBITION", source_name: exhibition.sourceName,
     resolution_criteria: "Practice only; this exhibition is unranked.",
-    locks_at: "2099-01-01T00:00:00Z", lock_healed: false, struck: false, struck_reason: null, line_p_yes: null,
+    locks_at: "2099-01-01T00:00:00Z", lock_healed: false, struck: false, struck_reason: null, line_p_yes: practiceLine(exhibition),
   };
 }
 
 export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibition; onCompleted: () => void }) {
   const [attempt, setAttempt] = useState(0);
-  const [buttons, setButtons] = useState(false);
   const [flow, setFlow] = useState(() => beginExhibition(exhibition));
   const [previous, setPrevious] = useState<PracticePrediction | null>(null);
-  const [lean, setLean] = useState({ conf: null as number | null, side: true, active: false });
-  const onLean = useCallback((conf: number | null, side: boolean, active: boolean) => {
-    setLean(prev => prev.conf === conf && prev.side === side && prev.active === active ? prev : { conf, side, active });
-  }, []);
   const receipt = flow.prediction;
   const revealed = flow.phase === "revealed";
   const provenance = exhibition.kind === "historical" ? "PAST ROUND · UNRANKED" : "FICTIONAL · UNRANKED";
@@ -62,23 +54,18 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
         {!revealed && <GoldButton title="REVEAL THE RESULT" onPress={() => {
           const next = revealExhibition(flow); setFlow(next.flow); if (next.completedNow) onCompleted();
         }} />}
-      </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} onSealed={() => {}} onLean={onLean} forceButtons={buttons}
-        practice={{ context: exhibition.context, onSeal: (answer, confidence) => {
+      </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} fortune={PRACTICE_FORTUNE} onSealed={() => {}}
+        practice={{ context: exhibition.context, stamp: "PRACTICE · UNRANKED", onSeal: (answer, confidence) => {
           setFlow(current => sealExhibition(current, { answer, confidence }));
-          setLean({ conf: null, side: answer, active: false });
         } }} />}
-      {!receipt && (lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
     </View>}</CardStage>
     <View style={{ minHeight: 48, gap: space(1), justifyContent: "center" }}>
-      {lean.conf !== null ? <>
-        <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "center" }]}>{confidenceMeaning(lean.conf)}</Mono>
-        <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{payoffLine(lean.conf, false)}</Mono>
-      </> : receipt ? <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>UNRANKED · YOUR RECORD AND STREAK ARE UNCHANGED.</Mono> :
+      {receipt ? <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>UNRANKED · YOUR RECORD AND STREAK ARE UNCHANGED.</Mono> :
         <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{previous ? "THE OUTCOME IS KNOWN. COMPARE THE POINTS AT A DIFFERENT CONFIDENCE." : "RETURN TO CENTER TO CANCEL"}</Mono>}
     </View>
     {receipt ? revealed && <QuietLink title="EXPLORE THE SCORING" onPress={() => {
       setPrevious(receipt); setFlow(current => retryExhibition(current)); setAttempt(n => n + 1);
-    }} /> : <QuietLink title={buttons ? "USE THE PULL" : "USE HOLD BUTTONS"} onPress={() => setButtons(!buttons)} />}
+    }} /> : null}
   </View>;
 }
 

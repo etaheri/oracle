@@ -17,9 +17,6 @@ import { join } from "node:path";
 // no role applies. Adding a file to this list should take an argument; the
 // fix for anything else is to spread a role.
 const ALLOWED = new Map<string, string>([
-  // The conviction meter: an 8pt scale cap and a 13pt bar glyph on a 15pt
-  // pitch. This is a drawn instrument that happens to be built from type.
-  ["src/ui/ConvictionColumn.tsx", "meter glyphs, sized to the bar not the scale"],
   // The card's interior, whose measurements are tuned to the tarot ratio and
   // the question's own 22/32 setting rather than to the chrome scale.
   ["src/ui/OracleCard.tsx", "card interior, tuned to the artifact's own metrics"],

@@ -110,8 +110,8 @@ function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    // GestureDetector (card swipe) requires a gesture-handler root; expo-router
-    // does not provide one.
+    // GestureDetector (the orb's stir) and gesture-handler's ScrollView require
+    // a gesture-handler root; expo-router does not provide one.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.museumWhite } }}>

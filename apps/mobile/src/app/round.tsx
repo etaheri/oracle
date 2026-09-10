@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
@@ -7,11 +7,8 @@ import { TopBar } from "../ui/TopBar";
 import { CardStage } from "../ui/CardStage";
 import { OracleCard } from "../ui/OracleCard";
 import { UndealtCard, STACK_TOP_Y, STACK_TOP_ROTATE } from "../ui/UndealtCard";
-import { ConvictionColumn } from "../ui/ConvictionColumn";
-import { confidenceMeaning } from "../game/confidence";
 import { crowdVerdict } from "../game/crowdVerdict";
 import { crowdAnticipation } from "../game/crowdAnticipation";
-import { payoffLine } from "../game/payoffLine";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
 import { SleepsPanel } from "../ui/SleepsPanel";
@@ -19,7 +16,6 @@ import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { numeral } from "../ui/CardChrome";
 import { useToday, useCrowdSoFar } from "../api/hooks";
-import { getFloorNoticed, markFloorNoticed } from "../api/flags";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { colors, space } from "../theme";
@@ -46,21 +42,9 @@ export default function Round() {
   // footer while the next card is contemplated — every seal pays out
   // immediately, and the full spread stays the finale.
   const [lastSealedId, setLastSealedId] = useState<string | null>(null);
-  // The card's live pull, lifted to the screen: the conviction column and
-  // the footer reading are stationary while the card moves.
-  const [lean, setLean] = useState<{ conf: number | null; side: boolean; active: boolean }>({ conf: null, side: true, active: false });
-  // Stable identity + no-op bailout: the card reports its lean on every
-  // change; an inline handler here would re-render forever.
-  const onLean = useCallback((conf: number | null, side: boolean, active: boolean) => {
-    setLean((prev) => (prev.conf === conf && prev.side === side && prev.active === active ? prev : { conf, side, active }));
-  }, []);
-  // The floor rite: the first committed pull EVER reads "NO COIN FLIPS · 55
-  // IS THE LEAST BELIEF" in the reading's slot — the scale explains itself
-  // at the exact moment every player first meets its floor, then never
-  // again. Defaults seen so the rite can't flash for veterans while the
-  // flag loads.
-  const [floorSeen, setFloorSeen] = useState(true);
-  const floorShown = useRef(false);
+  // The receipt the card handed back at the seal — "YES · STAKED 50 · WINS
+  // 93" — printed in the footer's slot while the next card is contemplated.
+  const [lastReceipt, setLastReceipt] = useState<string | null>(null);
   // Per-question early locks mean "closed" is time-dependent — recomputed
   // every 30s, not just at fetch time, so a card that locks mid-session
   // is skipped without a refetch.
@@ -69,14 +53,6 @@ export default function Round() {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
-  useEffect(() => { void getFloorNoticed().then(setFloorSeen); }, []);
-  useEffect(() => {
-    if (lean.conf !== null && !floorSeen) floorShown.current = true;
-    if (lean.conf === null && floorShown.current && !floorSeen) {
-      setFloorSeen(true);
-      void markFloorNoticed();
-    }
-  }, [lean.conf, floorSeen]);
 
   const qs = [...(today.data?.questions ?? [])].sort((a, b) => a.slot - b.slot);
   const anySealed = qs.some((q) => answers[q.id]?.sealed);
@@ -98,7 +74,7 @@ export default function Round() {
     const c = (crowd.data?.questions ?? []).find((q) => q.id === lastSealedId);
     if (!entry || !c) return;
     announcedFor.current = lastSealedId;
-    AccessibilityInfo.announceForAccessibility(`The crowd: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count).line}`);
+    AccessibilityInfo.announceForAccessibility(`The players: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count).line}`);
   }, [lastSealedId, answers, crowd.data]);
   const chromeScale = useChromeScale();
 
@@ -140,7 +116,7 @@ export default function Round() {
         {current ? (
           <CardStage stack={32}>{height => <View>
             {/* The rest of the deck: full undealt cards beneath the live one,
-                their prophecies still static — so a mid-swipe glance shows a
+                their prophecies still static — so a mid-throw glance shows a
                 real stack, not slivers, and nothing unspoiled is spoiled. */}
             {qs.filter((q) => q.id !== current.id && !answers[q.id]?.sealed).slice(0, 2).reverse().map((q, i, arr) => (
               <UndealtCard height={height} key={q.id} q={q} index={arr.length - 1 - i} />
@@ -150,8 +126,8 @@ export default function Round() {
                 height={height}
                 q={current}
                 roundLocksAt={today.data?.locks_at ?? null}
-                onSealed={() => setLastSealedId(current.id)}
-                onLean={onLean}
+                fortune={today.data?.fortune ?? null}
+                onSealed={(receipt) => { setLastSealedId(current.id); setLastReceipt(receipt); }}
               />
             </Animated.View>
           </View>}</CardStage>
@@ -162,7 +138,6 @@ export default function Round() {
           </View>
         )}
       </View>
-      {current && (lean.active || lean.conf !== null) && <ConvictionColumn conf={lean.conf} side={lean.side} />}
       {/* A struck question is the most dramatic thing this system does, and without
           this line it happens in silence: the numeral is simply struck, the same
           as a slot the player let expire. Shown only for a struck question the
@@ -206,36 +181,30 @@ export default function Round() {
           );
         })}
       </View>
-      {/* One fixed-height footer slot: reading, verdict, and hint trade
+      {/* One fixed-height footer slot: receipt, verdict, and hint trade
           places without nudging the layout above them. */}
-      <View style={{ minHeight: scaledRow(40, chromeScale), justifyContent: "center" }}>
-        {lean.conf !== null ? (
-          // The oracle reads the pull aloud — stationary, in the footer's
-          // slot — with the honest stake printed underneath: what this
-          // conviction pays if right, costs if wrong.
+      <View style={{ minHeight: scaledRow(56, chromeScale), justifyContent: "center" }}>
+        {current && lastSealedId && lastEntry ? (
+          // The seal's payout, two rows: the receipt the card handed back —
+          // side, stake, winnings — over the thrown card's verdict, printing
+          // while the next card deals. Gold only when the contrarian
+          // multiplier is truly in play.
           <View style={{ alignItems: "center", gap: 2 }}>
-            <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>
-              {floorSeen ? confidenceMeaning(lean.conf) : "NO COIN FLIPS · 55 IS THE LEAST BELIEF"}
-            </Mono>
-            <Mono {...role.caption} color={colors.mutedInk}>
-              {payoffLine(lean.conf, current?.is_big_one ?? false)}
-            </Mono>
+            {lastReceipt && (
+              <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{lastReceipt}</Mono>
+            )}
+            {verdict && lastCrowd ? (
+              <View key={lastSealedId} style={{ flexDirection: "row", gap: space(2), justifyContent: "center", alignItems: "center" }}>
+                <CrowdBar pct={lastCrowd.crowd_yes_pct} />
+                <DecodeLine {...role.caption} text={verdict.line} color={verdict.against ? colors.goldText : colors.mutedInk}/>
+              </View>
+            ) : (
+              <DecodeLine {...role.meta} text="COUNTING THE PLAYERS…" cursor color={colors.mutedInk} style={{ textAlign: "center" }}/>
+            )}
           </View>
-        ) : current && lastSealedId && lastEntry ? (
-          // The seal's payout: the thrown card's crowd verdict, printing while
-          // the next card deals. Gold only when the contrarian multiplier is
-          // truly in play.
-          verdict && lastCrowd ? (
-            <View key={lastSealedId} style={{ flexDirection: "row", gap: space(2), justifyContent: "center", alignItems: "center" }}>
-              <CrowdBar pct={lastCrowd.crowd_yes_pct} />
-              <DecodeLine {...role.caption} text={verdict.line} color={verdict.against ? colors.goldText : colors.mutedInk}/>
-            </View>
-          ) : (
-            <DecodeLine {...role.meta} text="CONSULTING THE CROWD…" cursor color={colors.mutedInk} style={{ textAlign: "center" }}/>
-          )
         ) : current ? (
           <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "center" }]}>
-            The crowd's leaning is hidden until you commit.
+            The players' leaning is hidden until you seal.
           </Mono>
         ) : null}
       </View>

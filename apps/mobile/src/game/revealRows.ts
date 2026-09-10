@@ -32,7 +32,7 @@ export function rowMark(state: RowState): string {
   }
 }
 
-// A true minus sign for a loss — matches payoffLine's receipt formatting,
+// A true minus sign for a loss — matches the receipt's formatting,
 // never the ASCII hyphen.
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
 
