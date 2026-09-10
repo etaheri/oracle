@@ -1,4 +1,4 @@
-import { count, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { oracleScore, settleStreak, vigilMultiplier, ratingEligible } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
@@ -72,6 +72,16 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
         .where(eq(schema.entitlements.userId, u.id));
     }
     settled++;
+  }
+
+  // The house delta (design 2026-09-10 §4.4): Σ(stake − payout) over the
+  // round's staked predictions. Written once; a resettle never revises it.
+  if (round.houseDelta === null) {
+    const [agg] = await db
+      .select({ delta: sql<number>`coalesce(sum(${schema.predictions.stake} - ${schema.predictions.payout}), 0)` })
+      .from(schema.predictions)
+      .where(and(inArray(schema.predictions.questionId, qs.map((q) => q.id)), isNotNull(schema.predictions.payout)));
+    await db.update(schema.rounds).set({ houseDelta: Number(agg?.delta ?? 0) }).where(and(eq(schema.rounds.date, date), isNull(schema.rounds.houseDelta)));
   }
 
   await db.update(schema.rounds).set({ status: "resolved" }).where(eq(schema.rounds.date, date));

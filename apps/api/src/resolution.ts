@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { brier, questionPoints, PIPELINE_LINES } from "@oracle/core";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { brier, questionPoints, payout as fortunePayout, PIPELINE_LINES } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 // Statuses a fresh resolution may write over. `open` is allowed because the
@@ -41,6 +41,35 @@ export async function resolveQuestion(
     const b = outcome === "void" ? null : String(brier({ answer: p.answer, confidence: p.confidence, outcome }));
     await db.update(schema.predictions).set({ points, brier: b }).where(eq(schema.predictions.id, p.id));
   }
+
+  await payFortune(db, questionId, outcome, new Date());
+}
+
+/**
+ * The fortune pass (design 2026-09-10 §5.6). Each staked prediction is
+ * claimed WHERE settled_at IS NULL, so a retried resolve, a forced
+ * re-resolution or an overlapping tick pays nobody twice. users.fortune is
+ * written here and nowhere else.
+ */
+export async function payFortune(db: Db, questionId: string, outcome: "yes" | "no" | "void", now: Date): Promise<{ paid: number }> {
+  const staked = await db.query.predictions.findMany({
+    where: and(eq(schema.predictions.questionId, questionId), isNull(schema.predictions.settledAt)),
+  });
+  let paid = 0;
+  for (const p of staked) {
+    if (p.stake === null || p.linePYes === null) continue;
+    const pay = fortunePayout({ stake: p.stake, answer: p.answer, line: Number(p.linePYes), outcome });
+    const claimed = await db.update(schema.predictions)
+      .set({ payout: pay, settledAt: now })
+      .where(and(eq(schema.predictions.id, p.id), isNull(schema.predictions.settledAt)))
+      .returning({ id: schema.predictions.id });
+    if (claimed.length === 0) continue;
+    await db.update(schema.users)
+      .set({ fortune: sql`${schema.users.fortune} + ${pay - p.stake}` })
+      .where(eq(schema.users.id, p.userId));
+    paid++;
+  }
+  return { paid };
 }
 
 // The reveal's receipt: one quote and/or one reason lifted from whatever
