@@ -41,12 +41,13 @@ describe("migration 0014", () => {
     const { db } = await makeTestDb();
     const rows = await seedRound(db, { date: "2026-09-10", opensAt: new Date("2026-09-10T16:00:00Z"), locksAt: new Date("2026-09-11T16:00:00Z") });
     await db.update(schema.questions).set({ linePYes: "0.35" }).where(eq(schema.questions.id, rows[0]!.id));
-    // drizzle-orm wraps the postgres error (message becomes "Failed query: …";
-    // the trigger's "house line is immutable" text lives on err.cause, not
-    // surfaced to .message) — same posture as the existing commitment-guard
-    // assertions in schema.test.ts and pipeline-forecast.test.ts, which also
-    // use a bare toThrow() rather than matching driver-unstable message text.
-    await expect(db.update(schema.questions).set({ linePYes: "0.40" }).where(eq(schema.questions.id, rows[0]!.id))).rejects.toThrow();
+    // drizzle-orm wraps the postgres error (message becomes "Failed query: …");
+    // the trigger's own "house line is immutable" text lives on err.cause, so
+    // assert on that directly to prove the house-line guard fired specifically,
+    // not just that some error occurred.
+    const err = await db.update(schema.questions).set({ linePYes: "0.40" }).where(eq(schema.questions.id, rows[0]!.id)).then(() => null, (e: unknown) => e);
+    expect(err).toBeTruthy();
+    expect(String((err as { cause?: { message?: string } }).cause?.message ?? (err as Error).message)).toMatch(/house line is immutable/);
     // unrelated updates still pass
     await expect(db.update(schema.questions).set({ crowdCount: 3 }).where(eq(schema.questions.id, rows[0]!.id))).resolves.toBeDefined();
   });
