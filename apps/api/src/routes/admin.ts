@@ -55,8 +55,9 @@ export const adminRoutes = new Hono<AppContext>()
     const parsed = ResolveSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const db = c.get("deps").db;
+    let alreadySettled = 0;
     try {
-      await resolveQuestion(db, c.req.param("id"), parsed.data.outcome, parsed.data.evidence ?? null, { force: parsed.data.force === true });
+      ({ alreadySettled } = await resolveQuestion(db, c.req.param("id"), parsed.data.outcome, parsed.data.evidence ?? null, { force: parsed.data.force === true }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "resolve failed";
       if (msg === "not resolvable") return c.json({ error: msg }, 409);
@@ -67,6 +68,18 @@ export const adminRoutes = new Hono<AppContext>()
     if (parsed.data.force) {
       const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, c.req.param("id")) });
       if (q) rescored = (await resettleRound(db, q.roundDate)).users;
+    }
+    // Overturning a question rescores points and Briers but moves no money:
+    // payFortune claims WHERE settled_at IS NULL, so stakes paid under the
+    // first outcome stay paid. Say it, rather than leave the operator to
+    // infer that the payouts followed the flip.
+    if (alreadySettled > 0) {
+      return c.json({
+        ok: true,
+        rescored,
+        fortune_revised: false,
+        note: `${alreadySettled} stake${alreadySettled === 1 ? " was" : "s were"} already paid under the previous outcome; fortune is not revised by a re-resolution`,
+      });
     }
     return c.json({ ok: true, rescored });
   })

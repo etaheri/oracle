@@ -231,6 +231,34 @@ describe("POST /admin/questions/:id/resolve", () => {
     expect(forced.status).toBe(200);
     expect(await forced.json()).toEqual({ ok: true, rescored: 0 }); // round not settled yet
   });
+
+  it("says so when a re-resolution leaves paid stakes unrevised", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-27T16:30:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-27", opensAt: new Date("2026-08-27T16:00:00Z"), locksAt: new Date("2026-08-28T16:00:00Z") });
+    await db.update(schema.rounds).set({ rulesVersion: 3 }).where(eq(schema.rounds.date, "2026-08-27"));
+    await db.update(schema.questions).set({ linePYes: "0.35" }).where(eq(schema.questions.id, qs[0]!.id));
+    const [player] = await db.insert(schema.users).values({}).returning();
+    await db.insert(schema.predictions).values({
+      questionId: qs[0]!.id, userId: player!.id, answer: true, confidence: 70,
+      fortuneAtSeal: 1000, stake: 40, linePYes: "0.35",
+    });
+    const post = (body: unknown) => app.request(`/admin/questions/${qs[0]!.id}/resolve`, { method: "POST", headers: { "content-type": "application/json", "x-admin-secret": "admin" }, body: JSON.stringify(body) });
+
+    expect((await post({ outcome: "yes" })).status).toBe(200);
+    const paid = await db.query.users.findFirst({ where: eq(schema.users.id, player!.id) });
+    expect(paid!.fortune).toBe(1074);
+
+    const forced = await post({ outcome: "no", force: true });
+    expect(forced.status).toBe(200);
+    const body = (await forced.json()) as { ok: boolean; fortune_revised?: boolean; note?: string };
+    expect(body.ok).toBe(true);
+    expect(body.fortune_revised).toBe(false);
+    expect(body.note).toMatch(/1 stake was already paid/);
+    // And the flip really did not move the money.
+    expect((await db.query.users.findFirst({ where: eq(schema.users.id, player!.id) }))!.fortune).toBe(1074);
+  });
 });
 
 describe("POST /admin/bank", () => {

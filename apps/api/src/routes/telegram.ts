@@ -111,9 +111,13 @@ export const telegramRoutes = new Hono<AppContext>().post("/:secret", async (c) 
         if (!date) { await send("no round to flip"); break; }
         const q = await pipeline.db.query.questions.findFirst({ where: and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, command.slot)) });
         if (!q) { await send(`no slot ${command.slot} on ${date}`); break; }
-        await resolveQuestion(pipeline.db, q.id, command.outcome, { flipped_by: "telegram", checked_at: pipeline.now().toISOString(), reason: "overturned by the operator" }, { force: true });
+        const { alreadySettled } = await resolveQuestion(pipeline.db, q.id, command.outcome, { flipped_by: "telegram", checked_at: pipeline.now().toISOString(), reason: "overturned by the operator" }, { force: true });
         const { users } = await resettleRound(pipeline.db, date);
-        await send(`flipped slot ${command.slot} of ${date} → ${command.outcome.toUpperCase()} · rescored ${users} users`);
+        // A flip rescores; it does not move fortune. Stakes claimed under the
+        // first outcome keep their payouts, so the reply must not read as if
+        // the money followed.
+        const unrevised = alreadySettled > 0 ? ` · fortune not revised (${alreadySettled} stake${alreadySettled === 1 ? "" : "s"} already paid)` : "";
+        await send(`flipped slot ${command.slot} of ${date} → ${command.outcome.toUpperCase()} · rescored ${users} users${unrevised}`);
         break;
       }
     }

@@ -8,13 +8,24 @@ import { schema, type Db } from "./db/client";
 const FRESH = new Set(["open", "locked"]);
 const JUDGED = new Set(["resolved", "void"]);
 
+/**
+ * Resolve one question and pay its stakes.
+ *
+ * Returns what the fortune pass actually did. `alreadySettled` counts the
+ * staked predictions this call found already paid — which on a FORCED
+ * re-resolution is the whole point: payFortune claims WHERE settled_at IS
+ * NULL, so flipping an outcome rescores points and Briers but moves no money.
+ * A caller that overturns a question must say so out loud rather than let the
+ * operator believe the payouts followed the flip. Callers that only ever
+ * resolve fresh questions can ignore the return value.
+ */
 export async function resolveQuestion(
   db: Db,
   questionId: string,
   outcome: "yes" | "no" | "void",
   evidence: unknown = null,
   opts: { force?: boolean } = {},
-): Promise<void> {
+): Promise<{ paid: number; alreadySettled: number }> {
   const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
   if (!q) throw new Error("question not found");
   const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
@@ -28,6 +39,10 @@ export async function resolveQuestion(
   if (!allowed) throw new Error("not resolvable");
 
   const preds = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, questionId) });
+  // Read BEFORE the writes below: a staked prediction already carrying a
+  // settled_at was paid by an earlier resolution and payFortune will not
+  // touch it again.
+  const alreadySettled = preds.filter((p) => p.stake !== null && p.linePYes !== null && p.settledAt !== null).length;
   const yesCount = preds.filter((p) => p.answer).length;
   const crowdCount = preds.length;
   const crowdYesPct = crowdCount === 0 ? 50 : Math.round((100 * yesCount) / crowdCount);
@@ -42,7 +57,8 @@ export async function resolveQuestion(
     await db.update(schema.predictions).set({ points, brier: b }).where(eq(schema.predictions.id, p.id));
   }
 
-  await payFortune(db, questionId, outcome, new Date());
+  const { paid } = await payFortune(db, questionId, outcome, new Date());
+  return { paid, alreadySettled };
 }
 
 /**
