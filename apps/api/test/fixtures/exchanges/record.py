@@ -9,7 +9,8 @@ It rewrites four files in this directory:
 
   kalshi-markets-page1.json   40 priced non-exotic rows + 3 exotic rows, cursor "PAGE2"
   kalshi-markets-page2.json   5 rows repeated from page 1, empty cursor
-  polymarket-markets-page1.json  40 events, each trimmed to the keys the feed reads
+  polymarket-markets-page1.json  40 events, each trimmed to the keys the feed
+                                 reads and to its four heaviest Yes/No markets
   polymarket-markets-page2.json  []
 
 The single-market fixtures (kalshi-market-*.json, polymarket-market-*.json,
@@ -53,6 +54,13 @@ POLY_MARKET_KEYS = [
     "id", "question", "description", "outcomes", "outcomePrices", "endDate",
     "volumeNum", "volume", "closed", "slug",
 ]
+# All 40 events are kept, because the category spread is what the fixture is
+# for. What is thrown away is depth: a single event can carry 291 legs and the
+# untrimmed page ran to 1.3MB. Four markets an event still exercises the
+# nested iteration, and the rules text a candidate needs survives at 300
+# characters.
+MARKETS_PER_EVENT = 4
+DESCRIPTION_CHARS = 300
 
 
 def get(url):
@@ -67,6 +75,34 @@ def trim(row, keys):
 
 def iso(d):
     return d.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def yes_no(m):
+    """The feed's own guard, so the trim never keeps a market it would drop."""
+    try:
+        o = json.loads(m.get("outcomes") or "")
+    except (TypeError, ValueError):
+        return False
+    return (isinstance(o, list) and len(o) == 2
+            and str(o[0]).lower() == "yes" and str(o[1]).lower() == "no")
+
+
+def poly_volume(m):
+    try:
+        return float(m.get("volumeNum") or m.get("volume") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def trim_markets(markets):
+    keep = sorted([m for m in markets if yes_no(m)], key=poly_volume, reverse=True)[:MARKETS_PER_EVENT]
+    out = []
+    for m in keep:
+        t = trim(m, POLY_MARKET_KEYS)
+        if isinstance(t.get("description"), str):
+            t["description"] = t["description"][:DESCRIPTION_CHARS]
+        out.append(t)
+    return out
 
 
 def priced(m):
@@ -126,7 +162,7 @@ def record_polymarket():
     for ev in events[:40]:
         e = trim(ev, POLY_EVENT_KEYS)
         e["tags"] = [{"slug": t.get("slug"), "label": t.get("label")} for t in (ev.get("tags") or [])]
-        e["markets"] = [trim(m, POLY_MARKET_KEYS) for m in (ev.get("markets") or [])]
+        e["markets"] = trim_markets(ev.get("markets") or [])
         page1.append(e)
     write("polymarket-markets-page1.json", page1)
     write("polymarket-markets-page2.json", [])

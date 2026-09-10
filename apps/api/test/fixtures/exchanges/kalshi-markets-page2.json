@@ -10,11 +10,11 @@
    "title": "Bitcoin price on Sep 11, 2026?",
    "yes_sub_title": "$76,000 or above",
    "rules_primary": "If the simple average of the sixty seconds of CF Benchmarks' Bitcoin Real-Time Index (BRTI) before 5 PM EDT is above 75999.99 at 5 PM EDT on Sep 11, 2026, then the market resolves to Yes.",
-   "yes_bid_dollars": "0.7400",
-   "yes_ask_dollars": "0.7700",
-   "last_price_dollars": "0.7600",
+   "yes_bid_dollars": "0.7300",
+   "yes_ask_dollars": "0.7600",
+   "last_price_dollars": "0.7500",
    "liquidity_dollars": "0.0000",
-   "volume_fp": "210803.64",
+   "volume_fp": "210844.95",
    "market_type": "binary"
   },
   {
@@ -27,11 +27,11 @@
    "title": "Bitcoin price on Sep 11, 2026?",
    "yes_sub_title": "$77,000 or above",
    "rules_primary": "If the simple average of the sixty seconds of CF Benchmarks' Bitcoin Real-Time Index (BRTI) before 5 PM EDT is above 76999.99 at 5 PM EDT on Sep 11, 2026, then the market resolves to Yes.",
-   "yes_bid_dollars": "0.5300",
-   "yes_ask_dollars": "0.5500",
-   "last_price_dollars": "0.5600",
+   "yes_bid_dollars": "0.5200",
+   "yes_ask_dollars": "0.5400",
+   "last_price_dollars": "0.5400",
    "liquidity_dollars": "0.0000",
-   "volume_fp": "207943.32",
+   "volume_fp": "208142.15",
    "market_type": "binary"
   },
   {
@@ -44,11 +44,11 @@
    "title": "Will the rate of CPI inflation be above 3.4% for the year ending in August 2026?",
    "yes_sub_title": "Above 3.4%",
    "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.4% in the twelve months ending August 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes.",
-   "yes_bid_dollars": "0.1800",
+   "yes_bid_dollars": "0.1700",
    "yes_ask_dollars": "0.2400",
-   "last_price_dollars": "0.1500",
+   "last_price_dollars": "0.2400",
    "liquidity_dollars": "0.0000",
-   "volume_fp": "200469.17",
+   "volume_fp": "200519.17",
    "market_type": "binary"
   },
   {
@@ -62,10 +62,10 @@
    "yes_sub_title": "Above 3.3%",
    "rules_primary": "If the Consumer Price Index (CPI) increases by more than 3.3% in the twelve months ending August 2026 (as represented by the one-decimal place value reported by the Bureau of Labor Statistics), then the market resolves to Yes.",
    "yes_bid_dollars": "0.6200",
-   "yes_ask_dollars": "0.6600",
-   "last_price_dollars": "0.6100",
+   "yes_ask_dollars": "0.6700",
+   "last_price_dollars": "0.6600",
    "liquidity_dollars": "0.0000",
-   "volume_fp": "163452.79",
+   "volume_fp": "163875.81",
    "market_type": "binary"
   },
   {
@@ -78,11 +78,11 @@
    "title": "Bitcoin price on Sep 11, 2026?",
    "yes_sub_title": "$80,000 or above",
    "rules_primary": "If the simple average of the sixty seconds of CF Benchmarks' Bitcoin Real-Time Index (BRTI) before 5 PM EDT is above 79999.99 at 5 PM EDT on Sep 11, 2026, then the market resolves to Yes.",
-   "yes_bid_dollars": "0.0700",
-   "yes_ask_dollars": "0.0800",
-   "last_price_dollars": "0.0800",
+   "yes_bid_dollars": "0.0800",
+   "yes_ask_dollars": "0.0900",
+   "last_price_dollars": "0.0900",
    "liquidity_dollars": "0.0000",
-   "volume_fp": "152543.90",
+   "volume_fp": "154964.80",
    "market_type": "binary"
   }
  ],
