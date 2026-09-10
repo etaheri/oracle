@@ -1,4 +1,5 @@
-import { dayCallCounts, type RoundBoard } from "@oracle/core";
+import { dayCallCounts, type AllTimeBoard, type RoundBoard } from "@oracle/core";
+import { formatFortune, returnPct } from "./fortuneText";
 
 // Where the day stood. The reveal's answer to the one question the plaque
 // cannot answer on install day -- the Oracle Score needs fifty rated calls,
@@ -35,6 +36,13 @@ const level = (n: number) => (n < 0 ? `−${Math.abs(n)}` : String(n));
 
 export function boardLines(b: RoundBoard | undefined, _rulesVersion = 1): string[] {
   if (!b) return [];
+  if (b.metric === "return") {
+    if (b.your_return_bp === null) return [UNRATED_LINE];
+    if (b.your_rank === null) return [FIELD_GATHERING_LINE];
+    const shape = b.best_return_bp === null || b.median_return_bp === null ? null : `BEST ${returnPct(b.best_return_bp)} · MEDIAN ${returnPct(b.median_return_bp)}`;
+    const rank = `RANK ${b.your_rank} OF ${b.field_size} PLAYERS · RETURN ${returnPct(b.your_return_bp)}`;
+    return [shape === null ? rank : `${rank} · ${shape}`];
+  }
   // The reader's own absence first: on a quiet day it is true at the same time
   // as the small field, and it is the more specific of the two facts -- also
   // the only one of them they can do anything about.
@@ -50,6 +58,9 @@ export function boardLines(b: RoundBoard | undefined, _rulesVersion = 1): string
 
 export function boardSupportingLines(b: RoundBoard | undefined, rulesVersion = 1): string[] {
   if (!b) return [];
+  if (b.metric === "return") {
+    return b.your_return_bp === null ? ["Complete every non-void question.", "At least three must resolve."] : [];
+  }
   if (b.your_points === null) {
     return rulesVersion >= 2
       ? ["Complete every non-void question.", "At least three must resolve.", ORACLE_COMPARISON_LINE]
@@ -79,7 +90,25 @@ export function oracleDayLine(
 }
 
 export function boardRowLines(
-  rows: Array<{ name: string; points: number; rank: number; is_you: boolean; is_oracle: boolean }>,
+  rows: Array<{ name: string; points: number; return_bp?: number | null; rank: number; is_you: boolean; is_oracle: boolean }>,
+  metric: "points" | "return" = "points",
 ): string[] {
-  return rows.map((r) => `${r.rank} · ${r.name} · ${level(r.points)}`);
+  return rows.map((r) => `${r.rank} · ${r.name} · ${metric === "return" ? returnPct(r.return_bp ?? 0) : level(r.points)}`);
+}
+
+export const NO_STAKE_LINE = "NO STAKE SETTLED YET";
+
+// The all-time board (design §7, §8.3): ranked by fortune, same floor and
+// window as the daily board.
+export function allTimeLines(b: AllTimeBoard | undefined | null): string[] {
+  if (!b) return [];
+  if (b.your_fortune === null) return [NO_STAKE_LINE];
+  if (b.your_rank === null) return [FIELD_GATHERING_LINE];
+  const shape = b.best_fortune === null || b.median_fortune === null ? null : `BEST ${formatFortune(b.best_fortune)} · MEDIAN ${formatFortune(b.median_fortune)}`;
+  const rank = `RANK ${b.your_rank} OF ${b.field_size} PLAYERS · FORTUNE ${formatFortune(b.your_fortune)}`;
+  return [shape === null ? rank : `${rank} · ${shape}`];
+}
+
+export function allTimeRowLines(rows: AllTimeBoard["rows"]): string[] {
+  return rows.map((r) => `${r.rank} · ${r.name} · ${formatFortune(r.fortune)}`);
 }
