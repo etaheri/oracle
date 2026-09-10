@@ -117,6 +117,9 @@ export async function recordSealHour(now: Date): Promise<void> {
       date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
       hour: now.getHours(),
     };
-    await (await store()).setItemAsync(SEAL_HOURS_KEY, JSON.stringify(withSealHour(await getSealHours(), local)));
+    const prev = await getSealHours();
+    const next = withSealHour(prev, local);
+    if (next === prev) return; // today's date already recorded — nothing changed, skip the write
+    await (await store()).setItemAsync(SEAL_HOURS_KEY, JSON.stringify(next));
   } catch {}
 }

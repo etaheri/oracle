@@ -20,5 +20,12 @@ describe("habit (design 2026-09-09 §4.2)", () => {
     expect(h).toHaveLength(HABIT_KEEP);
     expect(h[0]!.date).toBe("2026-09-04");
   });
+  // recordSealHour (apps/mobile/src/api/flags.ts) skips its persisted write
+  // when nothing changed -- it can only do that if a repeat date returns
+  // the exact same array reference rather than an equal-but-new copy.
+  it("returns the same array reference on a repeat date", () => {
+    const h = [{ date: "2026-09-01", hour: 8 }];
+    expect(withSealHour(h, { date: "2026-09-01", hour: 22 })).toBe(h);
+  });
 });
 

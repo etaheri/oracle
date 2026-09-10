@@ -15,8 +15,10 @@ export function habitualHour(history: ReadonlyArray<SealHour>): number | null {
 }
 
 // Records at most one entry per calendar date (first seal of the day wins)
-// and keeps only the newest HABIT_KEEP dates.
+// and keeps only the newest HABIT_KEEP dates. Returns the SAME array
+// reference when the date already exists, so a caller can skip a write
+// that would change nothing (recordSealHour in api/flags.ts).
 export function withSealHour(history: ReadonlyArray<SealHour>, entry: SealHour): SealHour[] {
-  if (history.some((e) => e.date === entry.date)) return [...history];
+  if (history.some((e) => e.date === entry.date)) return history as SealHour[];
   return [...history, entry].slice(-HABIT_KEEP);
 }
