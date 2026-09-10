@@ -19,7 +19,7 @@ import { GoldButton } from "./Button";
 import { CardChrome, numeral } from "./CardChrome";
 import { DecodeLine } from "./DecodeText";
 import { StakeLadder } from "./StakeLadder";
-import { stakeLadder, type RoundToday } from "@oracle/core";
+import { odds, stakeLadder, type RoundToday } from "@oracle/core";
 
 // The throw IS the seal: tap SEAL and the card leaves your hand -- off the
 // screen edge of the side you took, one heavy thunk at dispatch. The next card
@@ -109,20 +109,31 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
   }
 
   function pickRung(confidence: number) {
+    setError(null);
     setChoice((c) => chooseRung(c, confidence));
     void Haptics.selectionAsync();
   }
 
   // The round advances only after the throw: the store's sealed flag is the
   // thing that swaps `current`, so it must not flip mid-flight.
-  function finishSeal(answer: boolean, confidence: number) {
+  // `serverStake` is what the house actually took, and it is the truth: the
+  // local ladder was priced against the fortune this screen was rendered
+  // with, which an earlier round settling mid-window can have moved. Prefer
+  // it, and re-price the winnings at the same line the rung used. The local
+  // rung stays the fallback -- an unstaked (lineless) round has no server
+  // stake to prefer.
+  function finishSeal(answer: boolean, confidence: number, serverStake: number | null) {
     markSealed(q.id);
     capture("question_answered", { question_id: q.id, is_big_one: q.is_big_one, confidence, staked });
     // Habitual-hour history (design 2026-09-09 §4.2): fire-and-forget --
     // withSealHour already no-ops repeat seals on the same local day.
     void recordSealHour(new Date());
     const rung = rungs?.find((r) => r.confidence === confidence) ?? null;
-    onSealed(receiptLine({ answer, stake: rung?.stake ?? null, wins: rung?.wins ?? null, confidence }));
+    const stake = serverStake ?? rung?.stake ?? null;
+    const wins = serverStake !== null && line !== null
+      ? Math.round(serverStake * odds(answer, line))
+      : rung?.wins ?? null;
+    onSealed(receiptLine({ answer, stake, wins, confidence }));
   }
 
   // SEAL IS the seal, and the throw IS the ceremony: the moment it is
@@ -159,7 +170,7 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
       if (await claimFirstLiveSeal()) capture("first_live_seal", { stake: res.stake });
       await flight;
       if (reducedMotion) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      finishSeal(answer, confidence);
+      finishSeal(answer, confidence, res.stake);
     } catch (e) {
       // Let the throw land before the card returns -- a mid-air reversal
       // reads as a glitch, a full return reads as the oracle's refusal.

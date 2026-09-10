@@ -132,6 +132,9 @@ export function useSubmit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["round", "crowd"] });
       qc.invalidateQueries({ queryKey: ["round", "mine"] });
+      // The seal spent fortune, and an earlier round settling mid-window moves
+      // it too — refetch so the next card's ladder is priced at the real one.
+      qc.invalidateQueries({ queryKey: ["round", "today"] });
     },
   });
 }
