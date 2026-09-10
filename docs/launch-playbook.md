@@ -86,16 +86,40 @@ drafts write version 2 (`CURRENT_RULES_VERSION` in
 
 ### 2.3 Version 3 cutover (the House)
 
+**`PIPELINE_ENABLED` is armed FIRST, before the manual deal.** The admin
+authoring and forecast routes are pipeline routes: `buildPipelineDeps` returns
+`undefined` while the flag is unset, and both
+`POST /admin/rounds/:date/author` and `POST /admin/rounds/:date/forecast`
+answer `503 {"error":"pipeline not configured"}`. Arming early is safe — the
+cron only acts inside its scheduled hours (forecast 09:00–11:xx ET, publish at
+noon, authoring at 17:00 ET, settle hourly after lock), so between deploy and
+the next of those hours it does nothing at all.
+
 1. Apply `0014` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`.
-2. Deploy the API with `PIPELINE_ENABLED` still `false`.
-3. Deal tomorrow's round by hand and inspect it in Telegram:
+2. Deploy the API.
+3. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
+   Wait for the new deployment to go live before the next step.
+4. Deal tomorrow's round by hand and inspect it in Telegram:
    `curl -X POST -H 'x-admin-secret: …' https://<api>/admin/rounds/<tomorrow>/author`
    Then commit the forecast and the line:
    `curl -X POST … /admin/rounds/<tomorrow>/forecast` and `curl -X POST … /admin/rounds/<tomorrow>/line`
    Check `GET /admin/rounds/<tomorrow>` shows five questions with `market_source`, `market_id`, `line_p_yes`.
-4. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
-5. The round publishes at the next noon ET. The 17:00 ET tick deals the following day's round without help.
-6. Ship the mobile build only after the API is live; the response schemas default every new field, so the old build keeps parsing in the meantime.
+   A `503 {"error":"pipeline not configured"}` here means step 3 has not taken
+   effect yet, not that the round failed.
+5. Delete the retired probe Workflow from the account. Version 3 has no probe
+   and `wrangler.jsonc` no longer binds it, so `oracle-probe` survives the
+   deploy as an orphan that still holds any instances it had:
+   `cd apps/api && npx wrangler workflows list` to confirm it is there, then
+   `npx wrangler workflows delete oracle-probe` (deleting a Workflow also
+   deletes its own instances). The dashboard's Workers → Workflows page does
+   the same thing.
+6. The round publishes at the next noon ET. The 17:00 ET tick deals the following day's round without help.
+7. Ship the mobile build only after the API is live; the response schemas
+   default every new field, so the old build keeps parsing in the meantime.
+   **The build currently on the store renders a version 3 daily board empty** —
+   it reads points and comparisons that a version 3 round no longer carries, so
+   it shows 0 points and null comparisons. Parsing is safe; nothing crashes and
+   nothing 500s. It stays that way until the mobile plan ships.
 
 ### 2.4 Set secrets
 
@@ -129,7 +153,9 @@ wrangler secret put ONESIGNAL_API_KEY
 
 **Question resolution pushes:** Each question now pushes its players the moment it resolves (yes/no). One push per player per question, composed from the `resolve` copy pool. The claim is idempotent — a single `UPDATE predictions SET resolve_pushed_at = now() WHERE resolve_pushed_at IS NULL AND points IS NOT NULL RETURNING` — so the hourly re-dispatch never double-sends. Admin resolves, withdrawals, and voids never trigger push. The settle-time hinge push (published round announcement) is unchanged. `GET /v1/me/ledger` now also returns `reading` — the player's latest locked-or-settled round with decided/total counts — which home uses for the IN PLAY line and the ledger CTA. Resolution pushes fire at whatever hour a question actually resolves, since the resolver retries hourly until the void deadline — a late-verifiable question can push overnight. A quiet-hours delivery window is a follow-up, not yet implemented.
 
-Leave `PIPELINE_ENABLED` unset for the first deploy. Arm it deliberately in §3.
+`PIPELINE_ENABLED` is armed in §2.3, before the manual deal — the admin
+authoring and forecast routes 503 without it. §3 is where you watch the first
+unattended cycle, not where you arm it.
 
 ### 2.5 Deploy
 
@@ -137,8 +163,8 @@ Leave `PIPELINE_ENABLED` unset for the first deploy. Arm it deliberately in §3.
 cd apps/api && pnpm deploy
 ```
 
-Then **verify the three Workflow bindings actually registered**
-(`AUTHORING_WORKFLOW`, `RESOLUTION_WORKFLOW`, `PROBE_WORKFLOW`). A missing
+Then **verify both Workflow bindings actually registered**
+(`AUTHORING_WORKFLOW`, `RESOLUTION_WORKFLOW` — the probe binding is gone). A missing
 binding does not fail the deploy — `buildPipelineDeps` logs a warning and
 falls back to inline execution, which silently reinstates the exact
 15-minute-cron-cap bug the Workflow substrate exists to fix. Check the Worker's
@@ -186,11 +212,11 @@ noon, and two resolver reads per question at settle. The second resolver's Opus
 call is now the largest line by some distance. **Re-measure against the first
 armed week rather than trusting a figure derived from the old shape.**
 
-Arm it, then watch one full cycle end to end:
+It is already armed by §2.3. Watch one full cycle end to end:
 
 ```bash
 cd apps/api
-wrangler secret put PIPELINE_ENABLED   # "true"
+wrangler secret list | grep PIPELINE_ENABLED   # armed in §2.3
 wrangler tail --format pretty
 ```
 

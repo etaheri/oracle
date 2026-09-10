@@ -270,10 +270,23 @@ Existing events gain `stake`, `line`, `delta` properties where a prediction or r
 ## 11. Rollout
 
 1. Apply `0010` to production before deploying the API. Set the `EXA_API_KEY` secret.
-2. Deploy the API with `PIPELINE_ENABLED` still false. Run the market authoring once by the admin route against tomorrow's date and inspect the draft in Telegram.
-3. Arm the pipeline. The first version 3 round publishes at the next noon.
-4. Ship the mobile build. Version 2 rounds already settled remain readable.
-5. The production database holds one player. Their fortune starts at founding.
+2. Deploy the API.
+3. Arm the pipeline: set `PIPELINE_ENABLED` to true. This comes BEFORE the
+   manual deal, because the admin authoring and forecast routes are pipeline
+   routes and answer 503 while the flag is unset. Arming early is safe: the
+   cron only acts inside its scheduled hours, so it does nothing until the next
+   forecast, publish, authoring or settle hour arrives.
+4. Run the market authoring once by the admin route against tomorrow's date,
+   then forecast and line it, and inspect the draft in Telegram. The first
+   version 3 round publishes at the next noon.
+5. Delete the retired `oracle-probe` Workflow from the Cloudflare account
+   (`npx wrangler workflows delete oracle-probe`). Version 3 has no probe and
+   nothing binds it any more.
+6. Ship the mobile build. Version 2 rounds already settled remain readable.
+   Until the mobile plan ships, the build on the store renders a version 3
+   daily board empty — 0 points, null comparisons — because it reads fields a
+   version 3 round no longer carries. Parsing is safe.
+7. The production database holds one player. Their fortune starts at founding.
 
 ## 12. Alignment with forecasting research
 
