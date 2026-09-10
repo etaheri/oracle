@@ -1,4 +1,5 @@
 import { CONSTANTS } from "./constants";
+import { FORTUNE } from "./fortune";
 import { CURRENT_GAME_COPY } from "./gameCopy";
 
 // The machine voice (spec: docs/superpowers/specs/2026-08-26-oracle-voice-design.md).
@@ -50,15 +51,15 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.read-9", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results", "wrong"] },
   { id: "noon.read-10", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
   { id: "noon.tide-1", pool: "noon", text: "YOU STOOD AGAINST THE TIDE. THE TIDE BROKE.", requires: ["tideWin"] },
-  { id: "noon.tide-2", pool: "noon", text: "THE CROWD WENT ONE WAY. YOU WENT THE OTHER. THE LEDGER BOWED TO YOU.", requires: ["tideWin"] },
-  { id: "noon.tide-3", pool: "noon", text: "FEW STOOD WHERE YOU STOOD. THE LEDGER PAID A BOUNTY.", requires: ["tideWin"] },
+  { id: "noon.tide-2", pool: "noon", text: "THE PLAYERS WENT ONE WAY. YOU WENT THE OTHER. THE RECORD BOWED TO YOU.", requires: ["tideWin"] },
+  { id: "noon.tide-3", pool: "noon", text: "FEW STOOD WHERE YOU STOOD. THE HOUSE PAID.", requires: ["tideWin"] },
   { id: "noon.lapsed-1", pool: "noon", text: "YOUR RECORD IS STILL HERE. THE NEXT CALL IS YOURS.", requires: ["lapsed"] },
   { id: "noon.lapsed-2", pool: "noon", text: "YOUR RECORD IS STILL HERE. THE NEXT CALL IS YOURS.", requires: ["lapsed"] },
   { id: "noon.lapsed-3", pool: "noon", text: "YOUR RECORD IS STILL HERE. THE NEXT CALL IS YOURS.", requires: ["lapsed"] },
-  { id: "noon.vigil-1", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
-  { id: "noon.vigil-2", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
-  { id: "noon.vigil-3", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
-  { id: "noon.vigil-4", pool: "noon", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
+  { id: "noon.streak-1", pool: "noon", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
+  { id: "noon.streak-2", pool: "noon", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
+  { id: "noon.streak-3", pool: "noon", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
+  { id: "noon.streak-4", pool: "noon", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["results", "streak"] },
   // ── resolve: the resolution push. A trickle that replaces the batched
   // result (design 2026-09-09 §2.1) — one push per question as it settles,
   // carrying the outcome, the player's call, and the signed points it paid. ──
@@ -66,7 +67,7 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "resolve.plain-2", pool: "resolve", text: "THE ANSWER WAS {outcome}. YOUR CALL: {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-3", pool: "resolve", text: "{outcome}, AS IT HAPPENED. YOU SAID {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-4", pool: "resolve", text: "ONE IS DECIDED: {outcome}. YOUR STAND: {call}. {points}.", requires: ["outcome", "call", "points"] },
-  { id: "resolve.plain-5", pool: "resolve", text: "THE LEDGER READS {outcome}. YOU CALLED {call}. {points}.", requires: ["outcome", "call", "points"] },
+  { id: "resolve.plain-5", pool: "resolve", text: "THE RECORD READS {outcome}. YOU CALLED {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-6", pool: "resolve", text: "DECIDED: {outcome}. YOUR SEAL SAID {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-7", pool: "resolve", text: "{outcome} IT IS. YOU HELD {call}. {points}.", requires: ["outcome", "call", "points"] },
   { id: "resolve.plain-8", pool: "resolve", text: "THE WORLD ANSWERED {outcome}. YOU ANSWERED {call}. {points}.", requires: ["outcome", "call", "points"] },
@@ -93,16 +94,16 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "closing.call-20", pool: "closing", text: "MAKE YOUR CALL. LET THE OUTCOME ANSWER." },
   { id: "closing.partial-1", pool: "closing", text: "A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION.", requires: ["partial"] },
   { id: "closing.partial-2", pool: "closing", text: "YOUR SEALED CALLS CAN RECEIVE OUTCOMES EVEN IN AN INCOMPLETE ROUND.", requires: ["partial"] },
-  // ── streak: vigil lines for in-app surfaces. ──
-  { id: "streak.vigil-1", pool: "streak", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
-  { id: "streak.vigil-2", pool: "streak", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
-  { id: "streak.vigil-3", pool: "streak", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
-  { id: "streak.vigil-4", pool: "streak", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
-  { id: "streak.vigil-5", pool: "streak", text: "YOUR VIGIL: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
+  // ── streak: streak lines for in-app surfaces. ──
+  { id: "streak.kept-1", pool: "streak", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
+  { id: "streak.kept-2", pool: "streak", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
+  { id: "streak.kept-3", pool: "streak", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
+  { id: "streak.kept-4", pool: "streak", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
+  { id: "streak.kept-5", pool: "streak", text: "YOUR STREAK: {streak} DAYS. ONE CALL AT A TIME.", requires: ["streak"] },
   { id: "streak.lapse-1", pool: "streak", text: CURRENT_GAME_COPY.lapse.toUpperCase() },
-  { id: "streak.lapse-2", pool: "streak", text: "A GAP IN THE LEDGER IS NOT THE END OF IT." },
+  { id: "streak.lapse-2", pool: "streak", text: "A GAP IN THE RECORD IS NOT THE END OF IT." },
   { id: "streak.lapse-3", pool: "streak", text: "STREAKS END. RECORDS REMAIN." },
-  { id: "streak.shield-1", pool: "streak", text: CURRENT_GAME_COPY.shieldUsed.toUpperCase() },
+  { id: "streak.protection-1", pool: "streak", text: CURRENT_GAME_COPY.protectionUsed.toUpperCase() },
   { id: "streak.begin-1", pool: "streak", text: "BEGIN AGAIN. THE ORB DOES NOT DWELL." },
   { id: "streak.risk-1", pool: "streak", text: "YOUR STREAK: {streak} DAYS. ONE SEALED CALL KEEPS IT GOING WHEN THE ROUND SETTLES.", requires: ["streak"] },
   // ── system: states of the machine. ──
@@ -111,10 +112,10 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "system.offline-1", pool: "system", text: "COULD NOT CONNECT. YOUR SEALED CALLS ARE KEPT." },
   { id: "system.creed-1", pool: "system", text: "A CALL COMES FIRST. THE OUTCOME HAS THE LAST WORD." },
   { id: "system.creed-2", pool: "system", text: "EVERY ANSWER SEALED BEFORE THE OUTCOME." },
-  // ── paywall: the shield offer. Protection, never pressure. No CTA verbs here —
-  // button labels live in PAYWALL_CTA_LINES by construction. ──
-  { id: "paywall.rescue-1", pool: "paywall", text: "A SHIELD MAY PROTECT AN ELIGIBLE STREAK THROUGH A MISSED ROUND.", requires: ["streak"] },
-  { id: "paywall.terms-1", pool: "paywall", text: "EVERY ROUND IS FREE TO PLAY. YOUR CALLS EARN YOUR RANK AND FORECAST RATING." },
+  // ── paywall: the streak protection offer. Protection, never pressure. No
+  // CTA verbs here — button labels live in PAYWALL_CTA_LINES by construction. ──
+  { id: "paywall.rescue-1", pool: "paywall", text: "STREAK PROTECTION MAY CARRY AN ELIGIBLE STREAK THROUGH A MISSED ROUND.", requires: ["streak"] },
+  { id: "paywall.terms-1", pool: "paywall", text: "EVERY ROUND IS FREE TO PLAY. FORTUNE IS NEVER SOLD." },
 ] as const;
 
 // Purchase-button labels. Deliberately OUTSIDE the bank: the no-CTA-verb law
@@ -131,14 +132,14 @@ export const REMINDER_CTA_LINES = Object.freeze({
 
 export const PAYWALL_CTA_LINES = Object.freeze({
   subscribe: "JOIN OUTSEEN PLUS",
-  rescue: "RAISE THE SHIELD",
+  rescue: "PROTECT THE STREAK",
   restore: "RESTORE PURCHASES",
 } as const);
 
 // OneSignal dashboard campaign copy — the repo is the source of truth; the
 // dashboard is a paste target (spec §5). Standard bank rules apply.
 export const PUSH_CAMPAIGN_LINES = Object.freeze({
-  plusWelcome: "OUTSEEN PLUS IS ACTIVE. SHIELD PROTECTION DEPENDS ON YOUR STREAK AND AVAILABLE RESERVE.",
+  plusWelcome: "OUTSEEN PLUS IS ACTIVE. STREAK PROTECTION DEPENDS ON YOUR STREAK AND AVAILABLE RESERVE.",
 } as const);
 
 // Char-walk hash (31-multiplier, 32-bit wrapped): deterministic, and the
@@ -160,16 +161,17 @@ export function selectLine(
   return eligible[voiceSeed(seedKey) % eligible.length]!;
 }
 
-// The home vigil: one quiet line while a streak holds. Only streak-pool lines
-// that REQUIRE a streak are eligible — the lapse/shield lines are for other
-// moments. Streak 1 is every first day; the oracle starts counting at 2.
-const VIGIL_LINES = COPY_BANK.filter(
+// The home streak line: one quiet line while a streak holds. Only
+// streak-pool lines that REQUIRE a streak are eligible — the lapse/protection
+// lines are for other moments. Streak 1 is every first day; the oracle
+// starts counting at 2.
+const STREAK_LINES = COPY_BANK.filter(
   (l) => l.pool === "streak" && (l.requires ?? []).includes("streak") && !l.id.startsWith("streak.risk"),
 );
 
-export function vigilLine(streak: number, seedKey: string): string | null {
+export function streakLine(streak: number, seedKey: string): string | null {
   if (streak < 2) return null;
-  const line = selectLine(VIGIL_LINES, seedKey, ["streak"]);
+  const line = selectLine(STREAK_LINES, seedKey, ["streak"]);
   return line ? fillSlots(line.text, { streak }) : null;
 }
 
@@ -250,10 +252,10 @@ export const OPENING_RITES_LINES = RITES_LINES.slice(0, OPENING_RITES);
 // test/reading-register.test.ts; the pool's remaining lines (the rescue
 // offer, the terms line) stay in the bank because they stay machine voice.
 export const PLUS_CREED_LINES = [
-  "A shield protects a streak of three days or more through one missed round.",
-  "One free shield each month. Plus adds three shields per billing period, capped at five paid shields per grant.",
-  "Shields protect your streak, not your score. No calls or wins are added.",
-  "Protection requires an eligible streak and an available shield.",
+  "Streak protection carries a streak of three days or more through one missed round.",
+  "One free protection each month. Plus adds three protections per billing period, capped at five paid protections per grant.",
+  "Protection covers your streak, not your fortune or your rating. No calls or wins are added.",
+  "It needs an eligible streak and an available protection.",
 ] as const;
 
 export const SCORE_GLOSS = Object.freeze({
@@ -273,7 +275,7 @@ export const PARTIAL_LINE = "A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTI
 // spec §4). Three declaratives, then the machine asks once.
 export const SUMMONS_LINES = [
   "OUTSEEN CAN SEND UP TO TWO REMINDERS A DAY.",
-  "AN INVITATION TO PLAY OR RETURN TO YOUR LEDGER.",
+  "AN INVITATION TO PLAY OR RETURN TO YOUR RECORD.",
   "NOTIFICATIONS ARE OPTIONAL.",
 ] as const;
 
@@ -308,8 +310,8 @@ export const PIPELINE_LINES = Object.freeze({
 // §3.1). Short by law: they share the single-row slot with the day's CTA.
 export const READING_LINES = Object.freeze({
   inPlayCta: "SEE WHAT IS DECIDED",
-  settled: "THE LEDGER IS READ",
-  settledCta: "READ THE LEDGER",
+  settled: "THE NIGHT IS SETTLED",
+  settledCta: "SEE THE RESULT",
   rail: "LAST ROUND",
 } as const);
 
@@ -326,20 +328,19 @@ export function provenanceLine(written: number, rejected: number): string | null
 }
 
 // Introduction is intentionally separate from the reference rulebook.
-// The opening rites: the only rules screen a first-time player is guaranteed
+// The opening lines: the only rules screen a first-time player is guaranteed
 // to see, and therefore the one that has to be READ rather than recognised.
 // It was set in tracked caps while the reference canon below it was converted
 // to sentence case — the register work applied to the screen players skip and
 // not to the screen they cannot. See test/reading-register.test.ts.
 //
-// The second rite also carries the gesture now. It used to ask "how sure are
-// you?" and never answer how confidence is set, so a first-time player met
-// the swipe with nothing but the one-time nudge animation to explain it; the
-// sentence that does explain it lived only in the reference rites.
+// The second line carries the whole interaction (design D11): a side, a
+// stake, a seal. That is the one gesture the app turns on, so a first-time
+// player has to meet it here before their first card.
 export const INTRO_LINES = [
-  "Choose yes or no. Call what happens next.",
-  "Pull the card toward your answer, then release to seal it. The further you pull, the more confident the call — and the more it gains or costs.",
-  "Return to face the Oracle and find your place among other players.",
+  "The Oracle posts its line on five questions a day.",
+  "Tap YES or NO, then tap a stake from your fortune, then seal it.",
+  "Right calls pay at the Oracle's odds. Wrong calls lose the stake.",
 ] as const;
 
 // RITES_LINES and OPENING_RITES_LINES above are the archived version-1 canon.
@@ -365,64 +366,40 @@ function rite(title: string, defines: readonly string[], claims: readonly string
 
 export const RITES_V2_SECTIONS = [
   // Terms are named without their article: `Term` uppercases the match, so
-  // "the crowd" and "daily board" started the emphasis in a different place
-  // each time and the rite disagreed with itself one line apart. The claims
-  // are plain sentences for the same reason — encoding the caps in the source
-  // AND in `defines` says the same thing twice, and the two drift.
-  rite("The challenge", ["daily board", "crowd"], [
-    "Five questions about what happens next.",
-    "Make your calls, then find out whether you outscored the Oracle and other players.",
-    CURRENT_GAME_COPY.oracleIdentity,
-    "The daily board ranks players.",
-    "The crowd shows which way they lean.",
+  // "the fortune" and "streak protection" started the emphasis in a
+  // different place each time and the rite disagreed with itself one line
+  // apart. The claims are plain sentences for the same reason — encoding the
+  // caps in the source AND in `defines` says the same thing twice, and the
+  // two drift.
+  rite("The game", ["line", "stake", "fortune", "big one"], [
+    "Five questions a day about what happens next, each a live market.",
+    "On every question the Oracle posts its line: its own chance of YES.",
+    "Take a side and choose a stake, a slice of your fortune.",
+    "A right call wins the stake at the Oracle's odds; a wrong call loses it.",
+    `Your fortune starts at ${FORTUNE.FOUNDING.toLocaleString("en-US")}. It can fall hard, but it never reaches zero.`,
+    "The Big One doubles the stake, in both directions.",
   ]),
-  rite("Make a call", ["call", "seal"], [
-    "Your prediction is a call.",
-    "Choose yes or no and set confidence from 55% to 95%.",
-    "Pull toward your answer; a longer pull means greater confidence.",
-    "Release to seal.",
-    "Sealing locks your answer and confidence.",
-    "The crowd is hidden until you commit; the Oracle forecast stays hidden until reveal.",
+  rite("Results and the board", ["reveal", "return", "void"], [
+    "Questions settle from their markets after they close.",
+    "The reveal shows each stake, what it paid, and whether the house won or lost the night.",
+    "The daily board ranks players by return: what the day won or lost as a share of the fortune they started it with.",
+    "The all-time board ranks players by fortune.",
+    "A void question returns its stake to everyone.",
+    `A placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players and every non-void question sealed.`,
   ]),
-  rite("Face the result", ["big one", "crowd bounty"], [
-    "Choose the confidence you can stand behind.",
-    "Higher confidence earns more when right and loses more when wrong.",
-    "The Big One counts double in both directions.",
-    "Your duel and daily board use the same scoring formula for your calls and the Oracle's.",
-    "These base points include the Big One, but no crowd bonus.",
-    `A correct call on a side below ${CONSTANTS.CONTRARIAN_CROWD_PCT}% earns a separate crowd bounty when at least ${CONSTANTS.CONTRARIAN_MIN_CROWD} players answered.`,
-    "The bounty does not affect duel or board.",
-  ]),
-  rite("Build your record", ["forecast rating", "competitive round"], [
-    "A single round settles a challenge.",
-    "Your record shows how your judgment holds up over time.",
-    `Your forecast rating measures performance over qualifying calls and appears after ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} cumulative qualifying calls, not consecutive days.`,
-    "A competitive round requires every non-void question sealed and at least three resolved, non-void questions.",
-    "Only calls from eligible rounds count toward that rating.",
-    `Daily board placing does not require 50 calls; a placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison.`,
-    "Confidence history also includes resolved calls from incomplete rounds, showing how your confidence matched outcomes.",
-  ]),
-  rite("Keep a vigil", ["vigil", "shield", "exhibitions"], [
-    "Your vigil is your playing streak.",
-    "Seal at least one call in a daily round to keep it going; the count updates when that round settles.",
+  rite("Your record", ["streak", "streak protection", "calibration"], [
     CURRENT_GAME_COPY.streakMeaning,
-    `A shield can preserve a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through a missed round, without incrementing it or adding calls.`,
-    "One free shield is available each calendar month; available paid shields are used after it.",
-    CURRENT_GAME_COPY.lapse,
-    "Exhibitions do not count.",
-    "Streaks and early marks do not multiply current points.",
+    `Streak protection carries a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through one missed round, adding no calls.`,
+    "One free protection each month; Plus adds more.",
+    "Practice questions do not count.",
+    "Your calibration is how well your confidence matched what happened, kept beside your fortune as the judgment record.",
   ]),
-  rite("Timing and fairness", ["void", "abstention"], [
-    "Each question has its own deadline.",
-    "If an answer appears early, the question closes and is void for everyone.",
-    "Results follow verification, not a guaranteed time.",
-    "Unresolved outcomes are pending, never losses; void questions score nothing.",
-    "Incomplete rounds still keep the results of your calls.",
-    "An outcome correction or void can update your record.",
-    "The Oracle can report any chance of YES from 0% to 100%; 50% is an abstention.",
-    "Players choose a side at 55% to 95% confidence.",
-    "Both use the same points formula.",
-    "Older rounds retain their versioned rules.",
+  rite("Timing and fairness", ["lock"], [
+    "Every question has its own lock; nothing seals after it.",
+    "Results follow the market's settlement, not a guaranteed time.",
+    "Unsettled questions are pending, never losses.",
+    "A correction can update your record and your fortune.",
+    "Older rounds keep their own rules; open one to read them.",
   ]),
 ];
 export const RITES_V2_LINES = RITES_V2_SECTIONS.map(section => `${section.title.toUpperCase()}: ${section.text}`);

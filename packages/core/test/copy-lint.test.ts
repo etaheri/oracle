@@ -281,9 +281,9 @@ describe("the paywall creed (spec §5 — bank lines, quarantined CTA labels, ca
     expect(CONSTANTS.SHIELD_MIN_STREAK).toBe(3);
     expect(shown).toContain("THREE DAYS OR MORE");
     // What the subscription actually grants, in the player's words.
-    expect(shown).toContain("THREE SHIELDS");
-    // The wall that makes the whole economy honest, said at the till.
-    expect(shown).toContain("FORECAST RATING");
+    expect(shown).toContain("THREE PROTECTIONS");
+    // The wall that makes the whole economy honest, said at the till (D7).
+    expect(shown).toContain("FORTUNE IS NEVER SOLD");
   });
 
   it("CTA labels are quarantined: caps, no emoji, no exclamation, short enough for a button", () => {

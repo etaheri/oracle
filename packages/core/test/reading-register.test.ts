@@ -62,12 +62,14 @@ describe("the reading register", () => {
     }
   });
 
-  it("teaches the gesture that sets confidence", () => {
-    // The one line the whole app turns on. It lived only in the reference
-    // rites, which is the screen a first-time player does not open.
+  it("teaches the two-step seal", () => {
+    // The one interaction the whole app turns on (design D11): a side, a
+    // stake, a seal. It lives in the opening lines, which every first-time
+    // player is shown.
     const intro = INTRO_LINES.join(" ").toLowerCase();
-    expect(intro, "the opening rites must say how a call is made").toContain("pull");
-    expect(intro, "the opening rites must say how a call is committed").toContain("release");
+    expect(intro, "the opening lines must say how a side is chosen").toContain("tap");
+    expect(intro, "the opening lines must say what is chosen next").toContain("stake");
+    expect(intro, "the opening lines must say how a call is committed").toContain("seal");
   });
 });
 

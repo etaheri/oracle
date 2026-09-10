@@ -35,38 +35,35 @@ describe("selectLine", () => {
   });
 });
 
-import { vigilLine } from "../src/copy";
+import { streakLine } from "../src/copy";
 
-describe("vigilLine", () => {
+describe("streakLine", () => {
   it("is null below a 2-day streak", () => {
-    expect(vigilLine(0, "k")).toBeNull();
-    expect(vigilLine(1, "k")).toBeNull();
+    expect(streakLine(0, "k")).toBeNull();
+    expect(streakLine(1, "k")).toBeNull();
   });
-  it("fills the streak into a vigil line and never draws a lapse line", () => {
+  it("fills the streak into a streak line and never draws a lapse line", () => {
     for (let i = 0; i < 30; i++) {
-      const line = vigilLine(7, `seed-${i}`);
+      const line = streakLine(7, `seed-${i}`);
       expect(line).not.toBeNull();
       expect(line).toContain("7");
-      expect(line).not.toMatch(/UNCONSULTED|GAP|STREAKS END|SHIELD|BEGIN AGAIN/);
+      expect(line).not.toMatch(/UNCONSULTED|GAP|STREAKS END|PROTECTION|BEGIN AGAIN/);
     }
   });
   it("is deterministic per seed", () => {
-    expect(vigilLine(4, "home:2026-08-27:4")).toBe(vigilLine(4, "home:2026-08-27:4"));
+    expect(streakLine(4, "home:2026-08-27:4")).toBe(streakLine(4, "home:2026-08-27:4"));
   });
 });
 
-import { RITES_V2_LINES, RITES_LINES, PUSH_CAMPAIGN_LINES } from "../src/copy";
+import { RITES_LINES, PUSH_CAMPAIGN_LINES } from "../src/copy";
 import { CURRENT_GAME_COPY, GAME_TERMS } from "../src/gameCopy";
 describe("current factual copy", () => {
-  it("separates cumulative skill, participation and archived multipliers", () => {
-    const current = RITES_V2_LINES.join(" ");
-    expect(current).toContain("50 cumulative qualifying calls, not consecutive days");
-    expect(current).toContain("at least one call");
-    expect(current).toContain("at least three resolved");
-    expect(current).toContain("do not multiply");
-    expect(current).toContain(CURRENT_GAME_COPY.oracleIdentity);
+  it("keeps the archived canon and the current facts straight", () => {
+    // The rites (RITES_LINES) are the frozen version-1 canon; the four
+    // sections above hold the current facts (see vocabulary.test.ts for the
+    // money-word coverage of RITES_V2_SECTIONS itself).
     expect(RITES_LINES.join(" ")).toContain("TEN PERCENT MORE");
-    expect(CURRENT_GAME_COPY.shieldUsed).toContain("No calls were added");
+    expect(CURRENT_GAME_COPY.protectionUsed).toContain("No calls were added");
     expect(GAME_TERMS.playerRating).toBe("Your forecast rating");
     expect(PUSH_CAMPAIGN_LINES.plusWelcome).not.toContain("YOUR VIGIL IS PROTECTED");
   });
@@ -83,7 +80,7 @@ describe("current factual copy", () => {
 it("counts human players for the daily board minimum", async () => {
   const { RITES_V2_SECTIONS } = await import("../src/copy");
   const { CONSTANTS } = await import("../src/constants");
-  const record = RITES_V2_SECTIONS.find(section => section.title === "Build your record")!.text;
-  expect(record).toContain(`${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison`);
-  expect(record).not.toContain("including the Oracle");
+  const board = RITES_V2_SECTIONS.find(section => section.title === "Results and the board")!.text;
+  expect(board).toContain(`${CONSTANTS.BOARD_MIN_FIELD} eligible players and every non-void question sealed`);
+  expect(board).not.toContain("including the Oracle");
 });
