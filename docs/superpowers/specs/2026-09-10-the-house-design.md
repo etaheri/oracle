@@ -150,13 +150,13 @@ One Sonnet 5 call, no web search, effort low. Input: the five exchange titles an
 
 ### 5.5 Commit
 
-The existing forecast commit (`forecast` action, `rounds.oracle_*` columns) runs unchanged and produces `oracle_p_yes` for each question. The line is then derived and stored:
+The forecast commit (`forecast` action) becomes the Council commit (§13): every member commits a line on every question, independently, before open. `oracle_p_yes` is the median of the members present. The house line is then derived and stored:
 
 ```
 line = clamp(oracle_p_yes, max(LINE_MIN, market_prob − LINE_MARKET_BAND), min(LINE_MAX, market_prob + LINE_MARKET_BAND))
 ```
 
-`questions.line_p_yes` is written once, in the same transaction as the commit, and is immutable. A round whose commit misses the deadline opens without a line and without stakes, exactly as a round without a forecast opens without a duel today. Its predictions record confidence and Brier only.
+`questions.line_p_yes` is written once, in the same transaction as the members' lines, and is immutable. A round whose commit misses the deadline opens without a line and without stakes, exactly as a round without a forecast opens without a duel today. Its predictions record confidence and Brier only.
 
 ### 5.6 Settlement
 
@@ -175,7 +175,7 @@ Settlement of a question runs the existing `resolveQuestion` path, then computes
 
 For version 3 rounds: `gauntlet/generate`, `screen`, `sources`, `critic`, `preflight`, `editorial`, `probe.ts`, `leak.ts`, the model resolver, and the hourly authoring retry. Bank authoring and bank resolution keep the model paths, and the resolver prompt gains the current instant and the question's open instant with the instruction that evidence dated before the open instant is a different event. That is the only change to the retained model path.
 
-Expected model calls per night: one voice call, one taste call, one forecast commit. Roughly one cent.
+Expected model calls per night: one voice call, one taste call, three Council commits, and one lesson per model member per settled question (§14). Well under a dollar; the Opus commit is most of it.
 
 ## 6. Schema
 
@@ -195,6 +195,10 @@ questions.market_event_key   text
 questions.market_closes_at   timestamptz
 rounds.house_delta           integer
 user_rounds.fortune_at_open  integer
+
+lines                        (§13) question_id, member, p_yes, committed_at, model, prompt_version,
+                             brier, house_delta   — primary key (question_id, member)
+lessons                      (§14) id, member, series_key, question_id, text, resolved_at, created_at
 ```
 
 `CURRENT_RULES_VERSION` becomes 3. Version 3 rounds require `line_p_yes` on every question at publish, or the round opens unstaked (§5.5).
@@ -209,6 +213,8 @@ user_rounds.fortune_at_open  integer
 | `GET /v1/round/:date/board` | Daily rows ranked by `return`. Adds an all-time mode ranked by `fortune`. Eligibility rules unchanged. |
 | `GET /v1/me/ledger` | Adds `fortune`, `fortune_history` (one entry per settled round: date, delta, fortune after). Calibration buckets unchanged. |
 | `GET /v1/round/exhibition` | Practice runs on a fixed practice fortune of 1,000 and a fixed line, never touching the user's fortune. |
+| `GET /v1/round/:date/reveal` | Adds `council`: one entry per member with its line on each question, revealed only after lock. |
+| `GET /v1/standings` | Public, unauthenticated. Per member: calls, Brier, house delta since founding, plus the same figures for the crowd and for the market baseline. Backs the site page and the open dataset (§13.4). |
 
 ## 8. Mobile
 
@@ -221,7 +227,7 @@ Every surface keeps its materials, typography and motion. Copy follows the Outse
 | Seal | Unchanged gesture. Receipt reads `YES AT 70 · STAKED 42`. |
 | Card back | Crowd flip unchanged. |
 | Home | Fortune is the hero number. Beneath it the house line: `LAST NIGHT THE HOUSE LOST 1,240` or `WON`. |
-| Reveal | Headline is the round delta and the fortune after. Each card shows stake, payout, the line and, as context, the market's price. The Oracle comparison becomes "you took the Oracle for N" or "the Oracle took N". Points, streak and milestone copy move to the expandable detail. |
+| Reveal | Headline is the round delta and the fortune after. Each card shows stake, payout, the line and, as context, the market's price. The Oracle comparison becomes "you took the Oracle for N" or "the Oracle took N". Under the line, the Council's split (§13.3). Points, streak and milestone copy move to the expandable detail. |
 | Board | Daily by return, all-time by fortune. |
 | Ledger | Fortune history above the calibration record. |
 | Share card | Night realm, unchanged materials. Line one: fortune delta. Line two: the Oracle's line on the Big One and what the player did about it. |
@@ -239,6 +245,8 @@ Existing events gain `stake`, `line`, `delta` properties where a prediction or r
 - Settlement readers: fixtures for settled YES, settled NO, cancelled, and still-open on both exchanges; a retried settle pays nobody twice.
 - API: seal → settle → fortune on a version 3 round; a seal on a lineless question is rejected; version 2 rounds settle exactly as before.
 - Mobile: card line and stake readout at three confidences; reveal headline for win, loss and void; house headline for the negative purse; practice never posts a stake.
+- Council: median with an even and odd number of members; an abstaining member is excluded from the median and scored nothing; a member whose response fails to parse abstains rather than defaulting to 50; per-member Brier and house delta over a settled round; the market baseline member is never sent to a model.
+- Lessons: a lesson is written only after settlement; the as-of filter excludes a lesson whose outcome was not known at commit time; caps hold; a member never receives another member's lessons.
 - The full suite runs under the existing timing note: about six and a half minutes, bare 5,000 ms timeouts are contention.
 
 ## 11. Rollout
@@ -259,10 +267,73 @@ The Forecasting Research Institute and Metaculus tournaments score forecasters o
 
 The pitch writes itself as "the daily game that finds forecasters". Nothing in this spec is required for that pitch beyond what the game needs anyway.
 
-## 13. Out of scope
+## 13. The Council
+
+The line commit is plural, independent and publicly scored. A **member** is anything that commits a probability on every question of a round before the round opens and is scored on the outcome by the same rule as every other member.
+
+### 13.1 Members at launch
+
+| Member | What it is | Cost per night |
+| --- | --- | --- |
+| `sonnet` | Claude Sonnet 5 with the existing forecast prompt and web search | one call |
+| `opus` | Claude Opus 5, same prompt | one call |
+| `haiku` | Claude Haiku 4.5, same prompt, no search | one call |
+| `market` | The exchange price at selection time, verbatim | none |
+
+Three models is the smallest set that gives a median a meaning. The market member is the baseline every other member is measured against and is never sent to a model. Membership is a static table in code; adding a member is one row and, for a model member, one prompt-version string.
+
+### 13.2 Commit and the house line
+
+Each model member commits in its own workflow step so a failure or timeout in one does not lose the others. A member that fails, times out, or returns a probability that does not parse **abstains** for that question: no row, no score, and it is excluded from the median. The house line is the median of the members present, clamped to the market band (§5.5). If fewer than two members are present on any question the round opens unstaked (§5.5), and that is alerted.
+
+Every member's line is written to `lines` in the same transaction as `questions.line_p_yes`, with `committed_at`, the model id and the prompt version. Rows are immutable. The existing commitment snapshot on `rounds` keeps recording the round-level facts.
+
+### 13.3 What players see
+
+Before the seal: the house line only. Members' lines are not shown until the round locks, because the split is information and the house is the one line the player plays against.
+
+At the reveal, under each card's line: the split, one row per member, in a fixed order. "Sonnet 40 · Opus 31 · Haiku 44 · Market 35 · The Oracle's line 35." Each member's row carries its outcome for that question in the same win/loss colour the player's own call uses.
+
+### 13.4 Standings and the open record
+
+`GET /v1/standings` returns, for each member and for the crowd, the number of scored calls, mean Brier, and house delta since founding, computed over settled version 3 questions. House delta for a member is what the purse would have done had that member's line been the house alone, using the actual stakes players placed. It is the same aggregate as `rounds.house_delta`, with the member's line substituted.
+
+The site gains one page, `/standings`, that renders the table and a one-line explanation of the rule. The same route, with `?format=csv`, returns one row per settled question and member: date, slot, question text, market id, market price at selection, member line, house line, crowd yes percent, crowd count, outcome. This is the open record. It contains nothing about any individual player.
+
+The standings page is the public proof that the man-versus-machine claim is true, and the dataset is the artefact offered to forecasting-research partners (§12).
+
+### 13.5 Members to come
+
+None of these are built in this release; the table shape is what admits them.
+
+- **Seers.** Players in the top decile of the calibration ledger over a minimum number of calls earn a pre-open window in which they commit lines like any other member. On a round where a player is a Seer, they are the house, not a player: their lines are scored as a member and they place no stakes. The house line stays a median, so a single Seer cannot move it far.
+- **Visitors.** An external forecaster, human or model, that commits lines through an authenticated route before the commit deadline, scored identically. This is how another lab enters the arena.
+
+## 14. Memory
+
+Taken from TradingAgents' decision log rather than its agent graph. The mechanism is small: store the decision now, reflect once when the outcome is known, and feed a few short lessons back into the next prompt with a strict as-of rule so nothing learns from the future.
+
+### 14.1 Rule
+
+- At settlement of a question, for each model member that committed a line on it, one Haiku call writes a lesson: two to four sentences of plain prose stating whether the line was on the right side of the outcome, what in the reasoning held or failed, and one concrete adjustment for the next question in the same series. Written once, keyed on `(member, question)`, never rewritten.
+- `series_key` is the exchange's recurring series when one exists (Kalshi series ticker such as `KXHIGHNY`, Polymarket event tag), otherwise the question's category.
+- Before a member commits, its prompt receives at most the five most recent lessons from the same `series_key` and the three most recent from any other, **each with an outcome known before the moment of commit**. A lesson whose `resolved_at` is later than the commit instant is never included. This is the as-of rule and it is what keeps the standings honest and any later replay free of look-ahead.
+- A member receives only its own lessons. Sharing lessons across members would correlate their errors, and the median depends on them being independent.
+- Lessons are stored in `lessons` and are readable from the admin route, so a bad lesson can be found and deleted by hand.
+
+### 14.2 What this buys
+
+Recurring series are where a fixed prompt loses to a market: the same NYC high-temperature question every day, the same weekly game markets, the same monthly prints. A member that has learned "the NWS forecast high has run two degrees warm this month" from its own record has an edge the market may not, and that edge is exactly the kind of disagreement the line band permits. The cost is one Haiku call per member per settled question, about a tenth of a cent.
+
+### 14.3 Not taken
+
+TradingAgents' bull and bear researcher debate, its four-analyst fan-out and its portfolio-manager approval step are not taken. Each multiplies calls, and the debate correlates the participants' errors. The Council's median over independent members gets the diversity benefit at one call per member. Its `REVIEW`-not-`Hold` rule for an unparseable decision is already the Council's abstention rule.
+
+## 15. Out of scope
 
 - A moving line as players stake. The line is fixed at commit. Manifold's automated market-maker math is the reference if this ever changes.
-- Multi-agent forecasting for the Oracle's line. The pattern from TradingAgents is one prompt away and multiplies calls.
+- Debate between Council members before committing. Independent lines and a median give the diversity without the rounds of calls; a debate would also correlate the members' errors, which is the thing the median exists to exploit.
+- Player members and external members of the Council. The table shape admits them (§13.5); nothing in this release builds them.
 - A named currency. Fortune is unit-less by design.
 - Fortune leaderboards across friends, seasons or resets.
 - Kalshi or Polymarket as a source for the bank. The bank stays evergreen and authored.
