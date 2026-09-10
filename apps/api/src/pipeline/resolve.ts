@@ -25,6 +25,8 @@ import { askResolver, settled, type ResolverVerdict } from "./resolver";
 import { BudgetExhausted } from "./spend";
 import { claimResolutionPushes } from "../push/compose";
 import { sendPushes } from "../push/onesignal";
+import { DEFAULT_EXCHANGES } from "./market-round";
+import type { ExchangeSource } from "./exchanges/types";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -89,6 +91,29 @@ export async function resolveWithClaude(deps: PipelineDeps, questionId: string):
   return true;
 }
 
+/**
+ * Exchange settlement (design 2026-09-10 §5.6). No model: the market this
+ * question IS reports its own result. Unsettled stays locked and is retried
+ * hourly by the same action that retries the model resolver.
+ */
+export async function resolveFromExchange(deps: PipelineDeps, questionId: string): Promise<boolean> {
+  const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+  if (!q) throw new Error(`resolve: question not found: ${questionId}`);
+  if (!q.marketSource || !q.marketId) throw new Error(`resolve: ${questionId} is not a market question`);
+  const feeds = deps.exchangeFeeds ?? DEFAULT_EXCHANGES;
+  const feed = feeds.find((f) => f.source === (q.marketSource as ExchangeSource));
+  if (!feed) throw new Error(`resolve: no feed for ${q.marketSource}`);
+  const read = await feed.read(deps.marketFetch ?? fetch, q.marketId);
+  if (!read.settled || read.outcome === null) return false;
+  // Same late-write guard as the model path: a void may have landed meanwhile.
+  const current = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+  if (!current || current.status !== "locked") return false;
+  await resolveQuestion(deps.db, questionId, read.outcome, {
+    source: q.marketSource, market_id: q.marketId, read_at: deps.now().toISOString(), outcome: read.outcome, raw: read.raw,
+  });
+  return true;
+}
+
 export interface ResolveOutcome {
   questionId: string;
   resolved: boolean;
@@ -115,7 +140,8 @@ export async function resolveOne(deps: PipelineDeps, questionId: string): Promis
   let resolved = false;
   let error: string | undefined;
   try {
-    resolved = await resolveWithClaude(deps, questionId);
+    const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId), columns: { marketSource: true } });
+    resolved = q?.marketSource ? await resolveFromExchange(deps, questionId) : await resolveWithClaude(deps, questionId);
   } catch (err) {
     if (err instanceof BudgetExhausted) throw err;
     error = err instanceof Error ? err.message : String(err);
