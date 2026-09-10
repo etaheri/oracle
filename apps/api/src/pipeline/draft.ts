@@ -46,6 +46,15 @@ export const DraftQuestionSchema = z
     // against fixtures/DB rows that predate it.
     context: QuestionContextSchema.optional(),
     topic_key: z.string().min(3).max(64).nullable().optional(),
+    // The exchange market this question IS (design 2026-09-10 §5). Required
+    // at rules version 3, refused by upsertDraft when absent there; ignored
+    // at 1 and 2.
+    market: z.object({
+      source: z.enum(["kalshi", "polymarket"]),
+      id: z.string().min(1),
+      event_key: z.string().min(1),
+      closes_at: z.iso.datetime({ offset: true }),
+    }).optional(),
   })
   .superRefine((q, ctx) => {
     // Weather's information arrives continuously, so "after-lock" is never
@@ -134,9 +143,21 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
   const locksAtDefault = noonET(addDays(date, 1));
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
-  if (rulesVersion >= 2) {
+  if (rulesVersion === 2) {
     const fast = checkFastRound(draft.questions, { fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
     if (fast) throw new Error(fast);
+  }
+  if (rulesVersion >= 3) {
+    // The market window (design 2026-09-10 §5.2) replaces the fast-round
+    // rule: every question closes between lock + 2h and lock + 30h.
+    const minClose = locksAtDefault.getTime() + 2 * 3_600_000;
+    const maxClose = locksAtDefault.getTime() + 30 * 3_600_000;
+    for (const q of draft.questions) {
+      if (!q.market) throw new Error(`slot ${q.slot}: every version 3 question names its market`);
+      const t = Date.parse(q.market.closes_at);
+      if (t < minClose) throw new Error(`slot ${q.slot}: market closes before lock + 2h`);
+      if (t > maxClose) throw new Error(`slot ${q.slot}: market closes later than lock + 30h`);
+    }
   }
 
   // Validate ALL rows (including each question's resolves_at) before any
@@ -169,10 +190,14 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
       // were contested (design 2026-09-03 §6).
       authorProb: String(q.author_probability),
       topicKey: q.topic_key,
+      marketSource: q.market?.source ?? null,
+      marketId: q.market?.id ?? null,
+      marketEventKey: q.market?.event_key ?? null,
+      marketClosesAt: q.market ? new Date(q.market.closes_at) : null,
       opensAt,
       locksAt,
       resolvesAt: q.resolves_at === RESOLVES_AFTER_LOCK ? null : new Date(q.resolves_at),
-      resolveBy,
+      resolveBy: q.market ? new Date(Date.parse(q.market.closes_at) + 6 * 3_600_000) : resolveBy,
       status: "scheduled" as const,
     };
   });
