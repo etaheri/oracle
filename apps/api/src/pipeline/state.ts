@@ -13,9 +13,9 @@ import { addDays, type ETNow } from "./clock";
 export const BANK_LOW_WATER = 5;
 
 // How often the open window is swept for questions whose answers have already
-// appeared. Four hours gives roughly five probes per question across a 24-hour
-// window; the spend ceiling in spend.ts is what bounds the cost. An ops
-// threshold, like BANK_LOW_WATER — not a game rule.
+// appeared (version 1 and 2 mechanism). Four hours gives roughly five probes per
+// question across a 24-hour window; the spend ceiling in spend.ts is what bounds
+// the cost. An ops threshold, like BANK_LOW_WATER — not a game rule.
 export const PROBE_INTERVAL_HOURS = 4;
 
 export type Action =
@@ -40,6 +40,7 @@ export interface PipelineState {
     // probe could teach anything. A question already past its lock is the
     // lock action's business, not the probe's.
     probeIds: string[];
+    rulesVersion: number;
   } | null; // status='open'; lockPassed = now >= questions' locksAt
   lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
   scheduledDates: string[]; // rounds with status='scheduled'
@@ -80,6 +81,7 @@ export async function loadPipelineState(db: Db, now: Date, claudeAvailable: bool
         .filter((q) => q.status === "open" && q.locksAt.getTime() > now.getTime())
         .sort((a, b) => a.slot - b.slot)
         .map((q) => q.id),
+      rulesVersion: openRoundRow.rulesVersion,
     };
   }
 
@@ -138,6 +140,7 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     state.openRound &&
     !state.openRound.lockPassed &&
     state.openRound.probeIds.length > 0 &&
+    state.openRound.rulesVersion < 3 &&
     state.claudeAvailable &&
     hour % PROBE_INTERVAL_HOURS === 0 &&
     minute < 10
@@ -184,8 +187,9 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     }
   }
 
-  // AUTHOR tomorrow — hourly throttle at minute<10
-  if (!state.scheduledDates.includes(tomorrow) && hour >= 17 && minute < 10) {
+  // AUTHOR tomorrow — ONCE, at 17:00 (design 2026-09-10 §5). A failed night
+  // is narrated by the run itself and by the 23:00 alert; the bank covers noon.
+  if (!state.scheduledDates.includes(tomorrow) && hour === 17 && minute < 10) {
     actions.push({ kind: "author", date: tomorrow });
   }
 

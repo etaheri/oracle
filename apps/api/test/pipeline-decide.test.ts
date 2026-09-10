@@ -10,18 +10,18 @@ const at = (hour: number, minute = 0) => ({ date: "2026-08-27", hour, minute });
 
 describe("decideActions", () => {
   it("does nothing on a quiet mid-morning tick", () => {
-    expect(decideActions(at(9), { ...empty, openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false, probeIds: [] } })).toEqual([]);
+    expect(decideActions(at(9), { ...empty, openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false, probeIds: [], rulesVersion: 2 } })).toEqual([]);
   });
   it("locks a round past its lock time", () => {
-    const acts = decideActions(at(12), { ...empty, openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false, probeIds: [] } });
+    const acts = decideActions(at(12), { ...empty, openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false, probeIds: [], rulesVersion: 2 } });
     expect(acts[0]).toEqual({ kind: "lock", date: "2026-08-26" });
   });
   it("locks then publishes in one noon tick without a late forecast", () => {
-    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false, probeIds: [] }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
+    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: true, needsForecast: false, probeIds: [], rulesVersion: 2 }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
     expect(acts.map((a) => a.kind)).toEqual(["lock", "publish"]);
   });
   it("never publishes while another round is open and not yet lockable", () => {
-    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false, probeIds: [] }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
+    const acts = decideActions(at(12), { openRound: { date: "2026-08-26", lockPassed: false, needsForecast: false, probeIds: [], rulesVersion: 2 }, lockedRound: null, scheduledDates: ["2026-08-27"], bankCount: 0, claudeAvailable: true });
     expect(acts.some((a) => a.kind === "publish")).toBe(false);
   });
   it("does not publish before noon", () => {
@@ -60,7 +60,7 @@ describe("decideActions", () => {
   it("criticals at 12:10 with nothing published or publishable", () => {
     const acts = decideActions(at(12, 10), empty);
     expect(acts.some((a) => a.kind === "alert" && a.level === "critical")).toBe(true);
-    expect(decideActions(at(12, 10), { ...empty, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false, probeIds: [] } })).toEqual([]);
+    expect(decideActions(at(12, 10), { ...empty, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false, probeIds: [], rulesVersion: 2 } })).toEqual([]);
   });
   it("no alert at 13:30 once a locked round has nothing left unresolved (settles instead)", () => {
     const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [] } });
@@ -72,7 +72,7 @@ describe("decideActions", () => {
       { kind: "publish-bank", date: "2026-08-27" },
     ]);
     expect(decideActions(at(12), { ...empty, bankCount: 2, scheduledDates: ["2026-08-27"] }).map((a) => a.kind)).toEqual(["publish"]);
-    expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false, probeIds: [] } })).toEqual([]);
+    expect(decideActions(at(12), { ...empty, bankCount: 2, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false, probeIds: [], rulesVersion: 2 } })).toEqual([]);
     expect(decideActions(at(11, 50), { ...empty, bankCount: 2 })).toEqual([]);
   });
   it("never falls through to the bank when today already has a locked round (all-five-early-locks tail)", () => {
@@ -99,11 +99,11 @@ describe("loadPipelineState", () => {
     const idsBySlot = [...rows].sort((a, b) => a.slot - b.slot).map((r) => r.id);
     const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"), true);
     // Past its own lock: nothing left for a probe to teach.
-    expect(st.openRound).toEqual({ date: "2026-08-26", lockPassed: true, needsForecast: true, probeIds: [] });
+    expect(st.openRound).toEqual({ date: "2026-08-26", lockPassed: true, needsForecast: true, probeIds: [], rulesVersion: 1 });
     expect(st.claudeAvailable).toBe(true);
     const st2 = await loadPipelineState(db, new Date("2026-08-27T15:00:00Z"), false);
     // Still ahead of its lock: every open question is a probe candidate.
-    expect(st2.openRound).toEqual({ date: "2026-08-26", lockPassed: false, needsForecast: true, probeIds: idsBySlot });
+    expect(st2.openRound).toEqual({ date: "2026-08-26", lockPassed: false, needsForecast: true, probeIds: idsBySlot, rulesVersion: 1 });
     expect(st2.claudeAvailable).toBe(false);
   });
 
@@ -125,7 +125,7 @@ describe("loadPipelineState", () => {
 
 describe("the forecast action", () => {
   const openNeeding = {
-    openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true, probeIds: [] },
+    openRound: { date: "2026-09-03", lockPassed: false, needsForecast: true, probeIds: [], rulesVersion: 2 },
     lockedRound: null, scheduledDates: [], bankCount: 5, claudeAvailable: true,
   };
   const scheduled = { ...empty, scheduledDates: ["2026-08-27"] };
@@ -173,7 +173,7 @@ describe("the forecast action", () => {
 });
 
 describe("the probe action (design 2026-09-04 §5)", () => {
-  const openWithProbes = { date: "2026-09-04", lockPassed: false, needsForecast: false, probeIds: ["q1", "q2"] };
+  const openWithProbes = { date: "2026-09-04", lockPassed: false, needsForecast: false, probeIds: ["q1", "q2"], rulesVersion: 2 };
 
   it("fires on the probe interval, not on the hourly one", () => {
     const at = (hour: number, minute: number) =>
@@ -207,5 +207,25 @@ describe("the probe action (design 2026-09-04 §5)", () => {
   it("stays pure: the same clock and state give the same actions", () => {
     const s = { openRound: openWithProbes, lockedRound: null, scheduledDates: [], bankCount: 5, claudeAvailable: true };
     expect(decideActions({ date: "2026-09-04", hour: 16, minute: 3 }, s)).toEqual(decideActions({ date: "2026-09-04", hour: 16, minute: 3 }, s));
+  });
+});
+
+describe("authoring at version 3", () => {
+  it("fires once, at 17:00, and not at 18:00", () => {
+    const state = { ...empty, scheduledDates: [] };
+    expect(decideActions({ date: "2026-09-10", hour: 17, minute: 3 }, state).some((a) => a.kind === "author")).toBe(true);
+    expect(decideActions({ date: "2026-09-10", hour: 18, minute: 3 }, state).some((a) => a.kind === "author")).toBe(false);
+    expect(decideActions({ date: "2026-09-10", hour: 17, minute: 12 }, state).some((a) => a.kind === "author")).toBe(false);
+  });
+});
+
+describe("probe at version 3", () => {
+  it("never fires on a version 3 open round", () => {
+    const state = { ...empty, openRound: { date: "2026-09-10", lockPassed: false, needsForecast: false, probeIds: ["q1"], rulesVersion: 3 } };
+    expect(decideActions({ date: "2026-09-10", hour: 16, minute: 3 }, state).some((a) => a.kind === "probe")).toBe(false);
+  });
+  it("still fires on a version 2 open round", () => {
+    const state = { ...empty, openRound: { date: "2026-09-10", lockPassed: false, needsForecast: false, probeIds: ["q1"], rulesVersion: 2 } };
+    expect(decideActions({ date: "2026-09-10", hour: 16, minute: 3 }, state).some((a) => a.kind === "probe")).toBe(true);
   });
 });
