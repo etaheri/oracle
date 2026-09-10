@@ -271,10 +271,10 @@ describe("GET /admin/bank", () => {
 
 describe("POST /admin/rounds/:date/author", () => {
   // The nightly cron only ever authors TOMORROW (decideActions gates AUTHOR on
-  // hour >= 17 and hardcodes the date). There was no way to ask the gauntlet
-  // for a specific date — so seeding a round by hand meant POSTing a draft,
-  // which upsertDraft writes at rules_version 1: the legacy reveal, no duel.
-  // This runs the SAME path the cron runs, at v2, for a date you name.
+  // hour >= 17 and hardcodes the date). There was no way to ask for a market
+  // round on a specific date — so seeding a round by hand meant POSTing a
+  // draft, which upsertDraft writes at rules_version 1: the legacy reveal, no
+  // duel. This runs the SAME market round the cron runs, for a date you name.
   it("503s when the pipeline isn't configured", async () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });

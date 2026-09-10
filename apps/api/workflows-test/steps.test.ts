@@ -6,7 +6,7 @@
 // A load-bearing fact about this introspector, discovered empirically while
 // writing these tests (mockStepError/mockStepResult replace a step's REAL
 // callback outright — confirmed by watching an unmocked "context" step throw
-// real DB-query errors from src/pipeline/gauntlet/generate.ts, while a mocked
+// real DB-query errors from the step's own implementation, while a mocked
 // step never touches its real implementation at all): a mocked failure can
 // only ever exercise the ENGINE's own retry accounting for the policy passed
 // to `step.do()`. It can never reach the `catch` inside `durableStep`

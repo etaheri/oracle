@@ -23,7 +23,8 @@ export interface PipelineDeps {
   telegram: TelegramClient;
   claude: ClaudeClient | null;
   models: {
-    author: string;    // Opus 5 + search — writes the candidates
+    author: string;    // Opus 5 + search — bank authoring and /reroll only,
+                       // never the nightly round
     resolve: string;   // Sonnet 5 + search — resolver A
     resolveB: string;  // Opus 5 + search — resolver B, a DIFFERENT model on purpose
     forecast: string;  // Sonnet 5 + search — the Oracle's own position

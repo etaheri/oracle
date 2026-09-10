@@ -33,7 +33,12 @@ export const POLICY = {
    */
   modelWide: { timeout: "8 minutes", retries: { limit: 1, delay: "20 seconds", backoff: "exponential" } },
 
-  /** N parallel GETs, each already capped at SOURCE_TIMEOUT_MS internally. */
+  /**
+   * The exchange fetch that opens the market round. Guards `fetchCandidates`:
+   * each feed is walked page by page up to its own MAX_PAGES, feeds in
+   * sequence, and a feed that throws is caught and contributes zero rows
+   * rather than failing the step. The timeout is the whole walk, not one GET.
+   */
   sourceFetch: { timeout: "2 minutes", retries: { limit: 2, delay: "5 seconds", backoff: "exponential" } },
 
   /** Deterministic compute. Retried only to survive an engine restart. */

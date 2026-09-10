@@ -179,9 +179,12 @@ The deployed origin is now an input to three other systems:
 ## 3. Arm the pipeline — supervise the first day
 
 The pipeline has **never executed a single unattended day**. Everything in it
-is covered as code and uncovered as operations. Cost when armed is roughly
-**$80–96/month** in model calls; the probe cadence is the largest line, the
-second resolver's Opus call the next.
+is covered as code and uncovered as operations. The old **$80–96/month**
+estimate was dominated by the 4-hourly probe, which no longer exists: version 3
+spends one voice call and one taste call on authoring, one forecast call before
+noon, and two resolver reads per question at settle. The second resolver's Opus
+call is now the largest line by some distance. **Re-measure against the first
+armed week rather than trusting a figure derived from the old shape.**
 
 Arm it, then watch one full cycle end to end:
 
@@ -196,8 +199,12 @@ The cron fires every 10 minutes. The day's shape:
 - **noon ET** — publish, and the Oracle's forecast is stamped in the *same
   tick*, pushed after publish. If the forecast lands at 13:00 instead, the
   ordering regression is back (it used to trail every first-hour player).
-- **lock / probe** — a 4-hourly probe pulls a lock forward when an answer
-  appears early.
+- **17:00 ET** — authoring: the market round fetches both exchanges, picks
+  five markets, and spends one voice call and one taste call on them. Once a
+  night, not hourly. A night that cannot deal five falls through to the
+  evergreen bank.
+- **lock** — noon ET the next day, at the stated `locks_at`. Nothing pulls a
+  lock forward any more; the probe that used to is retired.
 - **settle** — resolution reads twice with two *different* models; a
   disagreement resolves to unverifiable, never a winner. Never set
   `PIPELINE_RESOLVE_MODEL` and `PIPELINE_RESOLVE_MODEL_B` to the same model —
@@ -207,8 +214,10 @@ The cron fires every 10 minutes. The day's shape:
 Telegram is the operator console: `/status`, `/reroll <slot> [guidance]`,
 `/flip <slot> <yes|no|void>`.
 
-Every threshold in the gauntlet is a first guess. Plan to tune them off the
-first live week's rejection tally.
+The market round's eligibility thresholds — the volume floor, the closing
+window, the five-market round size — are first guesses. Plan to tune them off
+the first live week, reading how many markets each exchange actually offers
+inside the window.
 
 Manual override if you want a round on the board before trusting the cron:
 `POST /admin/rounds/:date` (upsert draft) → `POST /admin/rounds/:date/publish`
