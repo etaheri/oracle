@@ -392,7 +392,7 @@ describe("v3 response fields are optional and typed", () => {
     const l = MeLedgerSchema.parse({
       milestones: [], oracle_score: null, percentile: null, cohort_size: 0, calls_rated: 0, calls_answered: 0, days_consulted: 0,
       streak: 0, accuracy_pct: null, avg_confidence: null, tide_wins: 0, majority_rate: null, free_shield_available: true,
-      paid_shields: 0, shield_used_on: null, claimed: false, epithet: null, computed_through: "2026-09-10",
+      paid_shields: 0, shield_used_on: null, claimed: false, epithet: { id: "novice", title: "THE NOVICE", receipt: "first calls" }, computed_through: "2026-09-10",
       oracle: { score: null, calls_rated: 0, days_outseen: 0, days_compared: 0 },
       fortune: 1086, fortune_history: [{ date: "2026-09-10", delta: 86, fortune_after: 1086 }],
     });
@@ -1055,7 +1055,7 @@ function fetchFrom(routes: Array<[string, string]>): typeof fetch {
 
 describe("POLYMARKET_FEED.list", () => {
   const window = { from: new Date("2026-09-11T18:00:00Z"), to: new Date("2026-09-12T22:00:00Z") };
-  it("pages by offset until an empty page, sends a browser user agent, maps fields", async () => {
+  it("stops at a short page, sends a browser user agent, maps fields", async () => {
     const calls: Array<{ url: string; ua: string | undefined }> = [];
     const f = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -1063,7 +1063,7 @@ describe("POLYMARKET_FEED.list", () => {
       return fetchFrom([["offset=100", fx("polymarket-markets-page2.json")], ["offset=0", fx("polymarket-markets-page1.json")]])(input, init);
     }) as typeof fetch;
     const out = await POLYMARKET_FEED.list(f, window);
-    expect(calls.length).toBe(2);
+    expect(calls.length).toBe(1); // the fixture page holds 40 rows, under PAGE, so paging stops
     expect(calls[0]!.ua).toMatch(/Mozilla/);
     expect(calls[0]!.url).toContain("end_date_min=2026-09-11T18:00:00Z");
     expect(calls[0]!.url).toContain("volume_num_min=");
@@ -1613,7 +1613,7 @@ import { describe, it, expect } from "vitest";
 import { voiceQuestions, VOICE_PROMPT_VERSION } from "../src/pipeline/voice";
 import type { PipelineDeps } from "../src/pipeline";
 
-function depsWith(structured: PipelineDeps["claude"] extends infer C ? (C extends null ? never : C["structured"]) : never): PipelineDeps {
+function depsWith(structured: NonNullable<PipelineDeps["claude"]>["structured"]): PipelineDeps {
   return {
     db: null as unknown as PipelineDeps["db"],
     telegram: { send: async () => {} },
@@ -1836,7 +1836,9 @@ import type { PipelineDeps } from "../src/pipeline";
 import type { ExchangeFeed, MarketCandidate } from "../src/pipeline/exchanges/types";
 import { noonET, addDays } from "../src/pipeline/clock";
 
-const DATE = "2026-09-10";
+// Authoring runs the evening BEFORE the round date (now is Sept 10, 21:05Z; the
+// round is Sept 11), so a context stamped "now" predates the round's opening.
+const DATE = "2026-09-11";
 const lock = noonET(addDays(DATE, 1));
 const h = (n: number) => new Date(lock.getTime() + n * 3_600_000).toISOString();
 
@@ -1910,7 +1912,7 @@ describe("runMarketRound", () => {
     expect(qs[0]!.text).toBe("Will btc happen on Friday?");
     expect(qs[0]!.resolutionCriteria).toContain("exchange rules");
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toContain("2026-09-10");
+    expect(sent[0]).toContain("2026-09-11");
     expect(sent[0]).toContain("5 published");
   });
   it("drops a market the taste gate refuses, re-selects once, and publishes", async () => {
@@ -2260,40 +2262,52 @@ import { schema } from "../src/db/client";
 import { commitLine } from "../src/pipeline/line";
 
 const DATE = "2026-09-10";
-async function seeded(rulesVersion: number) {
+// Migration 0009's commitment guard makes oracle_p_yes immutable once the
+// round carries oracle_committed_at, so every fixture writes the
+// probabilities FIRST and marks the round committed LAST.
+type Probs = ReadonlyArray<readonly [oracle: number | null, market: number | null]>;
+async function seeded(rulesVersion: number, probs: Probs) {
   const { db } = await makeTestDb();
   const rows = await seedRound(db, { date: DATE, opensAt: new Date("2026-09-10T16:00:00Z"), locksAt: new Date("2026-09-11T16:00:00Z") });
+  for (const [i, [oracle, market]] of probs.entries()) {
+    await db.update(schema.questions)
+      .set({ oracleProbYes: oracle === null ? null : String(oracle), marketProb: market === null ? null : String(market) })
+      .where(eq(schema.questions.id, rows[i]!.id));
+  }
   await db.update(schema.rounds).set({ rulesVersion, status: "scheduled", oracleCommittedAt: new Date("2026-09-10T14:00:00Z") }).where(eq(schema.rounds.date, DATE));
   return { db, rows };
 }
+const FIVE: Probs = [[0.40, 0.35], [0.10, 0.35], [0.70, 0.35], [0.60, null], [0.02, 0.10]];
+const EXPECTED_LINES = [0.40, 0.20, 0.50, 0.60, 0.05];
 
 describe("commitLine", () => {
   it("writes the clamped line for every committed version 3 question", async () => {
-    const { db, rows } = await seeded(3);
-    const fixtures = [[0.40, 0.35, 0.40], [0.10, 0.35, 0.20], [0.70, 0.35, 0.50], [0.60, null, 0.60], [0.02, 0.10, 0.05]] as const;
-    for (const [i, [oracle, market, _line]] of fixtures.entries()) {
-      await db.update(schema.questions).set({ oracleProbYes: String(oracle), marketProb: market === null ? null : String(market) }).where(eq(schema.questions.id, rows[i]!.id));
-    }
+    const { db } = await seeded(3, FIVE);
     expect(await commitLine(db, DATE)).toEqual({ written: 5 });
     const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE), orderBy: (q, { asc }) => [asc(q.slot)] });
-    expect(qs.map((q) => Number(q.linePYes))).toEqual(fixtures.map((f) => f[2]));
+    expect(qs.map((q) => Number(q.linePYes))).toEqual(EXPECTED_LINES);
   });
-  it("is idempotent and never rewrites a line", async () => {
-    const { db, rows } = await seeded(3);
-    for (const r of rows) await db.update(schema.questions).set({ oracleProbYes: "0.5", marketProb: "0.5" }).where(eq(schema.questions.id, r.id));
+  it("is idempotent: a second run writes nothing and changes nothing", async () => {
+    const { db, rows } = await seeded(3, FIVE);
     await commitLine(db, DATE);
-    await db.update(schema.questions).set({ oracleProbYes: "0.9" }).where(eq(schema.questions.id, rows[0]!.id));
     expect(await commitLine(db, DATE)).toEqual({ written: 0 });
     const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, rows[0]!.id) });
-    expect(Number(q!.linePYes)).toBe(0.5);
+    expect(Number(q!.linePYes)).toBe(0.40);
   });
-  it("skips questions without a forecast, and version 2 rounds entirely", async () => {
-    const v3 = await seeded(3);
-    await v3.db.update(schema.questions).set({ oracleProbYes: "0.5", marketProb: "0.5" }).where(eq(schema.questions.id, v3.rows[0]!.id));
-    expect(await commitLine(v3.db, DATE)).toEqual({ written: 1 });
-    const v2 = await seeded(2);
-    for (const r of v2.rows) await v2.db.update(schema.questions).set({ oracleProbYes: "0.5", marketProb: "0.5" }).where(eq(schema.questions.id, r.id));
-    expect(await commitLine(v2.db, DATE)).toEqual({ written: 0 });
+  it("skips questions without a forecast", async () => {
+    const { db } = await seeded(3, [[0.5, 0.5], [null, 0.5], [null, 0.5], [null, 0.5], [null, 0.5]]);
+    expect(await commitLine(db, DATE)).toEqual({ written: 1 });
+  });
+  it("skips version 2 rounds entirely", async () => {
+    const { db } = await seeded(2, FIVE);
+    expect(await commitLine(db, DATE)).toEqual({ written: 0 });
+  });
+  it("skips a round that is not yet committed", async () => {
+    const { db } = await makeTestDb();
+    const rows = await seedRound(db, { date: DATE, opensAt: new Date("2026-09-10T16:00:00Z"), locksAt: new Date("2026-09-11T16:00:00Z") });
+    await db.update(schema.rounds).set({ rulesVersion: 3 }).where(eq(schema.rounds.date, DATE));
+    for (const r of rows) await db.update(schema.questions).set({ oracleProbYes: "0.5", marketProb: "0.5" }).where(eq(schema.questions.id, r.id));
+    expect(await commitLine(db, DATE)).toEqual({ written: 0 });
   });
 });
 ```
