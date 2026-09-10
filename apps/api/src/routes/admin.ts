@@ -11,7 +11,6 @@ import { stampOracleForecast } from "../pipeline/forecast";
 import { commitLine } from "../pipeline/line";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
-import { pooledLeak, loadLeakRows, type SealRow } from "../pipeline/leak";
 import type { WorkflowInstanceBinding } from "../pipeline/workflows";
 
 const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
@@ -28,11 +27,11 @@ const PatchQuestionSchema = z.object({
 // needs a TelegramClient to narrate a skip.
 const noopTelegram = makeTelegramClient(undefined, undefined);
 
-const WORKFLOW_KINDS = { author: "AUTHORING_WORKFLOW", resolve: "RESOLUTION_WORKFLOW", probe: "PROBE_WORKFLOW" } as const;
+const WORKFLOW_KINDS = { author: "AUTHORING_WORKFLOW", resolve: "RESOLUTION_WORKFLOW" } as const;
 
 // Resolves a :kind param to its binding, or explains why not. Two distinct
-// failure modes get two distinct statuses: a kind outside {author, resolve,
-// probe} will NEVER exist, so it's a 400 — the request itself is wrong. A
+// failure modes get two distinct statuses: a kind outside {author, resolve}
+// will NEVER exist, so it's a 400 — the request itself is wrong. A
 // known kind whose binding is absent is a deployment missing its Workflow
 // bindings (spec: they're optional at runtime); that's a 503 — the request
 // is right, the server just isn't configured for it yet.
@@ -72,8 +71,8 @@ export const adminRoutes = new Hono<AppContext>()
     return c.json({ ok: true, rescored });
   })
   // Honest withdrawal (design 2026-09-09 §1.4): an operator strikes a live
-  // question with a TRUE reason, distinct from the probe's leak-heal. Every
-  // prediction on it zeroes exactly the way any other void does.
+  // question with a TRUE reason. Every prediction on it zeroes exactly the
+  // way any other void does.
   .post("/questions/:id/withdraw", async (c) => {
     const parsed = z.object({ reason: z.enum(["misauthored", "unresolvable"]) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -156,19 +155,19 @@ export const adminRoutes = new Hono<AppContext>()
       questions: questions.map((q) => ({ id: q.id, slot: q.slot, status: q.status, text: q.text, category: q.category, outcome: q.outcome })),
     });
   })
-  // Author a round for a named date, through the same gauntlet the cron runs.
+  // Author a round for a named date, through the same market round the cron runs.
   //
   // decideActions only ever authors TOMORROW, and only in the 17:00 ET window
   // — so there was no way to ask for a specific date. The gap mattered: the
   // only other way to seed a round is POST /admin/rounds/:date, and that goes
   // through upsertDraft at rules_version 1, which renders the legacy reveal
-  // with no duel. This dispatches the real thing (gauntlet → commitRound →
-  // upsertDraft at v2), so a hand-triggered round is indistinguishable from a
-  // scheduled one.
+  // with no duel. This dispatches the real thing (fetchCandidates →
+  // buildMarketDraft → commitMarketDraft), so a hand-triggered round is
+  // indistinguishable from a scheduled one.
   //
   // Refuses a date that already has a round rather than clobbering it: the
-  // gauntlet ends in upsertDraft, which would throw "round not editable" deep
-  // inside a Workflow where the caller never sees it.
+  // market round ends in upsertDraft, which would throw "round not editable"
+  // deep inside a Workflow where the caller never sees it.
   .post("/rounds/:date/author", async (c) => {
     const pipeline = c.get("deps").pipeline;
     if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
@@ -279,38 +278,4 @@ export const adminRoutes = new Hono<AppContext>()
     const instance = await resolved.binding.get(c.req.param("id"));
     await instance.restart(from);
     return c.json({ ok: true });
-  })
-  // The window's leak, across every round rather than one at a time. The
-  // settle-time LEAK WATCH answers "did this question leak"; this answers
-  // "does the window leak", which is the one that decides whether a standing
-  // ranks foresight or patience.
-  .get("/analytics/leak", async (c) => {
-    const db = c.get("deps").db;
-    const since = c.req.query("since");
-    const rounds = await db.query.rounds.findMany({
-      where: since ? gte(schema.rounds.date, since) : undefined,
-      orderBy: [asc(schema.rounds.date)],
-    });
-
-    const perRound: Array<{ date: string; drift: number | null; edge: number | null; seals: number; questions: number }> = [];
-    const everyQuestion: SealRow[][] = [];
-
-    for (const r of rounds) {
-      const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, r.date) });
-      const rowsPerQuestion = await Promise.all(qs.map((q) => loadLeakRows(db, q.id)));
-      everyQuestion.push(...rowsPerQuestion);
-      const p = pooledLeak(rowsPerQuestion);
-      perRound.push({ date: r.date, drift: p.drift, edge: p.edge, seals: p.seals, questions: p.questions });
-    }
-
-    return c.json({
-      pooled: pooledLeak(everyQuestion),
-      rounds: perRound,
-      // Stated in the payload, not only in leak.ts's header, so whoever reads
-      // this JSON gets it without reading the source.
-      caveat:
-        "DRIFT AND EDGE MEASURE DRIFT, NOT PROVEN LEAKAGE. HONEST NEWS CONVERGES A CROWD TOO, " +
-        "AND THE FIRST-HOUR BONUS SELECTS ENGAGED PLAYERS INTO THE EARLY HALF, BIASING EDGE NEGATIVE. " +
-        "A QUIET REPORT IS THE ABSENCE OF A SYMPTOM, NOT AN ALL-CLEAR.",
-    });
   });

@@ -41,7 +41,7 @@ function fakePipeline(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIs
     workflows: inlineStarter(),
     db,
     claude,
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", taste: "m-t", voice: "m-v" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
   };

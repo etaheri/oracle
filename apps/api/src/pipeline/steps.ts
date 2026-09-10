@@ -27,7 +27,9 @@ export const POLICY = {
   /**
    * One model call inside an N-wide fan-out. Shallower than `model` because
    * the limit multiplies by the fan-out width: 12 candidates at limit 1 is 24
-   * calls worst case, against a 150/day ceiling (spec §4.5).
+   * calls worst case, against a 150/day ceiling (spec §4.5). UNUSED since the
+   * gauntlet's per-candidate fan-out was retired; kept as the declared policy
+   * for the next fan-out rather than re-derived then.
    */
   modelWide: { timeout: "8 minutes", retries: { limit: 1, delay: "20 seconds", backoff: "exponential" } },
 
@@ -45,13 +47,15 @@ export const POLICY = {
 
   /**
    * The taste gate (spec §5.1). Zero retries so the fail-closed guarantee is
-   * DECLARED rather than emergent — tasteCheck catches internally today, but a
+   * DECLARED rather than emergent — tasteTexts catches internally today, but a
    * future edit that let an error escape must not silently gain a retry.
+   * UNUSED while the market round calls tasteTexts inside its draft step
+   * rather than as a step of its own.
    */
   failClosed: { timeout: "5 minutes", retries: { limit: 0, delay: "1 second" } },
 
   /**
-   * Resolve and probe model steps (spec §4.1). The hourly cron re-dispatch IS
+   * Resolve model steps (spec §4.1). The hourly cron re-dispatch IS
    * their retry layer, and it is already scoped per question by the DB, so an
    * inner retry buys nothing an outer one does not — it only multiplies.
    */

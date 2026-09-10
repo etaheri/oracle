@@ -7,8 +7,8 @@
 // and its own env check fails with a plain, named sentence rather than a
 // stack trace, with ZERO network calls made when it fails.
 //
-// Each gate is still a standalone script — critic.eval.ts, taste.eval.ts and
-// resolver.eval.ts all run directly with
+// Each gate is still a standalone script — taste.eval.ts and
+// resolver.eval.ts both run directly with
 // `ANTHROPIC_API_KEY=... npx tsx eval/<gate>.eval.ts` — and this file spawns
 // them as CHILD PROCESSES rather than importing them. Importing would run
 // them immediately as a side effect of module load (each ends in its own
@@ -21,8 +21,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-type Gate = "critic" | "taste" | "resolver";
-const GATES: Gate[] = ["critic", "taste", "resolver"];
+type Gate = "taste" | "resolver";
+const GATES: Gate[] = ["taste", "resolver"];
 const DEFAULT_SAMPLE = 10;
 
 function sampleFlag(argv: string[]): number {
@@ -36,8 +36,8 @@ function sampleFlag(argv: string[]): number {
   return n;
 }
 
-// What each gate is documented to spend. critic and taste each make ONE
-// batch call over their whole fixture set (see their own file headers); the
+// What each gate is documented to spend. taste makes ONE batch call over its
+// whole fixture set (see its own file header); the
 // resolver's disagreement half is a free query and its re-resolution half is
 // exactly --sample calls, one per sampled question.
 function callsFor(gate: Gate, sample: number): number {
@@ -74,8 +74,8 @@ function main(): void {
   const selection = process.argv[2];
   const rest = process.argv.slice(3);
 
-  if (selection !== "critic" && selection !== "taste" && selection !== "resolver" && selection !== "all") {
-    console.error("eval: usage: pnpm eval <critic|taste|resolver|all> [--sample N]");
+  if (selection !== "taste" && selection !== "resolver" && selection !== "all") {
+    console.error("eval: usage: pnpm eval <taste|resolver|all> [--sample N]");
     process.exit(1);
   }
 
@@ -91,14 +91,6 @@ function main(): void {
   if (gates.includes("resolver")) requireEnv("DATABASE_URL");
 
   console.log(estimate(gates, sample));
-
-  if (selection === "all") {
-    // design §8.3: pre-flight is measured by the leak tripwire in
-    // src/pipeline/leak.ts, NOT here. "Was this answerable on date X" cannot
-    // be re-run after the fact — the web has moved on since — and a fixture
-    // set for it would look like measurement without being any.
-    console.log("preflight: measured by the leak tripwire in src/pipeline/leak.ts, not this harness.");
-  }
 
   let exitCode = 0;
   for (const gate of gates) {

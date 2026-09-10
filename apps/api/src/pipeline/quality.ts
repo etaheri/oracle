@@ -3,7 +3,7 @@
 // people on uncontested questions makes any board a participation trophy, so
 // this is upstream of the whole scoreboard.
 //
-// Three numbers, and the same caution `leak.ts` asks for. A run of one-sided
+// Three numbers, and the same caution the retired leak watch asked for. A run of one-sided
 // outcomes moves `authorBrier` down without the author having written a
 // single gimme: the metric is the author's calibration over the window, and
 // over 140 questions that is a real signal, over 12 it is mostly the coin.
@@ -47,7 +47,7 @@ const mean = (xs: number[]) => (xs.length === 0 ? null : xs.reduce((a, b) => a +
  * difference matters here more than most places: a void rate of 0 is a clean
  * month and a void rate of null is a month nobody asked anything in, and an
  * author brier of 0 would be the worst possible reading of a column that is
- * simply not populated yet. `leakReport` had to learn this the hard way.
+ * simply not populated yet. The retired leak report had to learn this the hard way.
  */
 export function questionQuality(rows: QualityRow[]): QualityReport {
   const n = rows.length;
@@ -86,7 +86,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 // the comment reads. Both readers of this block — an operator scanning a
 // settle report at 12:10, and the authoring model reading its own record —
 // meet these numbers cold, and neither can act on "0.19" without being told
-// which direction is bad. Same rule `leak.ts:HEADER` follows.
+// which direction is bad. The retired leak report followed the same rule.
 const HEADER =
   `QUESTION QUALITY — last ${QUALITY_WINDOW_DAYS} days. ` +
   `void: share of questions that could not be resolved at all; ` +
@@ -109,7 +109,7 @@ export function qualityReport(r: QualityReport): string[] {
 
 // Postgres numeric arrives as a string and can hold 'NaN', which would pass a
 // plain !== null check and poison a mean. Treat anything non-finite as
-// unstated (the lesson loadLeakRows already carries).
+// unstated (the lesson the retired leak rows already carried).
 const toNum = (v: string | null): number | null => {
   if (v === null) return null;
   const n = Number(v);

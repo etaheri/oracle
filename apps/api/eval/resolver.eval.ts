@@ -1,10 +1,10 @@
 // Retrospective eval for the resolver — the highest-stakes call in the
-// system, and the one gate critic.eval.ts and taste.eval.ts's approach
+// system, and the one gate taste.eval.ts's approach
 // cannot reach (design 2026-09-08 §8.2, task 14).
 //
 // askResolver's web_search runs server-side at Anthropic. That page-in-time
-// cannot be recorded and replayed the way a hermetic gate can — critic and
-// taste both run with `models.critic`/`models.taste` (no search), so a
+// cannot be recorded and replayed the way a hermetic gate can — taste runs
+// with `models.taste` (no search), so a
 // fixture is a faithful record of what they judge. The resolver has no such
 // fixture. What it DOES have is production history nobody reads:
 // questions.resolutionEvidence already stores both resolver verdicts on
@@ -167,9 +167,6 @@ async function main(): Promise<void> {
       resolve: process.env.PIPELINE_RESOLVE_MODEL ?? "claude-sonnet-5",
       resolveB: "unused",
       forecast: "unused",
-      critic: "unused",
-      preflight: "unused",
-      probe: "unused",
       taste: "unused",
       voice: "unused",
     },

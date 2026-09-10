@@ -16,21 +16,18 @@ describe("bindingStarter", () => {
   const noDeps = null as unknown as import("../src/pipeline").PipelineDeps;
 
   it("routes each kind to its own binding and passes the id and params through", async () => {
-    const author: unknown[] = [], resolve: unknown[] = [], probe: unknown[] = [];
-    const s = bindingStarter({ AUTHORING_WORKFLOW: binding(author), RESOLUTION_WORKFLOW: binding(resolve), PROBE_WORKFLOW: binding(probe) });
+    const author: unknown[] = [], resolve: unknown[] = [];
+    const s = bindingStarter({ AUTHORING_WORKFLOW: binding(author), RESOLUTION_WORKFLOW: binding(resolve) });
     await s.start(noDeps, "author", "author-2026-09-05-2026090417", { date: "2026-09-05" });
     await s.start(noDeps, "resolve", "resolve-2026-09-04-2026090412", { date: "2026-09-04", questionIds: ["q1"] });
-    await s.start(noDeps, "probe", "probe-2026-09-04-2026090416", { date: "2026-09-04", questionIds: ["q1"] });
     expect(author).toEqual([{ id: "author-2026-09-05-2026090417", params: { date: "2026-09-05" } }]);
     expect(resolve[0]).toMatchObject({ id: "resolve-2026-09-04-2026090412" });
-    expect(probe[0]).toMatchObject({ id: "probe-2026-09-04-2026090416" });
   });
 
   it("swallows a duplicate-instance error, because a collision IS the idempotency", async () => {
     const s = bindingStarter({
       AUTHORING_WORKFLOW: { create: async () => { throw new Error("instance.already_exists: an instance with id author-x already exists"); } },
       RESOLUTION_WORKFLOW: { create: async () => {} },
-      PROBE_WORKFLOW: { create: async () => {} },
     });
     await expect(s.start(noDeps, "author", "author-x", { date: "2026-09-05" })).resolves.toBeUndefined();
   });
@@ -39,7 +36,6 @@ describe("bindingStarter", () => {
     const s = bindingStarter({
       AUTHORING_WORKFLOW: { create: async () => { throw new Error("binding is not configured"); } },
       RESOLUTION_WORKFLOW: { create: async () => {} },
-      PROBE_WORKFLOW: { create: async () => {} },
     });
     await expect(s.start(noDeps, "author", "author-x", { date: "2026-09-05" })).rejects.toThrow("not configured");
   });

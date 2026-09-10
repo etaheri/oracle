@@ -7,7 +7,7 @@ function depsWith(structured: NonNullable<PipelineDeps["claude"]>["structured"])
     db: null as unknown as PipelineDeps["db"],
     telegram: { send: async () => {} },
     claude: { structured },
-    models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", critic: "c", preflight: "p", probe: "pr", taste: "t", voice: "claude-sonnet-5" },
+    models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", taste: "t", voice: "claude-sonnet-5" },
     now: () => new Date("2026-09-10T21:00:00Z"),
     workflows: { start: async () => {} },
   };

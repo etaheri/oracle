@@ -18,7 +18,7 @@ async function depsWith(read: (id: string) => Promise<SettlementRead>, claudeCal
   const deps: PipelineDeps = {
     db, telegram: { send: async () => {} },
     claude: { structured: async (call) => { claudeCalls.push(call.schemaName); return { outcome: "unverifiable", quotes: [], reasoning: "" }; } },
-    models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", critic: "c", preflight: "p", probe: "pr", taste: "t", voice: "v" },
+    models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", taste: "t", voice: "v" },
     now: () => new Date("2026-09-12T01:00:00Z"), workflows: inlineStarter(), exchangeFeeds: [feed],
     marketFetch: (async () => { throw new Error("no network"); }) as unknown as typeof fetch,
   };

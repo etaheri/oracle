@@ -123,13 +123,13 @@ const WITHDRAWAL_LINE: Record<WithdrawalReason, string> = {
 
 // Editorial withdrawal (design 2026-09-09 §1.4). The operator strikes a live
 // question with a TRUE reason. The lock moves to now so no further seal can
-// land, withdrawn_at marks it (distinct from lock_healed_at, which only the
-// probe writes when an answer leaked), and the void goes through
+// land, withdrawn_at marks it (distinct from lock_healed_at, which the retired
+// probe wrote when an answer leaked), and the void goes through
 // resolveQuestion so every prediction is zeroed exactly the way any other
 // void is.
 //
-// Idempotent across a crash between the two writes, the same shape
-// probeQuestion repairs (pipeline/probe.ts): withdrawn_at set but status
+// Idempotent across a crash between the two writes, the same shape the
+// retired probe repaired: withdrawn_at set but status
 // still open/locked means the first write landed and the second (the void)
 // did not. A retry must finish that void rather than sticking forever behind
 // "already withdrawn" — the round can never settle otherwise, since

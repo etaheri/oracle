@@ -43,7 +43,7 @@ function fakeDeps(db: Db, responses: unknown[]) {
         return responses.shift();
       },
     },
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", taste: "m-t", voice: "m-v" },
     telegram: { send: async () => {} },
     now: () => new Date("2026-08-27T12:00:00Z"),
     // Feeds never reach the network in tests; a rejecting fetch makes every
@@ -295,7 +295,7 @@ describe("questions.author_prob", () => {
 });
 
 describe("the settle report carries the scorecard", () => {
-  it("reports the trailing window beside the leak watch, and counts only days inside it", async () => {
+  it("reports the trailing window, and counts only days inside it", async () => {
     const { db } = await makeTestDb();
     // Two rounds in the window (one of them today's) and one 40 days back,
     // which must not be counted.
@@ -308,7 +308,6 @@ describe("the settle report carries the scorecard", () => {
 
     const report = sent.find((t) => t.includes("Round 2026-08-27 settled"))!;
     expect(report).toContain("QUESTION QUALITY");
-    expect(report).toContain("LEAK WATCH");
     // 10 questions across the two in-window rounds, not the 15 on file.
     expect(report).toContain("10 asked");
     expect(report).toContain("author brier 0.250");

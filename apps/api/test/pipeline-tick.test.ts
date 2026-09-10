@@ -29,7 +29,7 @@ afterEach(() => vi.useRealTimers());
 function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
-    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
+    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", taste: "m-t", voice: "m-v" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
     workflows: inlineStarter(),
@@ -39,7 +39,6 @@ function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
     // fetch when absent. An empty body deals no markets, which is the quiet
     // no-op every test here that is not about authoring wants.
     marketFetch: (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch,
-    sourceFetch: (async () => new Response("", { status: 200 })) as unknown as typeof fetch,
   };
   return { deps, sent };
 }
@@ -152,11 +151,7 @@ describe("runTick", () => {
     expect(done).toContain("settle:2026-08-26");
     expect(sent3.some((t) => t.includes("reply if any outcome looks wrong"))).toBe(true);
     const report = sent3.find((t) => t.includes("reply if any outcome looks wrong"))!;
-    expect(report).toContain("LEAK WATCH");
-    // No predictions on this round, so every slot reports honestly rather
-    // than inventing a drift from a sample of zero.
-    expect(report).toContain("too few seals");
-    expect(report).toContain("early-lock rate 0/5");
+    expect(report).toContain("QUESTION QUALITY");
     const voided = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-08-26") });
     expect(voided.filter((q) => q.status === "void").length).toBe(2);
     for (const q of voided.filter((q) => q.status === "void")) {
@@ -378,9 +373,6 @@ describe("buildPipelineDeps", () => {
       resolve: "claude-sonnet-5",
       resolveB: "claude-opus-5",
       forecast: "claude-sonnet-5",
-      critic: "claude-opus-5",
-      preflight: "claude-sonnet-5",
-      probe: "claude-sonnet-5",
       taste: "claude-haiku-4-5-20251001",
       voice: "claude-sonnet-5",
     });
@@ -399,9 +391,6 @@ describe("buildPipelineDeps", () => {
       resolve: "claude-sonnet-custom",
       resolveB: "claude-opus-5",
       forecast: "claude-sonnet-5",
-      critic: "claude-opus-5",
-      preflight: "claude-sonnet-5",
-      probe: "claude-sonnet-5",
       taste: "claude-haiku-4-5-20251001",
       voice: "claude-sonnet-5",
     });

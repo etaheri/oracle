@@ -31,7 +31,7 @@ export const CandidateSchema = z
     context: QuestionContextSchema.optional(),
     topic_key: z.string().min(3).max(64).regex(/^[a-z0-9-]+$/),
     // Where to fetch the public forecast for a weather candidate (design
-    // 2026-09-09 §1.3). The critic is shown that forecast, because a line a
+    // 2026-09-09 §1.3). The retired critic was shown that forecast, because a line a
     // forecast already clears by six degrees is not contested however the
     // sentence reads. Required for weather; ignored elsewhere.
     forecast_point: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).nullable().optional(),

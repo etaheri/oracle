@@ -1,12 +1,9 @@
 // One model-resolver call, shared by everything that needs to ask "does the
 // answer exist yet, and can you show me where" (design 2026-09-04 §3, §5, §6).
 //
-// Three callers, three directions:
-//   - resolve.ts  — forwards, after lock: what IS the outcome (run twice)
-//   - preflight   — backwards, at authoring time: an answer that EXISTS is a
-//                   rejection, because the question was never a prediction
-//   - probe       — sideways, mid-window: an answer that has APPEARED pulls
-//                   the lock forward to now
+// One caller today: resolve.ts — forwards, after lock, asking what the
+// outcome IS (run twice, by two different models). The retired pre-flight and
+// probe gates asked the same question backwards and sideways.
 //
 // The domain restriction is deliberate and it bounds what a verdict means: an
 // `unverifiable` proves the NAMED SOURCE does not show it yet, not that no

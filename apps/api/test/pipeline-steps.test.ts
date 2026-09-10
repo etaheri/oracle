@@ -32,14 +32,15 @@ describe("step policies", () => {
 
   it("gives the fail-closed and no-retry policies zero retries", () => {
     // Spec §5.1: taste's guarantee must be DECLARED, not emergent.
-    // Spec §4.1: resolve/probe steps take limit 0 because the hourly cron IS
+    // Spec §4.1: resolve steps take limit 0 because the hourly cron IS
     // their retry layer.
     expect(POLICY.failClosed.retries.limit).toBe(0);
     expect(POLICY.noRetry.retries.limit).toBe(0);
   });
 
   it("keeps the wide model fan-out shallow", () => {
-    // Spec §3.1: preflight is 12 wide; limit 1 caps it at 24 calls.
+    // Spec §3.1: a 12-wide fan-out at limit 1 caps at 24 calls. The policy is
+    // unused since the gauntlet was retired; the cap it declares is the point.
     expect(POLICY.modelWide.retries.limit).toBe(1);
   });
 });

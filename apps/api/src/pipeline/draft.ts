@@ -38,7 +38,7 @@ export const DraftQuestionSchema = z
     // publicly determinable, or "after-lock" when nothing about it is
     // knowable before noon ET D+1.
     resolves_at: z.union([z.iso.datetime({ offset: true }), z.literal(RESOLVES_AFTER_LOCK)]),
-    // The normalized subject, when the gauntlet authored this question.
+    // The normalized subject, when the author stated one.
     // Optional: /reroll, the evergreen bank and the admin API all post
     // drafts that never had one, and none of them should have to change to
     // keep working (design 2026-09-04 §3.1). No `.default(null)` — that

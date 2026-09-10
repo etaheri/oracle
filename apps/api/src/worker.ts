@@ -10,7 +10,7 @@ import { bindingStarter, inlineStarter, type WorkflowInstanceBinding } from "./p
 // Cloudflare requires Workflow classes to be exported from the Worker's main
 // module, which is why this re-export lives here rather than the classes being
 // referenced only by wrangler.jsonc.
-export { AuthoringWorkflow, ResolutionWorkflow, ProbeWorkflow } from "./pipeline/workflow-entrypoints";
+export { AuthoringWorkflow, ResolutionWorkflow } from "./pipeline/workflow-entrypoints";
 
 export interface WorkerEnv {
   DATABASE_URL: string;
@@ -25,9 +25,6 @@ export interface WorkerEnv {
   PIPELINE_RESOLVE_MODEL?: string;
   PIPELINE_RESOLVE_MODEL_B?: string;
   PIPELINE_FORECAST_MODEL?: string;
-  PIPELINE_CRITIC_MODEL?: string;
-  PIPELINE_PREFLIGHT_MODEL?: string;
-  PIPELINE_PROBE_MODEL?: string;
   PIPELINE_TASTE_MODEL?: string;
   PIPELINE_VOICE_MODEL?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
@@ -39,7 +36,6 @@ export interface WorkerEnv {
   // it. bindingStarter only reads the create() half it declares.
   AUTHORING_WORKFLOW?: WorkflowInstanceBinding;
   RESOLUTION_WORKFLOW?: WorkflowInstanceBinding;
-  PROBE_WORKFLOW?: WorkflowInstanceBinding;
 }
 
 // Enablement gate (spec §11): the pipeline is fully wired but stays inert
@@ -48,11 +44,10 @@ export interface WorkerEnv {
 export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
   if (env.PIPELINE_ENABLED !== "true") return undefined;
   const bindings =
-    env.AUTHORING_WORKFLOW && env.RESOLUTION_WORKFLOW && env.PROBE_WORKFLOW
+    env.AUTHORING_WORKFLOW && env.RESOLUTION_WORKFLOW
       ? {
           AUTHORING_WORKFLOW: env.AUTHORING_WORKFLOW,
           RESOLUTION_WORKFLOW: env.RESOLUTION_WORKFLOW,
-          PROBE_WORKFLOW: env.PROBE_WORKFLOW,
         }
       : null;
   if (!bindings) {
@@ -76,9 +71,6 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
       // errors require independent models (design 2026-09-04 §6.2).
       resolveB: env.PIPELINE_RESOLVE_MODEL_B ?? "claude-opus-5",
       forecast: env.PIPELINE_FORECAST_MODEL ?? "claude-sonnet-5",
-      critic: env.PIPELINE_CRITIC_MODEL ?? "claude-opus-5",
-      preflight: env.PIPELINE_PREFLIGHT_MODEL ?? "claude-sonnet-5",
-      probe: env.PIPELINE_PROBE_MODEL ?? "claude-sonnet-5",
       taste: env.PIPELINE_TASTE_MODEL ?? "claude-haiku-4-5-20251001",
       voice: env.PIPELINE_VOICE_MODEL ?? "claude-sonnet-5",
     },
@@ -104,13 +96,12 @@ export default {
       },
       pipeline: buildPipelineDeps(env),
       // Independent of buildPipelineDeps's all-or-nothing bindings check
-      // (which requires all three before the pipeline will dispatch to any):
+      // (which requires both before the pipeline will dispatch to any):
       // the admin routes should read whichever bindings a deployment happens
-      // to have, even mid-rollout with only one or two configured.
+      // to have, even mid-rollout with only one configured.
       workflows: {
         AUTHORING_WORKFLOW: env.AUTHORING_WORKFLOW,
         RESOLUTION_WORKFLOW: env.RESOLUTION_WORKFLOW,
-        PROBE_WORKFLOW: env.PROBE_WORKFLOW,
       },
     });
     return app.fetch(req);

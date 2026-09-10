@@ -8,8 +8,8 @@
 // "can take minutes across chained web searches" by resolve.ts's own
 // admission, once ran inline as a single unbroken call with no checkpoint
 // between them. It never bit only because the pipeline had never run an
-// unattended day. The gauntlet adds roughly eight more long calls to the
-// authoring tick.
+// unattended day. The authoring tick's own market round adds more long calls
+// on top of that.
 //
 // A Workflow INSTANCE has no wall-clock limit — that is what makes this
 // substrate the fix for the cap above. A STEP does: Cloudflare's default step
@@ -29,7 +29,7 @@
 import type { ETNow } from "./clock";
 import type { PipelineDeps } from "./index";
 
-export type WorkflowKind = "author" | "resolve" | "probe";
+export type WorkflowKind = "author" | "resolve";
 
 export interface WorkflowStarter {
   // deps is passed AT START TIME rather than captured at construction, so
@@ -65,7 +65,6 @@ export interface WorkflowBinding {
 export interface WorkflowBindings {
   AUTHORING_WORKFLOW: WorkflowBinding;
   RESOLUTION_WORKFLOW: WorkflowBinding;
-  PROBE_WORKFLOW: WorkflowBinding;
 }
 
 export interface WorkflowInstanceHandle {
@@ -81,7 +80,6 @@ export interface WorkflowInstanceBinding extends WorkflowBinding {
 export interface WorkflowInstanceBindings {
   AUTHORING_WORKFLOW: WorkflowInstanceBinding;
   RESOLUTION_WORKFLOW: WorkflowInstanceBinding;
-  PROBE_WORKFLOW: WorkflowInstanceBinding;
 }
 
 const DUPLICATE = /already exists|instance\.already_exists|duplicate/i;
@@ -90,7 +88,6 @@ export function bindingStarter(bindings: WorkflowBindings): WorkflowStarter {
   const of: Record<WorkflowKind, WorkflowBinding> = {
     author: bindings.AUTHORING_WORKFLOW,
     resolve: bindings.RESOLUTION_WORKFLOW,
-    probe: bindings.PROBE_WORKFLOW,
   };
   return {
     // The deps argument is ignored here on purpose: the Workflow builds its own
@@ -115,19 +112,16 @@ export function bindingStarter(bindings: WorkflowBindings): WorkflowStarter {
 // why every existing tick test keeps asserting the same outcomes.
 //
 // The runners are imported lazily to keep this module free of an import cycle
-// (index.ts -> workflows.ts -> gauntlet -> index.ts).
+// (index.ts -> workflows.ts -> market-round.ts -> index.ts).
 export function inlineStarter(): WorkflowStarter {
   return {
     async start(deps, kind, _id, params) {
       if (kind === "author") {
         const { runMarketRound } = await import("./market-round");
         await runMarketRound(deps, params.date);
-      } else if (kind === "resolve") {
+      } else {
         const { runResolution } = await import("./resolve");
         await runResolution(deps, params.date, params.questionIds ?? []);
-      } else {
-        const { runProbe } = await import("./probe");
-        await runProbe(deps, params.date, params.questionIds ?? []);
       }
     },
   };

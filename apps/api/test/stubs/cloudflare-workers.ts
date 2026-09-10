@@ -9,7 +9,7 @@
 // module, and take the entire api suite down.
 //
 // It needs no behaviour: the entrypoint classes are thin shells over ordinary
-// functions (runAuthoringGauntlet, runResolution, runProbe) that are tested
+// functions (runMarketRound, runResolution) that are tested
 // directly against PGlite. WorkflowEvent and WorkflowStep are types only and
 // so need no runtime shape at all.
 export class WorkflowEntrypoint<Env = unknown, _T = unknown> {

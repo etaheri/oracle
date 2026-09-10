@@ -43,9 +43,13 @@ export const rounds = pgTable("rounds", {
   oracleForecastModel: text("oracle_forecast_model"),
   oraclePromptVersion: text("oracle_prompt_version"),
   oracleForecastSnapshot: jsonb("oracle_forecast_snapshot"),
-  // What the gauntlet cost, in candidates (design 2026-09-04 §11.1). Default
-  // 0 so every round authored before 0007 reads as "unknown" rather than as a
-  // perfect night — the reveal withholds the line entirely at 0.
+  // What authoring cost, in candidates (design 2026-09-04 §11.1). Default 0 so
+  // every round authored before 0007 reads as "unknown" rather than as a
+  // perfect night — the reveal withholds the line entirely at 0. NOTHING
+  // WRITES THESE SINCE THE GAUNTLET WAS RETIRED: the market round deals from
+  // exchanges rather than writing candidates, so both stay 0 and the reveal
+  // withholds the line. Kept rather than dropped so historical rounds keep
+  // their counts.
   candidatesWritten: integer("candidates_written").notNull().default(0),
   candidatesRejected: integer("candidates_rejected").notNull().default(0),
   // Σ(stake − payout) over the round's settled predictions, written when the
@@ -89,11 +93,11 @@ export const questions = pgTable("questions", {
   authorProb: numeric("author_prob"),
   // The Oracle's own forecast, committed atomically before the round opens.
   oracleProbYes: numeric("oracle_p_yes"),
-  // Written ONLY by the in-window probe (pipeline/probe.ts) when it finds the
-  // answer already exists and pulls the lock forward. This is why a boolean
-  // derived from locks_at will not do: an authored early lock and a healed one
-  // both produce locks_at < noon, and only the second is the machine catching
-  // a leak in real time (design 2026-09-04 §11.2).
+  // Was written ONLY by the in-window probe, which found an answer that already
+  // existed and pulled the lock forward. THE PROBE IS RETIRED, so nothing
+  // writes this now; it is kept because rounds from version 1 and 2 carry it
+  // and the reveal still distinguishes an authored early lock from a healed
+  // one (design 2026-09-04 §11.2).
   lockHealedAt: timestamp("lock_healed_at", { withTimezone: true }),
   // The author's own honest instant: when the outcome first becomes publicly
   // determinable (design 2026-09-09 §1.1). Null when the draft said
@@ -102,12 +106,12 @@ export const questions = pgTable("questions", {
   resolvesAt: timestamp("resolves_at", { withTimezone: true }),
   // Editorial withdrawal (design 2026-09-09 §1.4): the operator struck this
   // question from a live round with an honest reason. Distinct from
-  // lock_healed_at, which only the probe writes when an answer leaked.
+  // lock_healed_at, which the retired probe wrote when an answer leaked.
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
   // The normalized subject of the question ("btc-close-above-threshold"), as
-  // stated by the author. The gauntlet's tier-0 dedupe compares against the
-  // last TOPIC_KEY_DAYS of these; the text dedupe it replaces let "will BTC
-  // close above $X" through every night with a new X.
+  // stated by the author. The tier-0 dedupe in candidate.ts compares against
+  // the last TOPIC_KEY_DAYS of these; the text dedupe it replaces let "will
+  // BTC close above $X" through every night with a new X.
   topicKey: text("topic_key"),
   // The house line (design 2026-09-10 §5.5): oracle_p_yes clamped to the
   // market band. Written once at commit; immutable.

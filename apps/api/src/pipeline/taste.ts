@@ -1,5 +1,6 @@
-// Tier 4 — taste, and the only fail-closed gate in this design
-// (design 2026-09-04 §8).
+// Taste — the only fail-closed gate in this design (design 2026-09-04 §8).
+// It was tier 4 of the retired authoring gauntlet; the market round now calls
+// it directly on the titles it is about to publish.
 //
 // The forbidden list lives today as a clause in the AUTHORING prompt, checked
 // by nothing. With no human reading questions before they go live, one
@@ -21,10 +22,8 @@
 // It runs LAST, on the small set that survived everything else, so the
 // fail-closed blast radius is as small as it can be.
 import { z } from "zod";
-import type { PipelineDeps } from "../index";
-import type { Rejection } from "../candidate";
-import type { Judged } from "./critic";
-import { BudgetExhausted } from "../spend";
+import type { PipelineDeps } from "./index";
+import { BudgetExhausted } from "./spend";
 
 const TasteSchema = z.object({
   verdicts: z.array(z.object({ index: z.number().int().min(0), allowed: z.boolean(), reason: z.string().default("") })),
@@ -64,14 +63,10 @@ A public figure's professional outcome — an election, a resignation, a contrac
 
 Return exactly one verdict per candidate, carrying that candidate's index unchanged. Call the taste_verdicts tool exactly once.`;
 
-function rejectAll(judged: Judged[], detail: string): { passed: Judged[]; rejected: Rejection[] } {
-  return { passed: [], rejected: judged.map((j) => ({ text: j.candidate.text, reason: "taste" as const, detail })) };
-}
-
 // The text-only core of the gate: candidate strings in, one verdict per
-// string out. Carries no knowledge of Judged/Rejection so anything that has
-// plain text to screen (a candidate's text, a voiced question) can call it
-// directly. tasteCheck below is a thin wrapper over this.
+// string out. It knows nothing about the shape of what it screens, so
+// anything holding plain text (a bank candidate's text, a voiced exchange
+// title) can call it directly.
 export async function tasteTexts(
   deps: PipelineDeps,
   texts: string[],
@@ -93,8 +88,8 @@ export async function tasteTexts(
     });
   } catch (err) {
     // A spent budget is a day-level stop, not one batch's problem — let it
-    // propagate exactly as preflight.ts does, so reportBudgetExhaustion sees
-    // it and the ‼️ critical actually fires. Every OTHER error still fails
+    // propagate, so reportBudgetExhaustion sees it and the ‼️ critical
+    // actually fires. Every OTHER error still fails
     // closed: a taste check that fails open is not a taste check.
     if (err instanceof BudgetExhausted) throw err;
     return refuse(`the taste gate could not be reached, so the batch was refused: ${err instanceof Error ? err.message : String(err)}`);
@@ -117,18 +112,3 @@ export async function tasteTexts(
   };
 }
 
-export async function tasteCheck(
-  deps: PipelineDeps,
-  judged: Judged[],
-): Promise<{ passed: Judged[]; rejected: Rejection[] }> {
-  const { allowed, reasons, detail } = await tasteTexts(deps, judged.map((j) => j.candidate.text));
-  if (detail !== null) return rejectAll(judged, detail);
-
-  const passed: Judged[] = [];
-  const rejected: Rejection[] = [];
-  judged.forEach((j, i) => {
-    if (allowed[i]) passed.push(j);
-    else rejected.push({ text: j.candidate.text, reason: "taste", detail: reasons[i] || "refused by the taste gate" });
-  });
-  return { passed, rejected };
-}

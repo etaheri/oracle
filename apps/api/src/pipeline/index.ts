@@ -27,15 +27,12 @@ export interface PipelineDeps {
     resolve: string;   // Sonnet 5 + search — resolver A
     resolveB: string;  // Opus 5 + search — resolver B, a DIFFERENT model on purpose
     forecast: string;  // Sonnet 5 + search — the Oracle's own position
-    critic: string;    // Opus 5, no search — prosecutes the candidates
-    preflight: string; // Sonnet 5 + search — the pre-flight resolve
-    probe: string;     // Sonnet 5 + search — the in-window probe
     taste: string;     // Haiku 4.5, no search — classification only
     voice: string;     // Sonnet 5, no search — rewrites exchange titles in the app's voice
   };
   now(): Date;
   // How long work is launched. In production this is bindingStarter over the
-  // three Workflow bindings; in tests and wherever the bindings are absent it
+  // two Workflow bindings; in tests and wherever the bindings are absent it
   // is inlineStarter, which awaits the runner in-process — so behaviour and the
   // executed-action labels are identical either way.
   workflows: WorkflowStarter;
@@ -46,9 +43,6 @@ export interface PipelineDeps {
   // Fetch used for market signal feeds (feeds.ts); defaults to global fetch.
   // Injectable so tests never touch the network.
   marketFetch?: typeof fetch;
-  // Fetch used for tier-1 source reachability (gauntlet/sources.ts); defaults
-  // to global fetch. Injectable so tests never touch the network.
-  sourceFetch?: typeof fetch;
   // The exchanges the market round is dealt from (design 2026-09-10 §5.1).
   // Defaults to DEFAULT_EXCHANGES; tests inject canned feeds.
   exchangeFeeds?: ExchangeFeed[];
@@ -138,14 +132,6 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
             questionIds: action.questionIds,
           });
           done.push(`resolve:${action.date}`);
-          break;
-
-        case "probe":
-          await deps.workflows.start(metered, "probe", `probe-${action.date}-${bucket}`, {
-            date: action.date,
-            questionIds: action.questionIds,
-          });
-          done.push(`probe:${action.date}`);
           break;
 
         case "alert": {

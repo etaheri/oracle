@@ -127,19 +127,15 @@ export async function recentQuestionDigest(db: Db, date: string): Promise<string
 }
 
 // NOT ON THE NIGHTLY PATH ANY MORE. runTick's `author` case now dispatches
-// to the gauntlet in pipeline/gauntlet/ (runAuthoringGauntlet), which authors
-// a surplus of candidates and screens them through four gates before this
-// function's single-shot, unverified draft ever would have shipped one.
+// the market round (pipeline/market-round.ts), which deals five questions
+// from the exchanges instead of writing them.
 //
 // Kept, not deleted: /reroll (rerollSlot below) remains the human override
-// for a live slot, and a manual full-round authoring path may be wanted back
-// some day. Deleting this would also mean deleting the ~14 tests that cover
-// it, as the last act of an 18-commit branch — the worst moment for that.
+// for a live slot, and authorBankEntry still stocks the evergreen bank, which
+// is what covers a night the market round cannot deal.
 //
-// ITS PROMPT IS NOT KEPT IN STEP WITH THE GAUNTLET'S. Two authoring prompts
-// drift the moment nobody is required to update both, and nobody is. Read
-// gauntlet/generate.ts for what the pipeline actually asks Claude to write
-// tonight; this one is history, not current behaviour.
+// ITS PROMPT IS NOT WHAT THE PIPELINE ASKS FOR TONIGHT. Read market-round.ts
+// for that; this one authors the bank and the single-slot reroll.
 export async function authorRound(deps: PipelineDeps, date: string): Promise<void> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
   const claude = deps.claude;

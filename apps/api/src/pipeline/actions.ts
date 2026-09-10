@@ -11,7 +11,6 @@ import { addDays, noonET } from "./clock";
 import { resolveQuestion } from "../resolution";
 import { settleRound } from "../settlement";
 import { DraftSchema, upsertDraft } from "./draft";
-import { crowdDrift, lateEdge, leakReport, loadLeakRows } from "./leak";
 import { loadQualityRows, qualityReport, questionQuality } from "./quality";
 import type { TelegramClient } from "./telegram";
 import { composeHingePushes } from "../push/compose";
@@ -176,18 +175,8 @@ export async function settle(deps: { db: Db; telegram: TelegramClient; push?: Pu
     orderBy: (questions, { asc }) => [asc(questions.slot)],
   });
 
-  const defaultLocksAt = noonET(addDays(date, 1));
-  const leakLines = await Promise.all(
-    qs.map(async (q) => {
-      const rows = await loadLeakRows(deps.db, q.id);
-      return { slot: q.slot, drift: crowdDrift(rows), edge: lateEdge(rows), locksAt: q.locksAt };
-    }),
-  );
-
-  // LEAK WATCH asks whether today's questions stayed answerable after their
-  // answers existed. This asks the other half: whether they were worth
-  // answering at all. One day is too small a sample for either, so the
-  // scorecard reads the trailing window, not this round.
+  // Whether the round's questions were worth answering at all. One day is too
+  // small a sample, so the scorecard reads the trailing window, not this round.
   const quality = qualityReport(questionQuality(await loadQualityRows(deps.db, date)));
 
   const lines = qs.map((q) => `${q.slot}. ${q.text} → ${q.outcome ? q.outcome.toUpperCase() : "?"}`);
@@ -196,8 +185,6 @@ export async function settle(deps: { db: Db; telegram: TelegramClient; push?: Pu
     ...lines,
     `settled: ${result.settled}`,
     pushLine,
-    "",
-    ...leakReport(leakLines, defaultLocksAt),
     "",
     ...quality,
     "",

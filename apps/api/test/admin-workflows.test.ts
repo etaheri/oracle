@@ -63,12 +63,12 @@ describe("admin workflow routes", () => {
   it("POST .../restart with no body restarts from the top", async () => {
     let restartedFrom: unknown = "unset";
     const app = await makeApp({
-      PROBE_WORKFLOW: {
+      AUTHORING_WORKFLOW: {
         create: async () => {},
         get: async () => ({ status: async () => ({}), restart: async (o: unknown) => void (restartedFrom = o) }),
       },
     });
-    const res = await app.request("/admin/workflows/probe/probe-2026-09-07-2026090812/restart", {
+    const res = await app.request("/admin/workflows/author/author-2026-09-07-2026090812/restart", {
       method: "POST",
       headers: { "x-admin-secret": "s" },
     });

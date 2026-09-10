@@ -11,7 +11,7 @@ import { POLYMARKET_FEED } from "./exchanges/polymarket";
 import { eligible, eligibilityWindow, selectFive, SELECT } from "./exchanges/select";
 import type { ExchangeFeed, MarketCandidate } from "./exchanges/types";
 import { voiceQuestions } from "./voice";
-import { tasteTexts } from "./gauntlet/taste";
+import { tasteTexts } from "./taste";
 
 export const DEFAULT_EXCHANGES: ExchangeFeed[] = [KALSHI_FEED, POLYMARKET_FEED];
 

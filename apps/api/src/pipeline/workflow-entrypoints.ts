@@ -1,4 +1,4 @@
-// The three Workflow classes (design 2026-09-04 §2). Separate from
+// The two Workflow classes (design 2026-09-04 §2). Separate from
 // workflows.ts on purpose: this is the only file in the pipeline that imports
 // "cloudflare:workers", a specifier that resolves solely inside workerd, and
 // only worker.ts imports it. workflows.ts keeps WorkflowStarter, hourBucket,
@@ -23,20 +23,10 @@ import { schema } from "../db/client";
 import { buildPipelineDeps, type WorkerEnv } from "../worker";
 import { POLICY, type StepPolicy } from "./steps";
 import { BudgetExhausted, meterClaude, reportBudgetExhaustion } from "./spend";
-import { addDays, etNow, noonET, voidDeadline } from "./clock";
-import { emptyTally, screenCandidates, type Rejection } from "./candidate";
-import { gatherAuthoringContext, generateCandidates } from "./gauntlet/generate";
-import { checkSources } from "./gauntlet/sources";
-import { criticize } from "./gauntlet/critic";
-import { gatherForecasts } from "./gauntlet/forecast";
-import { preflightOne, assemblePreflight } from "./gauntlet/preflight";
-import { tasteCheck } from "./gauntlet/taste";
-import { assessEditorial } from "./editorial";
-import { commitRound, narrateGauntlet } from "./gauntlet";
+import { etNow } from "./clock";
 import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound, tooFewReason } from "./market-round";
 import { SELECT } from "./exchanges/select";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
-import { probeOne, narrateProbe, type ProbeOutcome } from "./probe";
 import type { PipelineDeps } from "./index";
 
 interface Params { date: string; questionIds?: string[] }
@@ -165,26 +155,3 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
   }
 }
 
-export class ProbeWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
-  async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
-    const deps = metered(this.env);
-    if (!deps) return;
-    const { date, questionIds = [] } = event.payload;
-
-    const outcomes: ProbeOutcome[] = [];
-    for (const questionId of questionIds) {
-      outcomes.push(
-        await durableStep(step, `probe-${questionId}`, POLICY.noRetry, deps, () =>
-          probeOne(deps, questionId),
-        ),
-      );
-    }
-
-    await durableStep(step, "narrate", POLICY.narrate, deps, async () => {
-      await narrateProbe(deps, date, outcomes);
-      return { healed: outcomes.filter((o) => o.healed).length };
-    });
-
-    return { healed: outcomes.filter((o) => o.healed).length, total: outcomes.length };
-  }
-}

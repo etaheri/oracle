@@ -60,7 +60,7 @@ async function depsWith(feeds: ExchangeFeed[], claude: PipelineDeps["claude"], s
   const { db } = await makeTestDb();
   return {
     db, telegram: { send: async (t) => { sent.push(t); } }, claude,
-    models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", critic: "c", preflight: "p", probe: "pr", taste: "t", voice: "v" },
+    models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", taste: "t", voice: "v" },
     now: () => new Date("2026-09-10T21:05:00Z"),
     workflows: inlineStarter(),
     exchangeFeeds: feeds,
