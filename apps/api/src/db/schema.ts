@@ -18,6 +18,9 @@ export const users = pgTable("users", {
   // settled through. Lets a crashed settleRound retry skip finished users
   // (neon-http has no transactions to lean on).
   streakSettledThrough: date("streak_settled_through"),
+  // The player's fortune (design 2026-09-10 §4.4). Written ONLY by settlement
+  // (resolution.ts payFortune). Never by a purchase, a grant or a shield.
+  fortune: integer("fortune").notNull().default(1000),
 }, (t) => [index("users_oracle_score_idx").on(t.oracleScore)]);
 
 export const devices = pgTable("devices", {
@@ -45,6 +48,9 @@ export const rounds = pgTable("rounds", {
   // perfect night — the reveal withholds the line entirely at 0.
   candidatesWritten: integer("candidates_written").notNull().default(0),
   candidatesRejected: integer("candidates_rejected").notNull().default(0),
+  // Σ(stake − payout) over the round's settled predictions, written when the
+  // round settles (design 2026-09-10 §4.4). Null until then and on v1/v2.
+  houseDelta: integer("house_delta"),
 });
 
 export const questions = pgTable("questions", {
@@ -103,6 +109,15 @@ export const questions = pgTable("questions", {
   // last TOPIC_KEY_DAYS of these; the text dedupe it replaces let "will BTC
   // close above $X" through every night with a new X.
   topicKey: text("topic_key"),
+  // The house line (design 2026-09-10 §5.5): oracle_p_yes clamped to the
+  // market band. Written once at commit; immutable.
+  linePYes: numeric("line_p_yes"),
+  // The exchange market this question IS (design 2026-09-10 §5.1). Null on
+  // authored and bank questions, which keep the model resolver.
+  marketSource: text("market_source"),
+  marketId: text("market_id"),
+  marketEventKey: text("market_event_key"),
+  marketClosesAt: timestamp("market_closes_at", { withTimezone: true }),
 }, (t) => [index("questions_round_date_idx").on(t.roundDate)]);
 
 export const predictions = pgTable("predictions", {
@@ -126,6 +141,15 @@ export const predictions = pgTable("predictions", {
   // seal is accepted, never rewritten. Null on rows that predate the column.
   crowdYesPctAtSeal: numeric("crowd_yes_pct_at_seal"),
   crowdCountAtSeal: integer("crowd_count_at_seal"),
+  // Frozen at seal (design 2026-09-10 §4.2): the fortune the stake was cut
+  // from, the stake, and the line it was taken at. Null on rounds before v3.
+  fortuneAtSeal: integer("fortune_at_seal"),
+  stake: integer("stake"),
+  linePYes: numeric("line_p_yes"),
+  // Written once by settlement, claimed WHERE settled_at IS NULL so a retried
+  // resolve pays nobody twice. payout includes the returned stake.
+  payout: integer("payout"),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId), index("predictions_user_idx").on(t.userId)]);
 
 // Oracle Plus entitlements (backend spec L55). Written by the RevenueCat
@@ -165,6 +189,9 @@ export const userRounds = pgTable("user_rounds", {
   userId: uuid("user_id").notNull().references(() => users.id),
   date: date("date").notNull(),
   vigilMult: numeric("vigil_mult").notNull(),
+  // The fortune at this player's FIRST accepted seal of the round, the
+  // denominator of the day's return (design 2026-09-10 §4.5). Never rewritten.
+  fortuneAtOpen: integer("fortune_at_open"),
 }, (t) => [primaryKey({ columns: [t.userId, t.date] })]);
 
 // The pipeline's daily model-call meter (design 2026-09-04 §9.1). One row per
