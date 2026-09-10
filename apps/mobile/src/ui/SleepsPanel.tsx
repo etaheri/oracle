@@ -33,10 +33,10 @@ export function SleepsPanel({
           of white above a button labelled CHALLENGE THE ORACLE — Home's word
           for the real round, pointing at a practice question instead. */}
       <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "center" }]}>
-        An exhibition is one practice question with a known answer. It scores
-        nothing and changes no record — a way to meet the call while you wait.
+        A practice question has a known answer. It runs on a practice fortune
+        and changes no record — a way to meet the call while you wait.
       </Mono>
-      <GoldButton title="TRY AN EXHIBITION" onPress={onExhibition} />
+      <GoldButton title="TRY A PRACTICE QUESTION" onPress={onExhibition} />
     </View>
   );
 }

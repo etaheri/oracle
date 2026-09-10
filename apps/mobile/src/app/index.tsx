@@ -4,7 +4,7 @@ import { useNotificationPermission } from "../notifications/permission";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, View, Pressable, Linking } from "react-native";
 import { Screen } from "../ui/Screen";
-import { Mono, role } from "../ui/Text";
+import { Mono, Ritual, role } from "../ui/Text";
 import { SystemHeader } from "../ui/SystemHeader";
 import { FooterNav, type NavItem } from "../ui/FooterNav";
 import { DecodeLine } from "../ui/DecodeText";
@@ -25,6 +25,8 @@ import { rescueOffered } from "../game/rescueOffer";
 import { readingSlot } from "../game/readingSlot";
 import { homeDates } from "../game/homeDates";
 import { riskLine, lapseNotice } from "../game/homeLines";
+import { houseLines } from "../game/houseLine";
+import { formatFortune } from "../game/fortuneText";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
 import { beginHomeAction, invalidateHomeAction, ownsHomeAction, type HomeActionGate } from "../game/homeActionGate";
 import { msUntil } from "../game/countdown";
@@ -35,8 +37,8 @@ import { maybeSummon, summonNow } from "../notifications/summons";
 import { purchaseRescue } from "../monetization/purchases";
 import { usePlusStore } from "../monetization/plusState";
 import { capture } from "../analytics/analytics";
-import { vigilLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, READING_LINES, REMINDER_CTA_LINES, type MeLedger } from "@oracle/core";
-import { colors, space, ROW_H } from "../theme";
+import { streakLine, COPY_BANK, CURRENT_GAME_COPY, GAME_TERMS, PAYWALL_CTA_LINES, READING_LINES, REMINDER_CTA_LINES, type MeLedger } from "@oracle/core";
+import { colors, space, ROW_H, displayScale } from "../theme";
 import { dateStamp } from "../game/dateStamp";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useChromeScale } from "../ui/useChromeScale";
@@ -45,7 +47,7 @@ import { scaledRow } from "../game/typeScaling";
 // The rescue offer at the breaking point (revenue-rites spec): the line has
 // no {streak} token (verbatim per copy bank), so no fillSlots is needed here.
 const RESCUE_LINE = COPY_BANK.find((l) => l.id === "paywall.rescue-1")!.text;
-const RESCUE_CONFIRM_LINE = COPY_BANK.find((l) => l.id === "streak.shield-1")!.text;
+const RESCUE_CONFIRM_LINE = COPY_BANK.find((l) => l.id === "streak.protection-1")!.text;
 const STORE_SILENT_LINE = "THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.";
 // The store took the purchase but the shield has not reached the ledger yet:
 // it is granted server-side by the RevenueCat webhook, so there is a real gap
@@ -53,7 +55,7 @@ const STORE_SILENT_LINE = "THE STORE DID NOT ANSWER. NOTHING WAS CHARGED.";
 // told the player they were safe before anything made them safe (audit
 // 2026-09-02 §4.2). This line is true in the gap, and the ledger's own row is
 // the thing that eventually says otherwise.
-const STORE_PENDING_LINE = "THE STORE ANSWERED. THE LEDGER WILL RECORD IT SHORTLY.";
+const STORE_PENDING_LINE = "THE STORE ANSWERED. YOUR RECORD WILL SHOW IT SHORTLY.";
 const SHIELD_LANDING_TRIES = 3;
 const SHIELD_LANDING_GAP_MS = 2000;
 
@@ -165,8 +167,8 @@ export default function Index() {
       capture("round_opened", { date: round.date });
     }
   }, [arrival.kind, round]);
-  const vigil = vigilLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
-  const shield = shieldNotice(ledger.data?.shield_used_on ?? null, calendarYesterday);
+  const kept = streakLine(ledger.data?.streak ?? 0, `home:${round?.date ?? ""}`);
+  const protection = shieldNotice(ledger.data?.shield_used_on ?? null, calendarYesterday);
   // Re-evaluated every 30s so the risk line can appear without a remount —
   // Home never remounts under the Stack (see the focus effect above).
   const now = useNow(30_000);
@@ -181,9 +183,9 @@ export default function Index() {
     anySealed,
     permission: notifPermission,
   });
-  const notice = shield ?? risk ?? lapse ?? vigil;
-  // Risk/lapse notices are the paywall's entry point — a missed vigil is the
-  // one moment protection actually matters. Shield/vigil lines stay plain.
+  const notice = protection ?? risk ?? lapse ?? kept;
+  // Risk/lapse notices are the paywall's entry point — a missed streak is the
+  // one moment protection actually matters. Protection/streak lines stay plain.
   const noticeLinksToPlus = notice !== null && (notice === risk || notice === lapse);
   // The one-row rescue offer: only below an ACTUAL risk notice (not when a
   // shield notice from yesterday is taking priority). Every other condition
@@ -229,6 +231,13 @@ export default function Index() {
     arrivalEvent.current = key;
     capture("arrival_viewed", { state: arrival.kind, first_visit: arrivalInput.firstVisit, has_schedule: arrivalInput.hasRound || !!arrivalInput.nextOpensAt });
   }, [arrival.kind, arrivalInput.firstVisit, arrivalInput.hasRound, arrivalInput.nextOpensAt]);
+  const houseSeenFor = useRef<number | null>(null);
+  useEffect(() => {
+    const last = ledger.data?.house?.last_delta ?? null;
+    if (last === null || houseSeenFor.current === last) return;
+    houseSeenFor.current = last;
+    capture("house_headline_viewed", { sign: Math.sign(last) });
+  }, [ledger.data?.house?.last_delta]);
   const doRescue = useCallback(async () => {
     setRescueResult("waiting");
     const shieldsNow = () => qc.getQueryData<MeLedger>(["me", "ledger"])?.paid_shields ?? 0;
@@ -313,7 +322,7 @@ export default function Index() {
   // The reading round's ledger keeps a rail slot only while it is not
   // already the screen's headline action.
   const navItems: NavItem[] = [
-    { label: "YOUR LEDGER", a11yLabel: "The forecaster's ledger", onPress: () => leaveHome(() => router.push("/ledger")) },
+    { label: "YOUR RECORD", a11yLabel: "Your record", onPress: () => leaveHome(() => router.push("/ledger")) },
     ...(showLedgerCta ? [] : [{ label: READING_LINES.rail, a11yLabel: "Your last round", onPress: () => leaveHome(() => router.push(`/reveal/${ledgerDate}`)) }]),
     { label: GAME_TERMS.rulesNav.toUpperCase(), a11yLabel: GAME_TERMS.rulesNav, onPress: () => leaveHome(() => router.push({ pathname: "/rites", params: { all: "1" } })) },
   ];
@@ -331,8 +340,24 @@ export default function Index() {
         {/* The wordmark materializes out of ASCII (patina spec phase 2) and
             settles into carved stillness with a faint edge residue. */}
         <MaterializeTitle active={cues.title} />
+        {/* Fortune is the hero number (design D4, §8.3). It reads from the
+            record, not from today's round, so it stands while no round is
+            open. Reserved two rows so it never shoves the clock. */}
+        <View style={{ minHeight: scaledRow(ROW_H.line, chromeScale) * 2 + space(1), alignItems: "center", justifyContent: "center", gap: space(1) }}>
+          {ledger.data?.fortune != null && (
+            <>
+              <Ritual bold size={displayScale.epithet} letterSpacing={2} style={{ marginRight: -2 }} accessibilityLabel={`Fortune ${formatFortune(ledger.data.fortune)}`}>{formatFortune(ledger.data.fortune)}</Ritual>
+              <Mono {...role.meta} color={colors.mutedInk}>FORTUNE</Mono>
+            </>
+          )}
+        </View>
         {/* The live line: what the oracle is doing, right now. */}
         <OracleClock round={arrival.kind === "waiting" ? null : round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} nextQuestionClosesAt={availability?.earliestOpenLock ?? null} />
+        <View style={{ minHeight: scaledRow(ROW_H.meta, chromeScale) * 2, alignItems: "center", justifyContent: "center" }}>
+          {houseLines(ledger.data?.house).map((line) => (
+            <Mono key={line} {...role.meta} color={colors.goldText}>{line}</Mono>
+          ))}
+        </View>
       </View>
       <View style={{ gap: space(3) }}>
         <View style={{ minHeight: callSlotHeight(chromeScale), justifyContent: "flex-end", gap: space(3) }}>

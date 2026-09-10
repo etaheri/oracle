@@ -45,5 +45,5 @@ export function lapseNotice(
   seedKey: string
 ): string | null {
   if (daysConsulted <= 0 || streak !== 0 || playedYesterday !== false) return null;
-  return "THE VIGIL BEGINS AGAIN. YOUR RECORD REMAINS.";
+  return "A NEW STREAK BEGINS. YOUR RECORD REMAINS.";
 }

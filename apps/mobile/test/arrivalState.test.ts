@@ -20,7 +20,7 @@ describe("arrivalState", () => {
   });
 
   it("never offers live play when no questions remain open", () => {
-    expect(arrivalState({ ...ready, openCount: 0 })).toMatchObject({ kind: "waiting", primary: "exhibition", label: "CHALLENGE THE ORACLE" });
+    expect(arrivalState({ ...ready, openCount: 0 })).toMatchObject({ kind: "waiting", primary: "exhibition", label: "PRACTICE AGAINST THE ORACLE" });
   });
 
   it("keeps loading, hydration, and failure truthful", () => {
@@ -42,7 +42,7 @@ describe("arrivalState", () => {
     expect(arrivalState({ ...ready, openCount: 0, allSubmitted: true })).toMatchObject({
       kind: "submitted",
       primary: "crowd",
-      label: "SEE THE CROWD",
+      label: "SEE THE PLAYERS",
     });
   });
 });

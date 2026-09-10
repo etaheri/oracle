@@ -35,13 +35,13 @@ export function arrivalState(input: ArrivalInput): ArrivalState {
   if (input.loading) return { kind: "loading", primary: null, label: null };
   if (input.failed) return { kind: "error", primary: "retry", label: "RETRY" };
   if (!input.hydrated) return { kind: "loading", primary: null, label: null };
-  if (input.hasRound && input.allSubmitted) return { kind: "submitted", primary: "crowd", label: "SEE THE CROWD" };
+  if (input.hasRound && input.allSubmitted) return { kind: "submitted", primary: "crowd", label: "SEE THE PLAYERS" };
   if (input.openCount > 0) {
     return input.missedCount > 0
       ? { kind: "partial", primary: "live", label: "ANSWER REMAINING QUESTIONS" }
       : { kind: "live", primary: "live", label: input.firstVisit ? "MAKE YOUR FIRST CALL" : "PLAY TODAY" };
   }
-  return { kind: "waiting", primary: "exhibition", label: "CHALLENGE THE ORACLE" };
+  return { kind: "waiting", primary: "exhibition", label: "PRACTICE AGAINST THE ORACLE" };
 }
 
 export function arrivalInputForRound(

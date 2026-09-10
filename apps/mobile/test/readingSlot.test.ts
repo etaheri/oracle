@@ -19,7 +19,7 @@ describe("readingSlot (design 2026-09-09 §2.2, §3.1)", () => {
   });
   it("is settled until the reveal has been seen", () => {
     expect(readingSlot({ date: "2026-09-09", settled: true, decided: 5, total: 5 }, "2026-09-08")).toEqual({
-      kind: "settled", date: "2026-09-09", line: "THE LEDGER IS READ", cta: "READ THE LEDGER",
+      kind: "settled", date: "2026-09-09", line: "THE NIGHT IS SETTLED", cta: "SEE THE RESULT",
     });
     expect(readingSlot({ date: "2026-09-09", settled: true, decided: 5, total: 5 }, "2026-09-09")).toEqual({ kind: "none" });
   });

@@ -38,9 +38,9 @@ export function HomeChallenge({
   const supporting = state.kind === "error"
     ? "COULDN'T LOAD TODAY'S ROUND."
     : state.kind === "partial"
-      ? `${input.openCount} ${input.openCount === 1 ? "QUESTION REMAINS" : "QUESTIONS REMAIN"} · A COMPETITIVE RESULT REQUIRES EVERY NON-VOID QUESTION. YOU CAN STILL PLAY FOR POINTS.`
+      ? `${input.openCount} ${input.openCount === 1 ? "QUESTION REMAINS" : "QUESTIONS REMAIN"} · A PLACING NEEDS EVERY NON-VOID QUESTION. YOUR STAKES STILL SETTLE.`
       : state.kind === "submitted"
-        ? "YOUR CALLS ARE SEALED. SEE WHERE YOU STOOD WITH THE CROWD WHILE OUTCOMES ARE VERIFIED."
+        ? "YOUR CALLS ARE SEALED. SEE WHERE THE PLAYERS LEAN WHILE THE MARKETS SETTLE."
         : state.kind === "waiting"
           // The state only. This line used to carry the state AND the offer
           // joined by a middot — "THE NEXT ROUND HASN'T BEEN ANNOUNCED. · TRY
@@ -52,7 +52,7 @@ export function HomeChallenge({
             ? `NEXT ROUND OPENS ${localOpening(input.nextOpensAt)}`
             : "THE NEXT ROUND HASN'T BEEN ANNOUNCED"
           : state.kind === "live"
-            ? "FIVE QUESTIONS ABOUT WHAT HAPPENS NEXT. HOW SURE ARE YOU?"
+            ? "FIVE QUESTIONS. THE ORACLE HAS POSTED ITS LINES."
             : "LOADING TODAY'S CHALLENGE…";
 
   return (
@@ -83,7 +83,7 @@ export function HomeChallenge({
           ONE CALL, ANSWERED NOW · UNRANKED
         </Mono>
       )}
-      {state.kind === "error" && <QuietLink title="TRY AN EXHIBITION" onPress={onExhibition} />}
+      {state.kind === "error" && <QuietLink title="TRY A PRACTICE QUESTION" onPress={onExhibition} />}
     </View>
   );
 }
