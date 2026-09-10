@@ -219,7 +219,7 @@ Set per profile (development / preview / production) in the EAS dashboard:
 | `EXPO_PUBLIC_SENTRY_DSN` | runtime DSN |
 | `SENTRY_ORG` (+ optional `SENTRY_PROJECT`) | build-time. Absent → `app.config.js` drops the Sentry plugin entirely rather than shipping a fake org |
 | `EXPO_PUBLIC_PRIVACY_URL` | **App Review gate.** Absent → the paywall offers no link at all |
-| `EXPO_PUBLIC_SHARE_URL` | `https://apps.apple.com/app/id<ASC id>`. Leave unset until the record exists — absent ships a link-free share, which is correct |
+| `EXPO_PUBLIC_SHARE_URL` | the site's `/play` smart link (see §4.1b), e.g. `https://outseen-site.etaheri.workers.dev/play`. Leave unset until it exists — absent ships a link-free share, which is correct |
 
 Every native key is optional by design: an absent key means that SDK stays
 dark and the app still runs. Absent is safe; wrong is not.
@@ -242,6 +242,14 @@ dark and the app still runs. Absent is safe; wrong is not.
 and `predictions.crowd_count_at_seal` — a snapshot of crowd prediction and count
 written at each seal, shown to the sealer only. The closing reminder follows the
 device's habitual first-seal hour after three days of history (noon reminder unchanged).
+
+Android still ships a link-free, text-free share: it goes through
+`expo-sharing`'s `shareAsync`, which puts only the image file on the intent, so
+the challenge line and `EXPO_PUBLIC_SHARE_URL` never travel there — only iOS's
+`Share.share` carries both. A preview build with `EXPO_PUBLIC_SHARE_HANDLE` set
+must be checked on a real device before turning it on for production: it is
+the only way to see the rendered card at actual size and confirm the handle
+clears the footer's lower boundary on both the round card and the plaque.
 
 ### 4.2 App Store Connect
 
@@ -289,6 +297,21 @@ ledger screen outright. Same for rules-version 2: settlement, reveal, board,
 ledger and share all read it.
 
 Order: migrate → deploy API → verify → build mobile → TestFlight → submit.
+
+### 4.6 Device pass before the next App Store build
+
+None of these are covered by the automated suite — confirm each on a real
+device before the build ships:
+
+- iOS share from both the reveal and the plaque shows the image and the
+  challenge text together in Messages and Mail.
+- The iPad share sheet presents correctly (not just the phone layout).
+- `/play` opened from a Messages link works both with and without the app
+  installed.
+- `oracle://round` from a cold start lands on the round, not a blank screen.
+- The finale movement line appears only after the seal, never before.
+- Reminders fire at the device's habitual hour, and the noon reminder stays
+  unmoved.
 
 ---
 
