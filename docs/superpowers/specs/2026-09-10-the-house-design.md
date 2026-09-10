@@ -1,6 +1,6 @@
 # The House: the Oracle as market maker
 
-Design, September 10, 2026. Supersedes the question-pipeline-integrity design (2026-09-04) for rounds at rules version 3, and reverses two decisions of the Outsee pass (2026-09-08), each marked below.
+Design, September 10, 2026. Supersedes the question-pipeline-integrity design (2026-09-04) for rounds at rules version 3, and reverses two decisions of the Outsee pass (2026-09-08), each marked below. Amended the same day after the first playtest: D11 to D13, §4.2, §8, §10 and §15.
 
 ## 1. The problem this solves
 
@@ -26,6 +26,9 @@ Every day at noon ET the Oracle deals five cards. Each card is a live real-money
 | D8 | Fortune carries no vigil, first-hour or contrarian multiplier. The Big One doubles the stake fraction and nothing else. | The market odds already reward a correct contrarian call. Multipliers on money are hard to explain and easy to distrust. |
 | D9 | Fewer than five eligible markets on a night publishes a bank round under the existing rules, with an alert. | One fallback path, already built, already tested. No hybrid rounds. |
 | D10 | Rounds at version 3 use this design. Versions 1 and 2 keep their rules. | Same posture as the version 2 cut. Production holds one player, so no fortune migration is needed. |
+| D11 | The seal is two steps: tap a side, tap a stake rung, tap seal. The pull gesture is retired. | The first playtest found the pull hard to control and asked for two steps. One path for every player also retires the separate accessibility button mode. |
+| D12 | The player-facing vocabulary is the Oracle, the house, the line, fortune, stake, the Big One, seal, streak, streak protection, practice and void. Vigil, shield, exhibition, the Rites, ledger, crowd, conviction, standing, epithet and the Oracle rating leave the surface. | The first playtest called the rules confusing and the metaphors a lot to manage. The money words carry the game; the rest were names for ordinary things. |
+| D13 | The stake ladder offers five of the nine grid values and shows money, not confidence. | Five rungs are tappable; nine are not. Confidence still records and scores as before, but the playtest could not tell whether it muddied the game, so it is kept out of the way of the stake. |
 
 ## 4. Stakes, odds and fortune
 
@@ -54,6 +57,8 @@ stake(fortune, c, isBigOne) = fortune ≥ 10 ? max(1, round(fortune × fraction)
 The floor of one applies from a fortune of ten upward. Below ten the floor is dropped and a zero stake is a valid, unpaid call. Without that rule five floored stakes could sum to a fortune of five and take it to zero.
 
 So 55 stakes one percent, 75 stakes five, 95 stakes nine, and the Big One doubles each. A round with every call at 95 and every call wrong loses 54 percent of the fortune. That is the point.
+
+The app offers five rungs of the grid, 55, 65, 75, 85 and 95, which stake 1, 3, 5, 7 and 9 percent (D13). The core and the API accept the full grid; older rounds and any later client may use it.
 
 The stake is computed from the fortune **at the instant of the seal** and frozen on the prediction. Fortune changes only at settlement, so a round's five stakes share one base unless an earlier round settles mid-window, in which case later seals use the updated fortune. Nothing is debited at seal.
 
@@ -233,23 +238,50 @@ lessons                      (§14) id, member, series_key, question_id, text, r
 
 ## 8. Mobile
 
-Every surface keeps its materials, typography and motion. Copy follows the Outsee register: ordinary words for actions and numbers, the inscription voice reserved for the Oracle.
+Every surface keeps its materials, typography and motion. Copy follows the two registers: tracked caps for what is recognised, sentence case for what is read.
+
+### 8.1 Vocabulary
+
+After this release the player sees these names and no others: the Oracle, the house, the line, fortune, stake, the Big One, seal, streak, streak protection, practice, void. Renames:
+
+| Was | Becomes | Where |
+| --- | --- | --- |
+| The Rites | How to play, as the title, not only the nav label | rules screen |
+| Ledger | Your record | record screen, home links |
+| Vigil | Streak | record, home ambient lines, Plus |
+| Shield | Streak protection; "one free per month" | record, Plus paywall, rescue offer |
+| Exhibition | Practice; stamp `PRACTICE · UNRANKED`; waiting-state button `PRACTICE AGAINST THE ORACLE` | practice screen, card, home, rules |
+| Summons | Route unchanged; copy says what it is: get told when the Oracle settles | notification interstitial |
+| Crowd | Other players in prose; the card back flip is labelled `PLAYERS` | rules, reveal, card back |
+| Conviction, standing, epithet, Oracle rating | Removed from the surface. Calibration stays in the record's detail as "your calibration" | round footer, record |
+
+A copy lint in `@oracle/core` fails on any retired word in player-facing copy.
+
+### 8.2 The card and the seal
+
+The pan gesture and the press-and-hold button mode are removed. One path:
+
+1. The card face shows the question and, under it, `THE ORACLE'S LINE · 35% YES`.
+2. Below the card, YES and NO. Tapping one leans the card that way with the existing wash and reveals the stake ladder. Tapping the other switches side.
+3. The ladder has five rungs (§4.2), each reading `STAKE 50 · WINS 93`, computed by the core preview function at the line for the chosen side, doubled on the Big One. The middle rung is preselected, so the fastest seal is two taps.
+4. SEAL commits. The receipt reads `YES · STAKED 50 · WINS 93`. The confidence percent appears nowhere on the ladder or the receipt; it is stored as today and shown only in the record's calibration detail.
+5. The card back and crowd flip are unchanged.
+
+Practice uses the same component on the practice fortune and line.
+
+### 8.3 Surfaces
 
 | Surface | Change |
 | --- | --- |
-| Card face | Below the question, one line: `THE ORACLE'S LINE · 35% YES`. |
-| Conviction column | The readout adds `STAKE 42 · PAYS 78` computed from the live confidence via the core preview function. Replaces the points payoff line. |
-| Seal | Unchanged gesture. Receipt reads `YES AT 70 · STAKED 42`. |
-| Card back | Crowd flip unchanged. |
-| Home | Fortune is the hero number. Beneath it the house line: `LAST NIGHT THE HOUSE LOST 1,240` or `WON`. |
-| Reveal | Headline is the round delta and the fortune after. Each card shows stake, payout, the line and, as context, the market's price. The Oracle comparison becomes "you took the Oracle for N" or "the Oracle took N". Under the line, the Council's split (§13.3). Points, streak and milestone copy move to the expandable detail. |
-| The reading | Under each member's row on the reveal, a collapsed line that opens into the member's paragraph and the evidence cards it cited. Evidence cards use the question card's chrome at smaller scale: title, source, published date, highlight. Uncited items sit under a final "also read" row. Named "the Oracle's reading" in copy. |
+| Home | Fortune is the hero number. Beneath it the house line: `LAST NIGHT THE HOUSE LOST 1,240` or `WON`, or `THE ORACLE OWES ITS PLAYERS N` when the purse is negative. Then today's state as now: make your calls, or waiting with the practice button. Streak and the streak-protection rescue offer move to the record. |
+| Reveal | Headline is the round delta and the fortune after: `+140 · FORTUNE 1,140`. Each card shows the side taken, stake, payout, the line and, as context, the market's price. The Oracle comparison reads "you took the Oracle for 93" or "the Oracle took 50"; a void card reads "stake returned". Points, streak and milestone copy move to the expandable detail. Each card leaves a slot under its line for the Council split (§13.3), which the Council plan fills. Rounds at versions 1 and 2 keep their points headline, chosen by the round's rules version. |
+| The reading | Under each member's row on the reveal, a collapsed line that opens into the member's paragraph and the evidence cards it cited. Evidence cards use the question card's chrome at smaller scale: title, source, published date, highlight. Uncited items sit under a final "also read" row. Named "the Oracle's reading" in copy. Built by the Council plan. |
 | The Council sits (stretch) | Between eleven and noon ET, home shows one row per member flipping to "sealed" as its commit lands, lines hidden. Truthful, since the commits happen then; cut first if time is short. |
-| Board | Daily by return, all-time by fortune. |
-| Ledger | Fortune history above the calibration record. |
+| Board | Daily by return as a signed percent, all-time by fortune. Existing eligibility rules and sparse-field states. |
+| Record | Fortune history at the top, one row per settled round: date, delta, fortune after. Then the streak with its protection count. Then the calibration record as now, confidence buckets included. |
 | Share card | Night realm, unchanged materials. Line one: fortune delta. Line two: the Oracle's line on the Big One and what the player did about it. |
-| Practice | Uses the exhibition fortune and line; copy says so. |
-| Rules | The three-idea introduction becomes: the Oracle posts a line, you take a side and a stake, right calls pay at the Oracle's odds. Full rules gain the stake ladder table. |
+| Practice | Same card and ladder on a fixed practice fortune of 1,000 and the exhibition's fixed line. The result says "practice fortune, nothing changed". |
+| Rules | The three-idea introduction: the Oracle posts its line on five questions a day; take a side and stake part of your fortune; right calls pay at the Oracle's odds, wrong calls lose the stake. The full rules shrink from six sections and about forty claims to four and about twenty: the game, results and the board, your record, timing and fairness. The stake ladder appears as a five-row table. Versions 1 and 2 rules stay in the archive, linked from those reveals. |
 
 ## 9. Analytics
 
@@ -261,7 +293,7 @@ Existing events gain `stake`, `line`, `delta` properties where a prediction or r
 - Feeds: recorded fixtures from both exchanges captured on September 10; eligibility window at the boundaries; one-per-event rule; category mapping for every known Kalshi category; a night with four candidates falls to the bank.
 - Settlement readers: fixtures for settled YES, settled NO, cancelled, and still-open on both exchanges; a retried settle pays nobody twice.
 - API: seal → settle → fortune on a version 3 round; a seal on a lineless question is rejected; version 2 rounds settle exactly as before.
-- Mobile: card line and stake readout at three confidences; reveal headline for win, loss and void; house headline for the negative purse; practice never posts a stake.
+- Mobile: card line and the ladder at all five rungs with and without the Big One; the two-step state machine including a side switch before seal; reveal headline for win, loss and void, chosen by rules version; house headline for the negative purse; practice never posts a stake; the retired-word lint; the rules claim count.
 - Council: median with an even and odd number of members; an abstaining member is excluded from the median and scored nothing; a member whose response fails to parse abstains rather than defaulting to 50; per-member Brier and house delta over a settled round; the market baseline member is never sent to a model.
 - Evidence: a pack is retrieved once per question and shared; every item's published date is at or before the retrieval instant; a member's cited ranks all exist in the pack; an empty pack still commits.
 - Lessons: a lesson is written only after settlement; the as-of filter excludes a lesson whose outcome was not known at commit time; caps hold; a member never receives another member's lessons.
@@ -369,3 +401,4 @@ TradingAgents' bull and bear researcher debate, its four-analyst fan-out and its
 - Fortune leaderboards across friends, seasons or resets.
 - Kalshi or Polymarket as a source for the bank. The bank stays evergreen and authored.
 - Adopting an agent-UI component library. The reading takes the expandable-trace and evidence-card patterns and renders them in the app's own materials.
+- A hand-of-predictions card game with modifiers and head-to-head play, raised in the first playtest. The Council split at reveal is the nearest thing this release builds.
