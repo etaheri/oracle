@@ -136,3 +136,22 @@ describe("GET /v1/me/ledger", () => {
     expect(json.fortune_history).toEqual([{ date: DATE, delta: 74 * 4 + 149, fortune_after: 1000 + 74 * 4 + 149 }]);
   });
 });
+
+describe("GET /v1/me/ledger carries the house", () => {
+  it("reports the purse total and last night's delta after settlement", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, as, seal } = await world(1);
+    for (const q of qs) await seal(0, q.id, false, 55); // every stake 10, Big One 20
+    vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+    await settleRound(db, DATE);
+    const json = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
+    expect(json.house).toEqual({ total: 60, last_delta: 60 });
+  });
+
+  it("is null-delta with a zero total before any round settles", async () => {
+    const { as } = await world(1);
+    const json = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
+    expect(json.house).toEqual({ total: 0, last_delta: null });
+  });
+});

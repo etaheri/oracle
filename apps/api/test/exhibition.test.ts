@@ -105,6 +105,7 @@ describe("selectExhibition", () => {
       roundDate: "2099-08-20",
       oraclePYes: 0.7,
       outcome: "yes",
+      linePYes: 0.7, // clampLine(0.7, null): no market on this question, so the line is the forecast itself.
     });
     expect(ExhibitionSchema.parse(selected)).toEqual(selected);
   });
@@ -158,6 +159,24 @@ describe("selectExhibition", () => {
       else expect(questions).toHaveLength(5);
     }
     expect(await selectExhibition(db)).toBeNull();
+  });
+
+  it("prices the practice card at the house line, clamped to the market band", async () => {
+    const { db } = await makeTestDb();
+    // A future date, like the rest of this file's fixtures: commit_oracle_forecast
+    // rejects a commitment stamped after the round's own opening.
+    const questions = await resolvedRound(db, "2099-08-28", { oraclePYes: 0.8 });
+    // Slot 1 is the first candidate the selector reaches.
+    await db.update(schema.questions).set({ marketProb: "0.55" }).where(eq(schema.questions.id, questions[0]!.id));
+    const ex = await selectExhibition(db);
+    expect(ex?.id).toBe(questions[0]!.id);
+    expect(ex?.linePYes).toBeCloseTo(0.7, 10); // 0.80 held to 0.55 + 0.15
+  });
+
+  it("prices the practice card at the forecast itself when the question had no market", async () => {
+    await resolvedRound(db, "2099-08-29", { oraclePYes: 0.7 });
+    const ex = await selectExhibition(db);
+    expect(ex?.linePYes).toBeCloseTo(0.7, 10);
   });
 });
 

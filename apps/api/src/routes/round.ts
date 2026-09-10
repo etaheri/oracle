@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { asc, and, count, countDistinct, desc, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
+import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
 import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
@@ -7,6 +7,7 @@ import { deviceAuth } from "./auth";
 import { evidenceSummary } from "../resolution";
 import { noonET } from "../pipeline/clock";
 import { selectExhibition } from "../exhibition";
+import { houseSummary } from "../house";
 
 // The live round: earliest open round whose latest question lock is still
 // ahead of the server clock. The cron flips statuses on a 10-minute tick;
@@ -40,12 +41,10 @@ export const roundRoutes = new Hono<AppContext>()
     // null while no round has settled. Both are read as aggregates: the row
     // set grows by one a day forever, and /today is the hottest route we
     // serve, so neither may become an unbounded select summed in JavaScript.
-    const [user, [houseTotal], [houseLast]] = await Promise.all([
+    const [user, house] = await Promise.all([
       db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
-      db.select({ total: sql<number>`coalesce(sum(${schema.rounds.houseDelta}), 0)` }).from(schema.rounds).where(isNotNull(schema.rounds.houseDelta)),
-      db.select({ delta: schema.rounds.houseDelta }).from(schema.rounds).where(isNotNull(schema.rounds.houseDelta)).orderBy(desc(schema.rounds.date)).limit(1),
+      houseSummary(db),
     ]);
-    const house = { total: Number(houseTotal?.total ?? 0), last_delta: houseLast?.delta ?? null };
     return c.json({
       date: round.date,
       rules_version: round.rulesVersion,

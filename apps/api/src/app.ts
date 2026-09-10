@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Db } from "./db/client";
 import { authRoutes } from "./routes/auth";
 import { roundRoutes } from "./routes/round";
+import { boardRoutes } from "./routes/board";
 import { predictionRoutes } from "./routes/predictions";
 import { adminRoutes } from "./routes/admin";
 import { meRoutes } from "./routes/me";
@@ -36,6 +37,7 @@ export function createApp(deps: Deps) {
   app.get("/v1/health", (c) => c.json({ ok: true }));
   app.route("/v1/auth", authRoutes);
   app.route("/v1/round", roundRoutes);
+  app.route("/v1/board", boardRoutes);
   app.route("/v1/predictions", predictionRoutes);
   app.route("/v1/me", meRoutes);
   app.route("/admin", adminRoutes);

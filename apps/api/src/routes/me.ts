@@ -5,6 +5,7 @@ import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
 import { readingRoundFor } from "../reading";
+import { houseSummary } from "../house";
 
 const WINDOW_MS = 28 * 86_400_000;
 
@@ -20,6 +21,7 @@ export const meRoutes = new Hono<AppContext>()
     const userId = c.get("userId");
     const user = await db.query.users.findFirst({ where: eq(schema.users.id, userId) });
     const ent = await db.query.entitlements.findFirst({ where: eq(schema.entitlements.userId, userId) });
+    const house = await houseSummary(db);
     const preds = await db.query.predictions.findMany({ where: eq(schema.predictions.userId, userId) });
     const qs = preds.length
       ? await db.query.questions.findMany({ where: inArray(schema.questions.id, preds.map((p) => p.questionId)) })
@@ -225,6 +227,7 @@ export const meRoutes = new Hono<AppContext>()
       computed_through: new Date().toISOString().slice(0, 10),
       fortune: user?.fortune ?? null,
       fortune_history: fortuneHistory,
+      house,
       oracle: {
         score: oracleScore(oracleBriers),
         calls_rated: oracleBriers.length,

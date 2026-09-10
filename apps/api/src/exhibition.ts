@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { ExhibitionSchema, QuestionContextSchema, type Exhibition } from "@oracle/core";
+import { ExhibitionSchema, QuestionContextSchema, clampLine, type Exhibition } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 export async function selectExhibition(db: Db): Promise<Exhibition | null> {
@@ -35,6 +35,9 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
     if (new Date(context.data.asOf).getTime() > question.opensAt.getTime()) continue;
     if (question.text.trim().length === 0 || question.sourceName.trim().length === 0) continue;
 
+    const marketP = question.marketProb === null || question.marketProb === undefined ? null : Number(question.marketProb);
+    const linePYes = clampLine(oraclePYes, Number.isFinite(marketP as number) ? marketP : null);
+
     const projected = ExhibitionSchema.safeParse({
       id: question.id,
       kind: "historical",
@@ -44,6 +47,7 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
       roundDate: question.roundDate,
       oraclePYes,
       outcome: question.outcome,
+      linePYes,
     });
     if (projected.success) return projected.data;
   }
