@@ -137,9 +137,12 @@ export async function buildMarketDraft(deps: PipelineDeps, date: string, pool: M
     if (taste.detail !== null) return { draft: null, reason: taste.detail };
     const refused = enriched.filter((_, i) => !taste.allowed[i]);
     if (refused.length === 0) return { draft: toDraft(enriched, voiced, deps.now()), reason: null };
-    const refusedIds = new Set(refused.map((c) => c.marketId));
+    // Keyed by source AND id: the two exchanges number their markets
+    // independently, so a bare marketId can collide and drop a Kalshi ticker
+    // the taste gate never saw because a Polymarket row happened to share it.
+    const refusedIds = new Set(refused.map((c) => `${c.source}:${c.marketId}`));
     refusedSoFar += refused.length;
-    remaining = remaining.filter((c) => !refusedIds.has(c.marketId));
+    remaining = remaining.filter((c) => !refusedIds.has(`${c.source}:${c.marketId}`));
   }
   return { draft: null, reason: "the taste gate refused a market on both passes" };
 }

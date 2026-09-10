@@ -1,19 +1,34 @@
 // Polymarket's gamma API (verified 2026-09-10): 403s without a browser user
 // agent, paginates at 100 by offset, and reports settlement as closed +
 // umaResolutionStatus "resolved" with final outcomePrices.
+//
+// THE LIST READS /events, NOT /markets. A market row from `GET /markets`
+// carries an `events[0]` WITHOUT its `tags`, so every candidate sourced that
+// way categorises as "news" and selectFive can never reach the four distinct
+// categories DraftSchema demands. `GET /events` carries `tags[]` on the event
+// and the event's binary markets nested underneath, which is the only shape
+// that gives a candidate its category. Settlement still reads a single
+// market: `GET /markets/{id}` is the only route with umaResolutionStatus.
 import { getJson, type Category, type ExchangeFeed, type MarketCandidate, type SettlementRead } from "./types";
 
 const BASE = "https://gamma-api.polymarket.com";
 const PAGE = 100;
 const MAX_PAGES = 20;
-const VOLUME_FLOOR = 3000; // the API-side pre-filter; select.ts applies the real floor
+// The API-side pre-filter, applied to the EVENT's volume; select.ts applies
+// the real per-market floor. An event's volume is the sum over its markets,
+// so it is never below any one market's — filtering events at the same
+// number therefore cannot drop a market that would have passed select.
+const VOLUME_FLOOR = 5000;
 
 interface PolyTag { slug?: string; label?: string }
-interface PolyEvent { slug?: string; title?: string; tags?: PolyTag[] }
 interface PolyMarket {
   id: string | number; question?: string; description?: string; slug?: string;
   outcomes?: string; outcomePrices?: string; closed?: boolean; active?: boolean;
-  umaResolutionStatus?: string; endDate?: string; volumeNum?: number; volume?: string; events?: PolyEvent[];
+  umaResolutionStatus?: string; endDate?: string; volumeNum?: number; volume?: string;
+}
+interface PolyEvent {
+  id?: string | number; slug?: string; title?: string; tags?: PolyTag[];
+  endDate?: string; volume?: number; markets?: PolyMarket[];
 }
 
 const TAG_CATEGORY: Array<[RegExp, Category]> = [
@@ -49,13 +64,13 @@ function isBinaryYesNo(m: PolyMarket): boolean {
   }
 }
 
-function toCandidate(m: PolyMarket): MarketCandidate | null {
+function toCandidate(m: PolyMarket, event: PolyEvent): MarketCandidate | null {
+  if (m.closed === true) return null;                 // an open event can hold a settled leg
   if (!isBinaryYesNo(m)) return null;
   const p = priceYes(m);
   if (p === null || !m.endDate) return null;
-  const event = m.events?.[0];
-  const eventSlug = event?.slug ?? m.slug ?? String(m.id);
-  const tags = (event?.tags ?? []).map((t) => t.slug ?? "").filter(Boolean);
+  const eventSlug = event.slug ?? m.slug ?? String(m.id);
+  const tags = (event.tags ?? []).map((t) => t.slug ?? "").filter(Boolean);
   return {
     source: "polymarket",
     marketId: String(m.id),
@@ -78,12 +93,14 @@ export const POLYMARKET_FEED: ExchangeFeed = {
   async list(fetchFn, window) {
     const out: MarketCandidate[] = [];
     for (let page = 0; page < MAX_PAGES; page++) {
-      const url = `${BASE}/markets?closed=false&active=true&volume_num_min=${VOLUME_FLOOR}&end_date_min=${iso(window.from)}&end_date_max=${iso(window.to)}&limit=${PAGE}&offset=${page * PAGE}`;
-      const body = await getJson<PolyMarket[]>(fetchFn, url);
+      const url = `${BASE}/events?closed=false&active=true&volume_min=${VOLUME_FLOOR}&end_date_min=${iso(window.from)}&end_date_max=${iso(window.to)}&limit=${PAGE}&offset=${page * PAGE}`;
+      const body = await getJson<PolyEvent[]>(fetchFn, url);
       if (!Array.isArray(body) || body.length === 0) break;
-      for (const m of body) {
-        const c = toCandidate(m);
-        if (c) out.push(c);
+      for (const event of body) {
+        for (const m of event.markets ?? []) {
+          const c = toCandidate(m, event);
+          if (c) out.push(c);
+        }
       }
       if (body.length < PAGE) break;
     }
