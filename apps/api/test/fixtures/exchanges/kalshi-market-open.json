@@ -1,0 +1,21 @@
+{
+ "market": {
+  "ticker": "KXTTELITEMATCH-26SEP101810MOLJMI-MOL",
+  "event_ticker": "KXTTELITEMATCH-26SEP101810MOLJMI",
+  "status": "active",
+  "result": "",
+  "close_time": "2026-09-17T22:10:00Z",
+  "expiration_time": "2026-09-17T22:10:00Z",
+  "settlement_ts": null,
+  "title": "Michal Olbrycht wins",
+  "yes_sub_title": "Michal Olbrycht",
+  "rules_primary": "If Michal Olbrycht wins the Michal Olbrycht vs Jacek Mitas men's professional TT Elite Series table tennis match originally scheduled for Sep 10, 2026 at 6:10 PM EDT, then the market resolves to Yes.",
+  "yes_bid_dollars": "0.0500",
+  "yes_ask_dollars": "0.9500",
+  "last_price_dollars": "0.0000",
+  "volume_fp": "0.00",
+  "liquidity_dollars": "0.0000",
+  "market_type": "binary",
+  "mve_collection_ticker": null
+ }
+}

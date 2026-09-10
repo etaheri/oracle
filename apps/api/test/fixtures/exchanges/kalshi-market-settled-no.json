@@ -1,0 +1,21 @@
+{
+ "market": {
+  "ticker": "KXMVECROSSCATEGORY-SHARD1-S20260E040069514-E86F2348C13",
+  "event_ticker": "KXMVECROSSCATEGORY-SHARD1-S20260E040069514",
+  "status": "finalized",
+  "result": "no",
+  "close_time": "2026-09-10T14:18:39Z",
+  "expiration_time": "2026-09-24T12:40:00Z",
+  "settlement_ts": "2026-09-10T14:18:39.761529Z",
+  "title": "yes Stefano Travaglia,yes Lukas Neumayer,yes Joao Lucas Reis Da Silva,yes Nicolas Ifi",
+  "yes_sub_title": "yes Stefano Travaglia,yes Lukas Neumayer,yes Joao Lucas Reis Da Silva,yes Nicolas Ifi",
+  "rules_primary": "",
+  "yes_bid_dollars": "0.0000",
+  "yes_ask_dollars": "0.0000",
+  "last_price_dollars": "0.0000",
+  "volume_fp": "0.00",
+  "liquidity_dollars": "0.0000",
+  "market_type": "binary",
+  "mve_collection_ticker": "KXMVECROSSCATEGORY-SHARD1-R"
+ }
+}

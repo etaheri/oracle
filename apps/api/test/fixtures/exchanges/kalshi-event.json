@@ -1,0 +1,26 @@
+{
+ "event": {
+  "event_ticker": "KXTTELITEMATCH-26SEP101810MOLJMI",
+  "series_ticker": "KXTTELITEMATCH",
+  "category": "Sports",
+  "title": "Michal Olbrycht vs Jacek Mitas",
+  "settlement_sources": [
+   {
+    "name": "TT Elite Series",
+    "url": "https://www.tt-series.com/"
+   },
+   {
+    "name": "Sofascore",
+    "url": "https://www.sofascore.com/"
+   },
+   {
+    "name": "ESPN",
+    "url": "https://www.espn.com"
+   },
+   {
+    "name": "Flashscore",
+    "url": "https://www.flashscore.com/"
+   }
+  ]
+ }
+}
