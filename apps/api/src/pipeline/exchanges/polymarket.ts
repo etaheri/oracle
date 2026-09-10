@@ -38,7 +38,19 @@ function priceYes(m: PolyMarket): number | null {
   }
 }
 
+function isBinaryYesNo(m: PolyMarket): boolean {
+  try {
+    const outcomes = JSON.parse(m.outcomes ?? "") as unknown;
+    if (!Array.isArray(outcomes) || outcomes.length !== 2) return false;
+    const [a, b] = outcomes as [unknown, unknown];
+    return typeof a === "string" && typeof b === "string" && a.toLowerCase() === "yes" && b.toLowerCase() === "no";
+  } catch {
+    return false;
+  }
+}
+
 function toCandidate(m: PolyMarket): MarketCandidate | null {
+  if (!isBinaryYesNo(m)) return null;
   const p = priceYes(m);
   if (p === null || !m.endDate) return null;
   const event = m.events?.[0];

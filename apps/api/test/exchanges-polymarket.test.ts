@@ -45,6 +45,24 @@ describe("POLYMARKET_FEED.list", () => {
     const out = await POLYMARKET_FEED.list(fetchFrom([["offset=100", "[]"], ["offset=0", JSON.stringify(page)]]), window);
     expect(out.find((m) => m.marketId === String(page[0].id))).toBeUndefined();
   });
+  it("drops markets whose outcomes are not Yes/No", async () => {
+    const page = JSON.parse(fx("polymarket-markets-page1.json"));
+    let nonBinary = page.find((m: { outcomes?: string }) => {
+      try {
+        const o = JSON.parse(m.outcomes ?? "");
+        return !(Array.isArray(o) && o.length === 2 && String(o[0]).toLowerCase() === "yes" && String(o[1]).toLowerCase() === "no");
+      } catch {
+        return true;
+      }
+    });
+    if (!nonBinary) {
+      nonBinary = page[0];
+      nonBinary.outcomes = JSON.stringify(["49ers", "Rams"]);
+    }
+    const out = await POLYMARKET_FEED.list(fetchFrom([["offset=100", "[]"], ["offset=0", JSON.stringify(page)]]), window);
+    expect(out.find((m) => m.marketId === String(nonBinary.id))).toBeUndefined();
+    expect(out.length).toBeGreaterThan(0);
+  });
 });
 
 describe("POLYMARKET_FEED.read", () => {
