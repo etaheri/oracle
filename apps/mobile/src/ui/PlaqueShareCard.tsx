@@ -3,7 +3,6 @@ import type { MeLedger } from "@oracle/core";
 import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { RegisterMarks, ShareFooter, NIGHT_LINE, NIGHT_DIM } from "./ShareCard";
-import { SHARE_HANDLE } from "../config/links";
 
 // The plaque, sent into the night realm: epithet, receipt, the record, the
 // liturgy. Same 5:8 card anatomy as the daily share.
@@ -54,7 +53,7 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
         <SkText key={line} font={mono} text={line} x={centered(mono, line)} y={710 + i * 32} color={NIGHT_DIM} />
       ))}
       <Line p1={vec(INSET + 40, 880)} p2={vec(PLAQUE_W - INSET - 40, 880)} color={NIGHT_LINE} strokeWidth={1} />
-      <ShareFooter mono={mono} monoSmall={monoSmall} y={SHARE_HANDLE ? 918 : 926} width={PLAQUE_W} />
+      <ShareFooter mono={mono} monoSmall={monoSmall} y={926} width={PLAQUE_W} />
     </Canvas>
   );
 }

@@ -21,6 +21,8 @@ export const PRIVACY_URL: string | null = rawPrivacy && rawPrivacy.length > 0 ? 
 // display string, never a full URL: set EXPO_PUBLIC_SHARE_HANDLE once a
 // registered domain exists. Absent → the card prints nothing extra. Must be
 // ASCII: Skia's Plex Mono has no glyph fallback, and the card would render
-// tofu for anything outside it.
+// tofu for anything outside it -- so anything outside the printable-ASCII
+// range is stripped rather than trusted from the environment.
 const rawHandle = process.env.EXPO_PUBLIC_SHARE_HANDLE?.trim();
-export const SHARE_HANDLE: string | null = rawHandle && rawHandle.length > 0 ? rawHandle.toUpperCase() : null;
+const ascii = rawHandle?.replace(/[^\x20-\x7E]/g, "").trim();
+export const SHARE_HANDLE: string | null = ascii && ascii.length > 0 ? ascii.toUpperCase() : null;

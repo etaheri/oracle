@@ -77,23 +77,32 @@ function centered(font: { measureText(t: string): { width: number } } | null, te
   return font ? (CARD_W - font.measureText(text).width) / 2 : CARD_W / 2;
 }
 
-// The handle sits 66px below the footer's y (18px past the second liturgy
-// line, the same rhythm as the 30/18 gaps above it). At the card's own
-// unshifted y this would land past CARD_H/PLAQUE_H − INSET (994) on both
-// cards, so each call site shifts its own y up when SHARE_HANDLE is set —
-// only far enough to clear the boundary with a margin, never when unset.
-const HANDLE_OFFSET = 66;
+// `y` never shifts up into the divider -- both call sites always pass the
+// unshifted footer position (938 on the round card, 926 on the plaque).
+// When SHARE_HANDLE is set, the internal gaps above the title tighten
+// instead (26/42/58 in place of 30/48/66) so the handle's baseline still
+// clears CARD_H/PLAQUE_H − INSET (994): 938 + 58 = 996 would still be over
+// on the round card, so that call site drops its own y to 934 when the
+// handle is set (934 + 58 = 992, and the title stays 34px under the 900
+// divider); the plaque's 926 + 58 = 984 already clears with room to spare.
+const HANDLE_LITURGY_GAP_1 = 26;
+const HANDLE_LITURGY_GAP_2 = 42;
+const HANDLE_OFFSET = 58;
+const LITURGY_GAP_1 = 30;
+const LITURGY_GAP_2 = 48;
 
 // Shared by both share surfaces (round spread + plaque). `centered` above is
 // CARD_W-specific; the plaque is the same width today but this takes its own
 // `width` so it centers correctly if the two ever diverge.
 export function ShareFooter({ mono, monoSmall, y, width }: { mono: SkFont | null; monoSmall: SkFont | null; y: number; width: number }) {
   const centeredIn = (font: SkFont, text: string) => (width - font.measureText(text).width) / 2;
+  const gap1 = SHARE_HANDLE ? HANDLE_LITURGY_GAP_1 : LITURGY_GAP_1;
+  const gap2 = SHARE_HANDLE ? HANDLE_LITURGY_GAP_2 : LITURGY_GAP_2;
   return (
     <>
       {mono && <SkText font={mono} text="CAN YOU OUTSEE ME?" x={centeredIn(mono, "CAN YOU OUTSEE ME?")} y={y} color={colors.agedGold} />}
-      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centeredIn(monoSmall, LITURGY_LINES[0])} y={y + 30} color={NIGHT_DIM} />}
-      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[1]} x={centeredIn(monoSmall, LITURGY_LINES[1])} y={y + 48} color={NIGHT_DIM} />}
+      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[0]} x={centeredIn(monoSmall, LITURGY_LINES[0])} y={y + gap1} color={NIGHT_DIM} />}
+      {monoSmall && <SkText font={monoSmall} text={LITURGY_LINES[1]} x={centeredIn(monoSmall, LITURGY_LINES[1])} y={y + gap2} color={NIGHT_DIM} />}
       {mono && SHARE_HANDLE && <SkText font={mono} text={SHARE_HANDLE} x={centeredIn(mono, SHARE_HANDLE)} y={y + HANDLE_OFFSET} color={colors.agedGold} />}
     </>
   );
@@ -213,7 +222,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
         />
       )}
       <Line p1={vec(INSET + 40, 900)} p2={vec(CARD_W - INSET - 40, 900)} color={NIGHT_LINE} strokeWidth={1} />
-      <ShareFooter mono={mono} monoSmall={monoSmall} y={SHARE_HANDLE ? 914 : 938} width={CARD_W} />
+      <ShareFooter mono={mono} monoSmall={monoSmall} y={SHARE_HANDLE ? 934 : 938} width={CARD_W} />
     </Canvas>
   );
 }
