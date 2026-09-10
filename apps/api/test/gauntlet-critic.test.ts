@@ -22,7 +22,7 @@ function deps(db: PipelineDeps["db"], reply: unknown, seen: { user?: string } = 
     db,
     telegram: { send: async () => {} },
     claude: { structured: async (call) => { seen.user = call.user; return reply; } },
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     now: () => new Date("2026-09-04T22:00:00Z"),
   };
 }

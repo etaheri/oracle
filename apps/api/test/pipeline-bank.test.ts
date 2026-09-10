@@ -36,7 +36,7 @@ function fakeDeps(db: PipelineDeps["db"], claude: ClaudeClient | null, nowIso = 
     workflows: inlineStarter(),
     db,
     claude,
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
     marketFetch: (async () => { throw new Error("no market feeds in tests"); }) as unknown as typeof fetch,

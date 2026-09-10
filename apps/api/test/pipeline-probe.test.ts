@@ -29,7 +29,7 @@ function deps(db: PipelineDeps["db"], reply: unknown, nowIso = "2026-09-04T20:00
     db,
     telegram: { send: async (t) => void sent.push(t) },
     claude: { structured: async () => reply },
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     now: () => new Date(nowIso),
   };
 }

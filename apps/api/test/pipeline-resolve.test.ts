@@ -37,7 +37,7 @@ function fakeDeps(
     workflows: inlineStarter(),
     db,
     claude,
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
     ...extra,
@@ -100,7 +100,7 @@ function depsWith(db: PipelineDeps["db"], structured: (call: StructuredCall) => 
     workflows: inlineStarter(),
     db,
     claude: { structured },
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async () => {} },
     now: () => new Date("2026-09-04T16:05:00Z"),
   };

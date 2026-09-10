@@ -20,7 +20,7 @@ function admin(app: ReturnType<typeof createApp>) {
 function fakePipeline(db: PipelineDeps["db"], nowIso: string): PipelineDeps {
   return {
     workflows: inlineStarter(),
-    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async () => {} },
     now: () => new Date(nowIso),
   };

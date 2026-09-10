@@ -67,6 +67,7 @@ async function main(): Promise<void> {
       preflight: "unused",
       probe: "unused",
       taste: process.env.PIPELINE_TASTE_MODEL ?? "claude-haiku-4-5-20251001",
+      voice: "unused",
     },
     now: () => new Date(),
     workflows: inlineStarter(),

@@ -10,7 +10,7 @@ function deps(db: PipelineDeps["db"], reply: unknown, seen: { call?: Record<stri
     db,
     telegram: { send: async () => {} },
     claude: { structured: async (call) => { seen.call = call as unknown as Record<string, unknown>; return reply; } },
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     now: () => new Date("2026-09-04T16:00:00Z"),
   };
 }

@@ -68,19 +68,25 @@ function rejectAll(judged: Judged[], detail: string): { passed: Judged[]; reject
   return { passed: [], rejected: judged.map((j) => ({ text: j.candidate.text, reason: "taste" as const, detail })) };
 }
 
-export async function tasteCheck(
+// The text-only core of the gate: candidate strings in, one verdict per
+// string out. Carries no knowledge of Judged/Rejection so anything that has
+// plain text to screen (a candidate's text, a voiced question) can call it
+// directly. tasteCheck below is a thin wrapper over this.
+export async function tasteTexts(
   deps: PipelineDeps,
-  judged: Judged[],
-): Promise<{ passed: Judged[]; rejected: Rejection[] }> {
+  texts: string[],
+): Promise<{ allowed: boolean[]; reasons: string[]; detail: string | null }> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
-  if (judged.length === 0) return { passed: [], rejected: [] };
+  if (texts.length === 0) return { allowed: [], reasons: [], detail: null };
+
+  const refuse = (detail: string) => ({ allowed: texts.map(() => false), reasons: texts.map(() => ""), detail });
 
   let response: unknown;
   try {
     response = await deps.claude.structured({
       model: deps.models.taste,
       system: SYSTEM,
-      user: `${judged.map((j, i) => `[${i}] ${j.candidate.text}`).join("\n")}\n\nReturn one verdict per candidate now.`,
+      user: `${texts.map((t, i) => `[${i}] ${t}`).join("\n")}\n\nReturn one verdict per candidate now.`,
       schemaName: "taste_verdicts",
       schema: tasteJsonSchema,
       // No webSearch. Classification, not research.
@@ -91,25 +97,38 @@ export async function tasteCheck(
     // it and the ‼️ critical actually fires. Every OTHER error still fails
     // closed: a taste check that fails open is not a taste check.
     if (err instanceof BudgetExhausted) throw err;
-    return rejectAll(judged, `the taste gate could not be reached, so the batch was refused: ${err instanceof Error ? err.message : String(err)}`);
+    return refuse(`the taste gate could not be reached, so the batch was refused: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   const parsed = TasteSchema.safeParse(response);
-  if (!parsed.success) return rejectAll(judged, "the taste gate's response could not be read, so the batch was refused");
+  if (!parsed.success) return refuse("the taste gate's response could not be read, so the batch was refused");
 
   const byIndex = new Map(parsed.data.verdicts.map((v) => [v.index, v]));
   // A missing verdict is a failed check, not a pass. Anything less would make
   // the gate's coverage depend on the model remembering to answer.
-  if (judged.some((_, i) => !byIndex.has(i))) {
-    return rejectAll(judged, "the taste gate did not judge every candidate, so the batch was refused");
+  if (texts.some((_, i) => !byIndex.has(i))) {
+    return refuse("the taste gate did not judge every candidate, so the batch was refused");
   }
+
+  return {
+    allowed: texts.map((_, i) => byIndex.get(i)!.allowed),
+    reasons: texts.map((_, i) => byIndex.get(i)!.reason),
+    detail: null,
+  };
+}
+
+export async function tasteCheck(
+  deps: PipelineDeps,
+  judged: Judged[],
+): Promise<{ passed: Judged[]; rejected: Rejection[] }> {
+  const { allowed, reasons, detail } = await tasteTexts(deps, judged.map((j) => j.candidate.text));
+  if (detail !== null) return rejectAll(judged, detail);
 
   const passed: Judged[] = [];
   const rejected: Rejection[] = [];
   judged.forEach((j, i) => {
-    const v = byIndex.get(i)!;
-    if (v.allowed) passed.push(j);
-    else rejected.push({ text: j.candidate.text, reason: "taste", detail: v.reason || "refused by the taste gate" });
+    if (allowed[i]) passed.push(j);
+    else rejected.push({ text: j.candidate.text, reason: "taste", detail: reasons[i] || "refused by the taste gate" });
   });
   return { passed, rejected };
 }

@@ -29,6 +29,7 @@ export interface WorkerEnv {
   PIPELINE_PREFLIGHT_MODEL?: string;
   PIPELINE_PROBE_MODEL?: string;
   PIPELINE_TASTE_MODEL?: string;
+  PIPELINE_VOICE_MODEL?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   APPLE_BUNDLE_ID?: string;
   ONESIGNAL_APP_ID?: string;
@@ -79,6 +80,7 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
       preflight: env.PIPELINE_PREFLIGHT_MODEL ?? "claude-sonnet-5",
       probe: env.PIPELINE_PROBE_MODEL ?? "claude-sonnet-5",
       taste: env.PIPELINE_TASTE_MODEL ?? "claude-haiku-4-5-20251001",
+      voice: env.PIPELINE_VOICE_MODEL ?? "claude-sonnet-5",
     },
     now: () => new Date(),
     // inlineStarter() takes no arguments: runTick hands it the metered deps at

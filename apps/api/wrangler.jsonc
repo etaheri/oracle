@@ -23,7 +23,8 @@
     "PIPELINE_CRITIC_MODEL": "claude-sonnet-5",
     "PIPELINE_PREFLIGHT_MODEL": "claude-sonnet-5",
     "PIPELINE_PROBE_MODEL": "claude-sonnet-5",
-    "PIPELINE_TASTE_MODEL": "claude-haiku-4-5-20251001"
+    "PIPELINE_TASTE_MODEL": "claude-haiku-4-5-20251001",
+    "PIPELINE_VOICE_MODEL": "claude-sonnet-5"
   }
   // secrets (wrangler secret put) — this list is WorkerEnv in src/worker.ts;
   // keep the two in step.

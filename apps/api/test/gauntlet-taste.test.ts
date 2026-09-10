@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeTestDb } from "./helpers/db";
-import { tasteCheck } from "../src/pipeline/gauntlet/taste";
+import { tasteCheck, tasteTexts } from "../src/pipeline/gauntlet/taste";
 import type { Judged } from "../src/pipeline/gauntlet/critic";
 import type { PipelineDeps } from "../src/pipeline";
 import { inlineStarter } from "../src/pipeline/workflows";
@@ -21,7 +21,7 @@ function deps(db: PipelineDeps["db"], structured: PipelineDeps["claude"]): Pipel
     db,
     telegram: { send: async () => {} },
     claude: structured,
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     now: () => new Date("2026-09-04T22:00:00Z"),
   };
 }
@@ -100,6 +100,19 @@ describe("tasteCheck — tier 4", () => {
     expect(r.passed).toHaveLength(0);
     expect(r.rejected).toHaveLength(2);
     expect(r.rejected.every((x) => x.reason === "taste")).toBe(true);
+  });
+
+  it("tasteTexts judges plain strings and fails closed on an unreadable reply", async () => {
+    const { db } = await makeTestDb();
+    const good = await tasteTexts(
+      deps(db, reply({ verdicts: [{ index: 0, allowed: true, reason: "" }, { index: 1, allowed: false, reason: "private individual" }] })),
+      ["Will it rain?", "Will my neighbour move?"],
+    );
+    expect(good).toEqual({ allowed: [true, false], reasons: ["", "private individual"], detail: null });
+    const bad = await tasteTexts(deps(db, reply({ nope: true })), ["Will it rain?"]);
+    expect(bad.allowed).toEqual([false]);
+    expect(bad.reasons).toEqual([""]);
+    expect(bad.detail).toMatch(/could not be read/);
   });
 
   it("asks for no web search — this is classification, not research", async () => {

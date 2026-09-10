@@ -29,6 +29,7 @@ export interface PipelineDeps {
     preflight: string; // Sonnet 5 + search — the pre-flight resolve
     probe: string;     // Sonnet 5 + search — the in-window probe
     taste: string;     // Haiku 4.5, no search — classification only
+    voice: string;     // Sonnet 5, no search — rewrites exchange titles in the app's voice
   };
   now(): Date;
   // How long work is launched. In production this is bindingStarter over the

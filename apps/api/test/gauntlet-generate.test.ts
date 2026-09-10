@@ -10,7 +10,7 @@ function deps(db: PipelineDeps["db"], claude: PipelineDeps["claude"]): PipelineD
     db,
     telegram: { send: async () => {} },
     claude,
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     now: () => new Date("2026-09-04T22:00:00Z"),
     marketFetch: (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch,
     sourceFetch: (async () => new Response("", { status: 200 })) as unknown as typeof fetch,

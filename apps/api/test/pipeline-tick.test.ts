@@ -27,7 +27,7 @@ afterEach(() => vi.useRealTimers());
 function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
   const sent: string[] = [];
   const deps: PipelineDeps = {
-    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date(nowIso),
     workflows: inlineStarter(),
@@ -362,6 +362,7 @@ describe("buildPipelineDeps", () => {
       preflight: "claude-sonnet-5",
       probe: "claude-sonnet-5",
       taste: "claude-haiku-4-5-20251001",
+      voice: "claude-sonnet-5",
     });
   });
 
@@ -382,6 +383,7 @@ describe("buildPipelineDeps", () => {
       preflight: "claude-sonnet-5",
       probe: "claude-sonnet-5",
       taste: "claude-haiku-4-5-20251001",
+      voice: "claude-sonnet-5",
     });
   });
 

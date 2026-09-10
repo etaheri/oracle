@@ -171,6 +171,7 @@ async function main(): Promise<void> {
       preflight: "unused",
       probe: "unused",
       taste: "unused",
+      voice: "unused",
     },
     now: () => new Date(),
     workflows: inlineStarter(),

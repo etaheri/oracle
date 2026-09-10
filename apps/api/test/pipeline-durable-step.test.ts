@@ -35,7 +35,7 @@ function fakeDeps(): { deps: PipelineDeps; sent: string[] } {
   const deps: PipelineDeps = {
     db: {} as unknown as PipelineDeps["db"], // never touched by durableStep or reportBudgetExhaustion
     claude: null,
-    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t" },
+    models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async (t) => void sent.push(t) },
     now: () => new Date("2026-09-08T12:00:00Z"),
     workflows: { start: async () => {} },
