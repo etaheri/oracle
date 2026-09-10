@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, count, eq, sql } from "drizzle-orm";
-import { PredictionSubmitSchema } from "@oracle/core";
+import { FORTUNE, PredictionSubmitSchema, stake } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -38,6 +38,17 @@ export const predictionRoutes = new Hono<AppContext>()
     if (round?.status !== "open") return c.json({ error: "not open" }, 409);
     if (now.getTime() >= q.locksAt.getTime()) return c.json({ error: "locked" }, 409);
 
+    // The stake (design 2026-09-10 §4.2): cut from the fortune at THIS seal
+    // and frozen on the row. Nothing is debited here; settlement pays.
+    // A lineless version 3 question, and every earlier version, seals unstaked.
+    const staked = (round.rulesVersion ?? 1) >= 3 && q.linePYes !== null;
+    let stakeCols: { fortuneAtSeal: number; stake: number; linePYes: string } | null = null;
+    if (staked) {
+      const user = await db.query.users.findFirst({ where: eq(schema.users.id, userId) });
+      const fortune = user?.fortune ?? FORTUNE.FOUNDING;
+      stakeCols = { fortuneAtSeal: fortune, stake: stake(fortune, parsed.data.confidence, q.isBigOne), linePYes: String(q.linePYes) };
+    }
+
     const firstHour = now.getTime() <= q.opensAt.getTime() + 3_600_000;
     const inserted = await db
       .insert(schema.predictions)
@@ -48,21 +59,28 @@ export const predictionRoutes = new Hono<AppContext>()
         confidence: parsed.data.confidence,
         createdAt: now,
         firstHour,
+        ...(stakeCols ?? {}),
       })
       .onConflictDoNothing({ target: [schema.predictions.questionId, schema.predictions.userId] })
-      .returning({ id: schema.predictions.id, firstHour: schema.predictions.firstHour });
+      .returning({ id: schema.predictions.id, firstHour: schema.predictions.firstHour, stake: schema.predictions.stake });
 
     if (inserted.length > 0) {
+      if (stakeCols) {
+        // The day's denominator, written at the FIRST accepted seal and never again.
+        await db.insert(schema.userRounds)
+          .values({ userId, date: q.roundDate, vigilMult: "1", fortuneAtOpen: stakeCols.fortuneAtSeal })
+          .onConflictDoNothing();
+      }
       try {
         await snapshotCrowdAtSeal(db, q.id, inserted[0]!.id);
       } catch {
         // Best-effort: a missing snapshot is honest, a failed seal is not.
         // The row already landed durably -- report success regardless.
       }
-      return c.json({ id: inserted[0]!.id, first_hour: inserted[0]!.firstHour });
+      return c.json({ id: inserted[0]!.id, first_hour: inserted[0]!.firstHour, stake: inserted[0]!.stake ?? null });
     }
     const existing = await db.query.predictions.findFirst({
       where: and(eq(schema.predictions.questionId, q.id), eq(schema.predictions.userId, userId)),
     });
-    return c.json({ id: existing!.id, first_hour: existing!.firstHour });
+    return c.json({ id: existing!.id, first_hour: existing!.firstHour, stake: existing!.stake ?? null });
   });
