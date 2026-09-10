@@ -120,8 +120,8 @@ export function inlineStarter(): WorkflowStarter {
   return {
     async start(deps, kind, _id, params) {
       if (kind === "author") {
-        const { runAuthoringGauntlet } = await import("./gauntlet");
-        await runAuthoringGauntlet(deps, params.date);
+        const { runMarketRound } = await import("./market-round");
+        await runMarketRound(deps, params.date);
       } else if (kind === "resolve") {
         const { runResolution } = await import("./resolve");
         await runResolution(deps, params.date, params.questionIds ?? []);

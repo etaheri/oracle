@@ -8,6 +8,8 @@ import { resolveQuestion } from "../src/resolution";
 import { upsertDraft } from "../src/pipeline/draft";
 import * as schema from "../src/db/schema";
 import { inlineStarter } from "../src/pipeline/workflows";
+import { addDays, noonET } from "../src/pipeline/clock";
+import type { ExchangeFeed, MarketCandidate } from "../src/pipeline/exchanges/types";
 import { PIPELINE_DAILY_CALL_BUDGET } from "../src/pipeline/spend";
 import { buildPipelineDeps, type WorkerEnv } from "../src/worker";
 import { createApp } from "../src/app";
@@ -32,13 +34,27 @@ function fakeDeps(db: PipelineDeps["db"], nowIso: string) {
     now: () => new Date(nowIso),
     workflows: inlineStarter(),
     // Nothing in this file may reach the network. runTick now dispatches
-    // `author` through the inline starter, so runAuthoringGauntlet runs here —
-    // and it calls fetchMarketSignals and tier 1's checkSources, both of which
-    // fall back to global fetch when these are absent.
+    // `author` through the inline starter, so runMarketRound runs here — and
+    // it reads the exchanges through marketFetch, which falls back to global
+    // fetch when absent. An empty body deals no markets, which is the quiet
+    // no-op every test here that is not about authoring wants.
     marketFetch: (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch,
     sourceFetch: (async () => new Response("", { status: 200 })) as unknown as typeof fetch,
   };
   return { deps, sent };
+}
+
+// The market round is what `author` runs now (design 2026-09-10 §5). A tick
+// that has to REACH a model call needs five eligible markets to deal, so this
+// stands in for the exchanges rather than the network.
+function fiveMarkets(roundDate: string): ExchangeFeed {
+  const closesAt = new Date(noonET(addDays(roundDate, 1)).getTime() + 10 * 3_600_000).toISOString();
+  const rows: MarketCandidate[] = (["sports", "markets", "weather", "culture", "news"] as const).map((category, i) => ({
+    source: "kalshi", marketId: `m${i}`, eventKey: `E-${i}`, seriesKey: "KXT",
+    title: `Will market ${i} settle yes on Friday?`, rules: "Resolves per the exchange rules for this market.",
+    url: "https://kalshi.com/markets/kxt", category, prob: 0.4, volume: 50_000 - i * 1_000, closesAt,
+  }));
+  return { source: "kalshi", list: async () => rows, read: async () => ({ settled: false, outcome: null, raw: null }) };
 }
 
 describe("runTick", () => {
@@ -151,7 +167,10 @@ describe("runTick", () => {
   it("author failure becomes a WARN, not a crash", async () => {
     const { db } = await makeTestDb();
     const { deps, sent } = fakeDeps(db, "2026-08-27T21:05:00Z"); // 17:05 ET
-    const done = await runTick(deps); // stub authorRound throws "authoring not wired"
+    // An exchange that cannot be reached is the failure the market round
+    // raises before it ever gets to a model call.
+    deps.marketFetch = (async () => { throw new Error("exchange unreachable"); }) as unknown as typeof fetch;
+    const done = await runTick(deps);
     expect(done.some((d) => d.startsWith("author"))).toBe(false);
     expect(sent.some((t) => t.includes("author failed"))).toBe(true);
   });
@@ -440,6 +459,9 @@ describe("the spend ceiling in the tick (design 2026-09-04 §9.1)", () => {
     const { deps, sent } = fakeDeps(db, "2026-09-04T21:05:00Z");
     let reached = false;
     deps.claude = { structured: async () => { reached = true; return {}; } };
+    // Five markets to deal, so the round actually reaches its voice call —
+    // which is the call the meter has to refuse.
+    deps.exchangeFeeds = [fiveMarkets("2026-09-05")];
     // The inline starter runs the runner in-process, so the metered client is
     // exercised end to end.
     await runTick(deps);

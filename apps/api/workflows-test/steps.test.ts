@@ -54,8 +54,8 @@ describe("resolution workflow step semantics", () => {
 		// getError().message is exactly the mocked message is proof no second
 		// attempt happened — i.e. POLICY.noRetry's retries.limit: 0 held.
 		// (Verified the other direction too: mocking the same way against a
-		// step with retries configured — POLICY.model's limit: 2, on
-		// AuthoringWorkflow's "generate" step — does surface a real second
+		// step with retries configured — POLICY.sourceFetch's limit: 2, on
+		// AuthoringWorkflow's "candidates" step — does surface a real second
 		// attempt's error instead of the mock's, confirming this technique
 		// actually distinguishes retried from not-retried rather than always
 		// reading one way.)
@@ -73,13 +73,13 @@ describe("resolution workflow step semantics", () => {
 	it("stops the AuthoringWorkflow instance on a step failure instead of continuing past it (defect §1.3, partial)", async () => {
 		// What this DOES pin: a step failure halts run() — the instance reaches
 		// "errored" carrying exactly the failing step's message, rather than
-		// silently continuing to "screen"/"critic"/"commit"/"narrate" with
-		// partial state, or hanging.
+		// silently continuing to "draft"/"commit"/"narrate" with partial
+		// state, or hanging.
 		//
 		// What this CANNOT pin, per this file's header comment: that a REAL
 		// BudgetExhausted specifically (as opposed to any other error) skips
 		// POLICY.model's configured retries via durableStep's NonRetryableError
-		// mapping. Exercising that mapping for real requires the "generate"
+		// mapping. Exercising that mapping for real requires the "draft"
 		// step's actual callback to throw a genuine BudgetExhausted, which
 		// means a live database whose pipeline_spend row is already past
 		// PIPELINE_DAILY_CALL_BUDGET — out of reach for an introspector whose
@@ -89,8 +89,8 @@ describe("resolution workflow step semantics", () => {
 		await using instance = await introspectWorkflowInstance(env.AUTHORING_WORKFLOW, "t-3");
 		await instance.modify(async (m) => {
 			await m.disableRetryDelays();
-			await m.mockStepResult({ name: "context" }, { recentTopicKeys: [] });
-			await m.mockStepError({ name: "generate" }, new Error("pipeline: daily call budget exhausted"));
+			await m.mockStepResult({ name: "editable" }, true);
+			await m.mockStepError({ name: "candidates" }, new Error("pipeline: daily call budget exhausted"));
 		});
 		await env.AUTHORING_WORKFLOW.create({ id: "t-3", params: { date: "2026-09-08" } });
 		await instance.waitForStatus("errored");

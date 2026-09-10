@@ -14,6 +14,7 @@ import { hourBucket, type WorkflowStarter } from "./workflows";
 import { meterClaude, reportBudgetExhaustion } from "./spend";
 import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
+import type { ExchangeFeed } from "./exchanges/types";
 import type { PushEnv } from "../push/onesignal";
 
 export interface PipelineDeps {
@@ -47,6 +48,9 @@ export interface PipelineDeps {
   // Fetch used for tier-1 source reachability (gauntlet/sources.ts); defaults
   // to global fetch. Injectable so tests never touch the network.
   sourceFetch?: typeof fetch;
+  // The exchanges the market round is dealt from (design 2026-09-10 §5.1).
+  // Defaults to DEFAULT_EXCHANGES; tests inject canned feeds.
+  exchangeFeeds?: ExchangeFeed[];
 }
 
 function errorMessage(err: unknown): string {

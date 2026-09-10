@@ -18,6 +18,8 @@ import {
 // specifier from "cloudflare:workers" — @cloudflare/workers-types puts it
 // there, not on the main module. Both imports stay confined to this one file.
 import { NonRetryableError } from "cloudflare:workflows";
+import { eq } from "drizzle-orm";
+import { schema } from "../db/client";
 import { buildPipelineDeps, type WorkerEnv } from "../worker";
 import { POLICY, type StepPolicy } from "./steps";
 import { BudgetExhausted, meterClaude, reportBudgetExhaustion } from "./spend";
@@ -31,6 +33,7 @@ import { preflightOne, assemblePreflight } from "./gauntlet/preflight";
 import { tasteCheck } from "./gauntlet/taste";
 import { assessEditorial } from "./editorial";
 import { commitRound, narrateGauntlet } from "./gauntlet";
+import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound } from "./market-round";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
 import { probeOne, narrateProbe, type ProbeOutcome } from "./probe";
 import type { PipelineDeps } from "./index";
@@ -114,90 +117,22 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
     const deps = metered(this.env);
     if (!deps) return;
     const { date } = event.payload;
-    const tally = emptyTally();
-    const count = (rs: Rejection[]) => rs.forEach((r) => (tally[r.reason] += 1));
-
-    const ctx = await durableStep(step, "context", POLICY.context, deps, () =>
-      gatherAuthoringContext(deps, date),
-    );
-
-    const raw = await durableStep(step, "generate", POLICY.model, deps, async () => {
-      // `generateCandidates` returns `unknown[]` by design (candidate.ts
-      // header) — it is unvalidated model output, and screenCandidates
-      // below is the first thing that parses it. `T extends
-      // Rpc.Serializable<T>` cannot prove a bare `unknown[]` is
-      // serializable, since `unknown` could be a function or symbol; cast
-      // to `object[]`, which DOES satisfy the constraint and is still
-      // assignable everywhere `raw` is used below (screenCandidates takes
-      // `unknown[]`).
-      return (await generateCandidates(deps, date, ctx)) as object[];
+    const editable = await durableStep(step, "editable", POLICY.db, deps, async () => {
+      const r = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+      return !(r && (r.status !== "scheduled" || r.oracleCommittedAt !== null));
     });
-
-    const opensAt = noonET(date);
-    const locksAtDefault = noonET(addDays(date, 1));
-
-    // Tier 0 — free.
-    // Mirror of gauntlet/index.ts's tier-0 call — keep the two runners in lockstep.
-    const tier0 = await durableStep(step, "screen", POLICY.pure, deps, async () =>
-      screenCandidates(raw, {
-        rulesVersion: 2,
-        opensAt,
-        locksAtDefault,
-        voidAt: voidDeadline(date),
-        recentTopicKeys: new Set(ctx.recentTopicKeys),
-      }),
-    );
-    count(tier0.rejected);
-
-    // Tier 1 — one GET each.
-    const tier1 = await durableStep(step, "sources", POLICY.sourceFetch, deps, () =>
-      checkSources(deps.sourceFetch ?? fetch, tier0.passed),
-    );
-    count(tier1.rejected);
-
-    // Tier 2 — the public forecast (its own step: a fetch, checkpointed as a
-    // plain object), then one model call, plus §7's contestedness gate.
-    const forecasts = await durableStep(step, "forecasts", POLICY.sourceFetch, deps, () =>
-      gatherForecasts(deps.sourceFetch ?? fetch, tier1.passed),
-    );
-    const tier2 = await durableStep(step, "critic", POLICY.model, deps, () =>
-      criticize(deps, tier1.passed, forecasts),
-    );
-    count(tier2.rejected);
-
-    // Tier 3 — THE FAN-OUT. One step per survivor, named by position over the
-    // checkpointed `critic` output so replays reproduce the same names
-    // (design 2026-09-08 §3.1).
-    const outcomes = await Promise.all(
-      tier2.judged.map((j, i) =>
-        durableStep(step, `preflight-${i}`, POLICY.modelWide, deps, () => preflightOne(deps, j, i)),
-      ),
-    );
-    const tier3 = assemblePreflight(tier2.judged, outcomes);
-    count(tier3.rejected);
-
-    // Tier 4 — last, and fail-closed. POLICY.failClosed is zero-retry so the
-    // guarantee is declared rather than emergent (design 2026-09-08 §5.1).
-    const tier4 = await durableStep(step, "taste", POLICY.failClosed, deps, () =>
-      tasteCheck(deps, tier3.passed),
-    );
-    count(tier4.rejected);
-
-    const edited = await durableStep(step, "editorial", POLICY.model, deps, () =>
-      assessEditorial(deps, tier4.passed, opensAt),
-    );
-    tally.editorial += tier4.passed.length - edited.length;
-
-    const result = await durableStep(step, "commit", POLICY.db, deps, () =>
-      commitRound(deps, date, raw.length, tally, edited),
-    );
-
-    await durableStep(step, "narrate", POLICY.narrate, deps, async () => {
-      await narrateGauntlet(deps, date, result);
-      return { published: result.published };
+    if (!editable) return;
+    const candidates = await durableStep(step, "candidates", POLICY.sourceFetch, deps, () => fetchCandidates(deps, date));
+    const built = await durableStep(step, "draft", POLICY.model, deps, async () => {
+      if (candidates.length < 5) return { draft: null, reason: `${candidates.length} eligible markets, five needed` };
+      return buildMarketDraft(deps, date, candidates);
     });
-
-    return result;
+    const result = await durableStep(step, "commit", POLICY.db, deps, async () => {
+      if (!built.draft) return { published: false, fetched: candidates.length, eligible: candidates.length, reason: built.reason };
+      await commitMarketDraft(deps, date, built.draft);
+      return { published: true, fetched: candidates.length, eligible: candidates.length, reason: null };
+    });
+    await durableStep(step, "narrate", POLICY.narrate, deps, () => narrateMarketRound(deps, date, result));
   }
 }
 
