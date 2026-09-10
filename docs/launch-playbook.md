@@ -62,7 +62,7 @@ Keep its connection string out of `.dev.vars`.
 
 ### 2.2 Apply migrations
 
-Nine migrations exist, `0000` through `0008`. Drizzle's relational query
+Migrations 0000 through 0014 exist. Drizzle's relational query
 builder selects every schema-declared column, so a database behind the schema
 does not degrade — every read 500s.
 
@@ -84,7 +84,20 @@ NOT NULL DEFAULT 1`. Existing rows stay on version-1 scoring; new automated
 drafts write version 2 (`CURRENT_RULES_VERSION` in
 `packages/core/src/roundRules.ts`). Historical results are preserved by design.
 
-### 2.3 Set secrets
+### 2.3 Version 3 cutover (the House)
+
+1. Apply `0014` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`.
+2. Deploy the API with `PIPELINE_ENABLED` still `false`.
+3. Deal tomorrow's round by hand and inspect it in Telegram:
+   `curl -X POST -H 'x-admin-secret: …' https://<api>/admin/rounds/<tomorrow>/author`
+   Then commit the forecast and the line:
+   `curl -X POST … /admin/rounds/<tomorrow>/forecast` and `curl -X POST … /admin/rounds/<tomorrow>/line`
+   Check `GET /admin/rounds/<tomorrow>` shows five questions with `market_source`, `market_id`, `line_p_yes`.
+4. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
+5. The round publishes at the next noon ET. The 17:00 ET tick deals the following day's round without help.
+6. Ship the mobile build only after the API is live; the response schemas default every new field, so the old build keeps parsing in the meantime.
+
+### 2.4 Set secrets
 
 `WorkerEnv` in `apps/api/src/worker.ts` is the authoritative list; the comment
 block at the bottom of `apps/api/wrangler.jsonc` mirrors it. Keep the two in
@@ -118,7 +131,7 @@ wrangler secret put ONESIGNAL_API_KEY
 
 Leave `PIPELINE_ENABLED` unset for the first deploy. Arm it deliberately in §3.
 
-### 2.4 Deploy
+### 2.5 Deploy
 
 ```bash
 cd apps/api && pnpm deploy
@@ -150,7 +163,7 @@ curl -s -X POST -H "x-admin-secret: $ADMIN_SECRET" -H "content-type: application
   -d '{"reason":"misauthored"}' https://<worker-url>/admin/questions/<question-id>/withdraw
 ```
 
-### 2.5 Wire the URL back out
+### 2.6 Wire the URL back out
 
 The deployed origin is now an input to three other systems:
 

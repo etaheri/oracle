@@ -7,6 +7,8 @@ import { upsertDraft } from "../src/pipeline/draft";
 import type { PipelineDeps } from "../src/pipeline";
 import * as schema from "../src/db/schema";
 import { inlineStarter } from "../src/pipeline/workflows";
+import type { ExchangeFeed, MarketCandidate } from "../src/pipeline/exchanges/types";
+import { noonET, addDays } from "../src/pipeline/clock";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 
@@ -23,6 +25,35 @@ function fakePipeline(db: PipelineDeps["db"], nowIso: string): PipelineDeps {
     db, claude: null, models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", critic: "m-c", preflight: "m-p", probe: "m-pr", taste: "m-t", voice: "m-v" },
     telegram: { send: async () => {} },
     now: () => new Date(nowIso),
+  };
+}
+
+// Helper to create a feed of five markets with distinct categories
+function fiveMarkets(roundDate: string): ExchangeFeed {
+  const closesAt = new Date(noonET(addDays(roundDate, 1)).getTime() + 10 * 3_600_000).toISOString();
+  const rows: MarketCandidate[] = (["sports", "markets", "weather", "culture", "news"] as const).map((category, i) => ({
+    source: "kalshi", marketId: `m${i}`, eventKey: `E-${i}`, seriesKey: "KXT",
+    title: `Will market ${i} settle yes?`, rules: "Resolves per the exchange rules for this market.",
+    url: "https://kalshi.com/markets/kxt", category, prob: 0.4, volume: 50_000 - i * 1_000, closesAt,
+  }));
+  return { source: "kalshi", list: async () => rows, read: async () => ({ settled: false, outcome: null, raw: null }) };
+}
+
+// A canned Claude: the voice call echoes titles as questions; the taste call allows everything unless told otherwise
+function claudeWith(opts: { refuse?: string[]; calls: string[] }): NonNullable<PipelineDeps["claude"]> {
+  return {
+    async structured(call) {
+      opts.calls.push(call.schemaName);
+      if (call.schemaName === "oracle_voice") {
+        const slots = [...call.user.matchAll(/\[slot (\d)[^\]]*\]\nTITLE: (.+)/g)];
+        return { questions: slots.map((m) => ({ slot: Number(m[1]), text: m[2]!.trim() + "?", context: "Some background." })) };
+      }
+      if (call.schemaName === "taste_verdicts") {
+        const lines = call.user.split("\n").filter((l) => /^\[\d+\]/.test(l));
+        return { verdicts: lines.map((l, i) => ({ index: i, allowed: !(opts.refuse ?? []).some((r) => l.includes(r)), reason: "" })) };
+      }
+      throw new Error(`unexpected call ${call.schemaName}`);
+    },
   };
 }
 
@@ -305,6 +336,22 @@ describe("POST /admin/rounds/:date/author", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, date: "2026-09-09" });
     expect(started).toEqual([{ kind: "author", date: "2026-09-09" }]);
+  });
+
+  it("POST /rounds/:date/author deals a version 3 round from the injected exchanges", async () => {
+    const { db } = await makeTestDb();
+    const calls: string[] = [];
+    const pipeline = {
+      ...fakePipeline(db, "2026-09-09T17:05:00Z"),
+      exchangeFeeds: [fiveMarkets("2026-09-10")],
+      claude: claudeWith({ calls }),
+      marketFetch: (async () => { throw new Error("no network in tests"); }) as unknown as typeof fetch,
+    };
+    const app = createApp({ db, env, pipeline });
+    const res = await admin(app)("/admin/rounds/2026-09-10/author", { method: "POST" });
+    expect(res.status).toBe(200);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-09-10") });
+    expect(round?.rulesVersion).toBe(3);
   });
 });
 
