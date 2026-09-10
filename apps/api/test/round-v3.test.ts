@@ -61,6 +61,31 @@ describe("GET /v1/round/:date/reveal at version 3", () => {
     expect(json.fortune_after).toBe(1216);
     expect(json.house_delta).toBe(-216);
   });
+  it("withholds the round's fortune figures until every card is decided", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, as, seal } = await world(1);
+    for (const q of qs) await seal(0, q.id, true, 70);
+    vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
+    // Three of five read. Payouts land one question at a time, so a total
+    // taken here would be a partial sum over a whole-day denominator.
+    for (const q of qs.filter((q) => q.slot <= 3)) await resolveQuestion(db, q.id, "yes");
+    const partial = RevealSchema.parse(await (await as(0)(`/v1/round/${DATE}/reveal`)).json());
+    expect(partial.delta).toBeNull();
+    expect(partial.return).toBeNull();
+    expect(partial.fortune_after).toBeNull();
+    expect(partial.house_delta).toBeNull();
+    // The paid card still shows its own figures -- those are final per question.
+    expect(partial.questions.find((q) => q.slot === 1)!.my).toMatchObject({ stake: 40, payout: 114, delta: 74 });
+    expect(partial.questions.find((q) => q.slot === 5)!.my).toMatchObject({ stake: 80, payout: null, delta: null });
+
+    for (const q of qs.filter((q) => q.slot > 3)) await resolveQuestion(db, q.id, "yes");
+    await settleRound(db, DATE);
+    const full = RevealSchema.parse(await (await as(0)(`/v1/round/${DATE}/reveal`)).json());
+    expect(full.delta).toBe(74 * 4 + 149);
+    expect(full.return).toBeCloseTo(0.445, 6);
+    expect(full.fortune_after).toBe(1445);
+    expect(full.house_delta).toBe(-(74 * 4 + 149));
+  });
   it("reports null fortune figures on a version 2 round", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-12T02:00:00Z"), toFake: ["Date"] });
     const { db, as } = await world(1);

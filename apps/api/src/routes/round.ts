@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { asc, and, count, countDistinct, desc, eq, inArray, isNotNull, sum } from "drizzle-orm";
+import { asc, and, count, countDistinct, desc, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
 import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
@@ -37,12 +37,15 @@ export const roundRoutes = new Hono<AppContext>()
       : [{ n: 0 }];
     // The purse and the house (design 2026-09-10 §7). The house total is every
     // settled round's delta since founding; last_delta is the newest of them,
-    // null while no round has settled.
-    const [user, houseRows] = await Promise.all([
+    // null while no round has settled. Both are read as aggregates: the row
+    // set grows by one a day forever, and /today is the hottest route we
+    // serve, so neither may become an unbounded select summed in JavaScript.
+    const [user, [houseTotal], [houseLast]] = await Promise.all([
       db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
-      db.select({ date: schema.rounds.date, delta: schema.rounds.houseDelta }).from(schema.rounds).where(isNotNull(schema.rounds.houseDelta)).orderBy(desc(schema.rounds.date)),
+      db.select({ total: sql<number>`coalesce(sum(${schema.rounds.houseDelta}), 0)` }).from(schema.rounds).where(isNotNull(schema.rounds.houseDelta)),
+      db.select({ delta: schema.rounds.houseDelta }).from(schema.rounds).where(isNotNull(schema.rounds.houseDelta)).orderBy(desc(schema.rounds.date)).limit(1),
     ]);
-    const house = { total: houseRows.reduce((s, r) => s + (r.delta ?? 0), 0), last_delta: houseRows[0]?.delta ?? null };
+    const house = { total: Number(houseTotal?.total ?? 0), last_delta: houseLast?.delta ?? null };
     return c.json({
       date: round.date,
       rules_version: round.rulesVersion,
@@ -160,9 +163,18 @@ export const roundRoutes = new Hono<AppContext>()
     // round has stakes, so every figure below is null before it. `return` is
     // divided by the fortune at the player's FIRST seal of the day, stamped on
     // user_rounds, so a later round's winnings never re-scale this one.
+    //
+    // WITHHELD UNTIL EVERY CARD IS DECIDED, the way vigil_mult is withheld
+    // above. This route admits a round from LOCK, but payouts land one
+    // question at a time: quoted mid-resolution, `delta` would be a partial
+    // sum, `return` would divide that partial over the whole day's fortune,
+    // and `fortune_after` would be a balance still being paid into. A number
+    // that climbs on the next refresh is the same broken promise as a
+    // provisional rank -- the client withholds the line rather than print one.
+    const decided = qs.every((q) => q.outcome !== null);
     const staked = mine.filter((p) => p.stake !== null && p.payout !== null);
     const deltas = staked.map((p) => p.payout! - p.stake!);
-    const v3 = (round?.rulesVersion ?? 1) >= 3;
+    const v3 = (round?.rulesVersion ?? 1) >= 3 && decided;
     const roundDelta = v3 && staked.length > 0 ? deltas.reduce((a, b) => a + b, 0) : null;
 
     return c.json({
