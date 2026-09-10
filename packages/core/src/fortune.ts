@@ -75,3 +75,20 @@ export function stakePreview(input: { fortune: number; confidence: number; isBig
   const s = stake(input.fortune, input.confidence, input.isBigOne);
   return { stake: s, pays: Math.round(s * odds(input.answer, input.line)) };
 }
+
+// The ladder the app offers (design §4.2, D13): five of the nine grid values,
+// staking 1, 3, 5, 7 and 9 percent. The core and the API still accept the
+// whole grid; only the offer narrows, so an older round or a later client can
+// use any value on it.
+export const LADDER_CONFIDENCES = [55, 65, 75, 85, 95] as const;
+export const LADDER_DEFAULT = 75;
+
+export type LadderRung = { confidence: number; stake: number; wins: number };
+
+/** Every rung priced at the line for the chosen side: the stake, and what a right call wins on top of it. */
+export function stakeLadder(input: { fortune: number; isBigOne: boolean; line: number; answer: boolean }): LadderRung[] {
+  return LADDER_CONFIDENCES.map((confidence) => {
+    const p = stakePreview({ ...input, confidence });
+    return { confidence, stake: p.stake, wins: p.pays };
+  });
+}

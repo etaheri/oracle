@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RoundTodaySchema, RevealSchema, RoundBoardSchema, MeLedgerSchema, SubmitResSchema } from "../src/schemas";
+import { RoundTodaySchema, RevealSchema, RoundBoardSchema, MeLedgerSchema, SubmitResSchema, AllTimeBoardSchema } from "../src/schemas";
 
 const q = {
   id: "5d3f0d2a-6a3e-4a1f-9b8e-0c2a1b3c4d5e", slot: 1, is_big_one: false, text: "Will it rain?", category: "weather",
@@ -57,5 +57,33 @@ describe("v3 response fields are optional and typed", () => {
   it("SubmitRes carries the frozen stake", () => {
     expect(SubmitResSchema.parse({ id: q.id, first_hour: false, stake: 40 }).stake).toBe(40);
     expect(SubmitResSchema.parse({ id: q.id, first_hour: false }).stake).toBeNull();
+  });
+});
+
+describe("the all-time board and the ledger's house (spec §7)", () => {
+  it("parses a full all-time board", () => {
+    const b = AllTimeBoardSchema.parse({
+      field_size: 6, your_fortune: 1140, your_rank: 2, best_fortune: 2002, median_fortune: 940,
+      rows: [{ name: "Quiet Heron", fortune: 2002, rank: 1, is_you: false }, { name: "You", fortune: 1140, rank: 2, is_you: true }],
+    });
+    expect(b.rows[1]!.is_you).toBe(true);
+  });
+
+  it("parses a sparse all-time board with nulls and no rows", () => {
+    const b = AllTimeBoardSchema.parse({ field_size: 2, your_fortune: 1000, your_rank: null, best_fortune: null, median_fortune: null, rows: [] });
+    expect(b.your_rank).toBeNull();
+  });
+
+  it("defaults the ledger's house to null so an older server still parses", () => {
+    // The smallest ledger the schema accepts, with house absent.
+    const minimal = {
+      oracle_score: null, percentile: null, cohort_size: 0, calls_rated: 0, calls_answered: 0, days_consulted: 0,
+      streak: 0, accuracy_pct: null, avg_confidence: null, tide_wins: 0, majority_rate: null,
+      free_shield_available: true, paid_shields: 0, shield_used_on: null, claimed: false,
+      epithet: { id: "unread", title: "THE UNREAD", receipt: "" }, computed_through: "2026-09-10",
+      oracle: { score: null, calls_rated: 0, days_outseen: 0, days_compared: 0 },
+    };
+    expect(MeLedgerSchema.parse(minimal).house).toBeNull();
+    expect(MeLedgerSchema.parse({ ...minimal, house: { total: -1240, last_delta: -1240 } }).house?.total).toBe(-1240);
   });
 });

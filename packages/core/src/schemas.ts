@@ -184,6 +184,19 @@ export const RoundBoardSchema = z.object({
 });
 export type RoundBoard = z.infer<typeof RoundBoardSchema>;
 
+// The all-time board (design §7, §8.3): every player who has settled at least
+// one stake, ranked by fortune. Same floor and window as the daily board.
+export const AllTimeBoardSchema = z.object({
+  field_size: z.number().int(),
+  // The caller's fortune. Null when the caller has never settled a stake.
+  your_fortune: z.number().int().nullable(),
+  your_rank: z.number().int().nullable(),
+  best_fortune: z.number().int().nullable(),
+  median_fortune: z.number().int().nullable(),
+  rows: z.array(z.object({ name: z.string(), fortune: z.number().int(), rank: z.number().int(), is_you: z.boolean() })),
+});
+export type AllTimeBoard = z.infer<typeof AllTimeBoardSchema>;
+
 export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean(), stake: z.number().int().nullable().default(null) });
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
@@ -244,5 +257,8 @@ export const MeLedgerSchema = z.object({
   }),
   fortune: z.number().int().nullable().default(null),
   fortune_history: z.array(z.object({ date: z.string(), delta: z.number().int(), fortune_after: z.number().int() })).default([]),
+  // The purse, so home can print the house headline without an open round
+  // (design §8.3). Same shape as /today's `house`. Defaulted for older servers.
+  house: z.object({ total: z.number().int(), last_delta: z.number().int().nullable() }).nullable().default(null),
 });
 export type MeLedger = z.infer<typeof MeLedgerSchema>;

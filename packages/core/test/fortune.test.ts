@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   FORTUNE, stakeFraction, stake, odds, payout, delta, clampLine, dayReturn, stakePreview,
+  LADDER_CONFIDENCES, LADDER_DEFAULT, stakeLadder,
 } from "../src/fortune";
 
 describe("stakeFraction", () => {
@@ -108,5 +109,37 @@ describe("fortune never reaches zero (negative control)", () => {
     for (const f of [1, 2, 5, 9, 10, 11, 100, 1000]) {
       expect(f - worstRound(f)).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the five-rung ladder (spec §4.2, D13)", () => {
+  it("offers 55, 65, 75, 85, 95 and defaults to 75", () => {
+    expect([...LADDER_CONFIDENCES]).toEqual([55, 65, 75, 85, 95]);
+    expect(LADDER_DEFAULT).toBe(75);
+  });
+
+  it("stakes 1, 3, 5, 7, 9 percent of a 1,000 fortune on an ordinary card", () => {
+    const rungs = stakeLadder({ fortune: 1000, isBigOne: false, line: 0.35, answer: true });
+    expect(rungs.map((r) => r.stake)).toEqual([10, 30, 50, 70, 90]);
+    expect(rungs.map((r) => r.confidence)).toEqual([55, 65, 75, 85, 95]);
+  });
+
+  it("doubles every rung on the Big One", () => {
+    const rungs = stakeLadder({ fortune: 1000, isBigOne: true, line: 0.35, answer: true });
+    expect(rungs.map((r) => r.stake)).toEqual([20, 60, 100, 140, 180]);
+  });
+
+  it("wins at the Oracle's odds for the chosen side", () => {
+    // YES at a 35% line pays (1 − 0.35) / 0.35 = 1.857× on top of the stake.
+    const yes = stakeLadder({ fortune: 1000, isBigOne: false, line: 0.35, answer: true });
+    expect(yes[2]!.wins).toBe(93); // round(50 × 1.857)
+    // NO at the same line pays 0.35 / 0.65 = 0.538×.
+    const no = stakeLadder({ fortune: 1000, isBigOne: false, line: 0.35, answer: false });
+    expect(no[2]!.wins).toBe(27); // round(50 × 0.538)
+  });
+
+  it("holds the floor of one below ten percent of a small fortune, and drops it under ten", () => {
+    expect(stakeLadder({ fortune: 40, isBigOne: false, line: 0.5, answer: true }).map((r) => r.stake)).toEqual([1, 1, 2, 3, 4]);
+    expect(stakeLadder({ fortune: 5, isBigOne: false, line: 0.5, answer: true }).map((r) => r.stake)).toEqual([0, 0, 0, 0, 0]);
   });
 });
