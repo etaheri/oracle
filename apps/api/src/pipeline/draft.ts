@@ -11,6 +11,7 @@ import { QuestionContextSchema } from "@oracle/core";
 import { eq } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import { addDays, fastResolveBy, noonET, voidDeadline } from "./clock";
+import { SELECT } from "./exchanges/select";
 import { z } from "zod";
 
 // The outcome's own clock. The model states a FACT — when does this become
@@ -150,8 +151,8 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
   if (rulesVersion >= 3) {
     // The market window (design 2026-09-10 §5.2) replaces the fast-round
     // rule: every question closes between lock + 2h and lock + 30h.
-    const minClose = locksAtDefault.getTime() + 2 * 3_600_000;
-    const maxClose = locksAtDefault.getTime() + 30 * 3_600_000;
+    const minClose = locksAtDefault.getTime() + SELECT.CLOSE_AFTER_LOCK_MIN_H * 3_600_000;
+    const maxClose = locksAtDefault.getTime() + SELECT.CLOSE_AFTER_LOCK_MAX_H * 3_600_000;
     for (const q of draft.questions) {
       if (!q.market) throw new Error(`slot ${q.slot}: every version 3 question names its market`);
       const t = Date.parse(q.market.closes_at);
