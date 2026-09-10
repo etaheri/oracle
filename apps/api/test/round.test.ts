@@ -301,7 +301,7 @@ describe("GET /v1/round/:date/board", () => {
     const res = await players[2]!.get("/v1/round/2026-08-20/board");
     const raw = await res.text();
     const body = JSON.parse(raw) as Board;
-    expect(Object.keys(body).sort()).toEqual(["best_points", "date", "field_size", "median_points", "rows", "your_points", "your_rank"]);
+    expect(Object.keys(body).sort()).toEqual(["best_points", "date", "field_size", "median_points", "metric", "rows", "your_points", "your_rank"]);
     for (const p of players) expect(raw).not.toContain(p.userId);
   });
 });

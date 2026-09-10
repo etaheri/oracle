@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
-import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
+import { asc, and, count, countDistinct, desc, eq, inArray, isNotNull, sum } from "drizzle-orm";
+import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -25,6 +25,7 @@ export const roundRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
   .get("/today", async (c) => {
     const { db } = c.get("deps");
+    const userId = c.get("userId");
     const found = await openRound(db, new Date());
     if (!found) return c.json({ error: "no open round" }, 404);
     const { round, qs, lastLock } = found;
@@ -34,11 +35,21 @@ export const roundRoutes = new Hono<AppContext>()
     const [players] = qIds.length
       ? await db.select({ n: countDistinct(schema.predictions.userId) }).from(schema.predictions).where(inArray(schema.predictions.questionId, qIds))
       : [{ n: 0 }];
+    // The purse and the house (design 2026-09-10 §7). The house total is every
+    // settled round's delta since founding; last_delta is the newest of them,
+    // null while no round has settled.
+    const [user, houseRows] = await Promise.all([
+      db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
+      db.select({ date: schema.rounds.date, delta: schema.rounds.houseDelta }).from(schema.rounds).where(isNotNull(schema.rounds.houseDelta)).orderBy(desc(schema.rounds.date)),
+    ]);
+    const house = { total: houseRows.reduce((s, r) => s + (r.delta ?? 0), 0), last_delta: houseRows[0]?.delta ?? null };
     return c.json({
       date: round.date,
       rules_version: round.rulesVersion,
       locks_at: lastLock.toISOString(),
       player_count: Number(players?.n ?? 0),
+      fortune: user?.fortune ?? null,
+      house,
       questions: qs.map((q) => ({
         id: q.id,
         slot: q.slot,
@@ -55,6 +66,7 @@ export const roundRoutes = new Hono<AppContext>()
         // above stays probe-only so the leak analytics keep their meaning.
         struck: q.lockHealedAt !== null || q.withdrawnAt !== null,
         struck_reason: q.lockHealedAt !== null || q.withdrawnAt !== null ? (evidenceSummary(q.resolutionEvidence).reason ?? null) : null,
+        line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
       })),
     });
   })
@@ -144,9 +156,24 @@ export const roundRoutes = new Hono<AppContext>()
     });
     const vigilMult = stamped ? Number(stamped.vigilMult) : null;
 
+    // The round's fortune figures (design 2026-09-10 §7). Only a version 3
+    // round has stakes, so every figure below is null before it. `return` is
+    // divided by the fortune at the player's FIRST seal of the day, stamped on
+    // user_rounds, so a later round's winnings never re-scale this one.
+    const staked = mine.filter((p) => p.stake !== null && p.payout !== null);
+    const deltas = staked.map((p) => p.payout! - p.stake!);
+    const v3 = (round?.rulesVersion ?? 1) >= 3;
+    const roundDelta = v3 && staked.length > 0 ? deltas.reduce((a, b) => a + b, 0) : null;
+
     return c.json({
       date,
       rules_version: round?.rulesVersion ?? 1,
+      delta: roundDelta,
+      return: v3 && stamped?.fortuneAtOpen ? dayReturn(deltas, stamped.fortuneAtOpen) : null,
+      // The caller's fortune as it stands, which equals the post-round fortune
+      // until a later round settles. /me/ledger carries the exact per-round value.
+      fortune_after: v3 ? (user?.fortune ?? null) : null,
+      house_delta: v3 ? (round?.houseDelta ?? null) : null,
       bonus_points: round && round.rulesVersion >= 2 ? perQuestionPoints.reduce((a, b) => a + b, 0) - base : 0,
       day_points: vigilMult === null ? raw : weighDay(raw, vigilMult),
       vigil_mult: vigilMult,
@@ -168,6 +195,7 @@ export const roundRoutes = new Hono<AppContext>()
           // three players is mostly the reader.
           crowd_count: q.crowdCount,
           market_prob: q.marketProb === null ? null : Number(q.marketProb),
+          line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
           my: p
             ? {
                 answer: p.answer,
@@ -176,6 +204,9 @@ export const roundRoutes = new Hono<AppContext>()
                 brier: p.brier === null ? null : Number(p.brier),
                 crowd_yes_pct_at_seal: p.crowdYesPctAtSeal === null ? null : Number(p.crowdYesPctAtSeal),
                 crowd_count_at_seal: p.crowdCountAtSeal,
+                stake: p.stake,
+                payout: p.payout,
+                delta: p.payout === null || p.stake === null ? null : p.payout - p.stake,
               }
             : null,
           source_name: q.sourceName,
@@ -210,6 +241,63 @@ export const roundRoutes = new Hono<AppContext>()
     // Same 409 posture /:date/reveal takes on a day that has not locked.
     if (qs.some((q) => q.outcome === null)) return c.json({ error: "not resolved" }, 409);
 
+    const boardRound = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+
+    // ─────────────────────────────────────────────────────────────────────
+    // VERSION 3: THE FIELD RANKED BY RETURN (design 2026-09-10 §7).
+    //
+    // A version 3 day is not scored in points at all, so this branch returns
+    // before the points recompute below ever runs. What is ranked is the day's
+    // RETURN -- Σ(payout − stake) over the fortune the player opened the day
+    // with -- carried in basis points so the wire stays integer. THE ORACLE
+    // does not stand in this field: the machine has no fortune and takes no
+    // stake, so it has no return to rank. Rows still carry `points: 0`, which
+    // the schema requires and a version 3 client must ignore.
+    // ─────────────────────────────────────────────────────────────────────
+    if ((boardRound?.rulesVersion ?? 1) >= 3) {
+      const predictions = await db.query.predictions.findMany({ where: inArray(schema.predictions.questionId, qs.map((q) => q.id)) });
+      const opens = await db.query.userRounds.findMany({ where: eq(schema.userRounds.date, date) });
+      const openBy = new Map(opens.map((u) => [u.userId, u.fortuneAtOpen]));
+      const returns = [...new Set(predictions.map((p) => p.userId))].flatMap((uid) => {
+        const played = predictions.filter((p) => p.userId === uid);
+        // The same completeness rule every rated surface enforces.
+        if (!ratingEligible(3, qs, new Set(played.map((p) => p.questionId)))) return [];
+        const base = openBy.get(uid);
+        if (!base) return [];
+        const deltas = played.filter((p) => p.stake !== null && p.payout !== null).map((p) => p.payout! - p.stake!);
+        return [{ userId: uid, bp: Math.round(dayReturn(deltas, base) * 10_000) }];
+      });
+      const field = returns.map((r) => r.bp);
+      const mineBp = returns.find((r) => r.userId === userId)?.bp ?? null;
+      const empty = { date, metric: "return" as const, field_size: field.length, your_points: null, your_rank: null, best_points: null, median_points: null, your_return_bp: mineBp, best_return_bp: null, median_return_bp: null, rows: [] as Array<{ name: string; points: number; return_bp: number; rank: number; is_you: boolean; is_oracle: boolean }> };
+      // Below the floor the board reports the field's size and nothing else.
+      if (field.length < CONSTANTS.BOARD_MIN_FIELD) return c.json(empty);
+      const sorted = [...field].sort((a, b) => b - a);
+      const mid = sorted.length >> 1;
+      // Even fields average the two middles, rounded by MAGNITUDE -- the same
+      // symmetry the points board keeps, so a losing field is never quoted
+      // cheaper than the winning field of the same size.
+      const median = sorted.length % 2 === 1 ? sorted[mid]! : Math.sign((sorted[mid - 1]! + sorted[mid]!) / 2) * Math.round(Math.abs((sorted[mid - 1]! + sorted[mid]!) / 2));
+      // Ties share the better rank: one plus the number of strictly better days.
+      const rankIn = (bp: number) => 1 + field.filter((x) => x > bp).length;
+      const ranked = returns.map((r) => ({ ...r, rank: rankIn(r.bp), is_you: r.userId === userId })).sort((a, b) => b.bp - a.bp);
+      // The window: the summit plus the caller's own neighbourhood, merged by
+      // index so overlapping windows never repeat a row.
+      const meIdx = ranked.findIndex((r) => r.is_you);
+      const keep = new Set<number>();
+      for (let i = 0; i < Math.min(CONSTANTS.BOARD_TOP_ROWS, ranked.length); i++) keep.add(i);
+      if (meIdx >= 0) for (let i = meIdx - CONSTANTS.BOARD_NEIGHBOURS; i <= meIdx + CONSTANTS.BOARD_NEIGHBOURS; i++) if (i >= 0 && i < ranked.length) keep.add(i);
+      const shown = [...keep].sort((a, b) => a - b).map((i) => ranked[i]!);
+      const names = disambiguate(shown.map((r) => designation(r.userId)));
+      return c.json({
+        ...empty,
+        your_rank: mineBp === null ? null : rankIn(mineBp),
+        best_return_bp: sorted[0]!,
+        median_return_bp: median,
+        rows: shown.map((r, i) => ({ name: names[i]!, points: 0, return_bp: r.bp, rank: r.rank, is_you: r.is_you, is_oracle: false })),
+      });
+    }
+
     // RANKED ON RAW PER-QUESTION POINTS -- the single most important line in
     // this route. SUM(predictions.points) is questionPoints output: the big-one
     // multiplier and the contrarian bonus are in it (both earned by the call
@@ -224,7 +312,6 @@ export const roundRoutes = new Hono<AppContext>()
       .where(inArray(schema.predictions.questionId, qs.map((q) => q.id)))
       .groupBy(schema.predictions.userId);
 
-    const boardRound = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
     if ((boardRound?.rulesVersion ?? 1) >= 2) {
       const predictions = await db.query.predictions.findMany({ where: inArray(schema.predictions.questionId, qs.map(q => q.id)) });
       rows = rows.flatMap(row => {
@@ -248,7 +335,7 @@ export const roundRoutes = new Hono<AppContext>()
 
     // Below the floor the board reports the field's size and nothing else.
     if (field.length < CONSTANTS.BOARD_MIN_FIELD) {
-      return c.json({ date, field_size: field.length, your_points: yourPoints, your_rank: null, best_points: null, median_points: null, rows: [] });
+      return c.json({ date, metric: "points", field_size: field.length, your_points: yourPoints, your_rank: null, best_points: null, median_points: null, rows: [] });
     }
 
     const sorted = [...field].sort((a, b) => b - a);
@@ -331,6 +418,7 @@ export const roundRoutes = new Hono<AppContext>()
 
     return c.json({
       date,
+      metric: "points",
       field_size: field.length,
       your_points: yourPoints,
       // Ties share the better rank: one plus the number of strictly better days.

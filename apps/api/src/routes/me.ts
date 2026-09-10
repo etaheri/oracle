@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { count, eq, inArray, isNotNull, lt, and } from "drizzle-orm";
-import { confidenceHistory, calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
+import { confidenceHistory, calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, FORTUNE, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -177,6 +177,21 @@ export const meRoutes = new Hono<AppContext>()
       if (you > machine) daysOutseen += 1;
     }
 
+    // Fortune history (design 2026-09-10 §7): one entry per settled round,
+    // in date order, with the running total rebuilt from founding.
+    const byRound = new Map<string, number>();
+    for (const p of preds) {
+      const q = qById.get(p.questionId);
+      if (!q || p.stake === null || p.payout === null) continue;
+      byRound.set(q.roundDate, (byRound.get(q.roundDate) ?? 0) + (p.payout - p.stake));
+    }
+    const settledDates = new Set(playedRounds.filter((r) => r.status === "resolved").map((r) => r.date));
+    let running = FORTUNE.FOUNDING;
+    const fortuneHistory = [...byRound.entries()]
+      .filter(([d]) => settledDates.has(d))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, delta]) => { running += delta; return { date, delta, fortune_after: running }; });
+
     const reading = await readingRoundFor(db, userId);
 
     return c.json({
@@ -208,6 +223,8 @@ export const meRoutes = new Hono<AppContext>()
       claimed: Boolean(user?.appleSub),
       epithet,
       computed_through: new Date().toISOString().slice(0, 10),
+      fortune: user?.fortune ?? null,
+      fortune_history: fortuneHistory,
       oracle: {
         score: oracleScore(oracleBriers),
         calls_rated: oracleBriers.length,
