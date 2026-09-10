@@ -25,6 +25,8 @@ export interface Reminder { kind: "closing" | "noon"; date: string; at: Date; bo
 // plain lead time stands. localHourOf is injected so this stays pure.
 export interface Habit { hour: number; localHourOf: (ms: number) => number }
 
+const NOON_STACK_GUARD_MS = 60 * 60_000;
+
 // Scans hourly from the start of the window; the first instant whose local
 // hour matches is snapped to the top of that hour (UTC minutes, which is
 // also local minutes for any whole-hour-offset timezone) before use. The
@@ -33,9 +35,25 @@ export interface Habit { hour: number; localHourOf: (ms: number) => number }
 // Newfoundland), so the hour is re-checked after snapping — a mismatch
 // falls through to the next sample. The default lead time is reachable
 // only when no whole hour in the window survives that re-check: a DST
-// spring-forward, or a non-hour-aligned lock in a fractional-offset zone.
-function habitualInstant(lockMs: number, habit: Habit): Date | null {
-  const start = lockMs - HABIT_WINDOW_MS;
+// spring-forward, a non-hour-aligned lock in a fractional-offset zone, or
+// a window entirely behind `now` (see below).
+//
+// The window's start is clamped to `nowMs`: for round k = 0 the plain
+// window [lock_0 − 24h, lock_0 − 30min] begins at today's open, which for
+// a habit hour in the afternoon/evening already lies in the past by the
+// time this plans — scanning from there would pick an instant that
+// `resealReminders` immediately discards as overdue. Clamping to `nowMs`
+// means the scan only ever considers instants that could still fire.
+//
+// `noonInstants` is every round's own lock_j + NOON_LAG_MS across the plan
+// (only lock_0's is ever actually scheduled by *this* call, but round k's
+// window always starts exactly at lock_(k-1) — 24h before its own lock — so
+// it can run straight through the previous round's noon instant). A
+// candidate within an hour of any of them is skipped so the habitual
+// closing call never lands on top of a noon return ping (design 2026-09-09
+// §4.2).
+function habitualInstant(lockMs: number, habit: Habit, nowMs: number, noonInstants: readonly number[]): Date | null {
+  const start = Math.max(lockMs - HABIT_WINDOW_MS, nowMs);
   const end = lockMs - HABIT_TAIL_MS;
   for (let t = start; t <= end; t += 3_600_000) {
     if (habit.localHourOf(t) !== habit.hour) continue;
@@ -43,17 +61,19 @@ function habitualInstant(lockMs: number, habit: Habit): Date | null {
     snapped.setUTCMinutes(0, 0, 0);
     if (snapped.getTime() < start || snapped.getTime() > end) continue;
     if (habit.localHourOf(snapped.getTime()) !== habit.hour) continue;
+    if (noonInstants.some((n) => Math.abs(snapped.getTime() - n) <= NOON_STACK_GUARD_MS)) continue;
     return snapped;
   }
   return null;
 }
 
-export function planReminders(locksAt: string, roundDate: string, sealedCount: number, total = 5, habit?: Habit | null): Reminder[] {
+export function planReminders(locksAt: string, roundDate: string, sealedCount: number, total = 5, habit?: Habit | null, nowMs: number = Date.now()): Reminder[] {
   const lock0 = new Date(locksAt).getTime();
   const day0 = new Date(`${roundDate}T00:00:00Z`).getTime();
   const out: Reminder[] = [];
   // The second hit: once anything is sealed today, the ledger's reading is worth a knock.
   if (sealedCount > 0) out.push({ kind: "noon", date: roundDate, at: new Date(lock0 + NOON_LAG_MS), body: NOON_LINE });
+  const noonInstants = Array.from({ length: REMINDER_DAYS }, (_, j) => lock0 + j * 86_400_000 + NOON_LAG_MS);
   for (let k = 0; k < REMINDER_DAYS; k++) {
     if (k === 0 && sealedCount >= total) continue;
     const date = new Date(day0 + k * 86_400_000).toISOString().slice(0, 10);
@@ -62,7 +82,7 @@ export function planReminders(locksAt: string, roundDate: string, sealedCount: n
     const line = selectLine(pool, `closing:${date}`, partial ? ["partial"] : []);
     if (!line) continue;
     const lockK = lock0 + k * 86_400_000;
-    const at = (habit && habitualInstant(lockK, habit)) ?? new Date(lockK - REMINDER_LEAD_MS);
+    const at = (habit && habitualInstant(lockK, habit, nowMs, noonInstants)) ?? new Date(lockK - REMINDER_LEAD_MS);
     out.push({ kind: "closing", date, at, body: line.text });
   }
   return out;

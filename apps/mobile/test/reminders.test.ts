@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planReminders, REMINDER_DAYS, REMINDER_LEAD_MS } from "../src/game/reminders";
+import { planReminders, REMINDER_DAYS, REMINDER_LEAD_MS, NOON_LAG_MS } from "../src/game/reminders";
 
 const locksAt = "2026-08-29T16:00:00.000Z"; // today's round (2026-08-28) locks tomorrow noon ET
 
@@ -92,6 +92,47 @@ describe("planReminders with a habitual hour (design 2026-09-09 §4.2)", () => {
   // snap. The invariant must still hold for every closing reminder: either
   // the chosen instant truly reads as the habitual local hour, or the
   // default lead time stands.
+  // An afternoon/evening habit hour would otherwise fall inside day 0's
+  // window in the past (the window starts at today's open), producing a
+  // reminder `resealReminders` immediately discards as overdue. Clamping
+  // the scan to `nowMs` means day 0 has nothing to offer and falls back to
+  // the default lead, while day 1's window is untouched by the clamp.
+  it("clamps day 0's window to now, so an already-past habitual hour falls back to the default lead (design 2026-09-09 §4.2)", () => {
+    const nowMs = Date.parse("2026-09-10T21:00:00Z");
+    const out = planReminders(lock, "2026-09-10", 0, 5, { hour: 20, localHourOf: utcHour }, nowMs);
+    const closing = out.filter((r) => r.kind === "closing");
+    const lock0 = new Date(lock).getTime();
+    expect(closing[0]!.at.toISOString()).toBe(new Date(lock0 - REMINDER_LEAD_MS).toISOString());
+    expect(closing[1]!.at.toISOString()).toBe("2026-09-11T20:00:00.000Z");
+  });
+  // Skip a candidate within an hour of any round's noon instant
+  // (lock_k + NOON_LAG_MS) so the habitual closing call never stacks on
+  // the noon return ping.
+  it("skips a habitual instant within an hour of the noon reminder", () => {
+    const habit = { hour: 13, localHourOf: utcHour };
+    const out = planReminders(lock, "2026-09-10", 0, 5, habit);
+    const lock0 = new Date(lock).getTime();
+    for (const r of out.filter((x) => x.kind === "closing")) {
+      for (let k = 0; k < REMINDER_DAYS; k++) {
+        const noonK = lock0 + k * 86_400_000 + NOON_LAG_MS;
+        expect(Math.abs(r.at.getTime() - noonK)).toBeGreaterThan(60 * 60_000);
+      }
+    }
+  });
+  // Round k's window starts exactly at lock_(k-1) (24h before its own
+  // lock), so it can run straight through the previous round's noon
+  // instant. Hour 17 sits only 15 minutes from that 16:45Z noon: day 1's
+  // window would otherwise pick 2026-09-11T17:00Z, 15 minutes after day
+  // 0's actual noon push, and no later hour-17 sample exists before day
+  // 1's own window closes — proving the guard actually engages, not just
+  // that it is vacuously satisfied.
+  it("actually falls through a near-noon candidate to the default lead, not just avoids one that was never reachable", () => {
+    const habit = { hour: 17, localHourOf: utcHour };
+    const out = planReminders(lock, "2026-09-10", 0, 5, habit);
+    const closing = out.filter((r) => r.kind === "closing");
+    expect(closing[0]!.at.toISOString()).toBe("2026-09-10T17:00:00.000Z"); // day 0: no nearby noon, habitual hour stands
+    expect(closing[1]!.at.toISOString()).toBe("2026-09-12T13:00:00.000Z"); // day 1: 17:00Z was 15min from day 0's noon — falls back to default
+  });
   it("re-checks the local hour after snapping, for a non-aligned lock in a fractional-offset zone", () => {
     const skewedLock = "2026-09-11T16:15:00Z"; // 15 past — not hour-aligned
     const istHour = (ms: number) => new Date(ms + 5.5 * 3_600_000).getUTCHours();

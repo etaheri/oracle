@@ -33,7 +33,7 @@ export async function resealReminders(locksAt: string, roundDate: string, sealed
     // reseal, since it may change as the device's history grows.
     const hour = habitualHour(await getSealHours());
     const habit: Habit | null = hour === null ? null : { hour, localHourOf: (ms: number) => new Date(ms).getHours() };
-    for (const r of planReminders(locksAt, roundDate, sealedCount, 5, habit)) {
+    for (const r of planReminders(locksAt, roundDate, sealedCount, 5, habit, now)) {
       if (r.at.getTime() <= now) continue; // inside the 3h window already — no late nag
       await Notifications.scheduleNotificationAsync({
         content: { title: "Outseen", body: r.body },
