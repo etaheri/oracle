@@ -1,5 +1,5 @@
-export type RoundRulesVersion = 1 | 2;
-export const CURRENT_RULES_VERSION: RoundRulesVersion = 2;
+export type RoundRulesVersion = 1 | 2 | 3;
+export const CURRENT_RULES_VERSION: RoundRulesVersion = 3;
 
 /** Version 1 keeps every original question mandatory, even if voided. */
 export function ratingEligible(version: number, questions: Array<{ id: string; outcome: "yes" | "no" | "void" | null }>, answeredIds: ReadonlySet<string>): boolean {

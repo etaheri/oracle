@@ -32,10 +32,12 @@ export type CrowdSoFar = z.infer<typeof CrowdSoFarSchema>;
 export const QuestionContextSchema = z.object({ text: z.string().min(1).max(240), asOf: z.iso.datetime({ offset: true }), sourceUrl: z.string().url() });
 
 export const RoundTodaySchema = z.object({
-  rules_version: z.number().int().min(1).max(2).default(1),
+  rules_version: z.number().int().min(1).max(3).default(1),
   date: z.string(),
   locks_at: z.string().nullable(),
   player_count: z.number().int(),
+  fortune: z.number().int().nullable().default(null),
+  house: z.object({ total: z.number().int(), last_delta: z.number().int().nullable() }).nullable().default(null),
   questions: z.array(
     z.object({
       id: z.string().uuid(),
@@ -57,6 +59,7 @@ export const RoundTodaySchema = z.object({
       struck: z.boolean().default(false),
       // The printable reason when struck; null otherwise. Rendered verbatim.
       struck_reason: z.string().nullable().default(null),
+      line_p_yes: z.number().min(0).max(1).nullable().default(null),
     }),
   ),
 });
@@ -81,7 +84,7 @@ export const MineTodaySchema = z.object({
 export type MineToday = z.infer<typeof MineTodaySchema>;
 
 export const RevealSchema = z.object({
-  rules_version: z.number().int().min(1).max(2).default(1),
+  rules_version: z.number().int().min(1).max(3).default(1),
   bonus_points: z.number().int().default(0),
   date: z.string(),
   day_points: z.number().int(),
@@ -95,6 +98,10 @@ export const RevealSchema = z.object({
   // the day has not been weighed yet -- the client must withhold the number
   // rather than print a total that will change (see revealRows.pointsWithheld).
   vigil_mult: z.number().nullable(),
+  delta: z.number().int().nullable().default(null),
+  return: z.number().nullable().default(null),
+  fortune_after: z.number().int().nullable().default(null),
+  house_delta: z.number().int().nullable().default(null),
   questions: z.array(
     z.object({
       id: z.string().uuid(),
@@ -107,6 +114,7 @@ export const RevealSchema = z.object({
       // round footer uses.
       crowd_count: z.number().int().nullable(),
       market_prob: z.number().nullable(),
+      line_p_yes: z.number().nullable().default(null),
       my: z
         .object({
           answer: z.boolean(),
@@ -117,6 +125,9 @@ export const RevealSchema = z.object({
           // (design 2026-09-09 §4.1). Null on rows that predate the column.
           crowd_yes_pct_at_seal: z.number().int().min(0).max(100).nullable().default(null),
           crowd_count_at_seal: z.number().int().min(0).nullable().default(null),
+          stake: z.number().int().nullable().default(null),
+          payout: z.number().int().nullable().default(null),
+          delta: z.number().int().nullable().default(null),
         })
         .nullable(),
       source_name: z.string(),
@@ -141,6 +152,7 @@ export type Reveal = z.infer<typeof RevealSchema>;
 // Every number here is RAW per-question points -- see the route for why.
 export const RoundBoardSchema = z.object({
   date: z.string(),
+  metric: z.enum(["points", "return"]).default("points"),
   // Players who completed the round -- answered every question it asked.
   field_size: z.number().int(),
   // The caller's own raw day. Null when they did not complete the round.
@@ -151,6 +163,9 @@ export const RoundBoardSchema = z.object({
   your_rank: z.number().int().nullable(),
   best_points: z.number().int().nullable(),
   median_points: z.number().int().nullable(),
+  your_return_bp: z.number().int().nullable().default(null),
+  best_return_bp: z.number().int().nullable().default(null),
+  median_return_bp: z.number().int().nullable().default(null),
   // The field as a room rather than a rank. Machine-assigned designations
   // only -- nothing a user typed reaches this array, which is what keeps the
   // board free of a moderation surface. Empty below BOARD_MIN_FIELD.
@@ -158,6 +173,7 @@ export const RoundBoardSchema = z.object({
     z.object({
       name: z.string(),
       points: z.number().int(),
+      return_bp: z.number().int().nullable().default(null),
       rank: z.number().int(),
       is_you: z.boolean(),
       // The machine stands in the list on the same ladder as the rows
@@ -168,7 +184,7 @@ export const RoundBoardSchema = z.object({
 });
 export type RoundBoard = z.infer<typeof RoundBoardSchema>;
 
-export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean() });
+export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean(), stake: z.number().int().nullable().default(null) });
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
 export const ConfidenceBucketSchema = z.object({
@@ -226,5 +242,7 @@ export const MeLedgerSchema = z.object({
     days_outseen: z.number().int(),
     days_compared: z.number().int(),
   }),
+  fortune: z.number().int().nullable().default(null),
+  fortune_history: z.array(z.object({ date: z.string(), delta: z.number().int(), fortune_after: z.number().int() })).default([]),
 });
 export type MeLedger = z.infer<typeof MeLedgerSchema>;

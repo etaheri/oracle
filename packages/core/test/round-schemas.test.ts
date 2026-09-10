@@ -49,7 +49,7 @@ export const validReveal = {
 describe("round schemas", () => {
   it("parses a real /round/today payload", () => {
     const payload = { ...validToday, questions: validToday.questions.map((q) => ({ ...q, lock_healed: false })) };
-    expect(RoundTodaySchema.parse(payload)).toEqual({ ...payload, rules_version: 1 });
+    expect(RoundTodaySchema.parse(payload)).toEqual({ ...payload, rules_version: 1, fortune: null, house: null, questions: payload.questions.map((q) => ({ ...q, line_p_yes: null })) });
   });
   it("parses /round/next", () => {
     const payload = { date: "2026-08-21", opens_at: "2026-08-21T16:00:00.000Z" };
@@ -57,7 +57,7 @@ describe("round schemas", () => {
   });
   it("parses a real reveal payload incl. void and null my", () => {
     const payload = { ...validReveal, candidates_written: 15, candidates_rejected: 10 };
-    expect(RevealSchema.parse(payload)).toEqual({ ...payload, rules_version: 1, bonus_points: 0 });
+    expect(RevealSchema.parse(payload)).toEqual({ ...payload, rules_version: 1, bonus_points: 0, delta: null, return: null, fortune_after: null, house_delta: null, questions: payload.questions.map((q) => ({ ...q, line_p_yes: null })) });
   });
 });
 
