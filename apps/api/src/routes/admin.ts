@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { eq, asc, gte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { AppContext } from "../app";
 import { resolveQuestion, withdrawQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";

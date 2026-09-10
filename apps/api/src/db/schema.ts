@@ -109,9 +109,10 @@ export const questions = pgTable("questions", {
   // lock_healed_at, which the retired probe wrote when an answer leaked.
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
   // The normalized subject of the question ("btc-close-above-threshold"), as
-  // stated by the author. The tier-0 dedupe in candidate.ts compares against
-  // the last TOPIC_KEY_DAYS of these; the text dedupe it replaces let "will
-  // BTC close above $X" through every night with a new X.
+  // stated by the author. The retired candidate screen deduped against the
+  // last TOPIC_KEY_DAYS of these, because the text dedupe it replaced let
+  // "will BTC close above $X" through every night with a new X. Nothing reads
+  // it now; version 1 and 2 rounds carry it.
   topicKey: text("topic_key"),
   // The house line (design 2026-09-10 §5.5): oracle_p_yes clamped to the
   // market band. Written once at commit; immutable.
