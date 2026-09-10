@@ -148,6 +148,16 @@ Pure code, the same greedy spread as `gauntlet/select.ts`: walk candidates by vo
 
 One Sonnet 5 call, no web search, effort low. Input: the five exchange titles and rules. Output per question: `text` in the app's question voice and a one-sentence neutral `context`. The call may not change what is being asked. The resolution criteria stored on the question are the exchange's rules verbatim, with the market URL as the source. The Haiku taste gate runs on the five rewritten questions and is the only gate. A taste rejection drops the market and re-selects from the remaining candidates once; a second failure falls to the bank.
 
+### 5.4b Evidence
+
+Retrieval is owned by the pipeline, not by the members. For each selected question, code fetches one **evidence pack** through Exa's search API with `highlights`, a published-date ceiling at the retrieval instant, a floor fourteen days earlier, and `numResults` of eight. `includeDomains` is set to the exchange's stated resolution source when the rules name one, otherwise left open. The query is the exchange title plus the resolution rules. Each item is stored in `evidence` with its URL, title, source domain, published date, and highlight, numbered in rank order.
+
+The published-date ceiling is what makes the September 9 failure structurally impossible: no member can be shown a recap of an earlier meeting of the same teams as if it were this one, and the as-of rule (§14) is enforced by retrieval rather than by instruction.
+
+Every member of the Council receives the same pack. Members reason independently over shared evidence and cite items by number. That is cheaper than one search per member, it makes the standings a comparison of judgment rather than search luck, and it is what a fair tournament looks like: same cards, same evidence, different minds. Council commit calls therefore carry no web search tool at all.
+
+A question whose pack comes back empty still commits; the members are told so. Exa's response reports its own cost; the plan's fixture task records the observed cost per pack and sets the budget line.
+
 ### 5.5 Commit
 
 The forecast commit (`forecast` action) becomes the Council commit (§13): every member commits a line on every question, independently, before open. `oracle_p_yes` is the median of the members present. The house line is then derived and stored:
@@ -175,7 +185,7 @@ Settlement of a question runs the existing `resolveQuestion` path, then computes
 
 For version 3 rounds: `gauntlet/generate`, `screen`, `sources`, `critic`, `preflight`, `editorial`, `probe.ts`, `leak.ts`, the model resolver, and the hourly authoring retry. Bank authoring and bank resolution keep the model paths, and the resolver prompt gains the current instant and the question's open instant with the instruction that evidence dated before the open instant is a different event. That is the only change to the retained model path.
 
-Expected model calls per night: one voice call, one taste call, three Council commits, and one lesson per model member per settled question (§14). Well under a dollar; the Opus commit is most of it.
+Expected calls per night: one voice call, one taste call, five Exa evidence packs, three Council commits with no search tool, and one lesson per model member per settled question (§14). Well under a dollar in model calls; the Exa cost is set from the fixture task.
 
 ## 6. Schema
 
@@ -197,7 +207,10 @@ rounds.house_delta           integer
 user_rounds.fortune_at_open  integer
 
 lines                        (§13) question_id, member, p_yes, committed_at, model, prompt_version,
-                             brier, house_delta   — primary key (question_id, member)
+                             reasoning, cited (int[] of evidence ranks), brier, house_delta
+                             — primary key (question_id, member)
+evidence                     (§5.4b) question_id, rank, url, title, source, published_at, highlight,
+                             retrieved_at — primary key (question_id, rank)
 lessons                      (§14) id, member, series_key, question_id, text, resolved_at, created_at
 ```
 
@@ -213,7 +226,7 @@ lessons                      (§14) id, member, series_key, question_id, text, r
 | `GET /v1/round/:date/board` | Daily rows ranked by `return`. Adds an all-time mode ranked by `fortune`. Eligibility rules unchanged. |
 | `GET /v1/me/ledger` | Adds `fortune`, `fortune_history` (one entry per settled round: date, delta, fortune after). Calibration buckets unchanged. |
 | `GET /v1/round/exhibition` | Practice runs on a fixed practice fortune of 1,000 and a fixed line, never touching the user's fortune. |
-| `GET /v1/round/:date/reveal` | Adds `council`: one entry per member with its line on each question, revealed only after lock. |
+| `GET /v1/round/:date/reveal` | Adds `council`: one entry per member per question with its line, its `reasoning` paragraph and the evidence items it cited, and `evidence`: the full pack per question. Both only after lock. |
 | `GET /v1/standings` | Public, unauthenticated. Per member: calls, Brier, house delta since founding, plus the same figures for the crowd and for the market baseline. Backs the site page and the open dataset (§13.4). |
 
 ## 8. Mobile
@@ -228,6 +241,8 @@ Every surface keeps its materials, typography and motion. Copy follows the Outse
 | Card back | Crowd flip unchanged. |
 | Home | Fortune is the hero number. Beneath it the house line: `LAST NIGHT THE HOUSE LOST 1,240` or `WON`. |
 | Reveal | Headline is the round delta and the fortune after. Each card shows stake, payout, the line and, as context, the market's price. The Oracle comparison becomes "you took the Oracle for N" or "the Oracle took N". Under the line, the Council's split (§13.3). Points, streak and milestone copy move to the expandable detail. |
+| The reading | Under each member's row on the reveal, a collapsed line that opens into the member's paragraph and the evidence cards it cited. Evidence cards use the question card's chrome at smaller scale: title, source, published date, highlight. Uncited items sit under a final "also read" row. Named "the Oracle's reading" in copy. |
+| The Council sits (stretch) | Between eleven and noon ET, home shows one row per member flipping to "sealed" as its commit lands, lines hidden. Truthful, since the commits happen then; cut first if time is short. |
 | Board | Daily by return, all-time by fortune. |
 | Ledger | Fortune history above the calibration record. |
 | Share card | Night realm, unchanged materials. Line one: fortune delta. Line two: the Oracle's line on the Big One and what the player did about it. |
@@ -246,12 +261,13 @@ Existing events gain `stake`, `line`, `delta` properties where a prediction or r
 - API: seal → settle → fortune on a version 3 round; a seal on a lineless question is rejected; version 2 rounds settle exactly as before.
 - Mobile: card line and stake readout at three confidences; reveal headline for win, loss and void; house headline for the negative purse; practice never posts a stake.
 - Council: median with an even and odd number of members; an abstaining member is excluded from the median and scored nothing; a member whose response fails to parse abstains rather than defaulting to 50; per-member Brier and house delta over a settled round; the market baseline member is never sent to a model.
+- Evidence: a pack is retrieved once per question and shared; every item's published date is at or before the retrieval instant; a member's cited ranks all exist in the pack; an empty pack still commits.
 - Lessons: a lesson is written only after settlement; the as-of filter excludes a lesson whose outcome was not known at commit time; caps hold; a member never receives another member's lessons.
 - The full suite runs under the existing timing note: about six and a half minutes, bare 5,000 ms timeouts are contention.
 
 ## 11. Rollout
 
-1. Apply `0010` to production before deploying the API.
+1. Apply `0010` to production before deploying the API. Set the `EXA_API_KEY` secret.
 2. Deploy the API with `PIPELINE_ENABLED` still false. Run the market authoring once by the admin route against tomorrow's date and inspect the draft in Telegram.
 3. Arm the pipeline. The first version 3 round publishes at the next noon.
 4. Ship the mobile build. Version 2 rounds already settled remain readable.
@@ -275,9 +291,9 @@ The line commit is plural, independent and publicly scored. A **member** is anyt
 
 | Member | What it is | Cost per night |
 | --- | --- | --- |
-| `sonnet` | Claude Sonnet 5 with the existing forecast prompt and web search | one call |
-| `opus` | Claude Opus 5, same prompt | one call |
-| `haiku` | Claude Haiku 4.5, same prompt, no search | one call |
+| `sonnet` | Claude Sonnet 5, forecast prompt over the shared evidence pack (§5.4b), no search tool | one call |
+| `opus` | Claude Opus 5, same prompt and pack | one call |
+| `haiku` | Claude Haiku 4.5, same prompt and pack | one call |
 | `market` | The exchange price at selection time, verbatim | none |
 
 Three models is the smallest set that gives a median a meaning. The market member is the baseline every other member is measured against and is never sent to a model. Membership is a static table in code; adding a member is one row and, for a model member, one prompt-version string.
@@ -286,7 +302,7 @@ Three models is the smallest set that gives a median a meaning. The market membe
 
 Each model member commits in its own workflow step so a failure or timeout in one does not lose the others. A member that fails, times out, or returns a probability that does not parse **abstains** for that question: no row, no score, and it is excluded from the median. The house line is the median of the members present, clamped to the market band (§5.5). If fewer than two members are present on any question the round opens unstaked (§5.5), and that is alerted.
 
-Every member's line is written to `lines` in the same transaction as `questions.line_p_yes`, with `committed_at`, the model id and the prompt version. Rows are immutable. The existing commitment snapshot on `rounds` keeps recording the round-level facts.
+Every member's line is written to `lines` in the same transaction as `questions.line_p_yes`, with `committed_at`, the model id, the prompt version, a one-paragraph `reasoning` in plain prose, and the evidence ranks it cited. Rows are immutable. The reasoning is the member's stated route from the evidence to its number, requested as a field of the structured output; it is not a chain of thought and is never presented as one. The existing commitment snapshot on `rounds` keeps recording the round-level facts.
 
 ### 13.3 What players see
 
@@ -319,7 +335,7 @@ Taken from TradingAgents' decision log rather than its agent graph. The mechanis
 - `series_key` is the exchange's recurring series when one exists (Kalshi series ticker such as `KXHIGHNY`, Polymarket event tag), otherwise the question's category.
 - Before a member commits, its prompt receives at most the five most recent lessons from the same `series_key` and the three most recent from any other, **each with an outcome known before the moment of commit**. A lesson whose `resolved_at` is later than the commit instant is never included. This is the as-of rule and it is what keeps the standings honest and any later replay free of look-ahead.
 - A member receives only its own lessons. Sharing lessons across members would correlate their errors, and the median depends on them being independent.
-- Lessons are stored in `lessons` and are readable from the admin route, so a bad lesson can be found and deleted by hand.
+- Lessons are stored in `lessons` and are readable from the admin route, so a bad lesson can be found and deleted by hand. The lessons a member received before a commit are recorded on its `lines` row by id, so the reading can show what the member remembered as well as what it read.
 
 ### 14.2 What this buys
 
@@ -337,3 +353,4 @@ TradingAgents' bull and bear researcher debate, its four-analyst fan-out and its
 - A named currency. Fortune is unit-less by design.
 - Fortune leaderboards across friends, seasons or resets.
 - Kalshi or Polymarket as a source for the bank. The bank stays evergreen and authored.
+- Adopting an agent-UI component library. The reading takes the expandable-trace and evidence-card patterns and renders them in the app's own materials.
