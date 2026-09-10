@@ -196,19 +196,27 @@ wrangler tail --format pretty
 
 The cron fires every 10 minutes. The day's shape:
 
-- **noon ET** — publish, and the Oracle's forecast is stamped in the *same
-  tick*, pushed after publish. If the forecast lands at 13:00 instead, the
-  ordering regression is back (it used to trail every first-hour player).
+- **09:00–11:xx ET** — the Oracle's forecast is stamped, and `commitLine`
+  writes the house line on the same tick. Hourly retries, all of them finished
+  before players can see the round.
+- **noon ET** — publish, on the first tick at or after noon. The forecast is
+  already committed by then, which is the point: if you ever see one stamped
+  *after* publish, the ordering regression is back (it used to trail every
+  first-hour player).
 - **17:00 ET** — authoring: the market round fetches both exchanges, picks
   five markets, and spends one voice call and one taste call on them. Once a
   night, not hourly. A night that cannot deal five falls through to the
   evergreen bank.
 - **lock** — noon ET the next day, at the stated `locks_at`. Nothing pulls a
   lock forward any more; the probe that used to is retired.
-- **settle** — resolution reads twice with two *different* models; a
-  disagreement resolves to unverifiable, never a winner. Never set
-  `PIPELINE_RESOLVE_MODEL` and `PIPELINE_RESOLVE_MODEL_B` to the same model —
-  that silently removes the error independence the second read buys.
+- **settle** — hourly after lock, retried for a full day before a question
+  voids at noon two days on. A question carrying a `market_source` settles
+  from the exchange it was dealt from, which is every question in an ordinary
+  round. The two-model read is what remains for bank questions: two
+  *different* models, and a disagreement resolves to unverifiable, never a
+  winner. Never set `PIPELINE_RESOLVE_MODEL` and `PIPELINE_RESOLVE_MODEL_B` to
+  the same model — that silently removes the error independence the second
+  read buys.
 
 `PIPELINE_DAILY_CALL_BUDGET` is 150, which caps an unattended retry storm.
 Telegram is the operator console: `/status`, `/reroll <slot> [guidance]`,
