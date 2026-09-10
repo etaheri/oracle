@@ -6,23 +6,21 @@
   <h1>OUTSEEN</h1>
   <p>Five questions about tomorrow. Choose your answer and how sure you are. Return to see whether you beat the Oracle.</p>
   <p id="open"><a href="oracle://round">Open in the app</a></p>
-  <p id="store" hidden><a id="storeLink" href="/">About OUTSEEN</a></p>
+  <p id="store"><a id="storeLink" href="/">About OUTSEEN</a></p>
 </main>
 <script>
-  // Smart link: try the app's scheme; if we are still here after a beat,
-  // offer a fallback. APP_STORE_URL is empty until the listing is live, so
-  // until then the fallback is a truthful link to the site, not a store
-  // promise the app can't keep.
+  // Both links show immediately — no scripted navigation. A `location.href`
+  // assignment to a custom scheme fires on every visitor including those
+  // without the app installed, which throws an OS-level "can't open this
+  // page" alert in front of them; only a user gesture (the anchor above)
+  // should attempt the scheme. APP_STORE_URL is empty until the listing is
+  // live, so until then the fallback is a truthful link to the site, not a
+  // store promise the app can't keep.
   var APP_STORE_URL = "";
-  var t = setTimeout(function () {
-    if (APP_STORE_URL) {
-      var link = document.getElementById("storeLink");
-      link.href = APP_STORE_URL;
-      link.textContent = "Get OUTSEEN on the App Store";
-    }
-    document.getElementById("store").hidden = false;
-  }, 1200);
-  window.addEventListener("pagehide", function () { clearTimeout(t); });
-  location.href = "oracle://round";
+  if (APP_STORE_URL) {
+    var link = document.getElementById("storeLink");
+    link.href = APP_STORE_URL;
+    link.textContent = "Get OUTSEEN on the App Store";
+  }
 </script>
 </body></html>
