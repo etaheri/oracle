@@ -19,7 +19,7 @@ function exhibitionQuestion(exhibition: Exhibition): RoundToday["questions"][num
     id: exhibition.id, slot: 1, is_big_one: false, text: exhibition.question,
     category: "EXHIBITION", source_name: exhibition.sourceName,
     resolution_criteria: "Practice only; this exhibition is unranked.",
-    locks_at: "2099-01-01T00:00:00Z", lock_healed: false, struck: false, struck_reason: null,
+    locks_at: "2099-01-01T00:00:00Z", lock_healed: false, struck: false, struck_reason: null, line_p_yes: null,
   };
 }
 

@@ -5,9 +5,13 @@ import { boardLines, boardSupportingLines, BOARD_MAX_LINES, FIELD_GATHERING_LINE
 function board(overrides: Partial<RoundBoard> = {}): RoundBoard {
   return {
     date: "2026-08-20",
+    metric: "points",
     field_size: 214,
     your_points: 137,
     your_rank: 31,
+    your_return_bp: null,
+    best_return_bp: null,
+    median_return_bp: null,
     rows: [],
     best_points: 268,
     median_points: 44,
