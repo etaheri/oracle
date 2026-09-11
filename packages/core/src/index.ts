@@ -2,6 +2,7 @@ export * from "./constants";
 export * from "./schemas";
 export * from "./scoring";
 export * from "./fortune";
+export * from "./council";
 export * from "./oracleRecord";
 export * from "./designation";
 export * from "./streak";

@@ -83,6 +83,29 @@ export const MineTodaySchema = z.object({
 });
 export type MineToday = z.infer<typeof MineTodaySchema>;
 
+// The Council on the wire (design 2026-09-11 §13). Both arrays default to
+// empty so an older server still parses.
+export const CouncilEntrySchema = z.object({
+  question_id: z.string().uuid(),
+  member: z.enum(["sonnet", "opus", "haiku", "market"]),
+  p_yes: z.number(),
+  on_right_side: z.boolean().nullable(),
+  reasoning: z.string().nullable(),
+  cited: z.array(z.number().int()),
+  lessons_received: z.number().int(),
+});
+export type CouncilEntry = z.infer<typeof CouncilEntrySchema>;
+export const EvidenceItemSchema = z.object({
+  question_id: z.string().uuid(),
+  rank: z.number().int(),
+  url: z.string(),
+  title: z.string(),
+  source: z.string(),
+  published_at: z.string().nullable(),
+  highlight: z.string(),
+});
+export type EvidenceItem = z.infer<typeof EvidenceItemSchema>;
+
 export const RevealSchema = z.object({
   rules_version: z.number().int().min(1).max(3).default(1),
   bonus_points: z.number().int().default(0),
@@ -102,6 +125,8 @@ export const RevealSchema = z.object({
   return: z.number().nullable().default(null),
   fortune_after: z.number().int().nullable().default(null),
   house_delta: z.number().int().nullable().default(null),
+  council: z.array(CouncilEntrySchema).default([]),
+  evidence: z.array(EvidenceItemSchema).default([]),
   questions: z.array(
     z.object({
       id: z.string().uuid(),
@@ -196,6 +221,20 @@ export const AllTimeBoardSchema = z.object({
   rows: z.array(z.object({ name: z.string(), fortune: z.number().int(), rank: z.number().int(), is_you: z.boolean() })),
 });
 export type AllTimeBoard = z.infer<typeof AllTimeBoardSchema>;
+
+// The open record (design 2026-09-11 §13). Public; nothing about any player.
+export const StandingsSchema = z.object({
+  as_of: z.string(),
+  rounds: z.number().int(),
+  questions: z.number().int(),
+  rows: z.array(z.object({
+    member: z.enum(["sonnet", "opus", "haiku", "market", "crowd"]),
+    calls: z.number().int(),
+    brier: z.number().nullable(),
+    house_delta: z.number().int(),
+  })),
+});
+export type Standings = z.infer<typeof StandingsSchema>;
 
 export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean(), stake: z.number().int().nullable().default(null) });
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
