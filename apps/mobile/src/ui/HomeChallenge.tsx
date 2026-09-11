@@ -52,7 +52,7 @@ export function HomeChallenge({
             ? `NEXT ROUND OPENS ${localOpening(input.nextOpensAt)}`
             : "THE NEXT ROUND HASN'T BEEN ANNOUNCED"
           : state.kind === "live"
-            ? "FIVE QUESTIONS. THE ORACLE HAS POSTED ITS LINES."
+            ? "THE ORACLE HAS POSTED FIVE LINES."
             : "LOADING TODAY'S CHALLENGE…";
 
   return (
