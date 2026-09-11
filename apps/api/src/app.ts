@@ -6,6 +6,7 @@ import { boardRoutes } from "./routes/board";
 import { predictionRoutes } from "./routes/predictions";
 import { adminRoutes } from "./routes/admin";
 import { meRoutes } from "./routes/me";
+import { standingsRoutes, standingsPage } from "./routes/standings";
 import { telegramRoutes } from "./routes/telegram";
 import { webhookRoutes } from "./routes/webhooks";
 import type { PipelineDeps } from "./pipeline";
@@ -40,6 +41,8 @@ export function createApp(deps: Deps) {
   app.route("/v1/board", boardRoutes);
   app.route("/v1/predictions", predictionRoutes);
   app.route("/v1/me", meRoutes);
+  app.route("/v1/standings", standingsRoutes);
+  app.route("/standings", standingsPage);
   app.route("/admin", adminRoutes);
   app.route("/v1/telegram", telegramRoutes);
   app.route("/v1/webhooks", webhookRoutes);
