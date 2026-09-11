@@ -54,6 +54,7 @@ export const DraftQuestionSchema = z
       source: z.enum(["kalshi", "polymarket"]),
       id: z.string().min(1),
       event_key: z.string().min(1),
+      series_key: z.string().min(1).optional(),
       closes_at: z.iso.datetime({ offset: true }),
     }).optional(),
   })
@@ -194,6 +195,7 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
       marketSource: q.market?.source ?? null,
       marketId: q.market?.id ?? null,
       marketEventKey: q.market?.event_key ?? null,
+      marketSeriesKey: q.market?.series_key ?? null,
       marketClosesAt: q.market ? new Date(q.market.closes_at) : null,
       opensAt,
       locksAt,

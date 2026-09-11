@@ -112,7 +112,7 @@ function toDraft(five: MarketCandidate[], voiced: Array<{ slot: number; text: st
         market_prob: c.prob,
         resolves_at: c.closesAt,
         ...(v.context.trim() ? { context: { text: v.context.trim(), asOf: now.toISOString(), sourceUrl: c.url } } : {}),
-        market: { source: c.source, id: c.marketId, event_key: c.eventKey, closes_at: c.closesAt },
+        market: { source: c.source, id: c.marketId, event_key: c.eventKey, series_key: c.seriesKey, closes_at: c.closesAt },
       };
     }),
   });

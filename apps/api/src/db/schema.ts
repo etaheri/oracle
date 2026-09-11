@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, integer, bigint, boolean, timestamp, date, numeric, jsonb, uniqueIndex, index, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const questionStatus = pgEnum("question_status", ["draft", "approved", "scheduled", "open", "locked", "resolved", "void"]);
 export const outcome = pgEnum("outcome", ["yes", "no", "void"]);
@@ -123,6 +124,10 @@ export const questions = pgTable("questions", {
   marketId: text("market_id"),
   marketEventKey: text("market_event_key"),
   marketClosesAt: timestamp("market_closes_at", { withTimezone: true }),
+  // The exchange's recurring series (design 2026-09-11 §9): Kalshi series
+  // ticker, Polymarket first tag. Keys a member's lessons; null falls back to
+  // the category.
+  marketSeriesKey: text("market_series_key"),
 }, (t) => [index("questions_round_date_idx").on(t.roundDate)]);
 
 export const predictions = pgTable("predictions", {
@@ -227,3 +232,46 @@ export const pipelineUsage = pgTable(
   },
   (t) => [primaryKey({ columns: [t.date, t.model] })],
 );
+
+// The Council (design 2026-09-11 §11). One row per question and member,
+// written by commit_council in the same statement as oracle_p_yes and never
+// rewritten. Scores are computed at read time, never stored (spec C4).
+export const lines = pgTable("lines", {
+  questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+  member: text("member").notNull(),
+  pYes: numeric("p_yes").notNull(),
+  committedAt: timestamp("committed_at", { withTimezone: true }).notNull(),
+  model: text("model"),
+  promptVersion: text("prompt_version"),
+  reasoning: text("reasoning"),
+  cited: integer("cited").array().notNull().default(sql`'{}'::integer[]`),
+  lessonsReceived: uuid("lessons_received").array().notNull().default(sql`'{}'::uuid[]`),
+}, (t) => [primaryKey({ columns: [t.questionId, t.member] })]);
+
+// The shared evidence pack (design 2026-09-11 §5): one Exa search per
+// question, numbered in rank order, the same pack for every member.
+export const evidence = pgTable("evidence", {
+  questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+  rank: integer("rank").notNull(),
+  url: text("url").notNull(),
+  title: text("title").notNull(),
+  source: text("source").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  highlight: text("highlight").notNull(),
+  retrievedAt: timestamp("retrieved_at", { withTimezone: true }).notNull(),
+}, (t) => [primaryKey({ columns: [t.questionId, t.rank] })]);
+
+// Memory (design 2026-09-11 §8): one lesson per model member per settled
+// question, fed back under the as-of rule on resolved_at.
+export const lessons = pgTable("lessons", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  member: text("member").notNull(),
+  seriesKey: text("series_key").notNull(),
+  questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("lessons_member_question_idx").on(t.member, t.questionId),
+  index("lessons_member_series_idx").on(t.member, t.seriesKey, t.resolvedAt),
+]);
