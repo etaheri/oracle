@@ -75,10 +75,11 @@ const call = (answer: boolean) => answer ? "YES" : "NO";
 
 function PracticeResult({ result, exhibition }: { result: ReturnType<typeof practiceResult>; exhibition: Exhibition }) {
   const outcome = exhibition.outcome === "yes";
+  const roundDate = exhibition.roundDate;
 
   return <>
     <DecodeLine serif text={`Actual outcome: ${call(outcome)}.`} size={22} style={{ textAlign: "center", lineHeight: 32 }} />
-    <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{exhibition.kind === "fictional" ? "FICTIONAL OUTCOME" : `PAST ROUND${exhibition.roundDate ? ` · ${exhibition.roundDate}` : ""}`}</Mono>
+    <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{exhibition.kind === "fictional" ? "FICTIONAL OUTCOME" : `PAST ROUND${roundDate ? ` · ${roundDate}` : ""}`}</Mono>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{result.oracleLine}</Mono>
     <View style={{ flexDirection: "row", justifyContent: "space-around", gap: space(2) }}>
       <View style={{ flex: 1, alignItems: "center" }}><Mono {...role.caption}>YOUR STAKE</Mono><Ritual bold size={displayScale.lead} color={colors.ink}>{formatFortune(result.stake)}</Ritual></View>

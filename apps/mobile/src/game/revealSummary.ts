@@ -15,7 +15,7 @@ export function revealSummary(qs: DuelQuestion[], duel: DuelResult) {
     // the day scored the way it did, it is rendered in the reading register,
     // and it was the only copy on the reveal still shouting through it.
     // practiceResult.ts already writes its own explanation this way.
-    explanation: duel.status === "complete" ? "Base points decide the duel. Crowd bonuses and streaks do not count." : duel.status === "unavailable" ? "No complete Oracle forecast. Your record still counts." : duel.status === "incomplete" ? "An incomplete round has no duel." : duel.status === "insufficient" ? "Too few scored questions for a duel." : "Unread questions are not losses.",
+    explanation: duel.status === "complete" ? "Base points decide the duel. Other players' bonuses and streaks do not count." : duel.status === "unavailable" ? "No complete Oracle forecast. Your record still counts." : duel.status === "incomplete" ? "An incomplete round has no duel." : duel.status === "insufficient" ? "Too few scored questions for a duel." : "Unread questions are not losses.",
     canShareFinal: !pending && scored.length > 0,
     rivalry: rivalryMoment(qs, duel),
   };

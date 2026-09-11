@@ -104,6 +104,10 @@ export default function Index() {
   // open) here — not on every 30s re-render from the risk-line clock below.
   const openedFor = useRef<string | null>(null);
   const ledger = useMeLedger();
+  // Named apart from `ledger` so the hero number's accessibility label never
+  // carries the query object's own name into a sentence a screen reader says
+  // aloud (the vocabulary cut, design §8.1, D12).
+  const fortune = ledger.data?.fortune ?? null;
   // Two different "yesterdays" (homeDates.ts, audit finding A): the shield
   // and lapse notices mean CALENDAR yesterday — shield_used_on is the date
   // NOT played, so it can never equal the reading round's own date — while
@@ -344,9 +348,9 @@ export default function Index() {
             record, not from today's round, so it stands while no round is
             open. Reserved two rows so it never shoves the clock. */}
         <View style={{ minHeight: scaledRow(ROW_H.line, chromeScale) * 2 + space(1), alignItems: "center", justifyContent: "center", gap: space(1) }}>
-          {ledger.data?.fortune != null && (
+          {fortune != null && (
             <>
-              <Ritual bold size={displayScale.epithet} letterSpacing={2} style={{ marginRight: -2 }} accessibilityLabel={`Fortune ${formatFortune(ledger.data.fortune)}`}>{formatFortune(ledger.data.fortune)}</Ritual>
+              <Ritual bold size={displayScale.epithet} letterSpacing={2} style={{ marginRight: -2 }} accessibilityLabel={`Fortune ${formatFortune(fortune)}`}>{formatFortune(fortune)}</Ritual>
               <Mono {...role.meta} color={colors.mutedInk}>FORTUNE</Mono>
             </>
           )}

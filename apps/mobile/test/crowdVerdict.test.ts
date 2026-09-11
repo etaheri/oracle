@@ -11,11 +11,11 @@ describe("crowdVerdict", () => {
     expect(crowdVerdict(false, 62, 50)).toEqual({ line: "62% SAY YES · AGAINST THE TIDE", against: true });
     expect(crowdVerdict(true, 39, 50)).toEqual({ line: "39% SAY YES · AGAINST THE TIDE", against: true });
   });
-  it("reads THE CROWD SPLITS in the contested middle (40..59 on my side)", () => {
-    expect(crowdVerdict(true, 45, 50)).toEqual({ line: "45% SAY YES · THE CROWD SPLITS", against: false });
-    expect(crowdVerdict(false, 55, 50)).toEqual({ line: "55% SAY YES · THE CROWD SPLITS", against: false });
-    expect(crowdVerdict(true, 40, 50)).toEqual({ line: "40% SAY YES · THE CROWD SPLITS", against: false });
-    expect(crowdVerdict(true, 59, 50)).toEqual({ line: "59% SAY YES · THE CROWD SPLITS", against: false });
+  it("reads THE PLAYERS SPLIT in the contested middle (40..59 on my side)", () => {
+    expect(crowdVerdict(true, 45, 50)).toEqual({ line: "45% SAY YES · THE PLAYERS SPLIT", against: false });
+    expect(crowdVerdict(false, 55, 50)).toEqual({ line: "55% SAY YES · THE PLAYERS SPLIT", against: false });
+    expect(crowdVerdict(true, 40, 50)).toEqual({ line: "40% SAY YES · THE PLAYERS SPLIT", against: false });
+    expect(crowdVerdict(true, 59, 50)).toEqual({ line: "59% SAY YES · THE PLAYERS SPLIT", against: false });
   });
   it("agrees with the scoring engine's contrarian rule exactly at the boundary", () => {
     // sidePct < 40 is the contrarianApplies condition — 40 itself is not contrarian.
@@ -59,8 +59,8 @@ describe("crowdVerdict", () => {
     // these move with it instead of the line silently lying.
     const edge = CONSTANTS.CONTRARIAN_CROWD_PCT;
     expect(crowdVerdict(true, edge - 1, 50).line).toContain("AGAINST THE TIDE");
-    expect(crowdVerdict(true, edge, 50).line).toContain("THE CROWD SPLITS");
-    expect(crowdVerdict(true, 100 - edge - 1, 50).line).toContain("THE CROWD SPLITS");
+    expect(crowdVerdict(true, edge, 50).line).toContain("THE PLAYERS SPLIT");
+    expect(crowdVerdict(true, 100 - edge - 1, 50).line).toContain("THE PLAYERS SPLIT");
     expect(crowdVerdict(true, 100 - edge, 50).line).toContain("WITH THE TIDE");
   });
 });

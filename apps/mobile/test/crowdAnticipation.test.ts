@@ -14,7 +14,7 @@ describe("crowdAnticipation", () => {
       { id: "b", crowd_yes_pct: 60, player_count: 12 },
       { id: "c", crowd_yes_pct: 10, player_count: 30 },
     ];
-    expect(crowdAnticipation(calls, crowd)).toBe("The crowd currently leans the other way on 2 of your calls.");
+    expect(crowdAnticipation(calls, crowd)).toBe("Other players currently lean the other way on 2 of your calls.");
   });
 
   it("keeps exact splits, tiny crowds, and missing data neutral", () => {
@@ -28,6 +28,6 @@ describe("crowdAnticipation", () => {
     expect(crowdAnticipation(
       [{ questionId: "a", answer: true, sealed: true }],
       [{ id: "a", crowd_yes_pct: 40, player_count: 5 }],
-    )).toBe("The crowd currently leans the other way on 1 of your calls.");
+    )).toBe("Other players currently lean the other way on 1 of your calls.");
   });
 });

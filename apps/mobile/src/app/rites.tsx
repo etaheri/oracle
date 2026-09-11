@@ -6,6 +6,7 @@ import { useToday, useMineToday } from "../api/hooks";
 import { markRitesSeen } from "../api/flags";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
 import { beginHomeAction, invalidateHomeAction, ownsHomeAction, type HomeActionGate } from "../game/homeActionGate";
+import { LadderTable } from "../ui/LadderTable";
 import { ReadingHeader } from "../ui/ReadingHeader";
 import { Screen, useScreenInset } from "../ui/Screen";
 import { TopBar } from "../ui/TopBar";
@@ -213,6 +214,9 @@ export default function Rites() {
                 <ClaimList claims={section.claims} defines={section.defines} />
               </Rite>
             ))}
+            <Rite index={RITES_V2_SECTIONS.length} gutter={gutter} delayMs={RITES_V2_SECTIONS.length * 90} stamp="THE LADDER">
+              <LadderTable />
+            </Rite>
           </View>
         )}
 
@@ -226,7 +230,7 @@ export default function Rites() {
 
         <View style={{ gap: space(1) }}>
           <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>ONE PRACTICE QUESTION · IMMEDIATE RESULT · UNRANKED</Mono>
-          <QuietLink title="TRY AN EXHIBITION" onPress={exhibition} />
+          <QuietLink title="TRY A PRACTICE QUESTION" onPress={exhibition} />
           {opening && <QuietLink title={GAME_TERMS.rulesNav} onPress={() => leaveRites(() => router.push({ pathname: "/rites", params: { all: "1" } }))} />}
         </View>
       </ScrollView>

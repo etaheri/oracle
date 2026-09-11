@@ -10,7 +10,7 @@ export const VERDICT_MIN_PLAYERS = 5;
 // Said in the crowd's place, not about it: under five players the percentage
 // is mostly the player themselves. Exported because the round's finale
 // (CrowdReveal) holds its tongue at the same floor, from the same string.
-export const GATHERING_LINE = "THE CROWD IS STILL GATHERING";
+export const GATHERING_LINE = "THE PLAYERS ARE STILL GATHERING";
 
 // The minority side, named where the bounty cannot yet pay. "AGAINST THE
 // TIDE" is the phrase the plaque stat, the epithet and the reveal's gold
@@ -33,6 +33,6 @@ export function crowdVerdict(answer: boolean, crowdYesPct: number, playerCount: 
         : UNCOUNTED_TIDE
       : sidePct >= 100 - C.CONTRARIAN_CROWD_PCT
         ? "WITH THE TIDE"
-        : "THE CROWD SPLITS";
+        : "THE PLAYERS SPLIT";
   return { line: `${crowdYesPct}% SAY YES · ${tide}`, against };
 }

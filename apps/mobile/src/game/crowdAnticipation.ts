@@ -14,5 +14,5 @@ export function crowdAnticipation(calls: SubmittedCall[], crowd: CrowdReading[])
     if (call.answer !== crowdCallsYes) disagreements += 1;
   }
   if (disagreements === 0) return null;
-  return `The crowd currently leans the other way on ${disagreements} of your calls.`;
+  return `Other players currently lean the other way on ${disagreements} of your calls.`;
 }

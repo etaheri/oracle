@@ -120,13 +120,13 @@ export const TOO_FEW_LINE = "TOO FEW PLAYED TO READ THE PLAYERS";
 // along. Null for a row the player never answered — the outcome column
 // already speaks for those.
 export function callLine(q: Question): string | null {
-  const crowd = crowdReadable(q) ? `PLAYERS ${q.crowd_yes_pct}% YES` : null;
+  const others = crowdReadable(q) ? `PLAYERS ${q.crowd_yes_pct}% YES` : null;
   // A row the player never answered still has something to say: what the
   // crowd made of it. On a lapsed day that IS the page — four outcomes and
   // four sources, and no sense of what was missed.
-  if (!q.my) return crowd;
+  if (!q.my) return others;
   const mine = `YOU: ${q.my.answer ? "YES" : "NO"} @ ${q.my.confidence}%`;
-  return crowd ? `${mine} · ${crowd}` : mine;
+  return others ? `${mine} · ${others}` : mine;
 }
 
 // The tide's move since this player sealed (design 2026-09-09 §4.1): the
@@ -186,6 +186,6 @@ export function weightLine(d: Reveal): string | null {
   if (d.rules_version >= 2) return d.first_hour ? "FIRST HOUR · EARLY MARK" : null;
   const parts: string[] = [];
   if (d.first_hour) parts.push(`FIRST HOUR ×${FIRST_HOUR_WEIGHT}`);
-  if (d.vigil_mult !== null && d.vigil_mult > 1) parts.push(`VIGIL ×${weight(d.vigil_mult)}`);
+  if (d.vigil_mult !== null && d.vigil_mult > 1) parts.push(`STREAK ×${weight(d.vigil_mult)}`);
   return parts.length === 0 ? null : `WEIGHED: ${parts.join(" · ")}`;
 }

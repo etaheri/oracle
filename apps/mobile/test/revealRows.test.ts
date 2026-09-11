@@ -305,12 +305,12 @@ describe("weightLine", () => {
     expect(weightLine(reveal({ vigil_mult: null, outcomes: ["yes"] }))).toBeNull();
   });
 
-  it("names the vigil's weight alone", () => {
-    expect(weightLine(reveal({ vigil_mult: 1.35, outcomes: ["yes"] }))).toBe("WEIGHED: VIGIL ×1.35");
+  it("names the streak's weight alone", () => {
+    expect(weightLine(reveal({ vigil_mult: 1.35, outcomes: ["yes"] }))).toBe("WEIGHED: STREAK ×1.35");
   });
 
   it("trims a trailing zero rather than printing 1.50", () => {
-    expect(weightLine(reveal({ vigil_mult: 1.5, outcomes: ["yes"] }))).toBe("WEIGHED: VIGIL ×1.5");
+    expect(weightLine(reveal({ vigil_mult: 1.5, outcomes: ["yes"] }))).toBe("WEIGHED: STREAK ×1.5");
   });
 
   it("names the first hour alone", () => {
@@ -321,7 +321,7 @@ describe("weightLine", () => {
     // Two stacked sentences is what pushed the headline block to seven centred
     // lines under the number; these are facts, so they take the terse register.
     expect(weightLine(reveal({ vigil_mult: 1.15, first_hour: true, outcomes: ["yes"] })))
-      .toBe("WEIGHED: FIRST HOUR ×1.1 · VIGIL ×1.15");
+      .toBe("WEIGHED: FIRST HOUR ×1.1 · STREAK ×1.15");
   });
 
   it("reads the first hour's rate off the constant", () => {
