@@ -5,8 +5,8 @@ import { PatinaHalo } from "./TerminalPatina";
 import { RegisterMarks, ShareFooter, NIGHT_LINE, NIGHT_DIM } from "./ShareCard";
 import { formatFortune } from "../game/fortuneText";
 
-// The plaque, sent into the night realm: fortune, receipt, the record, the
-// liturgy. Same 5:8 card anatomy as the daily share.
+// The plaque, sent into the night realm: fortune, the record, the liturgy.
+// Same 5:8 card anatomy as the daily share.
 export const PLAQUE_W = 640;
 export const PLAQUE_H = 1024;
 const INSET = 30;
@@ -21,7 +21,6 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
   // Cinzel 44 can overflow the 580px frame width for a wide grouped fortune.
   // Drop to 34 rather than ellipsize (the number is never cut).
   const ritual34 = useFont(require("../../assets/fonts/Cinzel-SemiBold.ttf"), 34);
-  const receiptFont = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 16);
   const mono = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 18);
   const monoSmall = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 12);
 
@@ -34,7 +33,6 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
     `ROUNDS PLAYED ${data.days_consulted} · STREAK ${data.streak}`,
     `ACCURACY ${pct(data.accuracy_pct)} · CONFIDENCE ${pct(data.avg_confidence)}`,
     `YOUR FORECAST RATING ${data.oracle_score ?? "UNWRITTEN"}`,
-    `AGAINST THE TIDE x${data.tide_wins}`,
   ];
 
   return (
@@ -47,7 +45,6 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
       <PatinaHalo x={PLAQUE_W / 2 - 190} y={330 - 190} width={380} height={380} center={[PLAQUE_W / 2, 330]} innerR={130} outerR={172} seed={[...data.epithet.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 97} />
       {orb && <SkImage image={orb} x={PLAQUE_W / 2 - 145} y={185} width={290} height={290} fit="contain" />}
       {ritual && <SkText font={ritual} text={fortuneTitle} x={centered(ritual, fortuneTitle)} y={600} color={colors.museumWhite} />}
-      {receiptFont && <SkText font={receiptFont} text={data.epithet.receipt} x={centered(receiptFont, data.epithet.receipt)} y={644} color={colors.agedGold} />}
       {mono && statLines.map((line, i) => (
         <SkText key={line} font={mono} text={line} x={centered(mono, line)} y={710 + i * 32} color={NIGHT_DIM} />
       ))}
