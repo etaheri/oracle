@@ -22,10 +22,8 @@ export function shareMessage(
   return url ? `${body} ${url}` : body;
 }
 
-// The plaque's own share text (design 2026-09-09 §3.2): unlike the daily
-// round, there is no pattern line to fall back on — the plaque IS the
-// challenge, so the epithet carries it.
-export function plaqueMessage(epithetTitle: string, url: string | null = SHARE_URL): string {
-  const body = `🔮 OUTSEEN — ${epithetTitle} · can you outsee me?`;
+// The record's own share text: the fortune IS the challenge now.
+export function plaqueMessage(fortune: number, url: string | null = SHARE_URL): string {
+  const body = `🔮 OUTSEEN — FORTUNE ${fortune.toLocaleString("en-US")} · can you beat the house?`;
   return url ? `${body} ${url}` : body;
 }

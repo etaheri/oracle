@@ -30,11 +30,11 @@ describe("shareMessage", () => {
   });
 });
 
-describe("plaqueMessage (design 2026-09-09 §3.2)", () => {
-  it("carries the epithet, the challenge and the link", () => {
-    expect(plaqueMessage("THE STEADY HAND", "https://x.test/play")).toBe("🔮 OUTSEEN — THE STEADY HAND · can you outsee me? https://x.test/play");
+describe("plaqueMessage", () => {
+  it("carries the fortune, the challenge and the link", () => {
+    expect(plaqueMessage(1140, "https://x.test/play")).toBe("🔮 OUTSEEN — FORTUNE 1,140 · can you beat the house? https://x.test/play");
   });
   it("omits the link when none is configured", () => {
-    expect(plaqueMessage("THE STEADY HAND", null)).toBe("🔮 OUTSEEN — THE STEADY HAND · can you outsee me?");
+    expect(plaqueMessage(1140, null)).toBe("🔮 OUTSEEN — FORTUNE 1,140 · can you beat the house?");
   });
 });

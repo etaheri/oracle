@@ -1,4 +1,4 @@
-import { GAME_TERMS, MILESTONE_COPY } from "@oracle/core";
+import { FORTUNE, GAME_TERMS } from "@oracle/core";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
@@ -23,23 +23,24 @@ import { LITURGY_LINES, SCORE_GLOSS } from "@oracle/core";
 import { ConfidenceHistory } from "../ui/ConfidenceHistory";
 import { shieldStat } from "../game/shieldStat";
 import { scoreValue } from "../game/scoreProgress";
-import { standingLine } from "../game/standing";
+import { fortuneHistoryLines } from "../game/fortuneHistory";
+import { formatFortune } from "../game/fortuneText";
 
 // The plaque's floor, shared by the frame that waits for it. The loading
 // frame exists so the plaque fills rather than flashes, and it only earns
 // that if the two are the same size: at 280 the frame still visibly grew
 // when the record landed. This is the loaded plaque's own height — its
-// padding, the epithet block, the rule, the lead stat, the score gloss
-// beneath it and six supporting rows — so the only step left is the epithet
-// wrapping to a second line or the claim row being offered, both of which are
+// padding, the fortune row and its history lines, the two rules, the streak
+// rows, the calibration rows and the score gloss — so the only step left is
+// a long fortune history or the claim row being offered, both of which are
 // the record's own news. Raised from 380 when the gloss was added: it is two
 // lines of size-10 mono plus its gap at ordinary text sizes.
 const PLAQUE_MIN_H = 420;
 
-// Seven rows at one size read as seven equal facts. The Oracle Score is the
-// headline — it is the number the epithet is derived from — so it takes the
-// temple voice and its own rule, and the six supporting stats stay machine
-// voice beneath it (refinement spec §7).
+// Rows at one size read as equal facts. Fortune and the forecast rating are
+// the headlines — they take the temple voice and their own carved numeral —
+// and the supporting stats stay machine voice beneath them (refinement spec
+// §7).
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
@@ -58,7 +59,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // as one fact at any width and at any text size, which is what the row could
 // never promise.
 function LeadStat({ label, value }: { label: string; value: string }) {
-  const earned = /^\d+$/.test(value);
+  const earned = /^[\d,]+$/.test(value);
   if (!earned) {
     return (
       <View style={{ gap: space(1) }}>
@@ -126,7 +127,7 @@ export default function Ledger() {
       if (!ok) return;
       // Every cached answer belonged to a record that no longer exists.
       // Without this the struck player lands on a Home still showing their
-      // old vigil and epithet until each query happens to refetch.
+      // old fortune and streak until each query happens to refetch.
       qc.clear();
       router.dismissTo("/");
     })();
@@ -140,7 +141,7 @@ export default function Ledger() {
     setSharing(true);
     setShareError(null);
     try {
-      await shareSnapshot(canvasRef, "oracle-plaque.png", plaqueMessage(d.epithet.title));
+      await shareSnapshot(canvasRef, "oracle-plaque.png", plaqueMessage(d.fortune ?? FORTUNE.FOUNDING));
     } catch {
       setShareError("THE PLAQUE WOULD NOT LEAVE. TRY AGAIN.");
     } finally {
@@ -157,8 +158,8 @@ export default function Ledger() {
     // long one; see its own note for why flexGrow is the load-bearing part.
     <Screen scroll overlayHeader patina header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
-        <Eyebrow>Your ledger</Eyebrow>
-        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your predictions and results</Mono>
+        <Eyebrow>{GAME_TERMS.history}</Eyebrow>
+        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your fortune, your streak, your calibration</Mono>
         <QuietLink title={GAME_TERMS.rulesNav} onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })} />
         {/* One column in both states. The frame used to be the only thing
             held steady while the six children below it did not exist yet —
@@ -169,58 +170,36 @@ export default function Ledger() {
         <View style={{ backgroundColor: colors.frescoWhite, borderWidth: 1, borderColor: colors.agedGold, padding: space(5), gap: space(4), minHeight: PLAQUE_MIN_H, ...(d ? null : { alignItems: "center", justifyContent: "center" }) }}>
           {d ? (
             <>
-              <Eyebrow>Epithet of the last 28 days</Eyebrow>
-              <View style={{ alignItems: "center", gap: space(2) }}>
-                <Ritual bold size={displayScale.epithet} color={colors.ink} letterSpacing={3} style={{ textAlign: "center" }}>{d.epithet.title}</Ritual>
-                <Mono {...role.meta} color={colors.goldText}>{d.epithet.receipt}</Mono>
-              </View>
-              <View style={{ height: 1, backgroundColor: colors.agedGold, opacity: 0.4 }} />
               <View style={{ gap: space(2) }}>
-                {d.milestones.map(id => <Mono key={id} {...role.line} color={colors.mutedInk}>{MILESTONE_COPY[id]}</Mono>)}
+                <LeadStat label="FORTUNE" value={d.fortune === null ? "UNSETTLED" : formatFortune(d.fortune)} />
+                {fortuneHistoryLines(d.fortune_history).map((line) => (
+                  <Mono key={line} {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{line}</Mono>
+                ))}
+                {d.fortune_history.length === 0 && (
+                  <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "left" }]}>Your first settled round writes the first row here.</Mono>
+                )}
+                <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
+                <Stat label="ROUNDS PLAYED" value={String(d.days_consulted)} />
+                <Stat label="STREAK" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
+                {/* A gloss on the row above it, in the register a gloss is
+                    written in. */}
+                <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { paddingBottom: space(1) }]}>Your streak is one call a day. It updates when the round settles. Streak protection can carry it through a missed round. It adds no fortune.</Mono>
+                <Stat label="STREAK PROTECTION" value={shieldStat(d.free_shield_available, d.paid_shields)} />
+                <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
+                <Eyebrow>Your calibration</Eyebrow>
                 <LeadStat label="YOUR FORECAST RATING" value={scoreValue(d.oracle_score, d.calls_rated)} />
-                {/* The machine's own plaque row, on the same fifty-call floor
-                    the player meets -- so for its first ten days it too reads
-                    UNWRITTEN beside them (schema comment, MeLedgerSchema.oracle). */}
-                <LeadStat label="ORACLE RATING" value={scoreValue(d.oracle.score, d.oracle.calls_rated)} />
-                {/* The score is the premise of the whole app — the ledger naming
+                {/* The score is the premise of the whole app — the record naming
                     who can actually see — and it used to sit here as a bare label
                     over a progress string that never said what fifty was fifty OF
                     (audit 2026-09-02 §1.1). One line, in the row's own register:
                     how it is earned while it is unwritten, what it measures once
                     it is. The second half is also the legal wall, stated to the
                     player rather than only to the spec. */}
-                {/* One gloss register on this plaque. This row used to be
-                    tracked caps at role.caption while the vigil's gloss eight
-                    rows below was sentence case at role.supporting — the same
-                    job, in two voices, inside one screenful. Its unwritten
-                    copy also lived here as a call-site literal, which is how
-                    it came to name the fifty without ever scaling it against
-                    the five a day the rest of the app says. */}
                 <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "left" }]}>
                   {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
                 </Mono>
-                {standingLine(d.percentile, d.cohort_size) && (
-                  <Mono {...role.meta} color={colors.goldText} style={[role.meta.style, { textAlign: "left" }]}>
-                    {standingLine(d.percentile, d.cohort_size)}
-                  </Mono>
-                )}
-                {d.oracle.days_compared > 0 && (
-                  <Mono {...role.meta} color={colors.goldText}>
-                    {`YOU HAVE OUTSEEN THE ORACLE ON ${d.oracle.days_outseen} OF ${d.oracle.days_compared} DAYS`}
-                  </Mono>
-                )}
-                <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
-                <Stat label="ROUNDS PLAYED" value={String(d.days_consulted)} />
-                <Stat label="STREAK" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
-                {/* A gloss on the row above it, in the register a gloss is
-                    written in. It used to sit two rows higher, sentence case
-                    and size 12, between tracked-caps stat rows that gave the
-                    eye no signal that the voice had changed. */}
-                <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { paddingBottom: space(1) }]}>Your vigil is your playing streak: a reason to make one call each day. The count updates when the round settles. Shields can hold it through a missed round. Your rating comes from your forecasts; your streak adds no points.</Mono>
                 <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
                 <Stat label="AVG CONFIDENCE" value={pct(d.avg_confidence)} />
-                <Stat label="AGAINST THE TIDE" value={`×${d.tide_wins}`} />
-                <Stat label="SHIELDS IN RESERVE" value={shieldStat(d.free_shield_available, d.paid_shields)} />
                 {d.confidence_history && <ConfidenceHistory history={d.confidence_history} />}
               </View>
               <View style={{ minHeight: 78, justifyContent: "center", marginTop: space(2) }}>
@@ -243,7 +222,7 @@ export default function Ledger() {
           ) : (
             <>
               <AsciiDust />
-              <DecodeLine text="THE LEDGER IS CONSULTED" cursor {...role.eyebrow} color={colors.goldText} />
+              <DecodeLine text="THE RECORD IS CONSULTED" cursor {...role.eyebrow} color={colors.goldText} />
             </>
           )}
         </View>
@@ -271,7 +250,7 @@ export default function Ledger() {
       <RiteConfirm
         visible={rite === "strike"}
         title="THE RECORD WILL BE STRUCK"
-        body="EVERY VIGIL, EVERY CALL, EVERY EPITHET. THIS IS NOT UNDONE."
+        body="EVERY STREAK, EVERY CALL, EVERY STAKE. THIS IS NOT UNDONE."
         confirmLabel="STRIKE THE RECORD"
         destructive
         onConfirm={confirmStrike}
