@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Reveal } from "@oracle/core";
-import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, moneyMark } from "../src/game/revealFortune";
+import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, stakedRound, moneyMark } from "../src/game/revealFortune";
 
 type Q = Reveal["questions"][number];
 const q = (over: Omit<Partial<Q>, "my"> & { my?: Partial<NonNullable<Q["my"]>> | null }): Q => ({
@@ -30,6 +30,14 @@ describe("the version 3 reveal (design §8.3)", () => {
 
   it("has no headline for a spectator who staked nothing", () => {
     expect(fortuneHeadline(reveal({ delta: null, questions: [q({ my: null })] }))).toEqual({ kind: "none" });
+  });
+
+  it("is a staked round only when a card carries a stake", () => {
+    expect(stakedRound(reveal({}))).toBe(true);
+    // A version 3 round that opened with no line committed (design §5.5):
+    // predictions carry confidence only, so the reveal reads in points.
+    expect(stakedRound(reveal({ questions: [q({ my: { stake: null, payout: null, delta: null } })] }))).toBe(false);
+    expect(stakedRound(reveal({ questions: [q({ my: null })] }))).toBe(false);
   });
 
   it("writes the stake receipt in money", () => {

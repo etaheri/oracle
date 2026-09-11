@@ -28,7 +28,7 @@ import { useReveal, useRoundBoard, useAllTimeBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { scaledLines, scaledRow } from "../../game/typeScaling";
-import { isFortuneRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark } from "../../game/revealFortune";
+import { isFortuneRound, stakedRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark } from "../../game/revealFortune";
 import { shareBigOneLine, fortuneShareMessage } from "../../game/shareLines";
 import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
 import { rivalryMoment } from "../../game/rivalryMoment";
@@ -218,7 +218,10 @@ export default function RevealScreen() {
   const bigState = big ? rowState(big) : null;
   // Version 3 reads the whole page in money: the headline is a delta, the
   // rows are stakes, and the duel -- which had no money in it -- is gone.
-  const fortuneRound = isFortuneRound(d);
+  // An unstaked version 3 round (no line committed, design §5.5) and a version
+  // 3 spectator have no money to read, so they fall through to the points
+  // rendering below rather than to a blank money headline.
+  const fortuneRound = isFortuneRound(d) && stakedRound(d);
   // There is no bounty at version 3 (design D8): the odds already paid for
   // standing against the field. Gated here rather than at each consumer so the
   // gold surge over the frame cannot outlive the line it celebrates.

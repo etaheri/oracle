@@ -9,6 +9,14 @@ export function isFortuneRound(d: Reveal): boolean {
   return d.rules_version >= 3;
 }
 
+// Did the player actually stake on this round? A version 3 round that opened
+// with no line committed (design §5.5) takes predictions at confidence only,
+// so it has no money in it and has to read as a points round; a spectator's
+// round has no stakes either. Callers pair this with isFortuneRound.
+export function stakedRound(d: Reveal): boolean {
+  return d.questions.some((q) => q.my !== null && q.my.stake !== null);
+}
+
 // The headline (design §8.3): the round's delta and the fortune after, once
 // every card is decided. The route withholds all four round figures until
 // then, so `delta === null` is the withheld signal -- never a partial sum.
@@ -18,8 +26,7 @@ export type FortuneHeadline =
   | { kind: "none" };
 
 export function fortuneHeadline(d: Reveal): FortuneHeadline {
-  const staked = d.questions.some((q) => q.my !== null && q.my.stake !== null);
-  if (!staked) return { kind: "none" };
+  if (!stakedRound(d)) return { kind: "none" };
   if (d.delta === null || d.fortune_after === null) return { kind: "withheld", read: readingLine(d.questions) };
   return { kind: "settled", delta: signedFortune(d.delta), fortune: `FORTUNE ${formatFortune(d.fortune_after)}` };
 }
