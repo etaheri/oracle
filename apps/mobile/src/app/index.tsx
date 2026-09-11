@@ -69,6 +69,14 @@ function callSlotHeight(scale: number) {
   return scaledRow(ROW_H.line, scale) * 2 + space(3) + Math.ceil(48 * scale);
 }
 
+// The fortune hero's reserved height, derived from what actually renders in
+// it: the Ritual's own line box (Text.tsx sets lineHeight to size * 1.5), the
+// gap, and the FORTUNE caption's meta row. It was two line rows, which is
+// shorter than the block, so the temple grew when the ledger query landed.
+function fortuneSlotHeight(scale: number) {
+  return scaledRow(Math.ceil(displayScale.epithet * 1.5), scale) + space(1) + scaledRow(ROW_H.meta, scale);
+}
+
 export default function Index() {
   const today = useToday();
   const answers = useRoundStore((s) => s.answers);
@@ -346,8 +354,9 @@ export default function Index() {
         <MaterializeTitle active={cues.title} />
         {/* Fortune is the hero number (design D4, §8.3). It reads from the
             record, not from today's round, so it stands while no round is
-            open. Reserved two rows so it never shoves the clock. */}
-        <View style={{ minHeight: scaledRow(ROW_H.line, chromeScale) * 2 + space(1), alignItems: "center", justifyContent: "center", gap: space(1) }}>
+            open. Reserved at the block's true height so it never shoves the
+            clock when the ledger query lands. */}
+        <View style={{ minHeight: fortuneSlotHeight(chromeScale), alignItems: "center", justifyContent: "center", gap: space(1) }}>
           {fortune != null && (
             <>
               <Ritual bold size={displayScale.epithet} letterSpacing={2} style={{ marginRight: -2 }} accessibilityLabel={`Fortune ${formatFortune(fortune)}`}>{formatFortune(fortune)}</Ritual>
