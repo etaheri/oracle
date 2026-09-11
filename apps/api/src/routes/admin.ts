@@ -27,11 +27,11 @@ const PatchQuestionSchema = z.object({
 // needs a TelegramClient to narrate a skip.
 const noopTelegram = makeTelegramClient(undefined, undefined);
 
-const WORKFLOW_KINDS = { author: "AUTHORING_WORKFLOW", resolve: "RESOLUTION_WORKFLOW" } as const;
+const WORKFLOW_KINDS = { author: "AUTHORING_WORKFLOW", resolve: "RESOLUTION_WORKFLOW", council: "COUNCIL_WORKFLOW" } as const;
 
 // Resolves a :kind param to its binding, or explains why not. Two distinct
-// failure modes get two distinct statuses: a kind outside {author, resolve}
-// will NEVER exist, so it's a 400 — the request itself is wrong. A
+// failure modes get two distinct statuses: a kind outside {author, resolve,
+// council} will NEVER exist, so it's a 400 — the request itself is wrong. A
 // known kind whose binding is absent is a deployment missing its Workflow
 // bindings (spec: they're optional at runtime); that's a 503 — the request
 // is right, the server just isn't configured for it yet.
@@ -223,6 +223,20 @@ export const adminRoutes = new Hono<AppContext>()
     const { db } = c.get("deps");
     const r = await commitLine(db, c.req.param("date"));
     return c.json(r);
+  })
+  // Sit the Council for a date, by hand (design 2026-09-11 §4.1). Same
+  // dispatch the cron uses; a manual id so it never collides with the hour's.
+  .post("/rounds/:date/council", async (c) => {
+    const pipeline = c.get("deps").pipeline;
+    if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
+    const date = c.req.param("date");
+    const round = await c.get("deps").db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
+    if (!round) return c.json({ error: "unknown round" }, 404);
+    if (round.rulesVersion < 3) return c.json({ error: "not a version 3 round" }, 409);
+    if (round.oracleCommittedAt !== null) return c.json({ error: "already committed" }, 409);
+    const id = `council-${date}-manual-${Date.now()}`;
+    await pipeline.workflows.start(pipeline, "council", id, { date });
+    return c.json({ ok: true, date, id });
   })
   .post("/rounds/:date/publish", async (c) => {
     const db = c.get("deps").db;

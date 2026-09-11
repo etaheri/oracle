@@ -19,6 +19,7 @@ import {
 // there, not on the main module. Both imports stay confined to this one file.
 import { NonRetryableError } from "cloudflare:workflows";
 import { eq } from "drizzle-orm";
+import { MODEL_MEMBER_IDS } from "@oracle/core";
 import { schema } from "../db/client";
 import { buildPipelineDeps, type WorkerEnv } from "../worker";
 import { POLICY, type StepPolicy } from "./steps";
@@ -27,6 +28,10 @@ import { etNow } from "./clock";
 import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound, tooFewReason } from "./market-round";
 import { SELECT } from "./exchanges/select";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
+import { councilEditable, narrateCouncil, type CouncilRun } from "./council";
+import { retrieveEvidence } from "./council/evidence";
+import { commitMember, type MemberResult } from "./council/member";
+import { commitCouncil } from "./council/commit";
 import type { PipelineDeps } from "./index";
 
 interface Params { date: string; questionIds?: string[] }
@@ -155,3 +160,23 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
   }
 }
 
+export class CouncilWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
+  async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
+    const deps = metered(this.env);
+    if (!deps) return;
+    const { date } = event.payload;
+    const editable = await durableStep(step, "editable", POLICY.db, deps, () => councilEditable(deps, date));
+    if (!editable) return { committed: false, reason: "not editable" };
+    const evidence = await durableStep(step, "evidence", POLICY.sourceFetch, deps, () => retrieveEvidence(deps, date));
+    // One step per member (design 2026-09-11 §4.2): a timeout in one cannot
+    // lose the others, and a retry of the commit step never re-asks a model.
+    const members: MemberResult[] = [];
+    for (const m of MODEL_MEMBER_IDS) {
+      members.push(await durableStep(step, `member-${m}`, POLICY.modelWide, deps, () => commitMember(deps, date, m)));
+    }
+    const commit = await durableStep(step, "commit", POLICY.db, deps, () => commitCouncil(deps, date, members));
+    const run: CouncilRun = { editable: true, evidence, members, commit };
+    await durableStep(step, "narrate", POLICY.narrate, deps, async () => { await narrateCouncil(deps, date, run); return { narrated: true }; });
+    return { committed: commit.committed, reason: commit.reason, lines: commit.lines };
+  }
+}

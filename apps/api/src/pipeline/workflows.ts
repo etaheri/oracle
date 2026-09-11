@@ -29,7 +29,7 @@
 import type { ETNow } from "./clock";
 import type { PipelineDeps } from "./index";
 
-export type WorkflowKind = "author" | "resolve";
+export type WorkflowKind = "author" | "resolve" | "council";
 
 export interface WorkflowStarter {
   // deps is passed AT START TIME rather than captured at construction, so
@@ -65,6 +65,7 @@ export interface WorkflowBinding {
 export interface WorkflowBindings {
   AUTHORING_WORKFLOW: WorkflowBinding;
   RESOLUTION_WORKFLOW: WorkflowBinding;
+  COUNCIL_WORKFLOW: WorkflowBinding;
 }
 
 export interface WorkflowInstanceHandle {
@@ -80,6 +81,7 @@ export interface WorkflowInstanceBinding extends WorkflowBinding {
 export interface WorkflowInstanceBindings {
   AUTHORING_WORKFLOW: WorkflowInstanceBinding;
   RESOLUTION_WORKFLOW: WorkflowInstanceBinding;
+  COUNCIL_WORKFLOW: WorkflowInstanceBinding;
 }
 
 const DUPLICATE = /already exists|instance\.already_exists|duplicate/i;
@@ -88,6 +90,7 @@ export function bindingStarter(bindings: WorkflowBindings): WorkflowStarter {
   const of: Record<WorkflowKind, WorkflowBinding> = {
     author: bindings.AUTHORING_WORKFLOW,
     resolve: bindings.RESOLUTION_WORKFLOW,
+    council: bindings.COUNCIL_WORKFLOW,
   };
   return {
     // The deps argument is ignored here on purpose: the Workflow builds its own
@@ -119,6 +122,9 @@ export function inlineStarter(): WorkflowStarter {
       if (kind === "author") {
         const { runMarketRound } = await import("./market-round");
         await runMarketRound(deps, params.date);
+      } else if (kind === "council") {
+        const { runCouncil } = await import("./council");
+        await runCouncil(deps, params.date);
       } else {
         const { runResolution } = await import("./resolve");
         await runResolution(deps, params.date, params.questionIds ?? []);

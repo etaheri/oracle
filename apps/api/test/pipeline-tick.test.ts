@@ -440,6 +440,27 @@ describe("runTick dispatches long work instead of awaiting it (design 2026-09-04
     expect(done).toContain("lock:2026-08-26");
     expect(started).toHaveLength(0);
   });
+
+  it("the forecast action dispatches the council for a version 3 round and stays inline for version 2", async () => {
+    const { db } = await makeTestDb();
+    const started: string[] = [];
+    const starter = { start: async (_d: unknown, kind: string, id: string) => { started.push(`${kind}:${id}`); } };
+    for (const [date, version] of [["2026-09-10", 3], ["2026-09-11", 2]] as const) {
+      await seedRound(db, { date, opensAt: new Date(`${date}T16:00:00Z`), locksAt: new Date(`${date}T16:00:00Z`) });
+      await db.update(schema.rounds).set({ status: "scheduled", rulesVersion: version }).where(eq(schema.rounds.date, date));
+      await db.update(schema.questions).set({ status: "scheduled" }).where(eq(schema.questions.roundDate, date));
+    }
+    // The brief's snippet calls a `makeDeps(db)` helper that does not exist in
+    // this file — its own base-deps helper is `fakeDeps(db, nowIso)`, which
+    // returns `{ deps, sent }`. Adapted to that shape; the intent (dispatch
+    // the council for a v3 round, stay inline for v2) is unchanged.
+    const { deps } = fakeDeps(db, "2026-09-10T13:05:00Z");
+    deps.workflows = starter;
+    deps.claude = { structured: async () => { throw new Error("no forecast in this test"); } };
+    const done = await runTick(deps);
+    expect(done).toContain("forecast:2026-09-10");
+    expect(started).toEqual(["council:council-2026-09-10-2026091009"]);
+  });
 });
 
 describe("the spend ceiling in the tick (design 2026-09-04 §9.1)", () => {

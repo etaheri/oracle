@@ -17,17 +17,25 @@ describe("bindingStarter", () => {
 
   it("routes each kind to its own binding and passes the id and params through", async () => {
     const author: unknown[] = [], resolve: unknown[] = [];
-    const s = bindingStarter({ AUTHORING_WORKFLOW: binding(author), RESOLUTION_WORKFLOW: binding(resolve) });
+    const s = bindingStarter({ AUTHORING_WORKFLOW: binding(author), RESOLUTION_WORKFLOW: binding(resolve), COUNCIL_WORKFLOW: binding([]) });
     await s.start(noDeps, "author", "author-2026-09-05-2026090417", { date: "2026-09-05" });
     await s.start(noDeps, "resolve", "resolve-2026-09-04-2026090412", { date: "2026-09-04", questionIds: ["q1"] });
     expect(author).toEqual([{ id: "author-2026-09-05-2026090417", params: { date: "2026-09-05" } }]);
     expect(resolve[0]).toMatchObject({ id: "resolve-2026-09-04-2026090412" });
   });
 
+  it("routes the council kind to its own binding", async () => {
+    const council: unknown[] = [];
+    const s = bindingStarter({ AUTHORING_WORKFLOW: binding([]), RESOLUTION_WORKFLOW: binding([]), COUNCIL_WORKFLOW: binding(council) });
+    await s.start(noDeps, "council", "council-2026-09-05-2026090409", { date: "2026-09-05" });
+    expect(council).toEqual([{ id: "council-2026-09-05-2026090409", params: { date: "2026-09-05" } }]);
+  });
+
   it("swallows a duplicate-instance error, because a collision IS the idempotency", async () => {
     const s = bindingStarter({
       AUTHORING_WORKFLOW: { create: async () => { throw new Error("instance.already_exists: an instance with id author-x already exists"); } },
       RESOLUTION_WORKFLOW: { create: async () => {} },
+      COUNCIL_WORKFLOW: { create: async () => {} },
     });
     await expect(s.start(noDeps, "author", "author-x", { date: "2026-09-05" })).resolves.toBeUndefined();
   });
@@ -36,6 +44,7 @@ describe("bindingStarter", () => {
     const s = bindingStarter({
       AUTHORING_WORKFLOW: { create: async () => { throw new Error("binding is not configured"); } },
       RESOLUTION_WORKFLOW: { create: async () => {} },
+      COUNCIL_WORKFLOW: { create: async () => {} },
     });
     await expect(s.start(noDeps, "author", "author-x", { date: "2026-09-05" })).rejects.toThrow("not configured");
   });

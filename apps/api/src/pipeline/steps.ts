@@ -27,9 +27,8 @@ export const POLICY = {
   /**
    * One model call inside an N-wide fan-out. Shallower than `model` because
    * the limit multiplies by the fan-out width: 12 candidates at limit 1 is 24
-   * calls worst case, against a 150/day ceiling (spec §4.5). UNUSED since the
-   * gauntlet's per-candidate fan-out was retired; kept as the declared policy
-   * for the next fan-out rather than re-derived then.
+   * calls worst case, against a 150/day ceiling (spec §4.5). Used by the
+   * Council's three member steps (design 2026-09-11 §4.2).
    */
   modelWide: { timeout: "8 minutes", retries: { limit: 1, delay: "20 seconds", backoff: "exponential" } },
 

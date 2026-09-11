@@ -4,7 +4,8 @@
 // state machine is idempotent per action kind, so a failed action simply
 // gets retried on the next tick. Telegram alerts are best-effort narration,
 // never load-bearing (spec §11).
-import type { Db } from "../db/client";
+import { eq } from "drizzle-orm";
+import { schema, type Db } from "../db/client";
 import { etNow } from "./clock";
 import { decideActions, loadPipelineState } from "./state";
 import { lock, publish, publishFromBank, settle, voidQuestions } from "./actions";
@@ -116,13 +117,23 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
           done.push(`author:${action.date}`);
           break;
 
-        case "forecast":
-          await stampOracleForecast(metered, action.date);
-          // The line follows the commit on the same tick (design 2026-09-10 §5.5)
-          // and on every later forecast tick until every question carries one.
+        case "forecast": {
+          // Version 3 sits the Council (design 2026-09-11 §4.1): three members
+          // in their own Workflow steps, dispatched with the hour bucket so a
+          // duplicate tick collides rather than commits twice. Version 2 keeps
+          // the single forecast, inline, exactly as before.
+          const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, action.date), columns: { rulesVersion: true } });
+          if ((round?.rulesVersion ?? 1) >= 3) {
+            await deps.workflows.start(metered, "council", `council-${action.date}-${bucket}`, { date: action.date });
+          } else {
+            await stampOracleForecast(metered, action.date);
+          }
+          // The line follows the commit (design 2026-09-10 §5.5) and on every
+          // later forecast tick until every question carries one.
           await commitLine(deps.db, action.date);
           done.push(`forecast:${action.date}`);
           break;
+        }
 
         case "author-bank":
           // One entry a night while the bank is thin. A failure here is

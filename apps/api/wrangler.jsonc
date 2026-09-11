@@ -7,7 +7,8 @@
   "triggers": { "crons": ["*/10 * * * *"] },
   "workflows": [
     { "name": "oracle-authoring", "binding": "AUTHORING_WORKFLOW", "class_name": "AuthoringWorkflow" },
-    { "name": "oracle-resolution", "binding": "RESOLUTION_WORKFLOW", "class_name": "ResolutionWorkflow" }
+    { "name": "oracle-resolution", "binding": "RESOLUTION_WORKFLOW", "class_name": "ResolutionWorkflow" },
+    { "name": "oracle-council", "binding": "COUNCIL_WORKFLOW", "class_name": "CouncilWorkflow" }
   ],
   "vars": {
     "PIPELINE_AUTHOR_MODEL": "claude-opus-5",

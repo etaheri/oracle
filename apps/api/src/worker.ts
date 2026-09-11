@@ -10,7 +10,7 @@ import { bindingStarter, inlineStarter, type WorkflowInstanceBinding } from "./p
 // Cloudflare requires Workflow classes to be exported from the Worker's main
 // module, which is why this re-export lives here rather than the classes being
 // referenced only by wrangler.jsonc.
-export { AuthoringWorkflow, ResolutionWorkflow } from "./pipeline/workflow-entrypoints";
+export { AuthoringWorkflow, ResolutionWorkflow, CouncilWorkflow } from "./pipeline/workflow-entrypoints";
 
 export interface WorkerEnv {
   DATABASE_URL: string;
@@ -41,6 +41,7 @@ export interface WorkerEnv {
   // it. bindingStarter only reads the create() half it declares.
   AUTHORING_WORKFLOW?: WorkflowInstanceBinding;
   RESOLUTION_WORKFLOW?: WorkflowInstanceBinding;
+  COUNCIL_WORKFLOW?: WorkflowInstanceBinding;
 }
 
 // Enablement gate (spec §11): the pipeline is fully wired but stays inert
@@ -49,10 +50,11 @@ export interface WorkerEnv {
 export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
   if (env.PIPELINE_ENABLED !== "true") return undefined;
   const bindings =
-    env.AUTHORING_WORKFLOW && env.RESOLUTION_WORKFLOW
+    env.AUTHORING_WORKFLOW && env.RESOLUTION_WORKFLOW && env.COUNCIL_WORKFLOW
       ? {
           AUTHORING_WORKFLOW: env.AUTHORING_WORKFLOW,
           RESOLUTION_WORKFLOW: env.RESOLUTION_WORKFLOW,
+          COUNCIL_WORKFLOW: env.COUNCIL_WORKFLOW,
         }
       : null;
   if (!bindings) {
@@ -114,6 +116,7 @@ export default {
       workflows: {
         AUTHORING_WORKFLOW: env.AUTHORING_WORKFLOW,
         RESOLUTION_WORKFLOW: env.RESOLUTION_WORKFLOW,
+        COUNCIL_WORKFLOW: env.COUNCIL_WORKFLOW,
       },
     });
     return app.fetch(req);
