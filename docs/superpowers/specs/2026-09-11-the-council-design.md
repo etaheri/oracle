@@ -24,7 +24,7 @@ The bank resolver's date-anchoring fix rides along, since bank questions are the
 | C6 | Evidence is retrieved inside the Council workflow, minutes before the members commit, not at authoring the evening before. | The published-date ceiling is the retrieval instant; retrieving at commit makes it as late as possible. |
 | C7 | Plan 3 includes the split and the reading on the reveal. The Council-sits pre-noon home state stays out. | Chosen against the calendar on September 11. The reading tasks are last in the plan so they can be cut at a task boundary. |
 | C8 | Cited evidence ranks that do not exist in the pack are dropped, not treated as a parse failure. | A member that reasons well and mistypes one number should not abstain. |
-| C9 | Players see the members as Sonnet, Opus, Haiku and the market. The block is "the Oracle's reading". | Honest names; nothing to explain. These four words join the allowed vocabulary; nothing else on the surface changes. |
+| C9 | Players see the members as Sonnet, Opus, Haiku and the market. The block is "the Oracle's reading". | Honest names; nothing to explain. None is on the retired list, and nothing else on the surface changes. |
 
 ## 3. Members
 
@@ -83,7 +83,7 @@ Each result is stored in `evidence` as `(question_id, rank, url, title, source, 
 
 A question whose pack is empty still commits; the members' prompt says so. Retrieval is idempotent on `(question_id)`: a question with any evidence rows is skipped.
 
-The resolution source host is extracted with the same `allowedDomainsFor` rule the resolver uses on `sourceUrl`.
+The resolution source hosts are the hostnames of any URLs written in the exchange's rules text, minus the exchange's own host (`sourceUrl`). A rules text that names no URL leaves `includeDomains` unset.
 
 ## 6. The member call
 
@@ -203,7 +203,7 @@ Under each model member's row, a `QuietLink` `THE ORACLE'S READING` toggles a `C
 
 ### 15.4 Copy
 
-The new player-facing words are Sonnet, Opus, Haiku, the market, and the Oracle's reading. They are added to the allowed vocabulary in core so the retired-word lint and the register test pass. Evidence titles and highlights come from the server and are exempt from the register test, as resolution evidence quotes already are.
+The new player-facing words are Sonnet, Opus, Haiku, the market, and the Oracle's reading. None of them is on the retired list, so the vocabulary lints need no change. Evidence titles and highlights come from the server and are exempt from the register test, as resolution evidence quotes already are.
 
 ## 16. Testing
 
