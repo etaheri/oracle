@@ -10,6 +10,7 @@ const exhibition = (overrides: Partial<Exhibition> = {}): Exhibition => ({
   roundDate: null,
   oraclePYes: 0.7,
   outcome: "yes",
+  linePYes: null,
   ...overrides,
 });
 
