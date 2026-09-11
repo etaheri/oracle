@@ -2495,3 +2495,86 @@ git commit -m "docs(plan): House mobile run-through evidence
 
 Claude-Session: https://claude.ai/code/session_01SkQjDm3cKGfE1pcvbB95Gc"
 ```
+
+---
+
+## Evidence
+
+Run on 2026-09-10 (UTC 2026-09-11), iPhone 17 / iOS 26.5 simulator, dev-client
+build against `apps/api` on :8787 and the Neon dev branch. The dev branch was
+nine migrations behind and every fortune column was missing, so `pnpm
+db:migrate` ran first; `driver.mjs seed 2026-09-02` then `driver.mjs seed3
+2026-09-03` built the world. `seed3` is new in this task: a **settled** version
+3 round (five questions with lines 0.35/0.60/0.50/0.42/0.70, outcomes
+yes/no/yes/void/yes, six players all staking off a founding 1,000) plus an
+**open** version 3 round for today with lines and no seals. The reader's day
+pays +191 against a house delta of −664; the 2026-09-02 round was moved to
+rules version 2 to give the legacy branch an honest screenshot.
+
+Screenshots in `assets/plan-house-mobile/`:
+
+| file | what it shows |
+|---|---|
+| `card-side.png` | Step 1. Today's card after tapping YES. The side is selected in ultramarine, the ladder has appeared with the middle rung live, and the readout says `STAKE 60 · WINS 111` — fortune 1,191 against a 35% line. |
+| `card-ladder.png` | Step 1. After tapping the top rung: `107 / +199` selected, readout `STAKE 107 · WINS 199`. The whole footer — YES/NO, ladder, readout, SEAL — sits inside the card frame with room to spare. |
+| `card-sealed.png` | Step 1. The seal landed: card II is dealt and the round footer prints the receipt `YES · STAKED 107 · WINS 199`. |
+| `home.png` | Step 2. Fortune `1,191` as the hero numeral under the `FORTUNE` label, with the house line `LAST NIGHT THE HOUSE LOST 664 / THE ORACLE OWES ITS PLAYERS 664`. |
+| `reveal-v3.png` | Step 3. The settled version 3 reveal: `+191`, `FORTUNE 1,191`, `THE HOUSE LOST 664 LAST NIGHT`, and per card `YES · STAKED 50 · PAID 143` / `YOU TOOK THE ORACLE FOR 93` / `THE LINE 35% YES · THE MARKET 40%`. |
+| `reveal-v3-board.png` | Step 3. The daily board ranked by return: `RANK 2 OF 6 PLAYERS · RETURN +19.1% · BEST +24.4% · MEDIAN +15.9%`, four rows by designation. |
+| `reveal-v3-alltime.png` | Step 3. The same slot after the all-time toggle: `ALL-TIME BOARD`, `FORTUNE 1,191 · BEST 1,244 · MEDIAN 1,159`, rows ranked by fortune. |
+| `reveal-v2.png` | Step 3. The 2026-09-02 version 2 reveal, still in points: `+192` over `DAY POINTS`, per-card `+32` rows, no stake receipts and no fortune. |
+| `record.png` | Step 4. The record leads with `FORTUNE 1,191` and the fortune history row `2026-09-03 · +191 · 1,191` above the streak and calibration rows. |
+| `practice-result.png` | Step 4. The practice result on the fixed fortune of 1,000: stake 50, net `+21`, `You took the Oracle for 21.`, `Practice fortune, nothing changed.` **Scrolled inside the card** — see the finding below. |
+| `practice-result-unscrolled.png` | Step 4. The same screen as it first appears. The last two lines are below the card's fold. |
+| `how-to-play.png` | Step 4. Sections `I THE GAME` and `II RESULTS AND THE BOARD`. |
+| `how-to-play-record.png` | Step 4. Sections `III YOUR RECORD` and the head of `IV TIMING AND FAIRNESS`. |
+| `how-to-play-ladder.png` | Step 4. `IV TIMING AND FAIRNESS` and `V THE LADDER` with its table: rung, stake, Big One, at 1,000. |
+
+### Step 5: the accessibility check
+
+The Mac's console was locked for the whole run, so Simulator.app had no window
+and no VoiceOver could be driven by ear. The check was made instead against the
+accessibility tree the screen reader actually reads (`idb ui describe-all`),
+which is the same data:
+
+- `YES` carries traits `["Button", "Selected"]` once tapped; `NO` carries
+  `["Button"]`. The selected state is announced.
+- Each rung is a `Button` labelled `Stake 60, wins 111` / `Stake 107, wins 199`
+  — the brief's `Stake 50, wins 93` shape, with this world's numbers (the
+  reader's fortune is 1,191, not 1,000; on the practice card, which is fixed at
+  1,000, the middle rung reads exactly `Stake 50, wins 21` at its 70% line).
+- `SEAL` is a `Button`.
+
+Every control in the card also inherits a `Scrollable` trait from the card's
+own `ScrollView`. Harmless, but VoiceOver will append the hint.
+
+### Found on device
+
+1. **The practice result overflows its card by two lines.** `Practice fortune,
+   nothing changed.` and `Next: a daily round against the Oracle's lines, with
+   your real fortune.` lay out below the card's visible area and need a scroll
+   *inside* the card to reach, with no affordance saying so. They are present
+   in the accessibility tree, so VoiceOver reads them and a sighted reader does
+   not. Compare `practice-result-unscrolled.png` with `practice-result.png`.
+2. **Home's closing paragraph is clipped mid-sentence** when a round is live:
+   `FIVE QUESTIONS. THE ORACLE HAS POSTED ITS` and then nothing. Visible in
+   `home.png`.
+3. **`PLAQUE_MIN_H` (420) no longer matches the plaque it was measured
+   against.** The loaded record plaque is roughly 800pt tall on this device, so
+   the frame still grows by ~380pt when the record lands — the exact flash the
+   constant's comment says it exists to prevent. Left at 420: raising it to 800
+   would put a near-fullscreen empty gold frame on screen during every load,
+   and the height now moves with the fortune history, which grows by a row a
+   day, so no fixed number holds it steady any more. Wants a decision, not a
+   bumped number.
+4. **The card footer fits.** At the default text size on a 402×874pt device the
+   YES/NO row, the ladder, the readout and SEAL all sit inside the card frame
+   with about 18pt of margin below SEAL. No change needed.
+
+### Reproducing this
+
+`driver.mjs` gained `seed3`; the taps and swipes above were driven with `idb`
+(`brew install facebook/fb/idb-companion` plus `fb-idb` in a venv), because the
+driver's `scroll` needs a Simulator window and the machine's console was
+locked. On an unlocked machine `driver.mjs scroll` covers the swipes, but there
+is still no tap command in the driver.

@@ -295,6 +295,133 @@ const commands = {
     console.log(out.trim());
   },
 
+  // The same favour for the HOUSE rules (design 2026-09-10). `seed` above
+  // builds a version 1/2 world -- no lines, no stakes, no fortune -- and every
+  // money screen renders its empty state against it, which reads as a bug.
+  // This builds two version 3 rounds: a SETTLED one on a past date (the
+  // reveal, the board by return, the fortune history) and an OPEN one for
+  // today (the card with its ladder, live and sealable).
+  //
+  // Run `seed` FIRST if you want both: it deletes every prediction this device
+  // owns, which would take this round's with them.
+  //
+  // The fortune arithmetic is INLINED rather than imported. @oracle/core
+  // exports raw TypeScript ("exports": "./src/index.ts"), so a plain node
+  // script cannot load it; keep these three in step with
+  // packages/core/src/fortune.ts.
+  async seed3(date = "2026-09-03") {
+    const today = new Date().toISOString().slice(0, 10);
+    const out = sql(`
+      const D = ${JSON.stringify(date)};
+      const TODAY = ${JSON.stringify(today)};
+
+      const stake = (fortune, c, big) => Math.max(1, Math.round(fortune * ((c - 50) / 50) * 0.10 * (big ? 2 : 1)));
+      const odds = (answer, line) => (answer ? (1 - line) / line : line / (1 - line));
+      const payout = (s, answer, line, outcome) =>
+        outcome === "void" ? s : ((outcome === "yes") === answer ? s + Math.round(s * odds(answer, line)) : 0);
+
+      const dev = (await sql.query("select user_id from devices order by created_at desc limit 1"))[0];
+      if (!dev) throw new Error("no device rows — launch the app once so it mints one");
+      const U = dev.user_id;
+
+      // ── the settled round ──────────────────────────────────────────────
+      const opens = D + "T16:00:00Z";
+      const locks = new Date(Date.parse(D + "T16:00:00Z") + 86400000).toISOString();
+
+      await sql.query("delete from predictions where question_id in (select id from questions where round_date=$1)", [D]);
+      await sql.query("delete from user_rounds where date=$1", [D]);
+      await sql.query("delete from questions where round_date=$1", [D]);
+      await sql.query("delete from rounds where date=$1", [D]);
+      await sql.query("insert into rounds(date,status,rules_version) values($1,'resolved',3)", [D]);
+
+      // category, text, line, market, outcome, crowd yes %, crowd count.
+      // Three yes, one no, one void; slot 5 is the Big One.
+      const QS = [
+        ["markets", "Will the index close above its opening print?", 0.35, 0.40, "yes", 62, 140],
+        ["sports", "Will the home side win in regulation?", 0.60, 0.55, "no", 44, 132],
+        ["weather", "Will the park record measurable rain before noon?", 0.50, 0.52, "yes", 71, 128],
+        ["culture", "Will the film hold the number one slot?", 0.42, 0.45, "void", 38, 121],
+        ["news", "Will the committee publish before the round closes?", 0.70, 0.68, "yes", 55, 147],
+      ];
+      const ids = [];
+      for (let i = 0; i < 5; i++) {
+        const [cat, text, line, market, outcome, pct, cnt] = QS[i];
+        const r = await sql.query(
+          "insert into questions(round_date,slot,is_big_one,text,category,resolution_criteria,source_name,source_url,opens_at,locks_at,resolve_by,status,outcome,resolved_at,crowd_yes_pct,crowd_count,author_prob,oracle_p_yes,line_p_yes,market_prob) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) returning id",
+          [D, i + 1, i === 4, text, cat, "Per the named source on the closing day.", "reuters", "https://www.reuters.com",
+           opens, locks, locks, outcome === "void" ? "void" : "resolved", outcome, locks, pct, cnt,
+           0.45 + i * 0.03, String(line), String(line), String(market)]);
+        ids.push(r[0].id);
+      }
+
+      // The reader plus five more, so the field clears BOARD_MIN_FIELD (5).
+      // Every one of them staked off a founding fortune of 1,000.
+      const PLAYERS = [
+        { id: U, calls: [[true, 75], [false, 65], [true, 55], [false, 85], [true, 75]] },
+        { calls: [[true, 95], [true, 95], [true, 95], [true, 95], [true, 95]] },
+        { calls: [[false, 55], [false, 55], [false, 55], [false, 55], [false, 55]] },
+        { calls: [[true, 65], [true, 65], [false, 65], [true, 65], [false, 65]] },
+        { calls: [[false, 85], [false, 85], [true, 85], [false, 85], [true, 85]] },
+        { calls: [[true, 55], [false, 75], [true, 75], [true, 55], [true, 55]] },
+      ];
+      let houseDelta = 0;
+      const report = [];
+      for (const p of PLAYERS) {
+        const uid = p.id ?? (await sql.query("insert into users(streak_current,streak_best,calls_resolved) values(0,0,0) returning id"))[0].id;
+        let net = 0;
+        for (let i = 0; i < 5; i++) {
+          const [answer, c] = p.calls[i];
+          const line = QS[i][2], outcome = QS[i][4];
+          const s = stake(1000, c, i === 4);
+          const pay = payout(s, answer, line, outcome);
+          net += pay - s;
+          houseDelta += s - pay;
+          const pYes = answer ? c / 100 : 1 - c / 100;
+          const brier = outcome === "void" ? null : String((pYes - (outcome === "yes" ? 1 : 0)) ** 2);
+          await sql.query(
+            "insert into predictions(question_id,user_id,answer,confidence,created_at,first_hour,fortune_at_seal,stake,line_p_yes,payout,settled_at,brier,crowd_yes_pct_at_seal,crowd_count_at_seal) values($1,$2,$3,$4,$5,true,1000,$6,$7,$8,$9,$10,$11,$12)",
+            [ids[i], uid, answer, c, opens, s, String(line), pay, locks, brier, String(QS[i][5]), QS[i][6]]);
+        }
+        // fortune_at_open is the day's denominator -- without it the version 3
+        // board drops the player from the field entirely.
+        await sql.query("insert into user_rounds(user_id,date,vigil_mult,fortune_at_open) values($1,$2,'1',1000) on conflict do nothing", [uid, D]);
+        await sql.query("update users set fortune=$1 where id=$2", [1000 + net, uid]);
+        report.push((p.id ? "you " : "    ") + uid.slice(0, 8) + "  fortune " + (1000 + net) + "  return " + Math.round(net * 10) + "bp");
+      }
+      await sql.query("update rounds set house_delta=$1 where date=$2", [houseDelta, D]);
+
+      console.log("settled v3 round " + D + "  house " + (houseDelta >= 0 ? "+" : "") + houseDelta);
+      for (const line of report) console.log("  " + line);
+
+      // ── the open round ─────────────────────────────────────────────────
+      const already = (await sql.query("select date,status,rules_version from rounds where date=$1", [TODAY]))[0];
+      if (already) {
+        console.log("round " + TODAY + " already exists (" + already.status + ", v" + already.rules_version + ") — left alone");
+      } else {
+        const oOpens = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+        const oLocks = new Date(Date.now() + 22 * 3600 * 1000).toISOString();
+        await sql.query("insert into rounds(date,status,rules_version) values($1,'open',3)", [TODAY]);
+        const OQS = [
+          ["markets", "Will bitcoin close the day above ninety thousand dollars?", 0.35, 0.38],
+          ["sports", "Will the visiting side keep a clean sheet?", 0.58, 0.60],
+          ["weather", "Will the city record its warmest night of the month?", 0.45, 0.44],
+          ["culture", "Will the album hold the top of the chart for a third week?", 0.62, 0.65],
+          ["news", "Will the central bank cut before the month is out?", 0.50, 0.50],
+        ];
+        for (let i = 0; i < 5; i++) {
+          const [cat, text, line, market] = OQS[i];
+          await sql.query(
+            "insert into questions(round_date,slot,is_big_one,text,category,resolution_criteria,source_name,source_url,opens_at,locks_at,resolve_by,status,author_prob,oracle_p_yes,line_p_yes,market_prob) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'open',$12,$13,$14,$15)",
+            [TODAY, i + 1, i === 4, text, cat, "Per the named source at the close.", "reuters", "https://www.reuters.com",
+             oOpens, oLocks, oLocks, 0.45 + i * 0.03, String(line), String(line), String(market)]);
+        }
+        console.log("open v3 round " + TODAY + " with lines, no seals — drive the card live");
+      }
+      console.log("now: driver.mjs go /reveal/" + D + "   ·   go /   ·   go /ledger");
+    `);
+    console.log(out.trim());
+  },
+
   help() {
     console.log(`ORACLE driver — node .claude/skills/run-oracle-mobile/driver.mjs <cmd>
 
@@ -305,6 +432,7 @@ const commands = {
   shot [name]       screenshot into ${SHOTS}
   scroll [n]        drag-scroll the frontmost Simulator window (needs cliclick)
   seed [date]       settled round + field + scored cohort, attached to this device
+  seed3 [date]      version 3: a settled fortune round + an open one for today
   reset-identity    wipe the sim Keychain (the dead-token trap)
 
 env: ORACLE_SIM (udid), ORACLE_SHOTS (output dir)`);

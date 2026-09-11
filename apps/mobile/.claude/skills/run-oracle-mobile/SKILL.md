@@ -63,6 +63,7 @@ Screenshots and service logs land in `.oracle-run/` at the repo root
 | `shot [name]` | screenshot into `.oracle-run/` |
 | `scroll [n]` | drag-scroll the frontmost Simulator window |
 | `seed [date]` | settled round + field + scored cohort, attached to this device |
+| `seed3 [date]` | version 3: a settled fortune round + an open one for today |
 | `reset-identity` | wipe the simulator Keychain (see Gotchas) |
 
 ### Navigate with `go`, never with taps
@@ -85,6 +86,14 @@ the screens render their empty states instead — which look like bugs.
 and attaches them to whichever device the simulator most recently minted. It
 deliberately gives the reader a **losing** first-hour day, because that is the
 case the reveal's weight line exists to show.
+
+`seed` builds a **version 1/2** world: no lines, no stakes, no fortune. Every
+money screen renders its empty state against it, which reads as a bug. `seed3`
+is the same favour for the House rules -- a **settled** version 3 round on a
+past date (the reveal, the board by return, the fortune history) and an **open**
+one for today (the card with its ladder, live and sealable). Run `seed` FIRST
+if you want both: it deletes every prediction this device owns, which would take
+seed3's with them.
 
 ## Test
 
