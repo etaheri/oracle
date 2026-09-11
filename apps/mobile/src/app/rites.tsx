@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { RITES_LINES, RITES_V2_SECTIONS, INTRO_LINES, LITURGY_LINES, CURRENT_GAME_COPY, GAME_TERMS } from "@oracle/core";
+import { RITES_LINES, RITES_V2_SECTIONS, RITES_V2_ARCHIVE_SECTIONS, INTRO_LINES, LITURGY_LINES, CURRENT_GAME_COPY, GAME_TERMS } from "@oracle/core";
 import { useToday, useMineToday } from "../api/hooks";
 import { markRitesSeen } from "../api/flags";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
@@ -82,7 +82,13 @@ export default function Rites() {
   const router = useRouter();
   const { all, rules_version } = useLocalSearchParams<{ all?: string; rules_version?: string }>();
   const opening = all !== "1";
-  const archived = !opening && rules_version === "1";
+  // Two archives now. A reveal passes its round's rules_version, and a round
+  // is read under the rules it was played under: version 1's flat canon,
+  // version 2's six rites, or the current House rules. Both archives suppress
+  // the current purpose headline, which is a claim about today's game.
+  const archivedV1 = !opening && rules_version === "1";
+  const archivedV2 = !opening && rules_version === "2";
+  const archived = archivedV1 || archivedV2;
   const today = useToday();
   const mine = useMineToday(opening);
   const actionGate = useRef<HomeActionGate>({ generation: 0, pending: false, focused: false });
@@ -165,7 +171,8 @@ export default function Rites() {
           {/* The version marker was the echo's only load-bearing passenger, so
               it now travels on its own and only when there is a version to
               mark. */}
-          {archived && <Mono {...role.meta} color={colors.mutedInk}>ARCHIVED RULES · VERSION 1</Mono>}
+          {archivedV1 && <Mono {...role.meta} color={colors.mutedInk}>ARCHIVED RULES · VERSION 1</Mono>}
+          {archivedV2 && <Mono {...role.meta} color={colors.mutedInk}>ARCHIVED RULES · VERSION 2</Mono>}
           {!archived && <Serif size={displayScale.lead} accessibilityRole="header" style={{ textAlign: "center" }}>{CURRENT_GAME_COPY.purpose}</Serif>}
         </View>
 
@@ -191,7 +198,7 @@ export default function Rites() {
               </View>
             ))}
           </View>
-        ) : archived ? (
+        ) : archivedV1 ? (
           // The archived canon is a reference, not a performance: numbered in
           // the same carved numerals, and printed already.
           <View style={{ gap: space(3) }}>
@@ -204,6 +211,18 @@ export default function Rites() {
                 <Mono {...role.line} maxFontSizeMultiplier={0} color={colors.ink}
                   style={{ flex: 1, lineHeight: 18 }}>{line}</Mono>
               </View>
+            ))}
+          </View>
+        ) : archivedV2 ? (
+          // The frozen version 2 canon, through the same spine and column as
+          // the current rules — it was written as rites and reads as rites.
+          // No ladder: there were no stakes to price at version 2.
+          <View style={{ gap: space(6) }}>
+            {RITES_V2_ARCHIVE_SECTIONS.map((section, i) => (
+              <Rite key={section.title} index={i} gutter={gutter} delayMs={i * 90}
+                stamp={section.title.toUpperCase()}>
+                <ClaimList claims={section.claims} defines={section.defines} />
+              </Rite>
             ))}
           </View>
         ) : (

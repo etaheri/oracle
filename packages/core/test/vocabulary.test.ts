@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  COPY_BANK, INTRO_LINES, RITES_V2_SECTIONS, PLUS_CREED_LINES, SCORE_GLOSS, SUMMONS_LINES, CALLING_LINES,
+  COPY_BANK, INTRO_LINES, RITES_V2_SECTIONS, RITES_V2_ARCHIVE_SECTIONS, PLUS_CREED_LINES, SCORE_GLOSS, SUMMONS_LINES, CALLING_LINES,
   PARTIAL_LINE, READING_LINES, PIPELINE_LINES, PAYWALL_CTA_LINES, REMINDER_CTA_LINES, PUSH_CAMPAIGN_LINES, LITURGY_LINES,
 } from "../src/copy";
 import { GAME_TERMS, CURRENT_GAME_COPY } from "../src/gameCopy";
@@ -46,6 +46,13 @@ describe("the vocabulary cut", () => {
     for (const word of ["line", "stake", "fortune", "big one", "streak protection", "practice", "void"]) {
       expect(rules, word).toContain(word);
     }
+  });
+
+  it("keeps the archived version 2 canon whole and unscanned", () => {
+    // The archive is history, so it is deliberately absent from SURFACE: it
+    // carries vigils, shields and crowds because that is what a version 2
+    // round was played under. All six of its rites must survive.
+    expect(RITES_V2_ARCHIVE_SECTIONS.length).toBe(6);
   });
 
   it("keeps the rules to four sections and about twenty claims", () => {

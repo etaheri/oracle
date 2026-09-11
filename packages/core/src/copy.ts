@@ -404,6 +404,73 @@ export const RITES_V2_SECTIONS = [
 ];
 export const RITES_V2_LINES = RITES_V2_SECTIONS.map(section => `${section.title.toUpperCase()}: ${section.text}`);
 
+// The archived version 2 canon, frozen at the rules the House replaced
+// (commit e87cdea). Rendered for a version 2 reveal only, so a round that was
+// played under points, confidence and the vigil can still be read under the
+// rules it was played under — which is what the current canon's closing claim
+// promises. Frozen means frozen: the strings that used to substitute
+// CURRENT_GAME_COPY.streakMeaning and .lapse are inlined here at their version
+// 2 wording, because those two have since been rewritten in money. It carries
+// retired words on purpose and is not scanned by the vocabulary lint or the
+// reading-register lint, exactly as the version 1 canon (RITES_LINES) is not.
+export const RITES_V2_ARCHIVE_SECTIONS = [
+  rite("The challenge", ["daily board", "crowd"], [
+    "Five questions about what happens next.",
+    "Make your calls, then find out whether you outscored the Oracle and other players.",
+    CURRENT_GAME_COPY.oracleIdentity,
+    "The daily board ranks players.",
+    "The crowd shows which way they lean.",
+  ]),
+  rite("Make a call", ["call", "seal"], [
+    "Your prediction is a call.",
+    "Choose yes or no and set confidence from 55% to 95%.",
+    "Pull toward your answer; a longer pull means greater confidence.",
+    "Release to seal.",
+    "Sealing locks your answer and confidence.",
+    "The crowd is hidden until you commit; the Oracle forecast stays hidden until reveal.",
+  ]),
+  rite("Face the result", ["big one", "crowd bounty"], [
+    "Choose the confidence you can stand behind.",
+    "Higher confidence earns more when right and loses more when wrong.",
+    "The Big One counts double in both directions.",
+    "Your duel and daily board use the same scoring formula for your calls and the Oracle's.",
+    "These base points include the Big One, but no crowd bonus.",
+    `A correct call on a side below ${CONSTANTS.CONTRARIAN_CROWD_PCT}% earns a separate crowd bounty when at least ${CONSTANTS.CONTRARIAN_MIN_CROWD} players answered.`,
+    "The bounty does not affect duel or board.",
+  ]),
+  rite("Build your record", ["forecast rating", "competitive round"], [
+    "A single round settles a challenge.",
+    "Your record shows how your judgment holds up over time.",
+    `Your forecast rating measures performance over qualifying calls and appears after ${CONSTANTS.ORACLE_SCORE_MIN_CALLS} cumulative qualifying calls, not consecutive days.`,
+    "A competitive round requires every non-void question sealed and at least three resolved, non-void questions.",
+    "Only calls from eligible rounds count toward that rating.",
+    `Daily board placing does not require 50 calls; a placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players; the Oracle is also shown for comparison.`,
+    "Confidence history also includes resolved calls from incomplete rounds, showing how your confidence matched outcomes.",
+  ]),
+  rite("Keep a vigil", ["vigil", "shield", "exhibitions"], [
+    "Your vigil is your playing streak.",
+    "Seal at least one call in a daily round to keep it going; the count updates when that round settles.",
+    "Your streak is a ritual you keep: one daily call is enough. It adds no points.",
+    `A shield can preserve a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through a missed round, without incrementing it or adding calls.`,
+    "One free shield is available each calendar month; available paid shields are used after it.",
+    "A new streak begins with your next call. Your predictions, results and rating remain.",
+    "Exhibitions do not count.",
+    "Streaks and early marks do not multiply current points.",
+  ]),
+  rite("Timing and fairness", ["void", "abstention"], [
+    "Each question has its own deadline.",
+    "If an answer appears early, the question closes and is void for everyone.",
+    "Results follow verification, not a guaranteed time.",
+    "Unresolved outcomes are pending, never losses; void questions score nothing.",
+    "Incomplete rounds still keep the results of your calls.",
+    "An outcome correction or void can update your record.",
+    "The Oracle can report any chance of YES from 0% to 100%; 50% is an abstention.",
+    "Players choose a side at 55% to 95% confidence.",
+    "Both use the same points formula.",
+    "Older rounds retain their versioned rules.",
+  ]),
+];
+
 // One claim, split into the run that is a defined term and the runs that are
 // not. The screen sets `term` segments in the machine's tracked caps and the
 // rest in ordinary reading text: the jargon announces itself exactly once,
