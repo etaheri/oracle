@@ -1,0 +1,9 @@
+{
+  "requestId": "fixture",
+  "results": [
+    { "id": "https://www.weather.gov/okx/", "url": "https://www.weather.gov/okx/", "title": "NWS New York forecast", "publishedDate": "2026-09-09T18:00:00.000Z", "author": null, "highlights": ["Highs near 84 on Thursday with a chance of afternoon storms."], "highlightScores": [0.91] },
+    { "id": "https://example.com/a", "url": "https://example.com/a", "title": "Heat builds across the Northeast", "publishedDate": "2026-09-08T12:00:00.000Z", "author": "Staff", "highlights": ["A ridge brings mid-80s to the city by midweek."], "highlightScores": [0.80] },
+    { "id": "https://example.com/b", "url": "https://example.com/b", "title": "No highlight here", "publishedDate": null, "author": null, "highlights": [], "highlightScores": [] }
+  ],
+  "costDollars": { "total": 0.0105, "search": { "neural": 0.005 }, "contents": { "highlights": 0.0055 } }
+}

@@ -27,6 +27,11 @@ export interface WorkerEnv {
   PIPELINE_FORECAST_MODEL?: string;
   PIPELINE_TASTE_MODEL?: string;
   PIPELINE_VOICE_MODEL?: string;
+  PIPELINE_COUNCIL_SONNET_MODEL?: string;
+  PIPELINE_COUNCIL_OPUS_MODEL?: string;
+  PIPELINE_COUNCIL_HAIKU_MODEL?: string;
+  PIPELINE_LESSON_MODEL?: string;
+  EXA_API_KEY?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   APPLE_BUNDLE_ID?: string;
   ONESIGNAL_APP_ID?: string;
@@ -79,6 +84,13 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
     // start time, which is the whole reason WorkflowStarter.start carries deps.
     workflows: bindings ? bindingStarter(bindings) : inlineStarter(),
     push: { ONESIGNAL_APP_ID: env.ONESIGNAL_APP_ID, ONESIGNAL_API_KEY: env.ONESIGNAL_API_KEY },
+    exaApiKey: env.EXA_API_KEY,
+    councilModels: {
+      sonnet: env.PIPELINE_COUNCIL_SONNET_MODEL,
+      opus: env.PIPELINE_COUNCIL_OPUS_MODEL,
+      haiku: env.PIPELINE_COUNCIL_HAIKU_MODEL,
+      lesson: env.PIPELINE_LESSON_MODEL,
+    },
   };
 }
 

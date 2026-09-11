@@ -47,6 +47,15 @@ export interface PipelineDeps {
   // The exchanges the market round is dealt from (design 2026-09-10 §5.1).
   // Defaults to DEFAULT_EXCHANGES; tests inject canned feeds.
   exchangeFeeds?: ExchangeFeed[];
+  // Exa search for the Council's evidence packs (design 2026-09-11 §5).
+  // Absent key → every pack is empty and the members are told so; the round
+  // still commits. Fetch injectable so tests never touch the network.
+  exaApiKey?: string;
+  exaFetch?: typeof fetch;
+  // The Council's members and the lesson writer (design 2026-09-11 §3, §8).
+  // Optional with defaults in council/members.ts, so every existing test's
+  // models literal stays valid.
+  councilModels?: { sonnet?: string; opus?: string; haiku?: string; lesson?: string };
 }
 
 function errorMessage(err: unknown): string {

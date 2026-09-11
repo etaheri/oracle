@@ -18,7 +18,13 @@
     // cheapest model carries it. Unlike RESOLVE_MODEL_B, nothing here depends
     // on this model differing from any other.
     "PIPELINE_TASTE_MODEL": "claude-haiku-4-5-20251001",
-    "PIPELINE_VOICE_MODEL": "claude-sonnet-5"
+    "PIPELINE_VOICE_MODEL": "claude-sonnet-5",
+    // The Council (design 2026-09-11 §3): three independent members over one
+    // shared evidence pack, no search tool; and the lesson writer at settlement.
+    "PIPELINE_COUNCIL_SONNET_MODEL": "claude-sonnet-5",
+    "PIPELINE_COUNCIL_OPUS_MODEL": "claude-opus-5",
+    "PIPELINE_COUNCIL_HAIKU_MODEL": "claude-haiku-4-5-20251001",
+    "PIPELINE_LESSON_MODEL": "claude-haiku-4-5-20251001"
   }
   // secrets (wrangler secret put) — this list is WorkerEnv in src/worker.ts;
   // keep the two in step.
@@ -40,6 +46,7 @@
   //     (PIPELINE_RESOLVE_MODEL_B is a DIFFERENT model from PIPELINE_RESOLVE_MODEL
   //      on purpose — see design 2026-09-04 §6.2. Setting both to the same model
   //      silently removes the error independence the second read exists to buy.)
+  //     EXA_API_KEY             the Council's evidence packs (design 2026-09-11 §5); absent → empty packs
   //
   //   PUSH — absent, the hinge push at settle no-ops and the settle report
   //   says "push: 0 sent". Nothing else changes.
