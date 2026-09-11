@@ -53,9 +53,14 @@ export async function narrateCouncil(deps: PipelineDeps, date: string, run: Coun
   const abstentions = run.members.filter((m) => m.abstained.length > 0).map((m) => `${m.member} abstained${m.error ? ` (${m.error})` : ""} on ${m.abstained.length === 5 ? "every slot" : `slot${m.abstained.length === 1 ? "" : "s"} ${m.abstained.join(", ")}`}`);
   const packErrors = (run.evidence?.packs ?? []).filter((p) => p.error).map((p) => `slot ${p.slot}: ${p.error}`);
   const cost = `exa $${(run.evidence?.cost ?? 0).toFixed(2)}`;
+  // "already committed" means the round IS staked — a concurrent or
+  // retried call landed it — so this is informational, not an alert: no ‼️,
+  // and no "opens unstaked", which would be false.
   const head = run.commit.committed
     ? `council ${date}: ${run.commit.lines} lines committed`
-    : `‼️ council ${date}: no line — ${run.commit.reason}; the round opens unstaked`;
+    : run.commit.reason === "already committed"
+      ? `council ${date}: already committed; nothing written`
+      : `‼️ council ${date}: no line — ${run.commit.reason}; the round opens unstaked`;
   const body = [head, ...slotLines, ...abstentions, ...(packErrors.length ? [`evidence: ${packErrors.join(" · ")}`] : []), cost].join("\n");
   await deps.telegram.send(body);
 }

@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
 import type { PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import { inlineStarter } from "../src/pipeline/workflows";
 import { commitCouncil } from "../src/pipeline/council/commit";
-import { runCouncil } from "../src/pipeline/council";
+import { runCouncil, narrateCouncil } from "../src/pipeline/council";
 import type { MemberResult } from "../src/pipeline/council/member";
 
 // 2099, not 2026: commit_oracle_forecast compares the opening deadline with the
@@ -101,6 +101,40 @@ describe("commitCouncil (spec §7)", () => {
     await commitCouncil(makeDeps(db, null), DATE, [result("sonnet", rows, 0.40), result("opus", rows, 0.31)]);
     expect((await db.query.lines.findMany({ where: eq(schema.lines.member, "market") })).length).toBe(4);
   });
+
+  it("closes out a line stranded by a step that landed the commit but died before commitLine ran", async () => {
+    // Reproduces a Workflow retry of the `commit` step: commit_council lands,
+    // then the step throws before commitLine runs (e.g. a crash mid-step).
+    // The retry must still see "already committed" (spec's return contract)
+    // but must NOT strand the line — it should finish what the first attempt
+    // started.
+    //
+    // line_p_yes is DB-level immutable once set (migration 0014's
+    // guard_house_line trigger), so a successful commitCouncil() call cannot
+    // be used to set up this scenario and then unwind it — commitCouncil
+    // always runs commitLine itself. Instead, commit_council is called
+    // directly (as council-schema.test.ts's migration tests do), which lands
+    // the round's commitment in the DB WITHOUT the JS-level commitLine call
+    // that commit.ts normally makes right after it — exactly the crash this
+    // test reproduces.
+    const { db, rows } = await world();
+    const full = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE), orderBy: (q, { asc }) => [asc(q.slot)] });
+    const snapshot = full.map((q) => ({
+      id: q.id, slot: q.slot, isBigOne: q.isBigOne, text: q.text, category: q.category, resolutionCriteria: q.resolutionCriteria,
+      sourceName: q.sourceName, sourceUrl: q.sourceUrl, context: q.context, opensAt: q.opensAt.toISOString(), locksAt: q.locksAt.toISOString(), pYes: 0.40,
+    }));
+    const lines = full.map((q) => ({ question_id: q.id, member: "sonnet", p_yes: 0.40, model: "m-sonnet", prompt_version: "council-v1", reasoning: "R.", cited: [], lessons_received: [] }));
+    await db.execute(sql`select commit_council(${DATE}::date, ${JSON.stringify(snapshot)}::jsonb, ${JSON.stringify(lines)}::jsonb, ${"council-v1"}, ${"2099-09-10T14:00:00Z"}::timestamptz)`);
+    const before = await db.query.questions.findFirst({ where: eq(schema.questions.id, rows[0]!.id) });
+    expect(before!.linePYes).toBeNull();
+
+    const deps = makeDeps(db, null);
+    const retried = await commitCouncil(deps, DATE, [result("sonnet", rows, 0.90), result("opus", rows, 0.90)]);
+    expect(retried).toEqual({ committed: false, reason: "already committed", lines: 0, slots: [] });
+    const after = await db.query.questions.findFirst({ where: eq(schema.questions.id, rows[0]!.id) });
+    expect(after!.linePYes).not.toBeNull();
+    expect(Number(after!.linePYes)).toBe(0.40);
+  });
 });
 
 describe("runCouncil (the inline path)", () => {
@@ -133,5 +167,30 @@ describe("runCouncil (the inline path)", () => {
     const run = await runCouncil(makeDeps(db, null), DATE);
     expect(run.editable).toBe(false);
     expect(run.members).toEqual([]);
+  });
+
+  // A second top-level runCouncil() on an already-committed round returns
+  // early via councilEditable — it never reaches commitCouncil or narration
+  // again. The scenario this guards is the Workflow's own retry, which calls
+  // commitCouncil and narrateCouncil as SEPARATE steps (workflow-entrypoints.ts):
+  // a retried "commit" step sees "already committed" and the SAME run object
+  // is then handed to the "narrate" step. This reproduces that hand-off
+  // directly rather than through a second runCouncil call, which cannot reach
+  // it at all.
+  it("narrates without an alert when a retried commit step finds the round already staked", async () => {
+    const { db } = await world();
+    const sent: string[] = [];
+    const claude = { structured: async (c: StructuredCall) => { const p = c.model === "m-opus" ? 0.31 : c.model === "m-haiku" ? 0.44 : 0.40; return { lines: [1, 2, 3, 4, 5].map((slot) => ({ slot, p_yes: p, reasoning: "R.", cited: [1] })) }; } };
+    const deps = makeDeps(db, claude, sent);
+    const first = await runCouncil(deps, DATE);
+    expect(first.commit!.committed).toBe(true);
+    sent.length = 0;
+    const retried = await commitCouncil(deps, DATE, first.members);
+    expect(retried).toEqual({ committed: false, reason: "already committed", lines: 0, slots: [] });
+    await narrateCouncil(deps, DATE, { editable: true, evidence: first.evidence, members: first.members, commit: retried });
+    expect(sent.length).toBe(1);
+    expect(sent[0]).not.toMatch(/^‼️/);
+    expect(sent[0]).not.toContain("opens unstaked");
+    expect(sent[0]).toContain(`council ${DATE}: already committed; nothing written`);
   });
 });

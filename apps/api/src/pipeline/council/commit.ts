@@ -21,7 +21,16 @@ export interface CouncilCommit {
 export async function commitCouncil(deps: PipelineDeps, date: string, results: MemberResult[]): Promise<CouncilCommit> {
   const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
   if (!round) return { committed: false, reason: "round missing", lines: 0, slots: [] };
-  if (round.oracleCommittedAt !== null) return { committed: false, reason: "already committed", lines: 0, slots: [] };
+  if (round.oracleCommittedAt !== null) {
+    // The round IS staked — a prior call landed the commit — so a retry
+    // (e.g. the Workflow's `commit` step re-running after committing but
+    // throwing before returning, most plausibly inside the commitLine call
+    // below) must still close out the line rather than leave it to a later
+    // forecast tick. commitLine is write-once and idempotent, so calling it
+    // again here is always safe.
+    await commitLine(deps.db, date);
+    return { committed: false, reason: "already committed", lines: 0, slots: [] };
+  }
   if (round.rulesVersion < 3) return { committed: false, reason: "not a version 3 round", lines: 0, slots: [] };
 
   const rows = await deps.db.query.questions.findMany({
@@ -60,7 +69,14 @@ export async function commitCouncil(deps: PipelineDeps, date: string, results: M
   ) as ok`);
   const resultRows = (res as { rows?: unknown[] } | null)?.rows ?? (Array.isArray(res) ? res : []);
   const ok = Boolean((resultRows[0] as { ok?: boolean } | undefined)?.ok);
-  if (!ok) return { committed: false, reason: "already committed", lines: 0, slots };
+  if (!ok) {
+    // commit_council itself returned false: another call landed first,
+    // between our own read of oracleCommittedAt above and this statement.
+    // Same reasoning as the early return above — the round is staked, so
+    // close out the line rather than strand it.
+    await commitLine(deps.db, date);
+    return { committed: false, reason: "already committed", lines: 0, slots };
+  }
   await commitLine(deps.db, date);
   return { committed: true, reason: null, lines: lines.length, slots };
 }

@@ -417,6 +417,66 @@ describe("POST /admin/rounds/:date/forecast", () => {
   });
 });
 
+describe("POST /admin/rounds/:date/council", () => {
+  // Same manual door as /forecast, for a version 3 round: the cron dispatches
+  // the Council on its own hourly window (pipeline/index.ts's forecast case),
+  // and a round seeded outside it otherwise has no way to ever get one.
+  it("503s when the pipeline isn't configured", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-09/council", { method: "POST" });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "pipeline not configured" });
+  });
+
+  it("404s a date with no round", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env, pipeline: fakePipeline(db, "2026-09-09T15:00:00Z") });
+    const res = await admin(app)("/admin/rounds/2026-09-09/council", { method: "POST" });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "unknown round" });
+  });
+
+  it("409s a version 2 round", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    await db.update(schema.rounds).set({ status: "scheduled", rulesVersion: 2 }).where(eq(schema.rounds.date, "2026-09-09"));
+    const app = createApp({ db, env, pipeline: fakePipeline(db, "2026-09-09T15:00:00Z") });
+    const res = await admin(app)("/admin/rounds/2026-09-09/council", { method: "POST" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "not a version 3 round" });
+  });
+
+  it("409s an already-committed version 3 round", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    await db.update(schema.rounds).set({ status: "scheduled", rulesVersion: 3, oracleCommittedAt: new Date("2026-09-09T14:00:00Z") }).where(eq(schema.rounds.date, "2026-09-09"));
+    const app = createApp({ db, env, pipeline: fakePipeline(db, "2026-09-09T15:00:00Z") });
+    const res = await admin(app)("/admin/rounds/2026-09-09/council", { method: "POST" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "already committed" });
+  });
+
+  it("dispatches the council for a scheduled version 3 round", async () => {
+    const { db } = await makeTestDb();
+    await seedRound(db, { date: "2026-09-09", opensAt: new Date("2026-09-09T16:00:00Z"), locksAt: new Date("2026-09-10T16:00:00Z") });
+    await db.update(schema.rounds).set({ status: "scheduled", rulesVersion: 3 }).where(eq(schema.rounds.date, "2026-09-09"));
+    const started: { kind: string; id: string; date: string }[] = [];
+    const pipeline = {
+      ...fakePipeline(db, "2026-09-09T15:00:00Z"),
+      workflows: { start: async (_d: unknown, kind: string, id: string, params: { date: string }) => { started.push({ kind, id, date: params.date }); } },
+    } as unknown as PipelineDeps;
+    const app = createApp({ db, env, pipeline });
+    const res = await admin(app)("/admin/rounds/2026-09-09/council", { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; date: string; id: string };
+    expect(body.ok).toBe(true);
+    expect(body.date).toBe("2026-09-09");
+    expect(body.id).toMatch(/^council-2026-09-09-manual-\d+$/);
+    expect(started).toEqual([{ kind: "council", id: body.id, date: "2026-09-09" }]);
+  });
+});
+
 describe("POST /admin/rounds/:date/line", () => {
   it("writes the house line with the admin secret and returns the written count", async () => {
     const { db } = await makeTestDb();
