@@ -19,6 +19,7 @@ const historical: Exhibition = {
   roundDate: "2026-09-01",
   oraclePYes: 0.65,
   outcome: "yes",
+  linePYes: null,
 };
 
 const replacement: Exhibition = {

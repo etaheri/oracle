@@ -1,36 +1,25 @@
-import { compareExhibition, type Exhibition } from "@oracle/core";
+import { practiceOutcome, type Exhibition } from "@oracle/core";
+import { formatFortune } from "./fortuneText";
+import { lineLabel, receiptLine } from "./stakeText";
 
 export type PracticePrediction = { answer: boolean; confidence: number };
 
+// Practice runs on the practice fortune and the exhibition's line (design
+// §8.3); nothing here touches the player's fortune. Reading register for the
+// sentences, machine register for the receipt and the line.
 export function practiceResult(prediction: PracticePrediction, exhibition: Exhibition) {
-  const comparison = compareExhibition(prediction, exhibition);
-  const opposite = compareExhibition(prediction, {
-    ...exhibition,
-    outcome: exhibition.outcome === "yes" ? "no" : "yes",
-  });
-  const oracleAnswer = exhibition.oraclePYes === 0.5 ? null : exhibition.oraclePYes > 0.5;
-  const oracleConfidence = oracleAnswer === null
-    ? null
-    : Math.round((oracleAnswer ? exhibition.oraclePYes : 1 - exhibition.oraclePYes) * 100);
-  const correct = prediction.answer === (exhibition.outcome === "yes");
-  const sameAnswer = oracleAnswer !== null && prediction.answer === oracleAnswer;
-  const explanation = comparison.winner === "tie"
-    ? "Equal points on this call."
-    : oracleAnswer === null
-      ? "The Oracle stayed at 50%. You took a side."
-      : sameAnswer
-        ? correct
-          ? comparison.winner === "you" ? "You were both right. Your higher confidence earned more." : "You were both right. The Oracle's higher confidence earned more."
-          : comparison.winner === "you" ? "You were both wrong. Your lower confidence cost less." : "You were both wrong. Your higher confidence cost more."
-        : `You chose ${prediction.answer ? "YES" : "NO"}. The Oracle chose ${oracleAnswer ? "YES" : "NO"}. The outcome was ${exhibition.outcome.toUpperCase()}.`;
+  const out = practiceOutcome(prediction, exhibition);
+  const side = (a: boolean) => (a ? "YES" : "NO");
+  const verdict = out.delta > 0 ? `You took the Oracle for ${formatFortune(out.delta)}.` : `The Oracle took ${formatFortune(-out.delta)}.`;
+  const other = side(exhibition.outcome !== "yes");
+  const counterfactual = out.oppositeDelta >= 0
+    ? `Had it gone ${other}, the same call would have won ${formatFortune(out.oppositeDelta)}.`
+    : `Had it gone ${other}, the same call would have lost ${formatFortune(-out.oppositeDelta)}.`;
   return {
-    ...comparison,
-    correct,
-    oppositePoints: opposite.youPoints,
-    oracleAnswer,
-    oracleConfidence,
-    oracleAbstained: oracleAnswer === null,
-    sameAnswer,
-    explanation,
+    ...out,
+    receipt: receiptLine({ answer: prediction.answer, stake: out.stake, wins: out.wins, confidence: prediction.confidence }),
+    verdict,
+    counterfactual,
+    oracleLine: lineLabel(out.line)!,
   };
 }

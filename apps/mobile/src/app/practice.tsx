@@ -150,10 +150,10 @@ export default function Practice() {
   return <Screen header={<TopBar />} footer={footer}>
     <Stack.Screen options={{ gestureEnabled: false }} />
     <View style={{ flex: 1, minHeight: 0, gap: space(3), paddingTop: space(3) }}>
-      <Eyebrow>Exhibition</Eyebrow>
+      <Eyebrow>Practice</Eyebrow>
       {exhibition
         ? <PracticeCard exhibition={exhibition} onCompleted={finish} />
-        : <View style={{ flex: 1, justifyContent: "center" }}><Mono {...role.line} color={colors.mutedInk}>PREPARING AN EXHIBITION…</Mono></View>}
+        : <View style={{ flex: 1, justifyContent: "center" }}><Mono {...role.line} color={colors.mutedInk}>PREPARING A PRACTICE QUESTION…</Mono></View>}
     </View>
   </Screen>;
 }
