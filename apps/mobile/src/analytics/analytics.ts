@@ -11,6 +11,7 @@ export type AnalyticsEvent =
   | "confidence_history_viewed"
   | "confidence_history_expanded"
   | "resolution_evidence_opened"
+  | "reading_opened"
   | "practice_started"
   | "practice_completed"
   | "practice_skipped"

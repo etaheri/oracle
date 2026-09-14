@@ -1,6 +1,6 @@
 import { ReadingHeader } from "../../ui/ReadingHeader";
 import { RevealSummary } from "../../ui/RevealSummary";
-import { calculateDuel, duelLine, MILESTONE_COPY, type MilestoneId } from "@oracle/core";
+import { calculateDuel, duelLine, MILESTONE_COPY, type MilestoneId, type Reveal } from "@oracle/core";
 import { getSeenMilestones, markMilestoneSeen } from "../../api/flags";
 import { useMeLedger } from "../../api/hooks";
 import { QuietLink } from "../../ui/Button";
@@ -34,7 +34,8 @@ import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeR
 import { rivalryMoment } from "../../game/rivalryMoment";
 import { capture } from "../../analytics/analytics";
 import { colors, space, displayScale, ROW_H } from "../../theme";
-import { councilFor, splitRows, SPLIT_ROW_H, type SplitRow } from "../../game/council";
+import { councilFor, splitRows, evidenceFor, SPLIT_ROW_H, type SplitRow } from "../../game/council";
+import { CouncilReading } from "../../ui/CouncilReading";
 
 const easeOut = Easing.out(Easing.poly(4));
 const ROW_DELAY = 0;
@@ -83,14 +84,23 @@ const TideFlash = new Keyframe({
 // line, coloured by the side it was on, then the house line. Reserves its
 // height only when it has rows, so a version 2 reveal, an unstaked round and
 // a pending reveal lose nothing.
-function CouncilSplit({ rows, fontScale, align = "left" }: { rows: SplitRow[]; fontScale: number; align?: "left" | "center" }) {
+function CouncilSplit({ d, questionId, linePYes, fontScale, align = "left" }: { d: Reveal; questionId: string; linePYes: number | null; fontScale: number; align?: "left" | "center" }) {
+  const entries = councilFor(d, questionId);
+  const rows = splitRows(entries, linePYes);
   if (rows.length === 0) return null;
+  const pack = evidenceFor(d, questionId);
   const tone = (t: SplitRow["tone"]) => (t === "win" ? colors.goldText : t === "loss" ? colors.vermilion : colors.mutedInk);
   return (
-    <View style={{ minHeight: scaledRow(SPLIT_ROW_H, fontScale) * rows.length, gap: 0 }} accessibilityRole="text" accessibilityLabel={`The Council: ${rows.map((r) => r.label.toLowerCase()).join(", ")}`}>
-      {rows.map((r) => (
-        <Mono key={r.member} {...role.meta} color={tone(r.tone)} style={[role.meta.style, { textAlign: align }]}>{r.label}</Mono>
-      ))}
+    <View style={{ minHeight: scaledRow(SPLIT_ROW_H, fontScale) * rows.length }} accessibilityLabel={`The Council: ${rows.map((r) => r.label.toLowerCase()).join(", ")}`}>
+      {rows.map((r) => {
+        const entry = entries.find((e) => e.member === r.member);
+        return (
+          <View key={r.member}>
+            <Mono {...role.meta} color={tone(r.tone)} style={[role.meta.style, { textAlign: align }]}>{r.label}</Mono>
+            {entry && entry.member !== "market" && <CouncilReading entry={entry} pack={pack} questionId={questionId} />}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -507,7 +517,7 @@ export default function RevealScreen() {
                   {context ? (
                     <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{context}</Mono>
                   ) : null}
-                  {money && <CouncilSplit rows={splitRows(councilFor(d, q.id), q.line_p_yes)} fontScale={fontScale} />}
+                  {money && <CouncilSplit d={d} questionId={q.id} linePYes={q.line_p_yes} fontScale={fontScale} />}
                   {/* How the tide moved after this player sealed (design
                       2026-09-09 §4.1) — no reserved space: rows are already
                       variable height, and most days say nothing here. */}
@@ -611,7 +621,7 @@ export default function RevealScreen() {
                       </Mono>
                     )
                   )}
-                  {fortuneRound && <CouncilSplit rows={splitRows(councilFor(d, big.id), big.line_p_yes)} fontScale={fontScale} />}
+                  {fortuneRound && <CouncilSplit d={d} questionId={big.id} linePYes={big.line_p_yes} fontScale={fontScale} />}
                   {fortuneRound && oracleTake(big) && (
                     <Mono {...role.caption} color={(big.my?.delta ?? 0) > 0 ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{oracleTake(big)}</Mono>
                   )}
