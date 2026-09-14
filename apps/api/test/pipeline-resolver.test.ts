@@ -15,7 +15,7 @@ function deps(db: PipelineDeps["db"], reply: unknown, seen: { call?: Record<stri
   };
 }
 
-const target = { text: "Will it?", resolutionCriteria: "per the page", sourceName: "SRC", sourceUrl: "https://www.example.com/x" };
+const target = { text: "Will it?", resolutionCriteria: "per the page", sourceName: "SRC", sourceUrl: "https://www.example.com/x", opensAt: "2026-09-10T16:00:00.000Z", now: "2026-09-12T02:00:00.000Z" };
 
 describe("allowedDomainsFor", () => {
   it("strips www and returns one hostname", () => {
@@ -55,5 +55,38 @@ describe("settled — the one definition of 'the answer exists'", () => {
     expect(settled(v("unverifiable", q))).toBeNull();
     expect(settled(v("yes", []))).toBeNull();
     expect(settled(v("no", []))).toBeNull();
+  });
+});
+
+describe("askResolver date anchors", () => {
+  it("anchors the resolver in time: the current instant, the open instant, and the different-event rule (design 2026-09-11 §10)", async () => {
+    const { db } = await makeTestDb();
+    interface StructuredCall {
+      system: string;
+      user?: string;
+      model?: string;
+      schemaName?: string;
+      schema?: unknown;
+      webSearch?: unknown;
+    }
+    const calls: StructuredCall[] = [];
+    const testDeps: PipelineDeps = {
+      workflows: inlineStarter(),
+      db,
+      telegram: { send: async () => {} },
+      claude: {
+        structured: async (c) => {
+          calls.push(c as StructuredCall);
+          return { outcome: "unverifiable", quotes: [], reasoning: "" };
+        },
+      },
+      models: { author: "m-a", resolve: "m-r", resolveB: "m-rb", forecast: "m-f", taste: "m-t", voice: "m-v" },
+      now: () => new Date("2026-09-04T16:00:00Z"),
+    };
+    await askResolver(testDeps, "m-r", { text: "Will the 49ers beat the Rams?", resolutionCriteria: "Final score per NFL.com", sourceName: "NFL.com", sourceUrl: "https://www.nfl.com/x", opensAt: "2026-09-10T16:00:00.000Z", now: "2026-09-12T02:00:00.000Z" });
+    const s = calls[0]!.system;
+    expect(s).toContain("It is now 2026-09-12T02:00:00.000Z.");
+    expect(s).toContain("This question opened at 2026-09-10T16:00:00.000Z.");
+    expect(s).toContain("before the open instant describes a different event");
   });
 });

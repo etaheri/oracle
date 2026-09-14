@@ -49,6 +49,8 @@ export async function resolveWithClaude(deps: PipelineDeps, questionId: string):
     resolutionCriteria: q.resolutionCriteria,
     sourceName: q.sourceName,
     sourceUrl: q.sourceUrl,
+    opensAt: q.opensAt.toISOString(),
+    now: deps.now().toISOString(),
   };
   // In parallel: they are independent readings of the same page, and running
   // them in series would double the slowest step in the whole pipeline.

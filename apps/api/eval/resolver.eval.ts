@@ -50,6 +50,7 @@ interface WindowRow {
   resolutionCriteria: string;
   sourceName: string;
   sourceUrl: string | null;
+  opensAt: Date;
   status: string;
   outcome: "yes" | "no" | "void" | null;
   resolutionEvidence: unknown;
@@ -64,6 +65,7 @@ async function loadWindow(db: Db, since: string, until: string): Promise<WindowR
     resolutionCriteria: q.resolutionCriteria,
     sourceName: q.sourceName,
     sourceUrl: q.sourceUrl,
+    opensAt: q.opensAt,
     status: q.status,
     outcome: q.outcome,
     resolutionEvidence: q.resolutionEvidence,
@@ -133,6 +135,8 @@ async function reportReResolution(deps: PipelineDeps, rows: WindowRow[], sampleS
       resolutionCriteria: row.resolutionCriteria,
       sourceName: row.sourceName,
       sourceUrl: row.sourceUrl,
+      opensAt: row.opensAt.toISOString(),
+      now: deps.now().toISOString(),
     });
     const outcome = settled(verdict);
     if (outcome === null) unverifiable += 1;

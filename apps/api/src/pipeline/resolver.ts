@@ -23,6 +23,10 @@ export interface ResolverTarget {
   resolutionCriteria: string;
   sourceName: string;
   sourceUrl: string | null;
+  // The date anchor (design 2026-09-11 §10). The September 9 void came from
+  // a resolver with no clock reading last week's meeting of the same teams.
+  opensAt: string;
+  now: string;
 }
 
 const ResolutionSchema = z.object({
@@ -66,6 +70,7 @@ export function allowedDomainsFor(sourceUrl: string | null): string[] | undefine
 
 function systemPrompt(t: ResolverTarget): string {
   return `You resolve a prediction question for ORACLE. Question: "${t.text}". Resolution criteria: "${t.resolutionCriteria}". Source: ${t.sourceName}.
+It is now ${t.now}. This question opened at ${t.opensAt}. Evidence describing events that concluded before the open instant describes a different event and must not settle this one.
 Determine the outcome STRICTLY per the criteria, using only ${t.sourceName}. Quote the exact evidence.
 If the source does not yet show a definitive outcome, answer "unverifiable" — never guess. Call the resolution tool exactly once.`;
 }
