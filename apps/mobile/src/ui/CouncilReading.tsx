@@ -5,10 +5,9 @@
 // reading copy, set in sentence case as the member wrote it; the link and
 // the labels are machine voice.
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import type { CouncilEntry, EvidenceItem } from "@oracle/core";
 import { Mono, Serif, role } from "./Text";
-import { QuietLink } from "./Button";
 import { EvidenceCard } from "./EvidenceCard";
 import { readingFor, memberName, READING_LINK } from "../game/council";
 import { capture } from "../analytics/analytics";
@@ -18,12 +17,23 @@ export function CouncilReading({ entry, pack, questionId }: { entry: CouncilEntr
   const [open, setOpen] = useState(false);
   const reading = readingFor(entry, pack);
   if (!reading) return null;
+  const name = memberName(entry.member).toUpperCase();
   return (
     <View style={{ gap: space(2) }}>
-      <QuietLink title={open ? `HIDE ${memberName(entry.member).toUpperCase()}'S READING` : `${READING_LINK} · ${memberName(entry.member).toUpperCase()}`} onPress={() => {
+      {/* Bracketed, like every other disclosure in this app (ResolutionEvidence's
+          [ WHY THIS RESOLVED ]) — not an underlined QuietLink, which reads as a
+          second control style and, at 44pt tall with its own padding, doubled
+          every card's height with three of these stacked under one line. */}
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => {
         if (!open) capture("reading_opened", { question_id: questionId, member: entry.member });
         setOpen((v) => !v);
-      }} />
+      }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+        <Mono {...role.line} color={colors.mutedInk} style={[role.line.style, { textAlign: "left" }]}>
+          <Text style={{ color: colors.agedGold }}>[</Text>
+          {open ? ` HIDE ${name}'S READING ` : ` ${READING_LINK} · ${name} `}
+          <Text style={{ color: colors.agedGold }}>]</Text>
+        </Mono>
+      </Pressable>
       {open && (
         <View style={{ gap: space(3) }}>
           <Serif size={15} color={colors.ink} style={{ lineHeight: 22 }}>{reading.paragraph}</Serif>

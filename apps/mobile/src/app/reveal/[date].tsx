@@ -91,7 +91,7 @@ function CouncilSplit({ d, questionId, linePYes, fontScale, align = "left" }: { 
   const pack = evidenceFor(d, questionId);
   const tone = (t: SplitRow["tone"]) => (t === "win" ? colors.goldText : t === "loss" ? colors.vermilion : colors.mutedInk);
   return (
-    <View style={{ minHeight: scaledRow(SPLIT_ROW_H, fontScale) * rows.length }} accessibilityLabel={`The Council: ${rows.map((r) => r.label.toLowerCase()).join(", ")}`}>
+    <View style={{ minHeight: scaledRow(SPLIT_ROW_H, fontScale) * rows.length + 44 * entries.filter((e) => e.member !== "market").length }} accessibilityLabel={`The Council: ${rows.map((r) => r.label.toLowerCase()).join(", ")}`}>
       {rows.map((r) => {
         const entry = entries.find((e) => e.member === r.member);
         return (
