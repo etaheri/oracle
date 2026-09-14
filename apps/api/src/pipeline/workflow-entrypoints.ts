@@ -32,6 +32,7 @@ import { councilEditable, narrateCouncil, type CouncilRun } from "./council";
 import { retrieveEvidence } from "./council/evidence";
 import { commitMember, type MemberResult } from "./council/member";
 import { commitCouncil } from "./council/commit";
+import { writeLessons } from "./council/lessons";
 import type { PipelineDeps } from "./index";
 
 interface Params { date: string; questionIds?: string[] }
@@ -149,6 +150,10 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
           resolveOne(deps, questionId),
         ),
       );
+      // Memory (design 2026-09-11 §8): its own step, after the outcome is
+      // known, so a retried resolve never re-asks and a failed lesson never
+      // fails the resolution. No-op below version 3 and on void.
+      await durableStep(step, `lessons-${questionId}`, POLICY.model, deps, () => writeLessons(deps, questionId));
     }
 
     await durableStep(step, "narrate", POLICY.narrate, deps, async () => {

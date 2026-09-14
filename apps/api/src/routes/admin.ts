@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { AppContext } from "../app";
 import { resolveQuestion, withdrawQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";
@@ -285,6 +285,24 @@ export const adminRoutes = new Hono<AppContext>()
       available: rows.filter((r) => r.usedOn === null).length,
       drafts: rows.map((r) => ({ id: r.id, created_at: r.createdAt.toISOString(), used_on: r.usedOn })),
     });
+  })
+  // Memory is readable and cuttable by hand (design 2026-09-11 §8): a bad
+  // lesson found here is deleted here, and the next commit never sees it.
+  .get("/lessons", async (c) => {
+    const db = c.get("deps").db;
+    const member = c.req.query("member");
+    const series = c.req.query("series");
+    const rows = await db.query.lessons.findMany({
+      where: and(...(member ? [eq(schema.lessons.member, member)] : []), ...(series ? [eq(schema.lessons.seriesKey, series)] : [])),
+      orderBy: (l, { desc }) => [desc(l.resolvedAt)],
+      limit: 100,
+    });
+    return c.json({ lessons: rows.map((l) => ({ id: l.id, member: l.member, series_key: l.seriesKey, question_id: l.questionId, text: l.text, resolved_at: l.resolvedAt.toISOString(), created_at: l.createdAt.toISOString() })) });
+  })
+  .delete("/lessons/:id", async (c) => {
+    const rows = await c.get("deps").db.delete(schema.lessons).where(eq(schema.lessons.id, c.req.param("id"))).returning({ id: schema.lessons.id });
+    if (rows.length === 0) return c.json({ error: "unknown lesson" }, 404);
+    return c.json({ ok: true });
   })
   .get("/workflows/:kind/:id", async (c) => {
     const resolved = bindingFor(c, c.req.param("kind"));

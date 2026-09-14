@@ -27,6 +27,7 @@ import { claimResolutionPushes } from "../push/compose";
 import { sendPushes } from "../push/onesignal";
 import { DEFAULT_EXCHANGES } from "./market-round";
 import type { ExchangeSource } from "./exchanges/types";
+import { writeLessons } from "./council/lessons";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -226,6 +227,7 @@ export async function runResolution(
   const outcomes: ResolveOutcome[] = [];
   for (const questionId of questionIds) {
     outcomes.push(await resolveOne(deps, questionId));
+    await writeLessons(deps, questionId);
   }
   await narrateResolution(deps, date, outcomes);
   return outcomes;
