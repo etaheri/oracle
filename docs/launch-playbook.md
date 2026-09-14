@@ -121,7 +121,17 @@ the next of those hours it does nothing at all.
    it shows 0 points and null comparisons. Parsing is safe; nothing crashes and
    nothing 500s. It stays that way until the mobile plan ships.
 
-### 2.4 Set secrets
+### 2.4 The Council (design 2026-09-11 §17)
+
+1. Apply migration 0015 to `oracle-prod` by hand, as 0014 was.
+2. `npx wrangler secret put EXA_API_KEY` in `apps/api`.
+3. `pnpm --filter @oracle/api deploy`. The deploy creates the `oracle-council` Workflow from `wrangler.jsonc`. Open `https://oracle-api.etaheri.workers.dev/standings`: it renders with zero calls.
+4. On a day with a scheduled version 3 round, before noon ET: `curl -X POST -H "x-admin-secret: …" https://oracle-api.etaheri.workers.dev/admin/rounds/<date>/council`. Read the Telegram message: five packs with item counts, each member's line per slot, the median, the line, the Exa cost. Record the observed cost per pack here: ____ per pack, ____ per night.
+5. After that round settles the next evening: `GET /admin/lessons` shows up to fifteen rows; `/standings` shows the first calls.
+6. Add the Standings link on the site (`apps/site`) and `pnpm --filter site deploy`.
+7. Ship the mobile build with the split and the reading.
+
+### 2.5 Set secrets
 
 `WorkerEnv` in `apps/api/src/worker.ts` is the authoritative list; the comment
 block at the bottom of `apps/api/wrangler.jsonc` mirrors it. Keep the two in
@@ -157,7 +167,7 @@ wrangler secret put ONESIGNAL_API_KEY
 authoring and forecast routes 503 without it. §3 is where you watch the first
 unattended cycle, not where you arm it.
 
-### 2.5 Deploy
+### 2.6 Deploy
 
 ```bash
 cd apps/api && pnpm deploy
@@ -189,7 +199,7 @@ curl -s -X POST -H "x-admin-secret: $ADMIN_SECRET" -H "content-type: application
   -d '{"reason":"misauthored"}' https://<worker-url>/admin/questions/<question-id>/withdraw
 ```
 
-### 2.6 Wire the URL back out
+### 2.7 Wire the URL back out
 
 The deployed origin is now an input to three other systems:
 
