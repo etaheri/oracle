@@ -4,7 +4,7 @@
 // member. That ceiling is what makes the September 9 failure structurally
 // impossible — no member can be shown a recap of last week's meeting as if
 // it were this one.
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
 
@@ -33,13 +33,17 @@ export function resolutionDomains(rules: string, exchangeUrl: string | null): st
 }
 
 async function search(deps: PipelineDeps, key: string, q: { resolutionCriteria: string; sourceUrl: string | null }, now: Date): Promise<{ results: ExaResult[]; cost: number }> {
+  const domains = resolutionDomains(q.resolutionCriteria, q.sourceUrl);
   const body = {
+    // No separate exchange title here: market-round.ts's toDraft already
+    // prefixes it onto resolutionCriteria (`${c.title}\n\n${c.rules}`), so
+    // the first QUERY_CHARS of the criteria already carry it.
     query: q.resolutionCriteria.slice(0, EVIDENCE.QUERY_CHARS),
     type: "auto",
     numResults: EVIDENCE.RESULTS,
     startPublishedDate: new Date(now.getTime() - EVIDENCE.WINDOW_DAYS * 86_400_000).toISOString(),
     endPublishedDate: now.toISOString(),
-    ...(resolutionDomains(q.resolutionCriteria, q.sourceUrl) ? { includeDomains: resolutionDomains(q.resolutionCriteria, q.sourceUrl) } : {}),
+    ...(domains ? { includeDomains: domains } : {}),
     contents: { highlights: { numSentences: EVIDENCE.HIGHLIGHT_SENTENCES, highlightsPerUrl: 1 } },
   };
   const res = await (deps.exaFetch ?? fetch)(EXA_URL, {

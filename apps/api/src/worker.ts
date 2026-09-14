@@ -58,10 +58,10 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
         }
       : null;
   if (!bindings) {
-    // Not fatal, but it means authoring and resolution run inside the cron's
-    // hard 15-minute cap — which is the exact bug the Workflow substrate
-    // exists to fix (design 2026-09-04 §2.1).
-    console.warn("pipeline: no Workflow bindings; long actions will run inline inside the cron's 15-minute cap");
+    // Not fatal, but it means authoring, resolution and the Council all run
+    // inside the cron's hard 15-minute cap — which is the exact bug the
+    // Workflow substrate exists to fix (design 2026-09-04 §2.1).
+    console.warn("pipeline: missing a Workflow binding (all three of AUTHORING_WORKFLOW, RESOLUTION_WORKFLOW and COUNCIL_WORKFLOW are required); long actions will run inline inside the cron's 15-minute cap");
   }
   const db = makeDb(env.DATABASE_URL);
   return {
@@ -110,9 +110,10 @@ export default {
       },
       pipeline: buildPipelineDeps(env),
       // Independent of buildPipelineDeps's all-or-nothing bindings check
-      // (which requires both before the pipeline will dispatch to any):
+      // (which requires all three — AUTHORING_WORKFLOW, RESOLUTION_WORKFLOW
+      // and COUNCIL_WORKFLOW — before the pipeline will dispatch to any):
       // the admin routes should read whichever bindings a deployment happens
-      // to have, even mid-rollout with only one configured.
+      // to have, even mid-rollout with only one or two configured.
       workflows: {
         AUTHORING_WORKFLOW: env.AUTHORING_WORKFLOW,
         RESOLUTION_WORKFLOW: env.RESOLUTION_WORKFLOW,

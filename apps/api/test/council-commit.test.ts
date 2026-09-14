@@ -13,6 +13,9 @@ import type { MemberResult } from "../src/pipeline/council/member";
 // database clock, so a real date would fail with "opening deadline passed".
 const DATE = "2099-09-10";
 const NOW = new Date("2099-09-10T14:00:00Z");
+// Past world()'s 16:00 opening — commit_oracle_forecast raises "opening
+// deadline passed" the instant p_checked_at (deps.now()) reaches it.
+const LATE = new Date("2099-09-10T17:00:00Z");
 type TestDb = Awaited<ReturnType<typeof makeTestDb>>["db"];
 
 function makeDeps(db: TestDb, claude: { structured: ClaudeClient["structured"] } | null, sent: string[] = []): PipelineDeps {
@@ -135,6 +138,21 @@ describe("commitCouncil (spec §7)", () => {
     expect(after!.linePYes).not.toBeNull();
     expect(Number(after!.linePYes)).toBe(0.40);
   });
+
+  it("reports an uncommitted outcome, not a rejection, when commit_council itself raises", async () => {
+    // commit_council wraps commit_oracle_forecast, which raises (rather than
+    // returning false) once the opening deadline has passed — the same
+    // failure that used to exhaust the Workflow's `commit` step's retries and
+    // strand the round with no narration at all (finding 1).
+    const { db, rows } = await world();
+    const deps = { ...makeDeps(db, null), now: () => LATE };
+    const c = await commitCouncil(deps, DATE, [result("sonnet", rows, 0.40), result("opus", rows, 0.31)]);
+    expect(c.committed).toBe(false);
+    expect(c.reason).toMatch(/deadline/);
+    expect(c.lines).toBe(0);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) });
+    expect(round!.oracleCommittedAt).toBeNull();
+  });
 });
 
 describe("runCouncil (the inline path)", () => {
@@ -161,6 +179,17 @@ describe("runCouncil (the inline path)", () => {
     expect(run.commit!.committed).toBe(false);
     expect(sent[0]).toMatch(/^‼️/);
     expect(sent[0]).toContain("opus abstained (down)");
+  });
+  it("narrates with ‼️, not a rejection, when commit_council raises past the opening deadline", async () => {
+    const { db } = await world();
+    const sent: string[] = [];
+    const claude = { structured: async (c: StructuredCall) => { const p = c.model === "m-opus" ? 0.31 : c.model === "m-haiku" ? 0.44 : 0.40; return { lines: [1, 2, 3, 4, 5].map((slot) => ({ slot, p_yes: p, reasoning: "R.", cited: [1] })) }; } };
+    const deps = { ...makeDeps(db, claude, sent), now: () => LATE };
+    const run = await runCouncil(deps, DATE);
+    expect(run.commit!.committed).toBe(false);
+    expect(run.commit!.reason).toMatch(/deadline/);
+    expect(sent[0]).toMatch(/^‼️/);
+    expect(sent[0]).toContain("opens unstaked");
   });
   it("returns early on a version 2 round and on a committed round", async () => {
     const { db } = await world(2);
@@ -192,5 +221,10 @@ describe("runCouncil (the inline path)", () => {
     expect(sent[0]).not.toMatch(/^‼️/);
     expect(sent[0]).not.toContain("opens unstaked");
     expect(sent[0]).toContain(`council ${DATE}: already committed; nothing written`);
+    // Each slot line reports the line that landed, not "no median" — commit's
+    // slots array is [] on an already-committed outcome, so the member/median
+    // form would be misleading here (finding 3).
+    expect(sent[0]).toContain("slot 1: committed line 40");
+    expect(sent[0]).not.toContain("no median");
   });
 });

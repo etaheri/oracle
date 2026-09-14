@@ -8,8 +8,20 @@ import { MODEL_MEMBER_IDS, medianLine } from "@oracle/core";
 import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
 import { commitLine } from "../line";
+import { BudgetExhausted } from "../spend";
 import { COUNCIL_PROMPT_VERSION, memberModel } from "./members";
 import type { MemberResult } from "./member";
+
+// drizzle-orm wraps a raised Postgres exception (e.g. commit_oracle_forecast's
+// "opening deadline passed") in a DrizzleQueryError whose own .message is the
+// generic "Failed query: ...", with the actual exception text on .cause — see
+// council-schema.test.ts. Prefer that when present.
+function errorReason(err: unknown): string {
+  if (err instanceof Error) {
+    return err.cause instanceof Error ? err.cause.message : err.message;
+  }
+  return String(err);
+}
 
 export interface CouncilCommit {
   committed: boolean;
@@ -59,24 +71,37 @@ export async function commitCouncil(deps: PipelineDeps, date: string, results: M
   });
 
   const checkedAt = deps.now();
-  // db.execute returns a driver-shaped result: neon-http and PGlite both give
-  // { rows }, but the widened PgDatabase type (src/db/client.ts) promises
-  // neither shape — see src/resolution.ts's executeRows for the same defensive
-  // read.
-  const res: unknown = await deps.db.execute(sql`select commit_council(
-    ${date}::date, ${JSON.stringify(snapshot)}::jsonb, ${JSON.stringify(lines)}::jsonb,
-    ${COUNCIL_PROMPT_VERSION}, ${checkedAt.toISOString()}::timestamptz
-  ) as ok`);
-  const resultRows = (res as { rows?: unknown[] } | null)?.rows ?? (Array.isArray(res) ? res : []);
-  const ok = Boolean((resultRows[0] as { ok?: boolean } | undefined)?.ok);
-  if (!ok) {
-    // commit_council itself returned false: another call landed first,
-    // between our own read of oracleCommittedAt above and this statement.
-    // Same reasoning as the early return above — the round is staked, so
-    // close out the line rather than strand it.
+  try {
+    // db.execute returns a driver-shaped result: neon-http and PGlite both
+    // give { rows }, but the widened PgDatabase type (src/db/client.ts)
+    // promises neither shape — see src/resolution.ts's executeRows for the
+    // same defensive read.
+    const res: unknown = await deps.db.execute(sql`select commit_council(
+      ${date}::date, ${JSON.stringify(snapshot)}::jsonb, ${JSON.stringify(lines)}::jsonb,
+      ${COUNCIL_PROMPT_VERSION}, ${checkedAt.toISOString()}::timestamptz
+    ) as ok`);
+    const resultRows = (res as { rows?: unknown[] } | null)?.rows ?? (Array.isArray(res) ? res : []);
+    const ok = Boolean((resultRows[0] as { ok?: boolean } | undefined)?.ok);
+    if (!ok) {
+      // commit_council itself returned false: another call landed first,
+      // between our own read of oracleCommittedAt above and this statement.
+      // Same reasoning as the early return above — the round is staked, so
+      // close out the line rather than strand it.
+      await commitLine(deps.db, date);
+      return { committed: false, reason: "already committed", lines: 0, slots };
+    }
     await commitLine(deps.db, date);
-    return { committed: false, reason: "already committed", lines: 0, slots };
+    return { committed: true, reason: null, lines: lines.length, slots };
+  } catch (err) {
+    // commit_council can raise (opening deadline passed, question snapshot
+    // changed, predictions already submitted): db.execute rejects, and
+    // without this catch the Workflow's `commit` step exhausts its retries,
+    // the instance fails, and `narrate` never runs — the round opens
+    // unstaked in silence. Report it as an ordinary uncommitted outcome
+    // instead, so narrateCouncil can raise the ‼️ head it already has.
+    // BudgetExhausted still propagates: it is mapped to a NonRetryableError
+    // by durableStep, not narrated as a council outcome.
+    if (err instanceof BudgetExhausted) throw err;
+    return { committed: false, reason: errorReason(err), lines: 0, slots };
   }
-  await commitLine(deps.db, date);
-  return { committed: true, reason: null, lines: lines.length, slots };
 }

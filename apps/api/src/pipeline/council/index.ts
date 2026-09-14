@@ -39,7 +39,15 @@ const pct = (p: number) => String(Math.round(p * 100));
 export async function narrateCouncil(deps: PipelineDeps, date: string, run: CouncilRun): Promise<void> {
   if (!run.editable || !run.commit) return;
   const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date), orderBy: (q, { asc }) => [asc(q.slot)], columns: { id: true, slot: true, marketProb: true, linePYes: true } });
+  // "already committed" carries slots: [] (commitCouncil never computed the
+  // medians for a round already staked), so the member/median form below
+  // would read "no median" on every slot under a head that already says the
+  // round is committed. Print what actually happened instead: the line that
+  // landed, from the questions row itself.
   const slotLines = qs.map((q) => {
+    if (run.commit!.reason === "already committed") {
+      return `slot ${q.slot}: committed line ${q.linePYes === null ? "—" : pct(Number(q.linePYes))}`;
+    }
     const s = run.commit!.slots.find((x) => x.slot === q.slot);
     const parts = MODEL_MEMBER_IDS.map((m) => {
       const l = run.members.find((r) => r.member === m)?.lines.find((x) => x.questionId === q.id);

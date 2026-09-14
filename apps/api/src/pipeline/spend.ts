@@ -24,9 +24,9 @@ import { sql } from "drizzle-orm";
 import { schema, type Db } from "../db/client";
 import type { ClaudeClient, StructuredCall } from "./claude";
 
-// Roughly three times a nominal night (authoring 1, critic 1, pre-flight ~12,
+// Roughly 2.2 times a nominal night (authoring 1, critic 1, pre-flight ~12,
 // taste 1, forecast 1 (version 2) or council 3 (version 3), lessons up to 15
-// at settlement, resolution 5x2, probes ~25 = ~52): high enough that a normal
+// at settlement, resolution 5x2, probes ~25 = ~68): high enough that a normal
 // night never approaches it, low enough that a retry storm is capped within
 // hours rather than days.
 export const PIPELINE_DAILY_CALL_BUDGET = 150;

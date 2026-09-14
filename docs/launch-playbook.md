@@ -125,7 +125,7 @@ the next of those hours it does nothing at all.
 
 1. Apply migration 0015 to `oracle-prod` by hand, as 0014 was.
 2. `npx wrangler secret put EXA_API_KEY` in `apps/api`.
-3. `pnpm --filter @oracle/api deploy`. The deploy creates the `oracle-council` Workflow from `wrangler.jsonc`. Open `https://oracle-api.etaheri.workers.dev/standings`: it renders with zero calls.
+3. `pnpm --filter @oracle/api deploy`. The deploy creates the `oracle-council` Workflow from `wrangler.jsonc`. The deploy must register all three Workflow bindings (`oracle-authoring`, `oracle-resolution`, `oracle-council`); with any one missing, `buildPipelineDeps` falls back to running every kind inline inside the cron's 15-minute cap. Open `https://oracle-api.etaheri.workers.dev/standings`: it renders with zero calls.
 4. On a day with a scheduled version 3 round, before noon ET: `curl -X POST -H "x-admin-secret: …" https://oracle-api.etaheri.workers.dev/admin/rounds/<date>/council`. Read the Telegram message: five packs with item counts, each member's line per slot, the median, the line, the Exa cost. Record the observed cost per pack here: ____ per pack, ____ per night.
 5. After that round settles the next evening: `GET /admin/lessons` shows up to fifteen rows; `/standings` shows the first calls.
 6. Add the Standings link on the site (`apps/site`) and `pnpm --filter site deploy`.

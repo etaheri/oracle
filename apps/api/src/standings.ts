@@ -2,7 +2,7 @@
 // settled version 3 question, the crowd and the market beside them, and the
 // CSV that is the dataset. Nothing here names a player.
 import { and, asc, eq, gte, inArray, isNotNull } from "drizzle-orm";
-import { MEMBER_ORDER, clampLine, standingsRow, type Standings, type StandingsCall } from "@oracle/core";
+import { MEMBER_ORDER, standingsRow, type Standings, type StandingsCall } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 export interface SettledCall {
@@ -114,5 +114,5 @@ export function standingsHtml(s: Standings): string {
   const rows = s.rows.map((r) =>
     `<tr><td>${escapeHtml(NAMES[r.member] ?? r.member)}</td><td class="n">${r.calls}</td><td class="n">${r.brier === null ? "—" : r.brier.toFixed(3)}</td><td class="n">${r.house_delta > 0 ? "+" : ""}${r.house_delta}</td></tr>`,
   ).join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standings · Outsee</title><style>${STYLE}</style></head><body><div class="wrap"><a class="brand" href="/">Outsee</a><h1>Standings</h1><p>Each member of the Council commits a line on every question before it opens. Brier is the mean squared error of the line, lower is better; house delta is what the purse would have done with that member alone, at the stakes players actually placed.</p><table><thead><tr><th>Member</th><th>Calls</th><th>Brier</th><th>House delta</th></tr></thead><tbody>${rows}</tbody></table><p>${s.questions} questions over ${s.rounds} rounds, as of ${escapeHtml(s.as_of.slice(0, 10))}. <a href="/v1/standings?format=csv">Download the record as CSV</a> · <a href="/v1/standings">JSON</a></p></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standings · Outsee</title><style>${STYLE}</style></head><body><div class="wrap"><a class="brand" href="https://outseen-site.etaheri.workers.dev/">Outsee</a><h1>Standings</h1><p>Each member of the Council commits a line on every question before it opens. Brier is the mean squared error of the line, lower is better; house delta is what the purse would have done with that member alone, at the stakes players actually placed.</p><table><thead><tr><th>Member</th><th>Calls</th><th>Brier</th><th>House delta</th></tr></thead><tbody>${rows}</tbody></table><p>${s.questions} questions over ${s.rounds} rounds, as of ${escapeHtml(s.as_of.slice(0, 10))}. <a href="/v1/standings?format=csv">Download the record as CSV</a> · <a href="/v1/standings">JSON</a></p></div></body></html>`;
 }
