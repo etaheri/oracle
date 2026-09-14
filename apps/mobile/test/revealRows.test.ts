@@ -38,6 +38,8 @@ function reveal({ vigil_mult, outcomes, first_hour = false }: { vigil_mult: numb
     fortune_after: null,
     house_delta: null,
     questions: outcomes.map((outcome, i) => question({ slot: i + 1, outcome })),
+    council: [],
+    evidence: [],
     ledger: { settled: true, streak: 3, calls_rated: 12, oracle_score: null },
   };
 }

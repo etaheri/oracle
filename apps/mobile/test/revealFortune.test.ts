@@ -12,6 +12,7 @@ const q = (over: Omit<Partial<Q>, "my"> & { my?: Partial<NonNullable<Q["my"]>> |
 const reveal = (over: Partial<Reveal>): Reveal => ({
   rules_version: 3, bonus_points: 0, date: "2026-09-10", day_points: 0, first_hour: false, candidates_written: 0, candidates_rejected: 0,
   vigil_mult: 1, delta: 140, return: 0.14, fortune_after: 1140, house_delta: -140, questions: [q({})],
+  council: [], evidence: [],
   ledger: { settled: true, streak: 1, calls_rated: 5, oracle_score: null }, ...over,
 });
 
