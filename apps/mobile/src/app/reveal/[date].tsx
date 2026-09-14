@@ -34,6 +34,7 @@ import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeR
 import { rivalryMoment } from "../../game/rivalryMoment";
 import { capture } from "../../analytics/analytics";
 import { colors, space, displayScale, ROW_H } from "../../theme";
+import { councilFor, splitRows, SPLIT_ROW_H, type SplitRow } from "../../game/council";
 
 const easeOut = Easing.out(Easing.poly(4));
 const ROW_DELAY = 0;
@@ -77,6 +78,22 @@ const TideFlash = new Keyframe({
   40: { opacity: 1 },
   100: { opacity: 0, easing: Easing.out(Easing.poly(4)) },
 }).duration(900).delay(BIG_ONE_DELAY + 500);
+
+// The Council split (design 2026-09-11 §15.2): one row per member under the
+// line, coloured by the side it was on, then the house line. Reserves its
+// height only when it has rows, so a version 2 reveal, an unstaked round and
+// a pending reveal lose nothing.
+function CouncilSplit({ rows, fontScale, align = "left" }: { rows: SplitRow[]; fontScale: number; align?: "left" | "center" }) {
+  if (rows.length === 0) return null;
+  const tone = (t: SplitRow["tone"]) => (t === "win" ? colors.goldText : t === "loss" ? colors.vermilion : colors.mutedInk);
+  return (
+    <View style={{ minHeight: scaledRow(SPLIT_ROW_H, fontScale) * rows.length, gap: 0 }} accessibilityRole="text" accessibilityLabel={`The Council: ${rows.map((r) => r.label.toLowerCase()).join(", ")}`}>
+      {rows.map((r) => (
+        <Mono key={r.member} {...role.meta} color={tone(r.tone)} style={[role.meta.style, { textAlign: align }]}>{r.label}</Mono>
+      ))}
+    </View>
+  );
+}
 
 export default function RevealScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
@@ -490,8 +507,7 @@ export default function RevealScreen() {
                   {context ? (
                     <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{context}</Mono>
                   ) : null}
-                  {/* Council split lands here (spec §13.3, Plan 3). */}
-                  {money && <View style={{ minHeight: 0 }} accessibilityElementsHidden />}
+                  {money && <CouncilSplit rows={splitRows(councilFor(d, q.id), q.line_p_yes)} fontScale={fontScale} />}
                   {/* How the tide moved after this player sealed (design
                       2026-09-09 §4.1) — no reserved space: rows are already
                       variable height, and most days say nothing here. */}
@@ -595,6 +611,7 @@ export default function RevealScreen() {
                       </Mono>
                     )
                   )}
+                  {fortuneRound && <CouncilSplit rows={splitRows(councilFor(d, big.id), big.line_p_yes)} fontScale={fontScale} />}
                   {fortuneRound && oracleTake(big) && (
                     <Mono {...role.caption} color={(big.my?.delta ?? 0) > 0 ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{oracleTake(big)}</Mono>
                   )}
