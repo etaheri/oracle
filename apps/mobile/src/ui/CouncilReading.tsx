@@ -9,7 +9,7 @@ import { Pressable, Text, View } from "react-native";
 import type { CouncilEntry, EvidenceItem } from "@oracle/core";
 import { Mono, Serif, role } from "./Text";
 import { EvidenceCard } from "./EvidenceCard";
-import { readingFor, memberName, READING_LINK } from "../game/council";
+import { readingFor, memberName } from "../game/council";
 import { capture } from "../analytics/analytics";
 import { colors, space } from "../theme";
 
@@ -30,7 +30,7 @@ export function CouncilReading({ entry, pack, questionId }: { entry: CouncilEntr
       }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
         <Mono {...role.line} color={colors.mutedInk} style={[role.line.style, { textAlign: "left" }]}>
           <Text style={{ color: colors.agedGold }}>[</Text>
-          {open ? ` HIDE ${name}'S READING ` : ` ${READING_LINK} · ${name} `}
+          {open ? ` HIDE ${name}'S READING ` : ` ${name}'S READING `}
           <Text style={{ color: colors.agedGold }}>]</Text>
         </Mono>
       </Pressable>

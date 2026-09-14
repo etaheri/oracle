@@ -6,6 +6,9 @@ import { MEMBER_ORDER, type CouncilEntry, type EvidenceItem, type Reveal } from 
 export type SplitTone = "win" | "loss" | "mute";
 export interface SplitRow { member: CouncilEntry["member"] | "line"; label: string; tone: SplitTone }
 
+// No longer read by CouncilReading's closed label (final review finding 5:
+// the label became "<MEMBER>'S READING" to fit iPhone width) — kept as an
+// export in case another surface still wants "the reading" phrased generically.
 export const READING_LINK = "THE ORACLE'S READING";
 // One meta row of machine voice; the slot reserves rows × this when it has rows.
 export const SPLIT_ROW_H = 15;
