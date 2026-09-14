@@ -85,6 +85,17 @@ describe("writeLessons (spec §8)", () => {
     await writeLessons(makeDeps(db, { structured: async () => ({ text: "L." }) }), q.id);
     expect((await db.query.lessons.findFirst())!.seriesKey).toBe("news");
   });
+
+  it("never throws — a failing read is an error value too, not a throw", async () => {
+    const { db, q } = await settled("yes");
+    const failingDb = {
+      ...db,
+      query: { ...db.query, questions: { ...db.query.questions, findFirst: async () => { throw new Error("db down"); } } },
+    } as unknown as TestDb;
+    const r = await writeLessons(makeDeps(failingDb, { structured: async () => ({ text: "L." }) }), q.id);
+    expect(r.written).toBe(0);
+    expect(r.error).toContain("db down");
+  });
 });
 
 describe("the admin lessons routes", () => {

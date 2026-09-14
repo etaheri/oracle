@@ -25,34 +25,45 @@ const SYSTEM = `You write one lesson for a forecaster reviewing its own settled 
 const NAMES: Record<ModelMemberId, string> = { sonnet: "Sonnet", opus: "Opus", haiku: "Haiku" };
 
 export async function writeLessons(deps: PipelineDeps, questionId: string): Promise<LessonsOutcome> {
-  const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
-  if (!q || q.outcome === null || q.outcome === "void" || q.resolvedAt === null) return { questionId, written: 0, skipped: 0 };
-  const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate), columns: { rulesVersion: true } });
-  if (!round || round.rulesVersion < 3) return { questionId, written: 0, skipped: 0 };
-  const lines = await deps.db.query.lines.findMany({ where: eq(schema.lines.questionId, questionId) });
-  const have = new Set((await deps.db.query.lessons.findMany({ where: eq(schema.lessons.questionId, questionId), columns: { member: true } })).map((l) => l.member));
-
   let written = 0;
   let skipped = 0;
   const errors: string[] = [];
-  for (const member of MODEL_MEMBER_IDS) {
-    const line = lines.find((l) => l.member === member);
-    if (!line) continue;
-    if (have.has(member)) { skipped++; continue; }
-    if (!deps.claude) { errors.push(`${member}: no claude client`); continue; }
-    const user = `MEMBER: ${NAMES[member]}\nQUESTION: ${q.text}\nRESOLVES BY: ${q.resolutionCriteria}\nSERIES: ${seriesKeyOf(q)}\nYOUR LINE: ${Number(line.pYes)} (probability of YES)\nYOUR REASONING: ${line.reasoning ?? "(none)"}\nOUTCOME: ${q.outcome.toUpperCase()}`;
-    try {
-      const res = await deps.claude.structured({ model: lessonModel(deps), system: SYSTEM, user, schemaName: "lesson", schema: lessonJsonSchema });
-      const parsed = LessonSchema.safeParse(res);
-      if (!parsed.success) { errors.push(`${member}: response failed the lesson schema`); continue; }
-      await deps.db.insert(schema.lessons)
-        .values({ member, seriesKey: seriesKeyOf(q), questionId, text: parsed.data.text.trim(), resolvedAt: q.resolvedAt })
-        .onConflictDoNothing();
-      written++;
-    } catch (err) {
-      if (err instanceof BudgetExhausted) throw err;
-      errors.push(`${member}: ${err instanceof Error ? err.message : String(err)}`);
+  // The whole body, not just the per-member calls, is guarded: a step named
+  // "lessons-<id>" exists precisely so a failure here can never fail the
+  // resolution it follows, and that promise has to hold for the reads below
+  // too, not only for the model calls. BudgetExhausted is the one exception
+  // that must still reach the caller (durableStep maps it to a day-level
+  // stop) — everything else becomes a value.
+  try {
+    const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+    if (!q || q.outcome === null || q.outcome === "void" || q.resolvedAt === null) return { questionId, written: 0, skipped: 0 };
+    const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate), columns: { rulesVersion: true } });
+    if (!round || round.rulesVersion < 3) return { questionId, written: 0, skipped: 0 };
+    const lines = await deps.db.query.lines.findMany({ where: eq(schema.lines.questionId, questionId) });
+    const have = new Set((await deps.db.query.lessons.findMany({ where: eq(schema.lessons.questionId, questionId), columns: { member: true } })).map((l) => l.member));
+
+    for (const member of MODEL_MEMBER_IDS) {
+      const line = lines.find((l) => l.member === member);
+      if (!line) continue;
+      if (have.has(member)) { skipped++; continue; }
+      if (!deps.claude) { errors.push(`${member}: no claude client`); continue; }
+      const user = `MEMBER: ${NAMES[member]}\nQUESTION: ${q.text}\nRESOLVES BY: ${q.resolutionCriteria}\nSERIES: ${seriesKeyOf(q)}\nYOUR LINE: ${Number(line.pYes)} (probability of YES)\nYOUR REASONING: ${line.reasoning ?? "(none)"}\nOUTCOME: ${q.outcome.toUpperCase()}`;
+      try {
+        const res = await deps.claude.structured({ model: lessonModel(deps), system: SYSTEM, user, schemaName: "lesson", schema: lessonJsonSchema });
+        const parsed = LessonSchema.safeParse(res);
+        if (!parsed.success) { errors.push(`${member}: response failed the lesson schema`); continue; }
+        await deps.db.insert(schema.lessons)
+          .values({ member, seriesKey: seriesKeyOf(q), questionId, text: parsed.data.text.trim(), resolvedAt: q.resolvedAt })
+          .onConflictDoNothing();
+        written++;
+      } catch (err) {
+        if (err instanceof BudgetExhausted) throw err;
+        errors.push(`${member}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
+  } catch (err) {
+    if (err instanceof BudgetExhausted) throw err;
+    errors.push(err instanceof Error ? err.message : String(err));
   }
   return { questionId, written, skipped, ...(errors.length ? { error: errors.join(" · ") } : {}) };
 }
