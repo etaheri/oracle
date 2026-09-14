@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { AppContext } from "../app";
 import { resolveQuestion, withdrawQuestion } from "../resolution";
 import { settleRound, resettleRound } from "../settlement";
@@ -163,9 +163,17 @@ export const adminRoutes = new Hono<AppContext>()
       where: eq(schema.questions.roundDate, date),
       orderBy: (questions, { asc }) => [asc(questions.slot)],
     });
+    const ids = questions.map((q) => q.id);
+    const [lineRows, evidenceRows] = ids.length
+      ? await Promise.all([
+          db.query.lines.findMany({ where: inArray(schema.lines.questionId, ids), columns: { questionId: true } }),
+          db.query.evidence.findMany({ where: inArray(schema.evidence.questionId, ids), columns: { questionId: true } }),
+        ])
+      : [[], []];
+    const countBy = (rows: { questionId: string }[], id: string) => rows.filter((r) => r.questionId === id).length;
     return c.json({
       round: { date: round.date, status: round.status },
-      questions: questions.map((q) => ({ id: q.id, slot: q.slot, status: q.status, text: q.text, category: q.category, outcome: q.outcome })),
+      questions: questions.map((q) => ({ id: q.id, slot: q.slot, status: q.status, text: q.text, category: q.category, outcome: q.outcome, lines: countBy(lineRows, q.id), evidence: countBy(evidenceRows, q.id) })),
     });
   })
   // Author a round for a named date, through the same market round the cron runs.

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
-import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal } from "@oracle/core";
+import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal, onRightSide, MEMBER_ORDER } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -140,9 +140,31 @@ export const roundRoutes = new Hono<AppContext>()
       db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) }),
       db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
     ]);
-    const mine = await db.query.predictions.findMany({
-      where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),
-    });
+    const qIds = qs.map((q) => q.id);
+    const [mine, councilRows, pack] = await Promise.all([
+      db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qIds)) }),
+      // The Council and its evidence (design 2026-09-11 §13). Only here, after
+      // lock: before it, the split is information and the house line is the
+      // one line the player plays against.
+      db.query.lines.findMany({ where: inArray(schema.lines.questionId, qIds) }),
+      db.query.evidence.findMany({ where: inArray(schema.evidence.questionId, qIds), orderBy: [asc(schema.evidence.questionId), asc(schema.evidence.rank)] }),
+    ]);
+    const memberRank = (m: string) => { const i = MEMBER_ORDER.indexOf(m as (typeof MEMBER_ORDER)[number]); return i === -1 ? MEMBER_ORDER.length : i; };
+    const council = qs.flatMap((q) =>
+      councilRows.filter((l) => l.questionId === q.id).sort((a, b) => memberRank(a.member) - memberRank(b.member)).map((l) => ({
+        question_id: q.id,
+        member: l.member,
+        p_yes: Number(l.pYes),
+        on_right_side: onRightSide(Number(l.pYes), q.outcome),
+        reasoning: l.reasoning,
+        cited: l.cited,
+        lessons_received: l.lessonsReceived.length,
+      })),
+    );
+    const evidence = pack.map((e) => ({
+      question_id: e.questionId, rank: e.rank, url: e.url, title: e.title, source: e.source,
+      published_at: e.publishedAt === null ? null : e.publishedAt.toISOString(), highlight: e.highlight,
+    }));
     const byQ = new Map(mine.map((p) => [p.questionId, p]));
     const perQuestionPoints = mine.map((p) => p.points ?? 0);
     const allFirstHour = mine.length === qs.length && mine.every((p) => p.firstHour);
@@ -192,6 +214,8 @@ export const roundRoutes = new Hono<AppContext>()
       first_hour: allFirstHour,
       candidates_written: round?.candidatesWritten ?? 0,
       candidates_rejected: round?.candidatesRejected ?? 0,
+      council,
+      evidence,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);
         const ev = evidenceSummary(q.resolutionEvidence);
