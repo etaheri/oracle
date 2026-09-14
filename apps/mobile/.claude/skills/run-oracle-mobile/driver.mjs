@@ -343,6 +343,10 @@ const commands = {
         ["culture", "Will the film hold the number one slot?", 0.42, 0.45, "void", 38, 121],
         ["news", "Will the committee publish before the round closes?", 0.70, 0.68, "yes", 55, 147],
       ];
+      // Clamp a member's line off the question's own line so nothing lands
+      // outside the range the split's colouring assumes.
+      const clamp = (x) => Math.max(0.05, Math.min(0.95, x));
+
       const ids = [];
       for (let i = 0; i < 5; i++) {
         const [cat, text, line, market, outcome, pct, cnt] = QS[i];
@@ -351,7 +355,39 @@ const commands = {
           [D, i + 1, i === 4, text, cat, "Per the named source on the closing day.", "reuters", "https://www.reuters.com",
            opens, locks, locks, outcome === "void" ? "void" : "resolved", outcome, locks, pct, cnt,
            0.45 + i * 0.03, String(line), String(line), String(market)]);
-        ids.push(r[0].id);
+        const qid = r[0].id;
+        ids.push(qid);
+
+        // The Council's own lines (design 2026-09-11 §15) -- three members
+        // committed near the house line plus the market's own row, so the
+        // reveal's split and reading have something to show.
+        const MEMBERS = [
+          ["sonnet", clamp(line - 0.05), "claude-sonnet-5",
+           "The reporting through the close leaned toward this side of the line. Nothing in the cited coverage suggested a late reversal was likely.",
+           "{1,2}"],
+          ["opus", clamp(line + 0.06), "claude-opus-5",
+           "The most recent account gave a clearer signal than the earlier ones did. That shifted this line a little further than the house's own.",
+           "{2}"],
+          ["haiku", clamp(line - 0.02), "claude-haiku-4-5",
+           "The available coverage was thin and largely repeated the same wire report. This line stays close to the house's own for that reason.",
+           "{}"],
+        ];
+        for (const [member, pYes, model, reasoning, cited] of MEMBERS) {
+          await sql.query(
+            "insert into lines(question_id,member,p_yes,committed_at,model,prompt_version,reasoning,cited) values($1,$2,$3,$4,$5,'council-v1',$6,$7::integer[])",
+            [qid, member, String(pYes), opens, model, reasoning, cited]);
+        }
+        await sql.query(
+          "insert into lines(question_id,member,p_yes,committed_at) values($1,'market',$2,$3)",
+          [qid, String(market), opens]);
+
+        const published = new Date(Date.parse(opens) - 86400000).toISOString();
+        for (let rank = 1; rank <= 3; rank++) {
+          await sql.query(
+            "insert into evidence(question_id,rank,url,title,source,published_at,highlight,retrieved_at) values($1,$2,$3,$4,'reuters.com',$5,$6,$7)",
+            [qid, rank, "https://www.reuters.com/" + cat + "-" + rank, "Report " + rank + ": " + text,
+             published, "A wire account bearing on this question, filed the day before the round opened.", opens]);
+        }
       }
 
       // The reader plus five more, so the field clears BOARD_MIN_FIELD (5).
