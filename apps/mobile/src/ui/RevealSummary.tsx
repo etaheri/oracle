@@ -28,12 +28,12 @@ export function RevealSummary({ data, milestone }: { data: Reveal; milestone: st
       <Mono {...role.line} color={colors.mutedInk}>YOU {highlight.my?.answer ? "YES" : "NO"} AT {highlight.my?.confidence}% · ANSWER {highlight.outcome?.toUpperCase()}</Mono>
       {learning && <>
         <Mono {...role.line} color={colors.mutedInk}>{`${learning.playerBasePoints > 0 ? "+" : ""}${learning.playerBasePoints} BASE POINTS${learning.doubleWeight ? " · DOUBLE WEIGHT" : ""}`}</Mono>
-        <Mono {...role.supporting}>Higher confidence makes a correct call worth more and a miss cost more.</Mono>
+        <Mono {...role.supporting}>Being surer makes a correct call worth more and a miss cost more.</Mono>
         {learning.oracleBasePoints !== null && <Mono {...role.line} color={colors.mutedInk}>{`THE ORACLE: ${learning.oracleBasePoints > 0 ? "+" : ""}${learning.oracleBasePoints} BASE POINTS · YOUR GAP: ${learning.gap! > 0 ? "+" : ""}${learning.gap}`}</Mono>}
       </>}
       <ResolutionEvidence question={highlight} />
     </View></GoldFrame>}
-    {!legacy && duel.status === "complete" && duel.youCorrect > duel.oracleCorrect && duel.winner === "oracle" && <Mono {...role.supporting}>More right answers, but fewer confidence points.</Mono>}
+    {!legacy && duel.status === "complete" && duel.youCorrect > duel.oracleCorrect && duel.winner === "oracle" && <Mono {...role.supporting}>More right answers, but fewer duel points.</Mono>}
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{summary.explanation}</Mono>
     {/* The most-confident-call line that used to share this slot had no
         meaning at a flat stake and is gone; the milestone keeps the slot. */}
