@@ -9,7 +9,9 @@ import { GAME_TERMS, CURRENT_GAME_COPY } from "../src/gameCopy";
 // the rules confusing and the metaphors a lot to manage; these words are
 // retired from everything a player reads. The archived version 1 canon
 // (RITES_LINES) keeps them because it is history, and is not scanned here.
-export const RETIRED = /\b(vigils?|shields?|exhibitions?|rites?|ledgers?|crowds?|conviction|epithets?|oracle rating)\b/i;
+// The Hand (design 2026-09-14 §8.1) retires confidence, calibration, the
+// ladder and its rungs from the surface as well.
+export const RETIRED = /\b(vigils?|shields?|exhibitions?|rites?|ledgers?|crowds?|conviction|epithets?|oracle rating|confidence|calibration|rungs?|ladder)\b/i;
 
 const SURFACE: Array<{ id: string; text: string }> = [
   ...COPY_BANK.map((l) => ({ id: l.id, text: l.text })),
@@ -43,7 +45,7 @@ describe("the vocabulary cut", () => {
 
   it("names the money words in the rules", () => {
     const rules = RITES_V2_SECTIONS.flatMap((s) => s.claims).join(" ").toLowerCase();
-    for (const word of ["line", "stake", "fortune", "big one", "streak protection", "practice", "void"]) {
+    for (const word of ["line", "stake", "fortune", "big one", "double", "best", "streak protection", "practice", "void"]) {
       expect(rules, word).toContain(word);
     }
   });

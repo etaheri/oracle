@@ -40,16 +40,16 @@ export const COPY_BANK: ReadonlyArray<CopyLine> = [
   { id: "noon.generic-3", pool: "noon", text: "A HUNCH IS A START. HOW SURE ARE YOU?" },
   { id: "noon.generic-4", pool: "noon", text: "THE ANSWER MATTERS. SO DOES HOW SURE YOU ARE." },
   { id: "noon.generic-5", pool: "noon", text: "OUTSEE THE ORACLE. OUTSCORE THE FIELD." },
-  { id: "noon.read-1", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results", "wrong"] },
-  { id: "noon.read-2", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-3", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-4", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-5", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-6", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-7", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-8", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
-  { id: "noon.read-9", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results", "wrong"] },
-  { id: "noon.read-10", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CONFIDENCE HOLD UP?", requires: ["results"] },
+  { id: "noon.read-1", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results", "wrong"] },
+  { id: "noon.read-2", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-3", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-4", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-5", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-6", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-7", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-8", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
+  { id: "noon.read-9", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results", "wrong"] },
+  { id: "noon.read-10", pool: "noon", text: "YOUR RESULT IS READY. HOW DID YOUR CALLS HOLD UP?", requires: ["results"] },
   { id: "noon.tide-1", pool: "noon", text: "YOU STOOD AGAINST THE TIDE. THE TIDE BROKE.", requires: ["tideWin"] },
   { id: "noon.tide-2", pool: "noon", text: "THE PLAYERS WENT ONE WAY. YOU WENT THE OTHER. THE RECORD BOWED TO YOU.", requires: ["tideWin"] },
   { id: "noon.tide-3", pool: "noon", text: "FEW STOOD WHERE YOU STOOD. THE HOUSE PAID.", requires: ["tideWin"] },
@@ -260,7 +260,7 @@ export const PLUS_CREED_LINES = [
 
 export const SCORE_GLOSS = Object.freeze({
   unwritten: "Fifty qualifying calls write your rating — five calls a day, at your own pace. A round qualifies when you complete every non-void question and at least three resolve.",
-  written: "How well your confidence matches what happens, across your latest qualifying calls.",
+  written: "How well your calls match what happens, across your latest qualifying calls.",
 } as const);
 
 // The Calling: the one-time cinematic on the app's very first open — the
@@ -339,8 +339,8 @@ export function provenanceLine(written: number, rejected: number): string | null
 // player has to meet it here before their first card.
 export const INTRO_LINES = [
   "The Oracle posts its line on five questions a day.",
-  "Tap YES or NO, then tap a stake from your fortune, then seal it.",
-  "Right calls pay at the Oracle's odds. Wrong calls lose the stake.",
+  "Swipe right for YES, left for NO. Every call stakes five percent of your fortune.",
+  "After your fifth seal, place your double on the call you're surest of. Right calls pay at the Oracle's odds.",
 ] as const;
 
 // RITES_LINES and OPENING_RITES_LINES above are the archived version-1 canon.
@@ -371,28 +371,29 @@ export const RITES_V2_SECTIONS = [
   // apart. The claims are plain sentences for the same reason — encoding the
   // caps in the source AND in `defines` says the same thing twice, and the
   // two drift.
-  rite("The game", ["line", "stake", "fortune", "big one"], [
+  rite("The game", ["line", "stake", "fortune", "big one", "double"], [
     "Five questions a day about what happens next, each a live market.",
     "On every question the Oracle posts its line: its own chance of YES.",
-    "Take a side and choose a stake, a slice of your fortune.",
+    "Swipe right for YES or left for NO; the swipe is the seal.",
+    "Every call stakes five percent of your fortune; the Big One stakes ten.",
     "A right call wins the stake at the Oracle's odds; a wrong call loses it.",
-    `Your fortune starts at ${FORTUNE.FOUNDING.toLocaleString("en-US")}. It can fall hard, but it never reaches zero.`,
-    "The Big One doubles the stake, in both directions.",
+    `Your fortune starts at ${FORTUNE.FOUNDING.toLocaleString("en-US")}. If it falls under ${FORTUNE.BUST_UNDER} the house has taken it, and a new fortune of ${FORTUNE.FOUNDING.toLocaleString("en-US")} opens at noon.`,
+    "After your fifth seal, place your double on the call you are surest of. Its stake doubles, and it stacks on the Big One.",
   ]),
   rite("Results and the board", ["reveal", "return", "void"], [
     "Questions settle from their markets after they close.",
     "The reveal shows each stake, what it paid, and whether the house won or lost the night.",
     "The daily board ranks players by return: what the day won or lost as a share of the fortune they started it with.",
-    "The all-time board ranks players by fortune.",
+    "The all-time board ranks players by their best fortune.",
     "A void question returns its stake to everyone.",
     `A placing needs at least ${CONSTANTS.BOARD_MIN_FIELD} eligible players and every non-void question sealed.`,
   ]),
-  rite("Your record", ["streak", "streak protection", "calibration"], [
+  rite("Your record", ["streak", "streak protection", "best"], [
     CURRENT_GAME_COPY.streakMeaning,
     `Streak protection carries a streak of ${CONSTANTS.SHIELD_MIN_STREAK} days or more through one missed round, adding no calls.`,
     "One free protection each month; Plus adds more.",
     "Practice questions do not count.",
-    "Your calibration is how well your confidence matched what happened, kept beside your fortune as the judgment record.",
+    "Your best fortune is the highest your fortune has ever reached, kept on your record through every bust.",
   ]),
   rite("Timing and fairness", ["lock"], [
     "Every question has its own lock; nothing seals after it.",
