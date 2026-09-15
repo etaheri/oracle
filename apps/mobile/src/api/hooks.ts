@@ -171,5 +171,13 @@ export function useDouble() {
       qc.invalidateQueries({ queryKey: ["round", "mine"] });
       qc.invalidateQueries({ queryKey: ["round", "today"] });
     },
+    // A refusal means the server's state has moved past the picture the tray
+    // was drawn from: the question locked, or the double already sits on
+    // another call (409 `placed`, from a client that missed it). Refetch the
+    // hand so the tray corrects itself instead of staying stuck on a stale
+    // one -- for `placed` that is the finale, and the tray simply goes.
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ["round", "mine"] });
+    },
   });
 }

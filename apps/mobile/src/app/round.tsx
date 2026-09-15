@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
 import { Mono, Ritual, role } from "../ui/Text";
@@ -12,7 +13,7 @@ import { crowdAnticipation } from "../game/crowdAnticipation";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
 import { DoubleTray } from "../ui/DoubleTray";
-import { trayTiles, trayState } from "../game/doubleTray";
+import { trayTiles, trayState, trayStage, DOUBLE_FAILED, TRAY_HOLD_MS } from "../game/doubleTray";
 import { capture } from "../analytics/analytics";
 import { SleepsPanel } from "../ui/SleepsPanel";
 import { AsciiDust } from "../ui/TerminalPatina";
@@ -73,6 +74,8 @@ export default function Round() {
   // crowd finale — the finale is the payoff, the tray is the decision.
   const [placedId, setPlacedId] = useState<string | null>(null);
   const [trayDone, setTrayDone] = useState(false);
+  // Set when a tap reached the server and was refused; cleared on the next one.
+  const [trayNotice, setTrayNotice] = useState<string | null>(null);
   useHydratePlayedState(!!today.data);
   // The payout reaches screen-reader players too: speak each card's verdict
   // once, when it first resolves (no-op while VoiceOver is off).
@@ -92,13 +95,34 @@ export default function Round() {
   const doubleId = mine.data?.double_question_id ?? placedId;
   const tray = trayDone ? "placed" : trayState(qs, minePreds, doubleId, now);
   const tiles = trayTiles(qs, minePreds, now);
+  const current = nextOpenQuestion(qs, (id) => !!answers[id]?.sealed, now);
+  // Card, tray, an empty beat, or the finale — see trayStage for why the
+  // empty beat exists.
+  const stage = trayStage({
+    hasOpenCard: !!current,
+    tray,
+    // `isPending` too: between the query becoming enabled and its first
+    // fetch actually starting, `isFetching` is still false and the hand is
+    // no more known than it is mid-flight. Both go false on an error, so a
+    // failed /today/mine falls through to the finale rather than hanging.
+    mineSettled: !mine.isFetching && !mine.isPending,
+    holdPlaced: !trayDone && placedId !== null,
+  });
+  // The placed tile holds its DOUBLED mark for a beat, then the stage moves
+  // on. In an effect, so leaving mid-beat cancels the timer with it.
+  useEffect(() => {
+    if (placedId === null || trayDone) return;
+    const id = setTimeout(() => setTrayDone(true), TRAY_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [placedId, trayDone]);
   // Leaving the tray unplaced is allowed (design §5.3) — and is the thing
-  // worth counting, so it is reported once, as the screen goes away.
-  const trayRef = useRef(tray);
-  trayRef.current = tray;
+  // worth counting, so it is reported once, as the screen goes away. The
+  // placed beat is not a skip, and neither is a tray the player never saw.
+  const trayOpenRef = useRef(false);
+  trayOpenRef.current = stage === "tray" && tray === "open";
   const dateRef = useRef(today.data?.date ?? null);
   dateRef.current = today.data?.date ?? null;
-  useEffect(() => () => { if (trayRef.current === "open" && dateRef.current) capture("double_skipped", { date: dateRef.current }); }, []);
+  useEffect(() => () => { if (trayOpenRef.current && dateRef.current) capture("double_skipped", { date: dateRef.current }); }, []);
 
   if (today.isLoading) return (
     <Screen>
@@ -122,7 +146,6 @@ export default function Round() {
   );
 
   const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
-  const current = nextOpenQuestion(qs, (id) => !!answers[id]?.sealed, now);
   const lastEntry = lastSealedId ? answers[lastSealedId] : undefined;
   const lastCrowd = lastSealedId ? crowdById.get(lastSealedId) : undefined;
   const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct, lastCrowd.player_count) : null;
@@ -153,16 +176,26 @@ export default function Round() {
               />
             </Animated.View>
           </View>}</CardStage>
-        ) : tray === "open" || (tray === "placed" && !trayDone && placedId !== null) ? (
-          <DoubleTray tiles={tiles} placedId={doubleId} pending={double.isPending} onPlace={(t) => {
+        ) : stage === "tray" ? (
+          <DoubleTray tiles={tiles} placedId={doubleId} pending={double.isPending} notice={trayNotice} onPlace={(t) => {
+            setTrayNotice(null);
             double.mutate({ question_id: t.id }, {
+              // The haptic lands with the double, not with the tap: it is the
+              // confirmation, and firing it on touch would promise a placement
+              // the server has not made yet.
               onSuccess: () => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                 setPlacedId(t.id);
                 capture("double_placed", { question_id: t.id, is_big_one: t.isBigOne, stake: t.doubledStake });
-                setTimeout(() => setTrayDone(true), 900);
               },
+              // useDouble refetches the hand, which corrects the tray on its
+              // own; this is the line for the beat before that lands, and for
+              // the failures a refetch cannot explain.
+              onError: () => setTrayNotice(DOUBLE_FAILED),
             });
           }} />
+        ) : stage === "waiting" ? (
+          <View style={{ flex: 1 }} />
         ) : (
           <View style={{ flex: 1, gap: space(2) }}>
             {anticipation && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "center" }]}>{anticipation}</Mono>}

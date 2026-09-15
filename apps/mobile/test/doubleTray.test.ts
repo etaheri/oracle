@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RoundToday, MineToday } from "@oracle/core";
-import { trayTiles, trayState } from "../src/game/doubleTray";
+import { trayTiles, trayState, trayStage } from "../src/game/doubleTray";
 
 type Q = RoundToday["questions"][number];
 const NOW = Date.parse("2026-09-14T17:00:00Z");
@@ -26,6 +26,13 @@ describe("the tray (design §5.3)", () => {
     expect(tiles).toHaveLength(1);
     expect(tiles[0]).toMatchObject({ id: "q1", locked: true });
   });
+  it("reads a placed double back at its base stake, never doubling it twice", () => {
+    // The server's double route stores `stake * 2` with `doubled = true`, so
+    // /today/mine comes back carrying the ALREADY doubled stake. The tile has
+    // to price from the base again or the beat after the tap reads 200 → 400.
+    const tiles = trayTiles([q(1)], [p(1, { stake: 100, doubled: true })], NOW);
+    expect(tiles[0]).toMatchObject({ stake: 50, doubledStake: 100, wins: 93, doubledWins: 186 });
+  });
   it("is hidden while a card is still open, open once the hand is sealed, placed once the double lands", () => {
     expect(trayState(five, [p(1), p(2), p(3), p(4)], null, NOW)).toBe("hidden");
     expect(trayState(five, [p(1), p(2), p(3), p(4), p(5)], null, NOW)).toBe("open");
@@ -37,5 +44,23 @@ describe("the tray (design §5.3)", () => {
     const allLocked = five.map((x) => ({ ...x, locks_at: "2026-09-14T16:00:00Z" }));
     expect(trayState(allLocked, [p(1), p(2), p(3), p(4), p(5)], null, NOW)).toBe("hidden");
     expect(trayState(five, [], null, NOW)).toBe("hidden");
+  });
+});
+
+describe("the stage after the last card (design §5.3)", () => {
+  it("waits rather than flashing the finale while the server's hand is still in flight", () => {
+    // `hasOpenCard` reads the local store and `tray` reads the server's rows,
+    // so on the fifth seal the mine refetch is still out when the card goes.
+    // "hidden" means "not known yet" there, not "there is no tray".
+    expect(trayStage({ hasOpenCard: true, tray: "hidden", mineSettled: false, holdPlaced: false })).toBe("card");
+    expect(trayStage({ hasOpenCard: false, tray: "hidden", mineSettled: false, holdPlaced: false })).toBe("waiting");
+    expect(trayStage({ hasOpenCard: false, tray: "hidden", mineSettled: true, holdPlaced: false })).toBe("finale");
+    expect(trayStage({ hasOpenCard: false, tray: "open", mineSettled: false, holdPlaced: false })).toBe("tray");
+  });
+  it("holds the tray for the beat after the double lands, then hands over to the finale", () => {
+    expect(trayStage({ hasOpenCard: false, tray: "placed", mineSettled: true, holdPlaced: true })).toBe("tray");
+    expect(trayStage({ hasOpenCard: false, tray: "placed", mineSettled: true, holdPlaced: false })).toBe("finale");
+    // A double placed on an earlier visit is settled fact: never a wait.
+    expect(trayStage({ hasOpenCard: false, tray: "placed", mineSettled: false, holdPlaced: false })).toBe("finale");
   });
 });
