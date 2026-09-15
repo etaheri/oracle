@@ -57,7 +57,7 @@ describe("round schemas", () => {
   });
   it("parses a real reveal payload incl. void and null my", () => {
     const payload = { ...validReveal, candidates_written: 15, candidates_rejected: 10 };
-    expect(RevealSchema.parse(payload)).toEqual({ ...payload, rules_version: 1, bonus_points: 0, delta: null, return: null, fortune_after: null, house_delta: null, council: [], evidence: [], questions: payload.questions.map((q) => ({ ...q, line_p_yes: null })) });
+    expect(RevealSchema.parse(payload)).toEqual({ ...payload, rules_version: 1, bonus_points: 0, delta: null, return: null, fortune_after: null, house_delta: null, bust_fortune: null, council: [], evidence: [], questions: payload.questions.map((q) => ({ ...q, line_p_yes: null })) });
   });
 });
 

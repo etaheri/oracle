@@ -27,30 +27,25 @@ describe("the practice outcome runs on the practice fortune", () => {
     expect(PRACTICE_FORTUNE).toBe(1000);
   });
 
-  it("pays a right call at the line's odds and never touches a real fortune", () => {
+  it("pays a right call at the line's odds on the flat stake and never touches a real fortune", () => {
     const ex = ExhibitionSchema.parse({ ...base, linePYes: 0.7 });
-    const out = practiceOutcome({ answer: true, confidence: 75 }, ex);
+    const out = practiceOutcome({ answer: true }, ex);
     expect(out.line).toBe(0.7);
     expect(out.stake).toBe(50);
     expect(out.wins).toBe(21); // round(50 × 0.3 / 0.7)
     expect(out.payout).toBe(71);
     expect(out.delta).toBe(21);
     expect(out.correct).toBe(true);
-    // Had the outcome gone the other way, the same call loses the stake.
     expect(out.oppositeDelta).toBe(-50);
   });
 
   it("loses the stake on a wrong call", () => {
     const ex = ExhibitionSchema.parse({ ...base, linePYes: 0.7 });
-    const out = practiceOutcome({ answer: false, confidence: 95 }, ex);
-    expect(out.stake).toBe(90);
+    const out = practiceOutcome({ answer: false }, ex);
+    expect(out.stake).toBe(50);
     expect(out.payout).toBe(0);
-    expect(out.delta).toBe(-90);
+    expect(out.delta).toBe(-50);
     expect(out.correct).toBe(false);
-    expect(out.oppositeDelta).toBe(210); // round(90 × 0.7 / 0.3)
-  });
-
-  it("rejects an off-grid confidence", () => {
-    expect(() => practiceOutcome({ answer: true, confidence: 72 }, ExhibitionSchema.parse(base))).toThrow();
+    expect(out.oppositeDelta).toBe(117); // round(50 × 0.7 / 0.3)
   });
 });

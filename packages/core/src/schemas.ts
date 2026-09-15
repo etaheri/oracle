@@ -13,7 +13,9 @@ export const ConfidenceSchema = z
 export const PredictionSubmitSchema = z.object({
   question_id: z.string().uuid(),
   answer: z.boolean(),
-  confidence: ConfidenceSchema,
+  // Accepted and ignored (design 2026-09-14 §6.1): the build on the store
+  // still sends one. The route writes FORTUNE.CONFIDENCE_FLAT.
+  confidence: ConfidenceSchema.optional(),
   idempotency_key: z.string().min(1).max(128),
 });
 export type PredictionSubmit = z.infer<typeof PredictionSubmitSchema>;
@@ -69,6 +71,7 @@ export const RoundNextSchema = z.object({ date: z.string(), opens_at: z.string()
 export type RoundNext = z.infer<typeof RoundNextSchema>;
 
 export const MineTodaySchema = z.object({
+  double_question_id: z.string().uuid().nullable().default(null),
   predictions: z.array(
     z.object({
       question_id: z.string().uuid(),
@@ -78,6 +81,9 @@ export const MineTodaySchema = z.object({
       // 2026-09-09 §4.1). Null on rows that predate the column.
       crowd_yes_pct_at_seal: z.number().int().min(0).max(100).nullable().default(null),
       crowd_count_at_seal: z.number().int().min(0).nullable().default(null),
+      // The frozen stake and whether the double sits on it (design 2026-09-14 §6.3).
+      stake: z.number().int().nullable().default(null),
+      doubled: z.boolean().default(false),
     }),
   ),
 });
@@ -125,6 +131,9 @@ export const RevealSchema = z.object({
   return: z.number().nullable().default(null),
   fortune_after: z.number().int().nullable().default(null),
   house_delta: z.number().int().nullable().default(null),
+  // Non-null means this round busted the caller, at this fortune (design
+  // 2026-09-14 §6.4). fortune_after then carries the same number.
+  bust_fortune: z.number().int().nullable().default(null),
   council: z.array(CouncilEntrySchema).default([]),
   evidence: z.array(EvidenceItemSchema).default([]),
   questions: z.array(
@@ -153,6 +162,7 @@ export const RevealSchema = z.object({
           stake: z.number().int().nullable().default(null),
           payout: z.number().int().nullable().default(null),
           delta: z.number().int().nullable().default(null),
+          doubled: z.boolean().default(false),
         })
         .nullable(),
       source_name: z.string(),
@@ -239,6 +249,13 @@ export type Standings = z.infer<typeof StandingsSchema>;
 export const SubmitResSchema = z.object({ id: z.string().uuid(), first_hour: z.boolean(), stake: z.number().int().nullable().default(null) });
 export type SubmitRes = z.infer<typeof SubmitResSchema>;
 
+// The double (design 2026-09-14 §6.2): one per round, on one of the caller's
+// own sealed calls, before that question's lock.
+export const DoubleSubmitSchema = z.object({ question_id: z.string().uuid() });
+export type DoubleSubmit = z.infer<typeof DoubleSubmitSchema>;
+export const DoubleResSchema = z.object({ question_id: z.string().uuid(), stake: z.number().int(), wins: z.number().int() });
+export type DoubleRes = z.infer<typeof DoubleResSchema>;
+
 export const ConfidenceBucketSchema = z.object({
   confidence: ConfidenceSchema,
   total: z.number().int().positive(),
@@ -295,6 +312,10 @@ export const MeLedgerSchema = z.object({
     days_compared: z.number().int(),
   }),
   fortune: z.number().int().nullable().default(null),
+  // The run (design 2026-09-14 §6.5): the highest fortune ever reached, and
+  // the first date of the current run (null for the founding run).
+  best_fortune: z.number().int().nullable().default(null),
+  run_started_on: z.string().nullable().default(null),
   fortune_history: z.array(z.object({ date: z.string(), delta: z.number().int(), fortune_after: z.number().int() })).default([]),
   // The purse, so home can print the house headline without an open round
   // (design §8.3). Same shape as /today's `house`. Defaulted for older servers.

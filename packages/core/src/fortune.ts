@@ -1,40 +1,37 @@
-// Fortune arithmetic (design 2026-09-10 §4). Pure, no I/O, integer fortune.
+// Fortune arithmetic (design 2026-09-10 §4, amended 2026-09-14 §4). Pure,
+// no I/O, integer fortune.
 import { CONSTANTS as C } from "./constants";
 
 export const FORTUNE = {
   FOUNDING: 1000,
-  STAKE_FRACTION_MAX: 0.10,   // ⚙ fraction of fortune at confidence 100
+  STAKE_FRACTION: 0.05,       // ⚙ every call stakes this share of the fortune
+  DOUBLE_MULT: 2,             // the player's double (the house's is BIG_ONE_MULT)
+  BUST_UNDER: 100,            // ⚙ a fortune under this at settlement busts
   LINE_MARKET_BAND: 0.15,     // ⚙ the line may sit this far from the market price
   LINE_MIN: 0.05,
   LINE_MAX: 0.95,
   HOUSE_FOUNDING: 0,
-  // Under this fortune the per-stake floor of 1 is dropped, so five stakes can
-  // never sum to the whole fortune. This is what makes "never reaches zero" true.
-  FLOOR_FROM: 10,
+  // Written to predictions.confidence on every seal (design 2026-09-14 H8).
+  // Never shown; keeps the points and Brier readers computing until the
+  // column is deleted after the deadline.
+  CONFIDENCE_FLAT: 75,
 } as const;
 
 export type Outcome = "yes" | "no" | "void";
 
-function assertOnGrid(confidence: number): void {
-  const ok =
-    Number.isInteger(confidence) &&
-    confidence >= C.CONFIDENCE_MIN &&
-    confidence <= C.CONFIDENCE_MAX &&
-    (confidence - C.CONFIDENCE_MIN) % C.CONFIDENCE_STEP === 0;
-  if (!ok) throw new Error(`fortune: confidence ${confidence} is off the grid`);
+/** The stake frozen at seal: STAKE_FRACTION of the fortune, doubled on the Big One, floor 1. */
+export function stake(fortune: number, isBigOne: boolean): number {
+  return Math.max(1, Math.round(fortune * FORTUNE.STAKE_FRACTION * (isBigOne ? C.BIG_ONE_MULT : 1)));
 }
 
-/** ((c − 50) / 50) × STAKE_FRACTION_MAX, doubled for the Big One. */
-export function stakeFraction(confidence: number, isBigOne: boolean): number {
-  assertOnGrid(confidence);
-  return ((confidence - 50) / 50) * FORTUNE.STAKE_FRACTION_MAX * (isBigOne ? 2 : 1);
+/** The stake after the player's double lands on it. */
+export function doubledStake(stake: number): number {
+  return stake * FORTUNE.DOUBLE_MULT;
 }
 
-/** The stake frozen at seal. Floor 1 from FLOOR_FROM upward; below, a zero stake is a valid unpaid call. */
-export function stake(fortune: number, confidence: number, isBigOne: boolean): number {
-  const raw = Math.round(fortune * stakeFraction(confidence, isBigOne));
-  if (fortune >= FORTUNE.FLOOR_FROM) return Math.max(1, raw);
-  return Math.max(0, raw);
+/** A fortune the house has taken (design 2026-09-14 §4.4). Judged once, at settlement. */
+export function busts(fortune: number): boolean {
+  return fortune < FORTUNE.BUST_UNDER;
 }
 
 /** What a right call pays per unit staked, on top of the stake. */
@@ -70,25 +67,8 @@ export function dayReturn(deltas: number[], fortuneAtOpen: number): number {
   return deltas.reduce((a, b) => a + b, 0) / fortuneAtOpen;
 }
 
-/** The card's readout: this stake, and what a right call pays on top of it. */
-export function stakePreview(input: { fortune: number; confidence: number; isBigOne: boolean; line: number; answer: boolean }): { stake: number; pays: number } {
-  const s = stake(input.fortune, input.confidence, input.isBigOne);
-  return { stake: s, pays: Math.round(s * odds(input.answer, input.line)) };
-}
-
-// The ladder the app offers (design §4.2, D13): five of the nine grid values,
-// staking 1, 3, 5, 7 and 9 percent. The core and the API still accept the
-// whole grid; only the offer narrows, so an older round or a later client can
-// use any value on it.
-export const LADDER_CONFIDENCES = [55, 65, 75, 85, 95] as const;
-export const LADDER_DEFAULT = 75;
-
-export type LadderRung = { confidence: number; stake: number; wins: number };
-
-/** Every rung priced at the line for the chosen side: the stake, and what a right call wins on top of it. */
-export function stakeLadder(input: { fortune: number; isBigOne: boolean; line: number; answer: boolean }): LadderRung[] {
-  return LADDER_CONFIDENCES.map((confidence) => {
-    const p = stakePreview({ ...input, confidence });
-    return { confidence, stake: p.stake, wins: p.pays };
-  });
+/** The card's readout for one side: the flat stake, and what a right call wins on top of it. */
+export function sidePreview(input: { fortune: number; isBigOne: boolean; line: number; answer: boolean }): { stake: number; wins: number } {
+  const s = stake(input.fortune, input.isBigOne);
+  return { stake: s, wins: Math.round(s * odds(input.answer, input.line)) };
 }

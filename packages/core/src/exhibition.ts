@@ -28,17 +28,17 @@ export function practiceLine(exhibition: Exhibition): number {
   return exhibition.linePYes ?? clampLine(exhibition.oraclePYes, null);
 }
 
-const PracticePredictionSchema = z.object({ answer: z.boolean(), confidence: ConfidenceSchema });
+const PracticeCallSchema = z.object({ answer: z.boolean() });
 
-/** The practice result in the game's own currency, on the practice fortune. */
+/** The practice result in the game's own currency, on the practice fortune at the flat stake. */
 export function practiceOutcome(
-  prediction: { answer: boolean; confidence: number },
+  prediction: { answer: boolean },
   exhibition: Exhibition,
 ): { line: number; stake: number; wins: number; payout: number; delta: number; correct: boolean; oppositeDelta: number } {
-  const p = PracticePredictionSchema.parse(prediction);
+  const p = PracticeCallSchema.parse(prediction);
   const ex = ExhibitionSchema.parse(exhibition);
   const line = practiceLine(ex);
-  const s = stake(PRACTICE_FORTUNE, p.confidence, false);
+  const s = stake(PRACTICE_FORTUNE, false);
   const wins = Math.round(s * odds(p.answer, line));
   const paid = payout({ stake: s, answer: p.answer, line, outcome: ex.outcome });
   const opposite = payout({ stake: s, answer: p.answer, line, outcome: ex.outcome === "yes" ? "no" : "yes" });
@@ -47,11 +47,13 @@ export function practiceOutcome(
 
 // The points duel the practice used to be scored in. Kept for the archived
 // tests and for any version 1 or 2 surface; no current screen calls it.
+const LegacyPredictionSchema = z.object({ answer: z.boolean(), confidence: ConfidenceSchema });
+
 export function compareExhibition(
   prediction: { answer: boolean; confidence: number },
   exhibition: Exhibition,
 ): { youPoints: number; oraclePoints: number; winner: "you" | "oracle" | "tie" } {
-  const validPrediction = PracticePredictionSchema.parse(prediction);
+  const validPrediction = LegacyPredictionSchema.parse(prediction);
   const validExhibition = ExhibitionSchema.parse(exhibition);
   const youPYes = validPrediction.answer ? validPrediction.confidence / 100 : 1 - validPrediction.confidence / 100;
   const youPoints = oracleQuestionPoints({ pYes: youPYes, outcome: validExhibition.outcome, isBigOne: false });

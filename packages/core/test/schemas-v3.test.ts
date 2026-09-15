@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RoundTodaySchema, RevealSchema, RoundBoardSchema, MeLedgerSchema, SubmitResSchema, AllTimeBoardSchema } from "../src/schemas";
+import { PredictionSubmitSchema, DoubleSubmitSchema, DoubleResSchema, MineTodaySchema } from "../src/schemas";
 
 const q = {
   id: "5d3f0d2a-6a3e-4a1f-9b8e-0c2a1b3c4d5e", slot: 1, is_big_one: false, text: "Will it rain?", category: "weather",
@@ -85,5 +86,51 @@ describe("the all-time board and the ledger's house (spec §7)", () => {
     };
     expect(MeLedgerSchema.parse(minimal).house).toBeNull();
     expect(MeLedgerSchema.parse({ ...minimal, house: { total: -1240, last_delta: -1240 } }).house?.total).toBe(-1240);
+  });
+});
+
+describe("the Hand on the wire (spec §6)", () => {
+  it("accepts a seal without confidence, and still accepts one with it", () => {
+    expect(PredictionSubmitSchema.parse({ question_id: q.id, answer: true, idempotency_key: "k" }).confidence).toBeUndefined();
+    expect(PredictionSubmitSchema.parse({ question_id: q.id, answer: true, confidence: 95, idempotency_key: "k" }).confidence).toBe(95);
+    expect(PredictionSubmitSchema.safeParse({ question_id: q.id, answer: true, confidence: 72, idempotency_key: "k" }).success).toBe(false);
+  });
+  it("the double's request and response", () => {
+    expect(DoubleSubmitSchema.parse({ question_id: q.id }).question_id).toBe(q.id);
+    expect(DoubleResSchema.parse({ question_id: q.id, stake: 100, wins: 186 })).toEqual({ question_id: q.id, stake: 100, wins: 186 });
+  });
+  it("mine carries stake, doubled and the round's double, all defaulted", () => {
+    const m = MineTodaySchema.parse({ predictions: [{ question_id: q.id, answer: true, confidence: 75 }] });
+    expect(m.predictions[0]!.stake).toBeNull();
+    expect(m.predictions[0]!.doubled).toBe(false);
+    expect(m.double_question_id).toBeNull();
+    const placed = MineTodaySchema.parse({ double_question_id: q.id, predictions: [{ question_id: q.id, answer: true, confidence: 75, stake: 100, doubled: true }] });
+    expect(placed.double_question_id).toBe(q.id);
+  });
+  it("the reveal carries bust_fortune and my.doubled, defaulted", () => {
+    const r = RevealSchema.parse({
+      rules_version: 3, date: "2026-09-10", day_points: 0, first_hour: false, candidates_written: 0, candidates_rejected: 0, vigil_mult: null,
+      questions: [{
+        id: q.id, slot: 1, text: q.text, outcome: "no", crowd_yes_pct: 60, crowd_count: 12, market_prob: 0.40, line_p_yes: 0.35,
+        my: { answer: true, confidence: 75, points: null, brier: null, stake: 100, payout: 0, delta: -100 },
+        source_name: "Kalshi", source_url: null, evidence_quote: null, void_reason: null, oracle_p_yes: 0.35,
+      }],
+      ledger: { settled: true, streak: 1, calls_rated: 0, oracle_score: null },
+    });
+    expect(r.bust_fortune).toBeNull();
+    expect(r.questions[0]!.my!.doubled).toBe(false);
+    expect(RevealSchema.parse({ ...r, bust_fortune: 60 }).bust_fortune).toBe(60);
+  });
+  it("the ledger carries best_fortune and run_started_on, defaulted", () => {
+    const minimal = {
+      oracle_score: null, percentile: null, cohort_size: 0, calls_rated: 0, calls_answered: 0, days_consulted: 0,
+      streak: 0, accuracy_pct: null, avg_confidence: null, tide_wins: 0, majority_rate: null,
+      free_shield_available: true, paid_shields: 0, shield_used_on: null, claimed: false,
+      epithet: { id: "unread", title: "THE UNREAD", receipt: "" }, computed_through: "2026-09-10",
+      oracle: { score: null, calls_rated: 0, days_outseen: 0, days_compared: 0 },
+    };
+    expect(MeLedgerSchema.parse(minimal).best_fortune).toBeNull();
+    expect(MeLedgerSchema.parse(minimal).run_started_on).toBeNull();
+    expect(MeLedgerSchema.parse({ ...minimal, best_fortune: 3400, run_started_on: "2026-09-12" })).toMatchObject({ best_fortune: 3400, run_started_on: "2026-09-12" });
   });
 });
