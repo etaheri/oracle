@@ -146,8 +146,9 @@ export async function runTick(deps: PipelineDeps): Promise<string[]> {
         case "resolve":
           // "resolve:<date>" means the tick DISPATCHED resolution for every
           // still-locked question in this round — not that all of them
-          // resolved. Unresolved questions stay locked and are retried
-          // hourly; they void at noon ET two days after the round date.
+          // resolved. Unresolved questions stay locked and are retried (exchange
+          // reads hourly, the model every MODEL_RESOLVE_EVERY_HOURS); they void
+          // at noon ET two days after the round date.
           await deps.workflows.start(metered, "resolve", `resolve-${action.date}-${bucket}`, {
             date: action.date,
             questionIds: action.questionIds,

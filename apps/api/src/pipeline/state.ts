@@ -12,6 +12,13 @@ import { addDays, type ETNow } from "./clock";
 // five days of drops with no author alive at all.
 export const BANK_LOW_WATER = 5;
 
+// How often a locked question with no exchange behind it goes back to the
+// model resolver after the noon hour. An exchange read costs nothing and stays
+// hourly; a model attempt is a searched call on two models, and on Sept 9 the
+// hourly retries of one unverifiable bank round were most of the day's calls.
+// Four hours leaves six model attempts before the noon void. An ops threshold.
+export const MODEL_RESOLVE_EVERY_HOURS = 4;
+
 export type Action =
   | { kind: "lock"; date: string }
   | { kind: "publish"; date: string }
@@ -31,7 +38,7 @@ export interface PipelineState {
     needsForecast: boolean;
     rulesVersion: number;
   } | null; // status='open'; lockPassed = now >= questions' locksAt
-  lockedRound: { date: string; unresolvedIds: string[] } | null; // status='locked'
+  lockedRound: { date: string; unresolvedIds: string[]; modelIds: string[] } | null; // status='locked'; modelIds ⊆ unresolvedIds have no exchange behind them
   scheduledDates: string[]; // rounds with status='scheduled'
   bankCount: number; // unused evergreen drafts (draft_bank.used_on IS NULL)
   // Whether runTick has a Claude client at all (deps.claude !== null). Not
@@ -79,7 +86,11 @@ export async function loadPipelineState(db: Db, now: Date, claudeAvailable: bool
       ),
       orderBy: (questions, { asc }) => [asc(questions.slot)],
     });
-    lockedRound = { date: lockedRoundRow.date, unresolvedIds: unresolved.map((q) => q.id) };
+    lockedRound = {
+      date: lockedRoundRow.date,
+      unresolvedIds: unresolved.map((q) => q.id),
+      modelIds: unresolved.filter((q) => !q.marketSource).map((q) => q.id),
+    };
   }
 
   return {
@@ -137,16 +148,20 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
   }
 
   // RESOLVE / VOID / SETTLE on the locked round. Late, never wrong (design
-  // §8): a question gets a full day of hourly retries before it voids.
+  // §8): a question gets a full day of retries before it voids — every
+  // question in the noon hour, then exchange reads hourly and the model
+  // resolver every MODEL_RESOLVE_EVERY_HOURS.
   if (state.lockedRound) {
-    const { date: lockedDate, unresolvedIds } = state.lockedRound;
+    const { date: lockedDate, unresolvedIds, modelIds } = state.lockedRound;
     if (unresolvedIds.length > 0) {
       const voidDay = addDays(lockedDate, 2); // locked at noon D+1 → voids at noon D+2
       const pastGrace = today > voidDay || (today === voidDay && hour >= 12);
       if (pastGrace) {
         actions.push({ kind: "void", date: lockedDate, questionIds: unresolvedIds });
       } else if (hour === 12 || minute < 10) {
-        actions.push({ kind: "resolve", date: lockedDate, questionIds: unresolvedIds });
+        const modelTurn = hour === 12 || hour % MODEL_RESOLVE_EVERY_HOURS === 0;
+        const questionIds = modelTurn ? unresolvedIds : unresolvedIds.filter((id) => !modelIds.includes(id));
+        if (questionIds.length > 0) actions.push({ kind: "resolve", date: lockedDate, questionIds });
       }
     } else {
       actions.push({ kind: "settle", date: lockedDate });
@@ -227,7 +242,7 @@ export function decideActions(now: ETNow, state: PipelineState): Action[] {
     actions.push({
       kind: "alert",
       level: "warn",
-      message: `round ${state.lockedRound.date} still has unresolved questions — retrying hourly, voids at noon ${addDays(state.lockedRound.date, 2)}`,
+      message: `round ${state.lockedRound.date} still has unresolved questions — exchange reads hourly, the model every ${MODEL_RESOLVE_EVERY_HOURS} hours, voids at noon ${addDays(state.lockedRound.date, 2)}`,
     });
   }
 

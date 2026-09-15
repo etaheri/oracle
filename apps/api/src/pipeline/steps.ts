@@ -59,8 +59,8 @@ export const POLICY = {
   failClosed: { timeout: "5 minutes", retries: { limit: 0, delay: "1 second" } },
 
   /**
-   * Resolve model steps (spec §4.1). The hourly cron re-dispatch IS
-   * their retry layer, and it is already scoped per question by the DB, so an
+   * Resolve model steps (spec §4.1). The cron's re-dispatch, every
+   * MODEL_RESOLVE_EVERY_HOURS for the model path (state.ts), IS their retry layer, and it is already scoped per question by the DB, so an
    * inner retry buys nothing an outer one does not — it only multiplies.
    */
   noRetry: { timeout: "9 minutes", retries: { limit: 0, delay: "1 second" } },

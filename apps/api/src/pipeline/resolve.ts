@@ -13,7 +13,7 @@
 //
 // DISAGREEMENT RESOLVES TO UNVERIFIABLE, NEVER TO A WINNER. The pipeline has no
 // basis for preferring one reading, and unverifiable already has correct,
-// tested behaviour: hourly retry, then void at the deadline. A void is an
+// tested behaviour: a retry every few hours, then void at the deadline. A void is an
 // honest "we could not read this"; a coin-flip between two disagreeing readings
 // is a lie with a number attached. resettleRound remains available if a human
 // ever corrects one by hand.

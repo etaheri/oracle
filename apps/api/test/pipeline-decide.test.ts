@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { decideActions, loadPipelineState, type PipelineState } from "../src/pipeline/state";
+import { decideActions, loadPipelineState, MODEL_RESOLVE_EVERY_HOURS, type PipelineState } from "../src/pipeline/state";
 import { makeTestDb, seedRound } from "./helpers/db";
 import * as schema from "../src/db/schema";
 import type { ETNow } from "../src/pipeline/clock";
@@ -27,22 +27,32 @@ describe("decideActions", () => {
   it("does not publish before noon", () => {
     expect(decideActions(at(11, 50), { ...empty, scheduledDates: ["2026-08-27"] })).toEqual([]);
   });
-  it("retries resolution every tick in the noon hour, hourly after, and voids at noon the next day", () => {
-    const st: PipelineState = { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["a", "b"] } };
-    const resolve = { kind: "resolve", date: "2026-08-26", questionIds: ["a", "b"] };
-    expect(decideActions(at(12, 20), st)).toEqual([resolve]);          // noon hour: every tick
-    expect(decideActions(at(13, 0), st)).toEqual([resolve]);           // hourly at :00
-    expect(decideActions(at(13, 20), st)).toEqual([]);                 // throttled
-    expect(decideActions(at(15, 5), st)).toEqual([resolve]);
+  it("retries every question in the noon hour, exchange reads hourly after, the model every four hours, and voids at noon the next day", () => {
+    const st: PipelineState = { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["a", "b"], modelIds: ["b"] } };
+    const all = { kind: "resolve", date: "2026-08-26", questionIds: ["a", "b"] };
+    const market = { kind: "resolve", date: "2026-08-26", questionIds: ["a"] };
+    expect(decideActions(at(12, 20), st)).toEqual([all]);             // noon hour: every question
+    expect(decideActions(at(13, 0), st)).toEqual([market]);           // hourly at :00, exchange reads only
+    expect(decideActions(at(13, 20), st)).toEqual([]);                // throttled
+    expect(decideActions(at(15, 5), st)).toEqual([market]);
+    expect(decideActions(at(16, 5), st)).toEqual([all]);              // the four-hour mark: the model resolver too
+    expect(decideActions({ date: "2026-08-28", hour: 0, minute: 0 }, st)).toEqual([all]);
     expect(decideActions({ date: "2026-08-28", hour: 11, minute: 50 }, st)).toEqual([]);
     expect(decideActions({ date: "2026-08-28", hour: 12, minute: 0 }, st)).toEqual([{ kind: "void", date: "2026-08-26", questionIds: ["a", "b"] }]);
   });
+  it("dispatches nothing off the four-hour mark when every unresolved question needs the model", () => {
+    const st: PipelineState = { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["b"], modelIds: ["b"] } };
+    expect(decideActions(at(13, 0), st)).toEqual([]);
+    expect(decideActions(at(14, 5), st)).toEqual([]);
+    expect(decideActions(at(20, 0), st)).toEqual([{ kind: "resolve", date: "2026-08-26", questionIds: ["b"] }]);
+    expect(MODEL_RESOLVE_EVERY_HOURS).toBe(4);
+  });
   it("warns (not criticals) hourly while a round is unresolved past the noon hour", () => {
-    const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["a"] } });
+    const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: ["a"], modelIds: ["a"] } });
     expect(acts.filter((a) => a.kind === "alert")).toEqual([expect.objectContaining({ level: "warn" })]);
   });
   it("settles once nothing is unresolved", () => {
-    expect(decideActions(at(12, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [] } }))
+    expect(decideActions(at(12, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [], modelIds: [] } }))
       .toEqual([{ kind: "settle", date: "2026-08-26" }]);
   });
   it("authors tomorrow from 17:00, only on minute<10 ticks", () => {
@@ -63,7 +73,7 @@ describe("decideActions", () => {
     expect(decideActions(at(12, 10), { ...empty, openRound: { date: "2026-08-27", lockPassed: false, needsForecast: false, rulesVersion: 2 } })).toEqual([]);
   });
   it("no alert at 13:30 once a locked round has nothing left unresolved (settles instead)", () => {
-    const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [] } });
+    const acts = decideActions(at(13, 30), { ...empty, lockedRound: { date: "2026-08-26", unresolvedIds: [], modelIds: [] } });
     expect(acts.filter((a) => a.kind === "alert")).toEqual([]);
     expect(acts).toContainEqual({ kind: "settle", date: "2026-08-26" });
   });
@@ -78,7 +88,7 @@ describe("decideActions", () => {
   it("never falls through to the bank when today already has a locked round (all-five-early-locks tail)", () => {
     const acts = decideActions(at(12), {
       ...empty,
-      lockedRound: { date: "2026-08-27", unresolvedIds: ["a"] },
+      lockedRound: { date: "2026-08-27", unresolvedIds: ["a"], modelIds: ["a"] },
       bankCount: 2,
     });
     expect(acts.some((a) => a.kind === "publish-bank")).toBe(false);
@@ -118,6 +128,19 @@ describe("loadPipelineState", () => {
 
     const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"), true);
     expect(st.lockedRound?.date).toBe("2026-08-25");
+  });
+
+  it("marks unresolved questions with no exchange behind them as needing the model", async () => {
+    const { db } = await makeTestDb();
+    const rows = await seedRound(db, { date: "2026-08-25", opensAt: new Date("2026-08-25T16:00:00Z"), locksAt: new Date("2026-08-26T16:00:00Z") });
+    const ids = [...rows].sort((a, b) => a.slot - b.slot).map((r) => r.id);
+    await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, "2026-08-25"));
+    await db.update(schema.questions).set({ status: "locked" }).where(eq(schema.questions.roundDate, "2026-08-25"));
+    await db.update(schema.questions).set({ marketSource: "kalshi", marketId: "KXTEST-1" }).where(eq(schema.questions.id, ids[0]!));
+
+    const st = await loadPipelineState(db, new Date("2026-08-27T16:05:00Z"), true);
+    expect(st.lockedRound?.unresolvedIds).toEqual(ids);
+    expect(st.lockedRound?.modelIds).toEqual(ids.slice(1));
   });
 });
 
