@@ -17,7 +17,7 @@ Verified Sept 15, 2026 (after the Hand merged and deployed):
 |---|---|
 | `origin/main` | `9966c41` — everything local is pushed (Plans 1–4: the House, mobile, the Council, the Hand) |
 | Tests / typecheck | 1,434 pass (core 241 / mobile 453 / api 740); typecheck clean |
-| Cloudflare Worker `oracle-api` | Deployed `ef800f5a` from `9966c41` with all three Workflow bindings (`oracle-authoring`, `oracle-resolution`, `oracle-council`); `oracle-probe` deleted |
+| Cloudflare Worker `oracle-api` | Deployed `254db119` from `434aca9` (model resolver every four hours) with all three Workflow bindings (`oracle-authoring`, `oracle-resolution`, `oracle-council`); `oracle-probe` deleted |
 | Production Neon `oracle-prod` (`lively-river-29150895`) | Migrations 0000–0016 applied and journaled (`last created_at = 1789437975543`); 8 users, one stale v2 round (2026-09-09, still `open`) |
 | Pipeline | `PIPELINE_ENABLED=true` set Sept 15 ~14:20 ET. First unattended authoring tick is 17:00 ET the same day; §3 supervision not yet done |
 | Secrets | All of §2.5 set except `EXA_API_KEY` — the Council runs with empty evidence packs until it is |
