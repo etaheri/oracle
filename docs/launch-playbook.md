@@ -96,6 +96,34 @@ noon, authoring at 17:00 ET, settle hourly after lock), so between deploy and
 the next of those hours it does nothing at all.
 
 1. Apply `0014`, `0015` and `0016` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`. `0016` is the Hand (design 2026-09-14 §7): best fortune and run start on `users`, the double and the bust on `user_rounds`, `doubled` on `predictions`, and the `guard_double` trigger. No data migration; production has no version 3 rows.
+
+   **The silent failure.** `drizzle-kit migrate` exits `1` and prints nothing
+   at all when a migration's schema is already applied to the database but its
+   row is missing from `drizzle.__drizzle_migrations` — the DDL re-runs, the
+   server rejects it (`column already exists`), and the CLI swallows the
+   error. **Do not retry**: every retry fails the same way. Find the migration
+   whose objects are already physically present, confirm it against
+   `apps/api/drizzle/<tag>.sql`, and insert its bookkeeping row by hand, with
+   the `hash` and the `created_at` that `apps/api/drizzle/meta/_journal.json`
+   records for it:
+
+   ```sql
+   INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+   VALUES ('<sha256 of the .sql file>', <the `when` from _journal.json>);
+   ```
+
+   Then run `pnpm db:migrate` again for the migrations that genuinely remain.
+
+   Verify, whichever path got you here:
+
+   ```sql
+   SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1;
+   ```
+
+   It must read `1789437975543` — `0016_whole_bishop`'s `when` in
+   `apps/api/drizzle/meta/_journal.json` (2026-09-15T02:06:15.543Z). A smaller
+   number means `0016` never landed and the Hand's columns are not there,
+   whatever the CLI's exit code said.
 2. Deploy the API.
 3. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
    Wait for the new deployment to go live before the next step.
@@ -381,6 +409,17 @@ device before the build ships:
 - The finale movement line appears only after the seal, never before.
 - Reminders fire at the device's habitual hour, and the noon reminder stays
   unmoved.
+
+The Hand's three gesture checks (design 2026-09-14 §5.2, §5.3). The Simulator
+could not perform any of them — a mouse drag does not carry the velocity the
+release threshold reads, and the Simulator's tap does not reproduce the tray's
+haptic. **Do all three on the first TestFlight install, before the build is
+submitted to review:**
+
+- A swipe released **past** the threshold seals the call and throws the card.
+- A swipe abandoned **short** of the threshold springs the card back and seals
+  nothing.
+- A tap on a tray tile places the double and that tile reads `DOUBLED`.
 
 ---
 
