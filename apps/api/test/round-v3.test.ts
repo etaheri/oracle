@@ -53,13 +53,13 @@ describe("GET /v1/round/:date/reveal at version 3", () => {
     const first = json.questions.find((q) => q.slot === 1)!;
     expect(first.line_p_yes).toBe(0.35);
     expect(first.market_prob).toBe(0.40);
-    expect(first.my).toMatchObject({ stake: 40, payout: 114, delta: 74 });
+    expect(first.my).toMatchObject({ stake: 50, payout: 143, delta: 93 });
     const big = json.questions.find((q) => q.slot === 5)!;
-    expect(big.my).toMatchObject({ stake: 80, payout: 0, delta: -80 });
-    expect(json.delta).toBe(74 * 4 - 80);
-    expect(json.return).toBeCloseTo(0.216, 6);
-    expect(json.fortune_after).toBe(1216);
-    expect(json.house_delta).toBe(-216);
+    expect(big.my).toMatchObject({ stake: 100, payout: 0, delta: -100 });
+    expect(json.delta).toBe(93 * 4 - 100);
+    expect(json.return).toBeCloseTo(0.272, 6);
+    expect(json.fortune_after).toBe(1272);
+    expect(json.house_delta).toBe(-272);
   });
   it("withholds the round's fortune figures until every card is decided", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
@@ -75,16 +75,16 @@ describe("GET /v1/round/:date/reveal at version 3", () => {
     expect(partial.fortune_after).toBeNull();
     expect(partial.house_delta).toBeNull();
     // The paid card still shows its own figures -- those are final per question.
-    expect(partial.questions.find((q) => q.slot === 1)!.my).toMatchObject({ stake: 40, payout: 114, delta: 74 });
-    expect(partial.questions.find((q) => q.slot === 5)!.my).toMatchObject({ stake: 80, payout: null, delta: null });
+    expect(partial.questions.find((q) => q.slot === 1)!.my).toMatchObject({ stake: 50, payout: 143, delta: 93 });
+    expect(partial.questions.find((q) => q.slot === 5)!.my).toMatchObject({ stake: 100, payout: null, delta: null });
 
     for (const q of qs.filter((q) => q.slot > 3)) await resolveQuestion(db, q.id, "yes");
     await settleRound(db, DATE);
     const full = RevealSchema.parse(await (await as(0)(`/v1/round/${DATE}/reveal`)).json());
-    expect(full.delta).toBe(74 * 4 + 149);
-    expect(full.return).toBeCloseTo(0.445, 6);
-    expect(full.fortune_after).toBe(1445);
-    expect(full.house_delta).toBe(-(74 * 4 + 149));
+    expect(full.delta).toBe(93 * 4 + 186);
+    expect(full.return).toBeCloseTo(0.558, 6);
+    expect(full.fortune_after).toBe(1558);
+    expect(full.house_delta).toBe(-(93 * 4 + 186));
   });
   it("reports null fortune figures on a version 2 round", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-12T02:00:00Z"), toFake: ["Date"] });
@@ -112,13 +112,13 @@ describe("GET /v1/round/:date/board at version 3", () => {
     expect(json.metric).toBe("return");
     expect(json.field_size).toBe(6);
     expect(json.your_rank).toBe(1);
-    // player 0: stakes 90×4 + 180 = 540, all right at 1.857× → delta round(90×1.857)×4 + round(180×1.857) = 167×4 + 334 = 1002 → 10020 bp
-    expect(json.your_return_bp).toBe(10020);
-    expect(json.best_return_bp).toBe(10020);
-    // players 1-5: −(10×4 + 20) = −60 → −600 bp
-    expect(json.median_return_bp).toBe(-600);
+    // player 0: flat stakes 50×4 + 100 = 300, all right → delta 93×4 + 186 = 558 on a 1000 fortune → 5580 bp
+    expect(json.your_return_bp).toBe(5580);
+    expect(json.best_return_bp).toBe(5580);
+    // players 1-5: −(50×4 + 100) = −300 on a 1000 fortune → −3000 bp
+    expect(json.median_return_bp).toBe(-3000);
     expect(json.rows.some((r) => r.is_oracle)).toBe(false);
-    expect(json.rows.find((r) => r.is_you)!.return_bp).toBe(10020);
+    expect(json.rows.find((r) => r.is_you)!.return_bp).toBe(5580);
   });
 });
 
@@ -131,9 +131,9 @@ describe("GET /v1/me/ledger", () => {
     for (const q of qs) await resolveQuestion(db, q.id, "yes");
     await settleRound(db, DATE);
     const json = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
-    // slots 1-4 at 70: stake 40, +74 each; the Big One at 70: stake 80, +round(80 × 0.65/0.35) = +149
-    expect(json.fortune).toBe(1000 + 74 * 4 + 149);
-    expect(json.fortune_history).toEqual([{ date: DATE, delta: 74 * 4 + 149, fortune_after: 1000 + 74 * 4 + 149 }]);
+    // slots 1-4: flat stake 50, +93 each; the Big One: flat stake 100, +round(100 × 0.65/0.35) = +186
+    expect(json.fortune).toBe(1000 + 93 * 4 + 186);
+    expect(json.fortune_history).toEqual([{ date: DATE, delta: 93 * 4 + 186, fortune_after: 1000 + 93 * 4 + 186 }]);
   });
 });
 
@@ -141,12 +141,12 @@ describe("GET /v1/me/ledger carries the house", () => {
   it("reports the purse total and last night's delta after settlement", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
     const { db, qs, as, seal } = await world(1);
-    for (const q of qs) await seal(0, q.id, false, 55); // every stake 10, Big One 20
+    for (const q of qs) await seal(0, q.id, false, 55); // every stake 50, Big One 100
     vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
     for (const q of qs) await resolveQuestion(db, q.id, "yes");
     await settleRound(db, DATE);
     const json = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
-    expect(json.house).toEqual({ total: 60, last_delta: 60 });
+    expect(json.house).toEqual({ total: 300, last_delta: 300 });
   });
 
   it("is null-delta with a zero total before any round settles", async () => {

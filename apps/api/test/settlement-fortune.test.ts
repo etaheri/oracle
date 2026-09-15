@@ -104,6 +104,24 @@ describe("settleRound writes the house delta", () => {
   });
 });
 
+describe("payFortune keeps the best fortune (design 2026-09-14 §4.4)", () => {
+  it("raises best_fortune on a win and never lowers it on a loss", async () => {
+    const { db, rows, alice } = await stagedRound();
+    await resolveQuestion(db, rows[0]!.id, "yes");   // alice +74 → 1074
+    let a = await db.query.users.findFirst({ where: eq(schema.users.id, alice.id) });
+    expect(a!.bestFortune).toBe(1074);
+    await resolveQuestion(db, rows[1]!.id, "no");    // alice −40 → 1034
+    a = await db.query.users.findFirst({ where: eq(schema.users.id, alice.id) });
+    expect(a!.fortune).toBe(1034);
+    expect(a!.bestFortune).toBe(1074);
+  });
+  it("stays at founding for a player who only loses", async () => {
+    const { db, rows, bob } = await stagedRound();
+    await resolveQuestion(db, rows[0]!.id, "yes");   // bob −10
+    expect((await db.query.users.findFirst({ where: eq(schema.users.id, bob.id) }))!.bestFortune).toBe(1000);
+  });
+});
+
 describe("settlement recovers a crashed fortune pass", () => {
   // Stage a fully resolved round, then rewind ONE prediction to the state a
   // crash between the claim and the credit would leave behind: payout and

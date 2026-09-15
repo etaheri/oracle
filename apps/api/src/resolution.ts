@@ -65,7 +65,9 @@ export async function resolveQuestion(
  * The fortune pass (design 2026-09-10 §5.6). Each staked prediction is
  * claimed WHERE settled_at IS NULL, so a retried resolve, a forced
  * re-resolution or an overlapping tick pays nobody twice. users.fortune is
- * written here and nowhere else.
+ * written here and by the bust in settlement.ts, and nowhere else;
+ * users.best_fortune is kept in step in this same statement so it can never
+ * lag.
  *
  * The claim and the credit are ONE statement: a data-modifying CTE stamps
  * payout + settled_at and feeds the claimed user_id straight into the fortune
@@ -89,7 +91,10 @@ export async function payFortune(db: Db, questionId: string, outcome: "yes" | "n
         WHERE id = ${p.id}::uuid AND settled_at IS NULL
         RETURNING user_id
       )
-      UPDATE users SET fortune = fortune + ${pay - p.stake} FROM claimed
+      UPDATE users
+        SET fortune = fortune + ${pay - p.stake},
+            best_fortune = GREATEST(best_fortune, fortune + ${pay - p.stake})
+      FROM claimed
       WHERE users.id = claimed.user_id
       RETURNING users.id
     `);

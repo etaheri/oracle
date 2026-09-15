@@ -38,15 +38,16 @@ export const predictionRoutes = new Hono<AppContext>()
     if (round?.status !== "open") return c.json({ error: "not open" }, 409);
     if (now.getTime() >= q.locksAt.getTime()) return c.json({ error: "locked" }, 409);
 
-    // The stake (design 2026-09-10 §4.2): cut from the fortune at THIS seal
-    // and frozen on the row. Nothing is debited here; settlement pays.
-    // A lineless version 3 question, and every earlier version, seals unstaked.
+    // The stake (design 2026-09-10 §4.2, 2026-09-14 §4.1): the flat fraction of
+    // the fortune at THIS seal, doubled on the Big One, frozen on the row.
+    // Nothing is debited here; settlement pays. A lineless version 3
+    // question, and every earlier version, seals unstaked.
     const staked = (round.rulesVersion ?? 1) >= 3 && q.linePYes !== null;
     let stakeCols: { fortuneAtSeal: number; stake: number; linePYes: string } | null = null;
     if (staked) {
       const user = await db.query.users.findFirst({ where: eq(schema.users.id, userId) });
       const fortune = user?.fortune ?? FORTUNE.FOUNDING;
-      stakeCols = { fortuneAtSeal: fortune, stake: stake(fortune, parsed.data.confidence, q.isBigOne), linePYes: String(q.linePYes) };
+      stakeCols = { fortuneAtSeal: fortune, stake: stake(fortune, q.isBigOne), linePYes: String(q.linePYes) };
     }
 
     const firstHour = now.getTime() <= q.opensAt.getTime() + 3_600_000;
@@ -56,7 +57,10 @@ export const predictionRoutes = new Hono<AppContext>()
         questionId: q.id,
         userId,
         answer: parsed.data.answer,
-        confidence: parsed.data.confidence,
+        // The client's confidence is accepted and ignored (design 2026-09-14
+        // H8): the seal is a side, and the column holds a constant so the
+        // points and Brier readers keep computing until it is deleted.
+        confidence: FORTUNE.CONFIDENCE_FLAT,
         createdAt: now,
         firstHour,
         ...(stakeCols ?? {}),

@@ -39,7 +39,7 @@ describe("GET /v1/me/ledger", () => {
     expect(out).toMatchObject({
       days_consulted: 1,
       accuracy_pct: 100,
-      avg_confidence: 85,
+      avg_confidence: 75,
       // Only 3 players saw this question — under CONTRARIAN_MIN_CROWD (20),
       // so a's correct minority call does not earn a tide win.
       tide_wins: 0,

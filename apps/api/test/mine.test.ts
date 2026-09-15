@@ -27,7 +27,7 @@ describe("GET /v1/round/today/mine", () => {
     const res = await a("/v1/round/today/mine");
     expect(res.status).toBe(200);
     const out = (await res.json()) as { predictions: Array<{ question_id: string; answer: boolean; confidence: number }> };
-    expect(out.predictions).toEqual([{ question_id: qs[0]!.id, answer: true, confidence: 85, crowd_yes_pct_at_seal: 100, crowd_count_at_seal: 1 }]);
+    expect(out.predictions).toEqual([{ question_id: qs[0]!.id, answer: true, confidence: 75, crowd_yes_pct_at_seal: 100, crowd_count_at_seal: 1 }]);
   });
 
   it("carries the crowd snapshot taken at the seal (design 2026-09-09 §4.1)", async () => {
@@ -49,7 +49,7 @@ describe("GET /v1/round/today/mine", () => {
       }>;
     };
     expect(out.predictions).toEqual([
-      { question_id: qs[0]!.id, answer: true, confidence: 85, crowd_yes_pct_at_seal: 100, crowd_count_at_seal: 1 },
+      { question_id: qs[0]!.id, answer: true, confidence: 75, crowd_yes_pct_at_seal: 100, crowd_count_at_seal: 1 },
     ]);
   });
 
