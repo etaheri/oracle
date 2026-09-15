@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
 import { createApp } from "../src/app";
@@ -67,6 +67,40 @@ describe("POST /v1/predictions/double (design 2026-09-14 §6.2)", () => {
     expect(other.status).toBe(409);
     expect(await other.json()).toEqual({ error: "placed" });
   });
+  it("a concurrent winner landing the double between the snapshot read and the write still returns 200, not a spurious 409", async () => {
+    // The bug this guards: the snapshot (`mine.doubled`) is read before the
+    // write. If another request's CTE lands the SAME question's double in
+    // that gap, the CTE here returns zero rows too -- the fix must re-query
+    // current state on zero rows and see this question is the one that won,
+    // rather than assuming zero rows always means "placed elsewhere". This
+    // is forced deterministically (PGlite serializes real concurrent HTTP
+    // calls, so a plain Promise.all never actually races): the mocked
+    // `findFirst` plants the concurrent winner's write right after the
+    // route's own stale read resolves, before the route's CTE runs.
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, seal, dbl, me } = await setup();
+    await seal(qs[0]!.id);
+    const u = await me();
+    const original = db.query.predictions.findFirst.bind(db.query.predictions);
+    const spy = vi.spyOn(db.query.predictions, "findFirst").mockImplementationOnce((async (...args: unknown[]) => {
+      const stale = await (original as (...a: unknown[]) => Promise<unknown>)(...args);
+      await db.execute(sql`
+        WITH placed AS (
+          UPDATE user_rounds SET double_question_id = ${qs[0]!.id}::uuid
+          WHERE user_id = ${u.id}::uuid AND date = ${DATE}::date AND double_question_id IS NULL
+          RETURNING user_id
+        )
+        UPDATE predictions SET stake = stake * 2, doubled = true
+        FROM placed
+        WHERE predictions.question_id = ${qs[0]!.id}::uuid AND predictions.user_id = placed.user_id AND predictions.settled_at IS NULL
+      `);
+      return stale;
+    }) as typeof db.query.predictions.findFirst);
+    const res = await dbl(qs[0]!.id);
+    spy.mockRestore();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ question_id: qs[0]!.id, stake: 100, wins: 186 });
+  });
   it("404s an unknown question and a question the caller has not sealed", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
     const { qs, dbl } = await setup();
@@ -90,6 +124,15 @@ describe("POST /v1/predictions/double (design 2026-09-14 §6.2)", () => {
     await seal(qs[0]!.id);
     await db.update(schema.rounds).set({ status: "locked" }).where(eq(schema.rounds.date, DATE));
     expect(await (await dbl(qs[0]!.id)).json()).toEqual({ error: "not open" });
+  });
+  it("409s a question that has not opened yet, even on an open round", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, seal, dbl } = await setup();
+    await seal(qs[0]!.id);
+    await db.update(schema.questions).set({ opensAt: new Date("2026-09-10T17:00:00Z") }).where(eq(schema.questions.id, qs[0]!.id));
+    const res = await dbl(qs[0]!.id);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "not open" });
   });
   it("404s an unstaked seal (a lineless question has no stake to double)", async () => {
     vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });

@@ -101,6 +101,7 @@ export const predictionRoutes = new Hono<AppContext>()
     const userId = c.get("userId");
     const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, parsed.data.question_id) });
     if (!q) return c.json({ error: "unknown question" }, 404);
+    if (q.status !== "open" || Date.now() < q.opensAt.getTime()) return c.json({ error: "not open" }, 409);
     const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
     if (round?.status !== "open") return c.json({ error: "not open" }, 409);
     if (Date.now() >= q.locksAt.getTime()) return c.json({ error: "locked" }, 409);
@@ -125,7 +126,15 @@ export const predictionRoutes = new Hono<AppContext>()
     `);
     const rows = executeRows(res) as Array<{ stake: number }>;
     if (rows.length > 0) return c.json(priced(Number(rows[0]!.stake)));
-    // Zero rows: the double is already placed. On this question the row above
-    // would have read doubled; so it sits on another.
+    // Zero rows: the round's double is already placed -- either on another
+    // question, or (a race) a concurrent call just landed it on this one in
+    // the gap between our snapshot read above and this statement. The
+    // snapshot is stale by construction here, so re-query current state
+    // rather than trust it: 200 if it landed on this question, 409 if it's
+    // elsewhere.
+    const current = await db.query.predictions.findFirst({
+      where: and(eq(schema.predictions.questionId, q.id), eq(schema.predictions.userId, userId)),
+    });
+    if (current?.doubled) return c.json(priced(Number(current.stake)));
     return c.json({ error: "placed" }, 409);
   });
