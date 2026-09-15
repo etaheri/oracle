@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, AllTimeBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, AllTimeBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, DoubleResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -154,6 +154,22 @@ export function useAllTimeBoard(enabled: boolean) {
         if (e instanceof ApiError && e.status === 404) return null;
         throw e;
       }
+    },
+  });
+}
+
+// The double (design 2026-09-14 §6.2). One per round, fixed once placed. The
+// server's row is the truth: /today/mine carries `doubled` and the stake
+// after the double, and /today re-prices nothing but is refetched for the
+// fortune line.
+export function useDouble() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { question_id: string }) =>
+      api("/v1/predictions/double", DoubleResSchema, { method: "POST", body: JSON.stringify(p), token: await getDeviceToken() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["round", "mine"] });
+      qc.invalidateQueries({ queryKey: ["round", "today"] });
     },
   });
 }

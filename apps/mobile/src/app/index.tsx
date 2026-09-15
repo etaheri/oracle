@@ -14,7 +14,7 @@ import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { OracleClock } from "../ui/OracleClock";
 import { HomeChallenge } from "../ui/HomeChallenge";
 import { useQueryClient } from "@tanstack/react-query";
-import { useToday, useCrowdSoFar, useMeLedger, useNextRound, useReveal } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMeLedger, useMineToday, useNextRound, useReveal } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { crowdLean } from "../game/orbMood";
@@ -24,7 +24,8 @@ import { shieldNotice } from "../game/shieldNotice";
 import { rescueOffered } from "../game/rescueOffer";
 import { readingSlot } from "../game/readingSlot";
 import { homeDates } from "../game/homeDates";
-import { riskLine, lapseNotice } from "../game/homeLines";
+import { riskLine, lapseNotice, doubleNotice } from "../game/homeLines";
+import { trayState } from "../game/doubleTray";
 import { houseLines } from "../game/houseLine";
 import { formatFortune } from "../game/fortuneText";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
@@ -102,6 +103,9 @@ export default function Index() {
   const availabilityNow = useNow(1000);
   const localSealedIds = new Set(round?.questions.filter(q => answers[q.id]?.sealed).map(q => q.id) ?? []);
   const hydration = useHydratePlayedState(!!round, round?.date ?? null);
+  // The same ["round","mine"] query the hydration above already drives — read
+  // here for the stake rows and the round's double, not fetched a second time.
+  const mine = useMineToday(!!round);
   const sealedIds = new Set([...localSealedIds, ...hydration.sealedQuestionIds]);
   const availability = round ? roundAvailability(round.questions, sealedIds, availabilityNow, round.rules_version) : null;
   const requiredQuestions = round?.questions.filter((question) => !(round.rules_version >= 2 && question.struck)) ?? [];
@@ -184,6 +188,10 @@ export default function Index() {
   // Re-evaluated every 30s so the risk line can appear without a remount —
   // Home never remounts under the Stack (see the focus effect above).
   const now = useNow(30_000);
+  // The unplaced double outranks the risk line: it is an action still open on
+  // TODAY's round, where risk and lapse are about the streak around it.
+  const tray = round ? trayState(round.questions, mine.data?.predictions ?? [], mine.data?.double_question_id ?? null, now) : "hidden";
+  const dbl = doubleNotice(tray);
   const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
   const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${calendarYesterday}`);
   // The summons only ever fires after a seal, so a reader who answers nothing
@@ -195,10 +203,12 @@ export default function Index() {
     anySealed,
     permission: notifPermission,
   });
-  const notice = protection ?? risk ?? lapse ?? kept;
+  const notice = protection ?? dbl ?? risk ?? lapse ?? kept;
   // Risk/lapse notices are the paywall's entry point — a missed streak is the
   // one moment protection actually matters. Protection/streak lines stay plain.
   const noticeLinksToPlus = notice !== null && (notice === risk || notice === lapse);
+  // The double notice is the one notice that leads back into the round.
+  const noticeLinksToRound = notice !== null && notice === dbl;
   // The one-row rescue offer: only below an ACTUAL risk notice (not when a
   // shield notice from yesterday is taking priority). Every other condition
   // — the streak floor a shield will actually defend, an existing
@@ -400,7 +410,11 @@ export default function Index() {
             The slot exists from frame one whether or not there is a line. */}
         <View style={{ minHeight: noticeRowH, justifyContent: "center" }}>
           {notice && (
-            noticeLinksToPlus ? (
+            noticeLinksToRound ? (
+              <Pressable accessibilityRole="button" hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => leaveHome(() => router.push("/round"))}>
+                <Mono {...role.meta} color={colors.goldText} style={[role.meta.style, { textDecorationLine: "underline" }]}>{notice}</Mono>
+              </Pressable>
+            ) : noticeLinksToPlus ? (
               // hitSlop, not minHeight: the notice keeps its one reserved row
               // while the tap target reaches 44pt. The underline is the only
               // thing separating a notice you can act on from one that is just

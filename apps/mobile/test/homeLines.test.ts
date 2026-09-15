@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { partialLine, spokenLine, riskLine, lapseNotice } from "../src/game/homeLines";
+import { partialLine, spokenLine, riskLine, lapseNotice, doubleNotice } from "../src/game/homeLines";
 
 describe("homeLines", () => {
   it("partialLine names the count and the rule, only for a partial day", () => {
@@ -28,5 +28,13 @@ describe("homeLines", () => {
     expect(lapseNotice(6, 3, false, "k")).toBeNull();   // shield held / vigil alive
     expect(lapseNotice(6, 0, true, "k")).toBeNull();    // played yesterday
     expect(lapseNotice(6, 0, null, "k")).toBeNull();    // unknown
+  });
+});
+
+describe("the double notice (design §5.3)", () => {
+  it("speaks only while the double is unplaced on a sealed hand", () => {
+    expect(doubleNotice("open")).toBe("YOUR DOUBLE IS UNPLACED");
+    expect(doubleNotice("hidden")).toBeNull();
+    expect(doubleNotice("placed")).toBeNull();
   });
 });

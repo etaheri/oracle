@@ -1,5 +1,6 @@
 import { COPY_BANK, PARTIAL_LINE, fillSlots, selectLine } from "@oracle/core";
 import { numeral } from "./numerals";
+import { DOUBLE_NOTICE, type TrayState } from "./doubleTray";
 
 // Home's truth-telling lines (audit §3.1, #9, #7, §5.2, #6, §5). All pure —
 // node-tested. index.tsx supplies the live inputs and priority order.
@@ -46,4 +47,10 @@ export function lapseNotice(
 ): string | null {
   if (daysConsulted <= 0 || streak !== 0 || playedYesterday !== false) return null;
   return "A NEW STREAK BEGINS. YOUR RECORD REMAINS.";
+}
+
+// The unplaced double (design 2026-09-14 §5.3): one line, only while the hand
+// is sealed and the double can still land. Links to the round screen.
+export function doubleNotice(state: TrayState): string | null {
+  return state === "open" ? DOUBLE_NOTICE : null;
 }

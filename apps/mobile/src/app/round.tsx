@@ -11,11 +11,14 @@ import { crowdVerdict } from "../game/crowdVerdict";
 import { crowdAnticipation } from "../game/crowdAnticipation";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
+import { DoubleTray } from "../ui/DoubleTray";
+import { trayTiles, trayState } from "../game/doubleTray";
+import { capture } from "../analytics/analytics";
 import { SleepsPanel } from "../ui/SleepsPanel";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { numeral } from "../ui/CardChrome";
-import { useToday, useCrowdSoFar } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMineToday, useDouble } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { colors, space } from "../theme";
@@ -64,6 +67,12 @@ export default function Round() {
   // (index.tsx), which puts the question after the crowd has been beheld and
   // covers the partial player who never returns to a finished spread.
   const crowd = useCrowdSoFar(anySealed);
+  const mine = useMineToday(!!today.data);
+  const double = useDouble();
+  // After the double lands the tray holds for a beat, then hands over to the
+  // crowd finale — the finale is the payoff, the tray is the decision.
+  const [placedId, setPlacedId] = useState<string | null>(null);
+  const [trayDone, setTrayDone] = useState(false);
   useHydratePlayedState(!!today.data);
   // The payout reaches screen-reader players too: speak each card's verdict
   // once, when it first resolves (no-op while VoiceOver is off).
@@ -77,6 +86,19 @@ export default function Round() {
     AccessibilityInfo.announceForAccessibility(`The players: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count).line}`);
   }, [lastSealedId, answers, crowd.data]);
   const chromeScale = useChromeScale();
+  const minePreds = mine.data?.predictions ?? [];
+  // The server's row is the truth; `placedId` only covers the beat between
+  // the mutation landing and /today/mine coming back carrying it.
+  const doubleId = mine.data?.double_question_id ?? placedId;
+  const tray = trayDone ? "placed" : trayState(qs, minePreds, doubleId, now);
+  const tiles = trayTiles(qs, minePreds, now);
+  // Leaving the tray unplaced is allowed (design §5.3) — and is the thing
+  // worth counting, so it is reported once, as the screen goes away.
+  const trayRef = useRef(tray);
+  trayRef.current = tray;
+  const dateRef = useRef(today.data?.date ?? null);
+  dateRef.current = today.data?.date ?? null;
+  useEffect(() => () => { if (trayRef.current === "open" && dateRef.current) capture("double_skipped", { date: dateRef.current }); }, []);
 
   if (today.isLoading) return (
     <Screen>
@@ -131,6 +153,16 @@ export default function Round() {
               />
             </Animated.View>
           </View>}</CardStage>
+        ) : tray === "open" || (tray === "placed" && !trayDone && placedId !== null) ? (
+          <DoubleTray tiles={tiles} placedId={doubleId} pending={double.isPending} onPlace={(t) => {
+            double.mutate({ question_id: t.id }, {
+              onSuccess: () => {
+                setPlacedId(t.id);
+                capture("double_placed", { question_id: t.id, is_big_one: t.isBigOne, stake: t.doubledStake });
+                setTimeout(() => setTrayDone(true), 900);
+              },
+            });
+          }} />
         ) : (
           <View style={{ flex: 1, gap: space(2) }}>
             {anticipation && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "center" }]}>{anticipation}</Mono>}
