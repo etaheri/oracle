@@ -141,10 +141,15 @@ export const predictionRoutes = new Hono<AppContext>()
     // the gap between our snapshot read above and this statement. The
     // snapshot is stale by construction here, so re-query current state
     // rather than trust it: 200 if it landed on this question, 409 if it's
-    // elsewhere.
+    // elsewhere -- or if this call settled under the caller.
     const current = await db.query.predictions.findFirst({
       where: and(eq(schema.predictions.questionId, q.id), eq(schema.predictions.userId, userId)),
     });
     if (current?.doubled) return c.json(priced(Number(current.stake)));
+    // A call that settled in the gap is the other way to match nothing, and
+    // it is the opposite news: the CTE's EXISTS kept the round's double
+    // unspent, so the caller still holds it and can place it elsewhere.
+    // "PLACED" would send them looking for a double they never used.
+    if (current?.settledAt) return c.json({ error: "settled" }, 409);
     return c.json({ error: "placed" }, 409);
   });
