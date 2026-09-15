@@ -9,7 +9,7 @@ import { join } from "node:path";
 // A string literal is prose when it contains a space; identifiers, route
 // paths, storage keys, event names and API fields never do. Comments are
 // stripped first so the reasoning in them can still name the old words.
-const RETIRED = /\b(vigils?|shields?|exhibitions?|rites?|ledgers?|crowds?|conviction|epithets?|oracle rating)\b/i;
+const RETIRED = /\b(vigils?|shields?|exhibitions?|rites?|ledgers?|crowds?|conviction|epithets?|oracle rating|confidence|calibration|rungs?|ladder)\b/i;
 const ROOT = join(__dirname, "..", "src");
 
 function walk(dir: string): string[] {

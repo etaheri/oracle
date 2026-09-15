@@ -15,7 +15,7 @@ const complete = (highlightId = "q1", winner: "you" | "oracle" | "tie" = "you"):
 describe("rivalryMoment", () => {
   it("explains a same-call confidence gap without calling it decisive", () => {
     expect(rivalryMoment([question()], complete())).toEqual({
-      questionId: "q1", kind: "confidence", line: "You were both right. Your higher confidence earned more.",
+      questionId: "q1", kind: "confidence", line: "You were both right. You were surer, and it earned more.",
     });
   });
 
@@ -66,8 +66,8 @@ describe("rivalryMoment", () => {
 
 // The lesson must distinguish prudent uncertainty from costly overconfidence.
 it("explains confidence on both right and wrong calls, including NO", () => {
-  expect(rivalryMoment([question({ outcome: "no" })], complete())?.line).toContain("Your higher confidence cost more");
-  expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: .95 })], complete())?.line).toContain("Your lower confidence cost less");
-  expect(rivalryMoment([question({ oracle_p_yes: .95 })], complete())?.line).toContain("Oracle's higher confidence earned more");
-  expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: .35, my: { answer: false, confidence: 85 } })], complete())?.line).toContain("Your higher confidence earned more");
+  expect(rivalryMoment([question({ outcome: "no" })], complete())?.line).toContain("You were surer, and it cost more");
+  expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: .95 })], complete())?.line).toContain("You were less sure, and it cost less");
+  expect(rivalryMoment([question({ oracle_p_yes: .95 })], complete())?.line).toContain("The Oracle was surer, and it earned more");
+  expect(rivalryMoment([question({ outcome: "no", oracle_p_yes: .35, my: { answer: false, confidence: 85 } })], complete())?.line).toContain("You were surer, and it earned more");
 });

@@ -152,7 +152,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   const points = data.dayPoints >= 0 ? `+${data.dayPoints}` : String(data.dayPoints);
   const wins = data.results.filter((r) => r === "win").length;
   const answered = data.results.filter((r) => r !== "none").length;
-  const scoreLine = duelScores ? "CONFIDENCE POINTS" : fortune ? signedFortune(data.fortuneDelta!) : `${wins}/${answered} · ${points}`;
+  const scoreLine = duelScores ? "DUEL POINTS" : fortune ? signedFortune(data.fortuneDelta!) : `${wins}/${answered} · ${points}`;
   const fortuneAfterLine = fortune && data.fortuneAfter !== undefined ? `FORTUNE ${formatFortune(data.fortuneAfter)}` : null;
   const [bigOneHead, bigOneTail] = data.bigOneLine ? splitShareLine(data.bigOneLine) : [null, null];
   const bigOne = data.bigOneText ? ellipsize(data.bigOneText, display, CARD_W - 130) : null;

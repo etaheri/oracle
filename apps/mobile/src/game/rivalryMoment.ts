@@ -31,12 +31,12 @@ export function rivalryMoment(questions: DuelQuestion[], duel: DuelResult): Riva
         : "The Oracle saw what you missed on this call.",
     };
   }
-  const higherConfidence = playerProbability > 0.5
+  const moreSure = playerProbability > 0.5
     ? playerProbability > question.oracle_p_yes
     : playerProbability < question.oracle_p_yes;
   const right = playerCall === question.outcome;
   const line = right
-    ? higherConfidence ? "You were both right. Your higher confidence earned more." : "You were both right. The Oracle's higher confidence earned more."
-    : higherConfidence ? "You were both wrong. Your higher confidence cost more." : "You were both wrong. Your lower confidence cost less.";
+    ? moreSure ? "You were both right. You were surer, and it earned more." : "You were both right. The Oracle was surer, and it earned more."
+    : moreSure ? "You were both wrong. You were surer, and it cost more." : "You were both wrong. You were less sure, and it cost less.";
   return { questionId: question.id, kind: "confidence", line };
 }

@@ -15,6 +15,6 @@ it("carries a truthful largest-gap rivalry moment without changing the duel head
   const round = qs(); round[0]!.oracle_p_yes = .55;
   expect(revealSummary(round, calculateDuel(round, 2))).toMatchObject({
     headline: "YOU OUTSAW THE ORACLE",
-    rivalry: { questionId: "0", kind: "confidence", line: "You were both right. Your higher confidence earned more." },
+    rivalry: { questionId: "0", kind: "confidence", line: "You were both right. You were surer, and it earned more." },
   });
 });

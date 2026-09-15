@@ -129,7 +129,8 @@ export function callLine(q: Question): string | null {
   // crowd made of it. On a lapsed day that IS the page — four outcomes and
   // four sources, and no sense of what was missed.
   if (!q.my) return others;
-  const mine = `YOU: ${q.my.answer ? "YES" : "NO"} @ ${q.my.confidence}%`;
+  const pct = q.my.confidence;
+  const mine = `YOU: ${q.my.answer ? "YES" : "NO"} @ ${pct}%`;
   return others ? `${mine} · ${others}` : mine;
 }
 
