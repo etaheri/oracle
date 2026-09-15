@@ -62,8 +62,16 @@ describe("payFortune via resolveQuestion", () => {
     expect((await db.query.users.findFirst({ where: eq(schema.users.id, alice.id) }))!.fortune).toBe(1074);
   });
   it("ignores unstaked predictions (version 2 rows, or a lineless round)", async () => {
-    const { db, rows, alice } = await stagedRound();
-    await db.update(schema.predictions).set({ stake: null, linePYes: null }).where(eq(schema.predictions.questionId, rows[0]!.id));
+    const { db, rows, alice, bob } = await stagedRound();
+    // guard_double refuses to null out a stake already frozen at seal, so an
+    // unstaked (version 2 or lineless) seal is simulated by deleting the
+    // staged rows for this question and reinserting them the way the seal
+    // route would have: no fortuneAtSeal, stake or line.
+    await db.delete(schema.predictions).where(eq(schema.predictions.questionId, rows[0]!.id));
+    await db.insert(schema.predictions).values([
+      { questionId: rows[0]!.id, userId: alice.id, answer: true, confidence: 70 },
+      { questionId: rows[0]!.id, userId: bob.id, answer: false, confidence: 55 },
+    ]);
     await resolveQuestion(db, rows[0]!.id, "yes");
     expect((await db.query.users.findFirst({ where: eq(schema.users.id, alice.id) }))!.fortune).toBe(1000);
   });
@@ -85,9 +93,19 @@ describe("settleRound writes the house delta", () => {
     // Fortune is a version 3 rule. An older round has no staked predictions,
     // so the aggregate would sum to a truthful-looking 0 where the honest
     // answer is that the house never played.
-    const { db, rows } = await stagedRound();
+    const { db, rows, alice, bob } = await stagedRound();
     await db.update(schema.rounds).set({ rulesVersion: 2 }).where(eq(schema.rounds.date, DATE));
-    await db.update(schema.predictions).set({ stake: null, linePYes: null, payout: null });
+    // guard_double refuses to null out a stake already frozen at seal, so an
+    // unstaked (version 2) round is simulated by deleting every staged row
+    // and reinserting them the way a version 2 seal would have: no
+    // fortuneAtSeal, stake, line or payout.
+    await db.delete(schema.predictions);
+    for (const r of rows) {
+      await db.insert(schema.predictions).values([
+        { questionId: r.id, userId: alice.id, answer: true, confidence: 70 },
+        { questionId: r.id, userId: bob.id, answer: false, confidence: 55 },
+      ]);
+    }
     for (const r of rows) await resolveQuestion(db, r.id, "yes");
     await settleRound(db, DATE);
     const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) });
