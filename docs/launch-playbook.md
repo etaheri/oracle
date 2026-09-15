@@ -95,7 +95,7 @@ cron only acts inside its scheduled hours (forecast 09:00–11:xx ET, publish at
 noon, authoring at 17:00 ET, settle hourly after lock), so between deploy and
 the next of those hours it does nothing at all.
 
-1. Apply `0014` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`.
+1. Apply `0014`, `0015` and `0016` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`. `0016` is the Hand (design 2026-09-14 §7): best fortune and run start on `users`, the double and the bust on `user_rounds`, `doubled` on `predictions`, and the `guard_double` trigger. No data migration; production has no version 3 rows.
 2. Deploy the API.
 3. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
    Wait for the new deployment to go live before the next step.
@@ -120,6 +120,9 @@ the next of those hours it does nothing at all.
    it reads points and comparisons that a version 3 round no longer carries, so
    it shows 0 points and null comparisons. Parsing is safe; nothing crashes and
    nothing 500s. It stays that way until the mobile plan ships.
+   The build on the store sends `confidence` and shows the ladder priced at
+   the old fractions; the server ignores the number and stakes flat, so an
+   old client's receipt may disagree with its ladder until it updates.
 
 ### 2.4 The Council (design 2026-09-11 §17)
 
