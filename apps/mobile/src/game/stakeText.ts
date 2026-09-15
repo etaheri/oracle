@@ -1,42 +1,24 @@
-import { FORTUNE, LADDER_CONFIDENCES, stakeFraction } from "@oracle/core";
 import { formatFortune } from "./fortuneText";
-import { numeral } from "./numerals";
 
-// The card's money text (design §8.2, D13). Money, never confidence, on the
-// ladder and the receipt; the confidence percent is stored and shown only in
-// the record's calibration detail. Machine register throughout.
+// The card's money text (design 2026-09-14 §5.1). Money, never a percent:
+// the flat stake and what it wins on each side. Machine register throughout.
 export function lineLabel(line: number | null): string | null {
   if (line === null) return null;
   return `THE ORACLE'S LINE · ${Math.round(line * 100)}% YES`;
 }
 
-export function rungLabel(r: { stake: number; wins: number }): string {
-  return `STAKE ${formatFortune(r.stake)} · WINS ${formatFortune(r.wins)}`;
+// One side's stake and winnings. The Big One names itself, because its
+// stake is the one that is already doubled before the player's double.
+export function sideLine(_answer: boolean, stake: number, wins: number, isBigOne: boolean): string {
+  const body = `STAKE ${formatFortune(stake)} · WINS ${formatFortune(wins)}`;
+  return isBigOne ? `THE BIG ONE · ${body}` : body;
 }
 
-export function rungA11y(r: { stake: number; wins: number }): string {
-  return `Stake ${formatFortune(r.stake)}, wins ${formatFortune(r.wins)}`;
-}
-
-// A round whose line commit missed opens unstaked (design §5.5); the ladder
-// still has to say something, so it says the one thing it knows.
-export function unstakedRungLabel(confidence: number): string {
-  return `${confidence}% SURE`;
-}
-
-export function receiptLine(input: { answer: boolean; stake: number | null; wins: number | null; confidence: number }): string {
+// The receipt under the stage. An unstaked round (no line committed, design
+// §5.5) has only the side to say.
+export function receiptLine(input: { answer: boolean; stake: number | null; wins: number | null; doubled?: boolean }): string {
   const side = input.answer ? "YES" : "NO";
-  if (input.stake === null || input.wins === null) return `${side} · ${unstakedRungLabel(input.confidence)}`;
-  return `${side} · STAKED ${formatFortune(input.stake)} · WINS ${formatFortune(input.wins)}`;
-}
-
-// The five rungs for the rules screen, at a founding fortune.
-export function ladderTable(): Array<{ rung: string; percent: string; bigOne: string; example: string }> {
-  const pct = (f: number) => `${Math.round(f * 100)}%`;
-  return LADDER_CONFIDENCES.map((c, i) => ({
-    rung: numeral(i + 1),
-    percent: pct(stakeFraction(c, false)),
-    bigOne: pct(stakeFraction(c, true)),
-    example: formatFortune(Math.round(FORTUNE.FOUNDING * stakeFraction(c, false))),
-  }));
+  if (input.stake === null || input.wins === null) return side;
+  const body = `${side} · STAKED ${formatFortune(input.stake)} · WINS ${formatFortune(input.wins)}`;
+  return input.doubled ? `${body} · DOUBLED` : body;
 }

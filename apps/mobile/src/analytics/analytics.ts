@@ -8,8 +8,6 @@ import { KEYS } from "../config/keys";
 export type AnalyticsEvent =
   | "arrival_viewed"
   | "house_headline_viewed"
-  | "confidence_history_viewed"
-  | "confidence_history_expanded"
   | "resolution_evidence_opened"
   | "reading_opened"
   | "practice_started"
@@ -26,7 +24,10 @@ export type AnalyticsEvent =
   | "paywall_viewed"
   | "purchase_completed"
   | "shield_used"
-  | "record_claimed";
+  | "record_claimed"
+  | "double_placed"
+  | "double_skipped"
+  | "bust_viewed";
 
 let client: PostHog | null = null;
 

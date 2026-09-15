@@ -10,8 +10,8 @@ export function isFortuneRound(d: Reveal): boolean {
 }
 
 // Did the player actually stake on this round? A version 3 round that opened
-// with no line committed (design §5.5) takes predictions at confidence only,
-// so it has no money in it and has to read as a points round; a spectator's
+// with no line committed (design §5.5) takes predictions with no stake at
+// all, so it has no money in it and reads as a points round; a spectator's
 // round has no stakes either. Callers pair this with isFortuneRound.
 export function stakedRound(d: Reveal): boolean {
   return d.questions.some((q) => q.my !== null && q.my.stake !== null);
@@ -31,12 +31,12 @@ export function fortuneHeadline(d: Reveal): FortuneHeadline {
   return { kind: "settled", delta: signedFortune(d.delta), fortune: `FORTUNE ${formatFortune(d.fortune_after)}` };
 }
 
-// Each card's stake, read back in money. Confidence appears only when the
-// round was unstaked (design §5.5), because then it is all there is.
+// Each card's stake, read back in money. An unstaked round (design §5.5)
+// has no money in it, so the receipt is the side and nothing more.
 export function stakeReceipt(q: Question): string | null {
   if (!q.my) return null;
   const side = q.my.answer ? "YES" : "NO";
-  if (q.my.stake === null) return receiptLine({ answer: q.my.answer, stake: null, wins: null, confidence: q.my.confidence });
+  if (q.my.stake === null) return receiptLine({ answer: q.my.answer, stake: null, wins: null });
   const head = `${side} · STAKED ${formatFortune(q.my.stake)}`;
   if (q.outcome === null || q.my.payout === null) return `${head} · PENDING`;
   if (q.outcome === "void") return `${head} · STAKE RETURNED`;

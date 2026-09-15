@@ -1,7 +1,7 @@
 import type { Exhibition } from "@oracle/core";
 import type { ArrivalState } from "./arrivalState";
 
-export type ExhibitionPrediction = { answer: boolean; confidence: number };
+export type ExhibitionPrediction = { answer: boolean };
 export type ExhibitionPhase = "choosing" | "sealed" | "revealed";
 
 export type ExhibitionFlow = {

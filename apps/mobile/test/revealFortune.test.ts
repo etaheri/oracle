@@ -47,7 +47,7 @@ describe("the version 3 reveal (design §8.3)", () => {
     expect(stakeReceipt(q({ outcome: "void", my: { payout: 50, delta: 0 } }))).toBe("YES · STAKED 50 · STAKE RETURNED");
     expect(stakeReceipt(q({ outcome: null, my: { payout: null, delta: null } }))).toBe("YES · STAKED 50 · PENDING");
     expect(stakeReceipt(q({ my: null }))).toBeNull();
-    expect(stakeReceipt(q({ my: { stake: null, payout: null, delta: null } }))).toBe("YES · 75% SURE");
+    expect(stakeReceipt(q({ my: { stake: null, payout: null, delta: null } }))).toBe("YES");
   });
 
   it("reads the Oracle comparison as who took whom", () => {

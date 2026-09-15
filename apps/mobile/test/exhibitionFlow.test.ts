@@ -43,16 +43,16 @@ describe("exhibition flow", () => {
   });
 
   it("retries the same Oracle forecast and outcome", () => {
-    const revealed = revealExhibition(sealExhibition(beginExhibition(historical), { answer: true, confidence: 70 })).flow;
+    const revealed = revealExhibition(sealExhibition(beginExhibition(historical), { answer: true })).flow;
     const retried = retryExhibition(revealed);
 
     expect(retried).toMatchObject({ phase: "choosing", exhibition: historical, prediction: null });
   });
 
   it("records completion only on the first reveal in a route session", () => {
-    const sealed = sealExhibition(beginExhibition(historical), { answer: true, confidence: 70 });
+    const sealed = sealExhibition(beginExhibition(historical), { answer: true });
     const first = revealExhibition(sealed);
-    const secondAttempt = sealExhibition(retryExhibition(first.flow), { answer: false, confidence: 55 });
+    const secondAttempt = sealExhibition(retryExhibition(first.flow), { answer: false });
     const second = revealExhibition(secondAttempt);
 
     expect(first.completedNow).toBe(true);

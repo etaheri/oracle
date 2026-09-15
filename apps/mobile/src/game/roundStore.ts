@@ -4,13 +4,15 @@ export function makeIdempotencyKey(qid: string): string {
   return `${qid}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
-interface Entry { answer: boolean; confidence: number; sealed: boolean; idempotencyKey: string; atSeal?: { pct: number; count: number } }
+// `stake` is the server's frozen stake once the seal has round-tripped (null
+// before, and on an unstaked round). `doubled` arrives from /today/mine after
+// the tray places the double (design 2026-09-14 §5.3).
+interface Entry { answer: boolean; sealed: boolean; idempotencyKey: string; stake: number | null; doubled: boolean; atSeal?: { pct: number; count: number } }
 interface RoundState {
   answers: Record<string, Entry>;
   setAnswer(qid: string, answer: boolean): void;
-  setConfidence(qid: string, confidence: number): void;
-  markSealed(qid: string): void;
-  hydrate(predictions: ReadonlyArray<{ question_id: string; answer: boolean; confidence: number }>): void;
+  markSealed(qid: string, stake: number | null): void;
+  hydrate(predictions: ReadonlyArray<{ question_id: string; answer: boolean; stake?: number | null; doubled?: boolean }>): void;
   // The crowd at the instant this question was sealed (design 2026-09-09
   // §4.1) — arrives later, from /today/mine, once the seal has round-tripped
   // the server. Merges onto whatever entry already exists; never touches
@@ -27,31 +29,30 @@ export const useRoundStore = create<RoundState>((set) => ({
       answers: {
         ...s.answers,
         [qid]: {
-          confidence: existing?.confidence ?? 75,
           sealed: existing?.sealed ?? false,
           idempotencyKey: existing?.idempotencyKey ?? makeIdempotencyKey(qid),
+          stake: existing?.stake ?? null,
+          doubled: existing?.doubled ?? false,
           answer,
         },
       },
     };
   }),
-  setConfidence: (qid, confidence) => set((s) => s.answers[qid] ? ({ answers: { ...s.answers, [qid]: { ...s.answers[qid]!, confidence } } }) : s),
-  markSealed: (qid) => set((s) => s.answers[qid] ? ({ answers: { ...s.answers, [qid]: { ...s.answers[qid]!, sealed: true } } }) : s),
+  markSealed: (qid, stake) => set((s) => s.answers[qid] ? ({ answers: { ...s.answers, [qid]: { ...s.answers[qid]!, sealed: true, stake } } }) : s),
   setAtSeal: (qid, snap) => set((s) => s.answers[qid] ? ({ answers: { ...s.answers, [qid]: { ...s.answers[qid]!, atSeal: snap } } }) : s),
   hydrate: (predictions) => set((s) => {
     const answers = { ...s.answers };
     for (const p of predictions) {
       const existing = answers[p.question_id];
-      // Server is the source of truth (Plan-3 carry-over): a server-known
-      // prediction is sealed, and its answer/confidence overwrite any local
-      // draft or divergent replay. `atSeal` is not this function's field —
-      // it's `setAtSeal`'s — so it survives untouched rather than getting
-      // dropped and waiting for the sibling mine.data effect to restore it.
+      // Server is the source of truth: a server-known prediction is sealed,
+      // and its answer, stake and double overwrite any local draft. `atSeal`
+      // is setAtSeal's field and survives untouched.
       answers[p.question_id] = {
         ...existing,
         answer: p.answer,
-        confidence: p.confidence,
         sealed: true,
+        stake: p.stake ?? null,
+        doubled: p.doubled ?? false,
         idempotencyKey: existing?.idempotencyKey ?? makeIdempotencyKey(p.question_id),
       };
     }

@@ -56,16 +56,16 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
           const next = revealExhibition(flow); setFlow(next.flow); if (next.completedNow) onCompleted();
         }} />}
       </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} fortune={PRACTICE_FORTUNE} onSealed={() => {}}
-        practice={{ context: exhibition.context, stamp: "PRACTICE · UNRANKED", onSeal: (answer, confidence) => {
-          setFlow(current => sealExhibition(current, { answer, confidence }));
+        practice={{ context: exhibition.context, stamp: "PRACTICE · UNRANKED", onSeal: (answer) => {
+          setFlow(current => sealExhibition(current, { answer }));
         } }} />}
     </View>}</CardStage>
     <View style={{ minHeight: 48, gap: space(1), justifyContent: "center" }}>
       <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>
-        {result ? "UNRANKED · YOUR FORTUNE, RECORD AND STREAK ARE UNCHANGED." : "TAP A SIDE, THEN A STAKE, THEN SEAL."}
+        {result ? "UNRANKED · YOUR FORTUNE, RECORD AND STREAK ARE UNCHANGED." : "SWIPE RIGHT FOR YES, LEFT FOR NO."}
       </Mono>
     </View>
-    {revealed && <QuietLink title="TRY ANOTHER STAKE" onPress={() => {
+    {revealed && <QuietLink title="TRY THE OTHER SIDE" onPress={() => {
       setFlow(current => retryExhibition(current)); setAttempt(n => n + 1);
     }} />}
   </View>;

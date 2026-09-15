@@ -9,7 +9,7 @@ const ex = ExhibitionSchema.parse({
 
 describe("practice on the practice fortune (design §8.3)", () => {
   it("prices a right call at the line and says who took whom", () => {
-    const r = practiceResult({ answer: true, confidence: 75 }, ex);
+    const r = practiceResult({ answer: true }, ex);
     expect(r.stake).toBe(50);
     expect(r.wins).toBe(21);
     expect(r.delta).toBe(21);
@@ -19,13 +19,14 @@ describe("practice on the practice fortune (design §8.3)", () => {
     expect(r.oracleLine).toBe("THE ORACLE'S LINE · 70% YES");
   });
   it("loses the stake on a wrong call", () => {
-    const r = practiceResult({ answer: false, confidence: 95 }, ex);
-    expect(r.delta).toBe(-90);
-    expect(r.verdict).toBe("The Oracle took 90.");
-    expect(r.counterfactual).toBe("Had it gone NO, the same call would have won 210.");
+    const r = practiceResult({ answer: false }, ex);
+    expect(r.stake).toBe(50);
+    expect(r.delta).toBe(-50);
+    expect(r.verdict).toBe("The Oracle took 50.");
+    expect(r.counterfactual).toBe("Had it gone NO, the same call would have won 117.");
   });
   it("derives a line when the fixture has none", () => {
-    const r = practiceResult({ answer: true, confidence: 55 }, { ...ex, linePYes: null });
+    const r = practiceResult({ answer: true }, { ...ex, linePYes: null });
     expect(r.line).toBe(0.7);
   });
 });
