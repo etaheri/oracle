@@ -94,6 +94,11 @@ export const predictionRoutes = new Hono<AppContext>()
   // user_rounds.double_question_id; placing it and doubling the stake are ONE
   // statement, for the same reason payFortune is (neon-http has no
   // transactions). The guard_double trigger refuses every other stake change.
+  // The CTE's own EXISTS repeats the outer UPDATE's predicate: without it the
+  // round's one double is spent by the CTE even when the outer statement
+  // matches nothing -- a prediction settled between the snapshot read and this
+  // write would burn the double on a row it could not touch, and the trigger
+  // would not save it because no stake changed.
   .post("/double", async (c) => {
     const parsed = DoubleSubmitSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -117,6 +122,11 @@ export const predictionRoutes = new Hono<AppContext>()
       WITH placed AS (
         UPDATE user_rounds SET double_question_id = ${q.id}::uuid
         WHERE user_id = ${userId}::uuid AND date = ${q.roundDate}::date AND double_question_id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM predictions p
+            WHERE p.question_id = ${q.id}::uuid AND p.user_id = ${userId}::uuid
+              AND p.settled_at IS NULL AND p.stake IS NOT NULL
+          )
         RETURNING user_id
       )
       UPDATE predictions SET stake = stake * ${FORTUNE.DOUBLE_MULT}, doubled = true

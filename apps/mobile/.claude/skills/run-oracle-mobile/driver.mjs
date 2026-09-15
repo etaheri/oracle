@@ -315,7 +315,7 @@ const commands = {
       const D = ${JSON.stringify(date)};
       const TODAY = ${JSON.stringify(today)};
 
-      const stake = (fortune, c, big) => Math.max(1, Math.round(fortune * ((c - 50) / 50) * 0.10 * (big ? 2 : 1)));
+      const stake = (fortune, big) => Math.max(1, Math.round(fortune * 0.05 * (big ? 2 : 1)));
       const odds = (answer, line) => (answer ? (1 - line) / line : line / (1 - line));
       const payout = (s, answer, line, outcome) =>
         outcome === "void" ? s : ((outcome === "yes") === answer ? s + Math.round(s * odds(answer, line)) : 0);
@@ -408,7 +408,7 @@ const commands = {
         for (let i = 0; i < 5; i++) {
           const [answer, c] = p.calls[i];
           const line = QS[i][2], outcome = QS[i][4];
-          const s = stake(1000, c, i === 4);
+          const s = stake(1000, i === 4);
           const pay = payout(s, answer, line, outcome);
           net += pay - s;
           houseDelta += s - pay;

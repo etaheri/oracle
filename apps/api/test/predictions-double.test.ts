@@ -3,6 +3,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
 import { createApp } from "../src/app";
+import { payFortune } from "../src/resolution";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 const DATE = "2026-09-10";
@@ -139,6 +140,34 @@ describe("POST /v1/predictions/double (design 2026-09-14 §6.2)", () => {
     const { qs, seal, dbl } = await setup({ linelessSlot: 1 });
     await seal(qs[0]!.id);
     expect(await (await dbl(qs[0]!.id)).json()).toEqual({ error: "no prediction" });
+  });
+  // The bug this guards: the `placed` CTE spends the round's one double
+  // regardless of whether the outer UPDATE finds a row. A prediction that
+  // settled before the call has no stake left to double -- the outer statement
+  // skips it on `settled_at IS NULL` -- and without the CTE's own EXISTS the
+  // double was consumed anyway, leaving the player's round marked doubled on a
+  // call whose stake never grew and every other call unable to take it.
+  it("leaves the round's double unspent when the call has already settled", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, seal, dbl, me } = await setup();
+    await seal(qs[0]!.id);
+    await seal(qs[1]!.id);
+    // Settled through settlement's own path, never by writing `stake`: the
+    // guard_double trigger would refuse that, and it is the stake being
+    // untouched that makes this bug invisible to the trigger.
+    const { paid } = await payFortune(db, qs[0]!.id, "yes", new Date("2026-09-10T16:45:00Z"));
+    expect(paid).toBe(1);
+    const u = await me();
+    const res = await dbl(qs[0]!.id);
+    expect(res.status).toBe(409);
+    const ur = await db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, u.id), eq(schema.userRounds.date, DATE)) });
+    expect(ur!.doubleQuestionId).toBeNull();
+    // And the double is still there to place on a call that can take it.
+    const other = await dbl(qs[1]!.id);
+    expect(other.status).toBe(200);
+    expect(await other.json()).toEqual({ question_id: qs[1]!.id, stake: 100, wins: 186 });
+    const after = await db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, u.id), eq(schema.userRounds.date, DATE)) });
+    expect(after!.doubleQuestionId).toBe(qs[1]!.id);
   });
   it("400s a malformed body", async () => {
     const { dbl } = await setup();

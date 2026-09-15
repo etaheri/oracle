@@ -12,6 +12,7 @@ import { useRoundStore } from "../game/roundStore";
 import { asciiGauge } from "../game/terminalPrint";
 import { GATHERING_LINE, VERDICT_MIN_PLAYERS } from "../game/crowdVerdict";
 import { crowdMovement } from "../game/crowdMovement";
+import { crowdCallLine } from "../game/stakeText";
 import { contrarianApplies, type RoundToday } from "@oracle/core";
 
 // The crowd bar in the machine's own alphabet: [#######·····], the fill
@@ -98,10 +99,15 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
                   {!gathering && c && (
                     <CrowdBar pct={c.crowd_yes_pct} />
                   )}
+                  {/* The player's own line is the receipt once the round is
+                      staked (design 2026-09-14 §5.3): side, stake, winnings,
+                      and DOUBLED on the call that took the double -- the
+                      finale is the only place the placed double is ever shown
+                      back. An unstaked round still reads "YOU: YES". */}
                   <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
                     {!gathering && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "left" }]}>{c!.crowd_yes_pct}% SAY YES</Mono>}
                     <Mono {...role.caption} color={against ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
-                      {mine.answer ? "YOU: YES" : "YOU: NO"}{against ? " · AGAINST THE TIDE" : ""}
+                      {crowdCallLine({ answer: mine.answer, stake: mine.stake, line: q.line_p_yes, doubled: mine.doubled })}{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>
                   </View>
                   {movement && (

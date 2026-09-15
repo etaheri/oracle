@@ -1,5 +1,5 @@
 import { Canvas, Fill, Line, Rect, Text as SkText, Image as SkImage, vec, useCanvasRef, useFont, useImage } from "@shopify/react-native-skia";
-import type { MeLedger } from "@oracle/core";
+import { FORTUNE, type MeLedger } from "@oracle/core";
 import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { RegisterMarks, ShareFooter, NIGHT_LINE, NIGHT_DIM } from "./ShareCard";
@@ -24,13 +24,13 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
   const mono = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 18);
   const monoSmall = useFont(require("../../assets/fonts/IBMPlexMono-Regular.ttf"), 12);
 
-  const fortuneTitle = formatFortune(data.fortune ?? 1000);
+  const fortuneTitle = formatFortune(data.fortune ?? FORTUNE.FOUNDING);
   const titleFits44 = ritual44 ? ritual44.measureText(fortuneTitle).width <= PLAQUE_W - 2 * INSET : true;
   const ritual = titleFits44 ? ritual44 : ritual34;
 
   const statLines = [
     `ROUNDS PLAYED ${data.days_consulted} · STREAK ${data.streak}`,
-    `BEST ${formatFortune(data.best_fortune ?? data.fortune ?? 1000)}`,
+    `BEST ${formatFortune(data.best_fortune ?? data.fortune ?? FORTUNE.FOUNDING)}`,
   ];
 
   return (

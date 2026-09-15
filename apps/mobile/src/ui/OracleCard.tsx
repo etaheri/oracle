@@ -244,6 +244,7 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
                   return (
                     <Pressable key={String(v)} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { void seal(v); }}
                       accessibilityLabel={preview ? `${v ? "Yes" : "No"}, stake ${preview.stake}, wins ${preview.wins}` : v ? "Yes" : "No"}
+                      accessibilityHint="Seals your call."
                       style={{ flex: 1, borderWidth: 1, borderColor: tone, minHeight: 48, justifyContent: "center", alignItems: "center", gap: 2 }}>
                       <Mono size={12} color={tone} letterSpacing={5} style={{ marginRight: -5 }}>{v ? "YES" : "NO"}</Mono>
                       {preview && <Mono size={9} color={colors.mutedInk} letterSpacing={1}>{sideLine(v, preview.stake, preview.wins, q.is_big_one)}</Mono>}
