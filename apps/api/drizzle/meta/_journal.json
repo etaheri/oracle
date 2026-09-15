@@ -113,6 +113,13 @@
       "when": 1789144065887,
       "tag": "0015_gray_captain_america",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789437975543,
+      "tag": "0016_whole_bishop",
+      "breakpoints": true
     }
   ]
 }

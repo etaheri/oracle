@@ -19,9 +19,15 @@ export const users = pgTable("users", {
   // settled through. Lets a crashed settleRound retry skip finished users
   // (neon-http has no transactions to lean on).
   streakSettledThrough: date("streak_settled_through"),
-  // The player's fortune (design 2026-09-10 §4.4). Written ONLY by settlement
-  // (resolution.ts payFortune). Never by a purchase, a grant or a shield.
+  // The player's fortune (design 2026-09-10 §4.4, 2026-09-14 §4.4). Written by
+  // settlement (resolution.ts payFortune) and by the bust (settlement.ts
+  // bustIfUnder), and nowhere else. Never by a purchase, a grant or a shield.
   fortune: integer("fortune").notNull().default(1000),
+  // The run (design 2026-09-14 §4.4): the highest fortune ever reached, kept
+  // in step with fortune by payFortune's own statement; and the first date of
+  // the current run, null for the founding run.
+  bestFortune: integer("best_fortune").notNull().default(1000),
+  runStartedOn: date("run_started_on"),
 }, (t) => [index("users_oracle_score_idx").on(t.oracleScore)]);
 
 export const devices = pgTable("devices", {
@@ -160,6 +166,9 @@ export const predictions = pgTable("predictions", {
   // resolve pays nobody twice. payout includes the returned stake.
   payout: integer("payout"),
   settledAt: timestamp("settled_at", { withTimezone: true }),
+  // The player's double sits on this call (design 2026-09-14 §4.2). The only
+  // permitted rewrite of `stake`, enforced by the guard_double trigger.
+  doubled: boolean("doubled").notNull().default(false),
 }, (t) => [uniqueIndex("predictions_question_user_unique").on(t.questionId, t.userId), index("predictions_user_idx").on(t.userId)]);
 
 // Oracle Plus entitlements (backend spec L55). Written by the RevenueCat
@@ -202,6 +211,11 @@ export const userRounds = pgTable("user_rounds", {
   // The fortune at this player's FIRST accepted seal of the round, the
   // denominator of the day's return (design 2026-09-10 §4.5). Never rewritten.
   fortuneAtOpen: integer("fortune_at_open"),
+  // The one-per-round rule for the double (design 2026-09-14 §6.2): set once,
+  // in the same statement that doubles the prediction's stake.
+  doubleQuestionId: uuid("double_question_id").references(() => questions.id),
+  // Non-null means this round busted the player, at this fortune (§4.4).
+  bustFortune: integer("bust_fortune"),
 }, (t) => [primaryKey({ columns: [t.userId, t.date] })]);
 
 // The pipeline's daily model-call meter (design 2026-09-04 §9.1). One row per
