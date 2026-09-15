@@ -160,6 +160,11 @@ describe("POST /v1/predictions/double (design 2026-09-14 §6.2)", () => {
     const u = await me();
     const res = await dbl(qs[0]!.id);
     expect(res.status).toBe(409);
+    // ...and it says why. "PLACED" would tell the caller the round's double
+    // is spent, which is the one thing that did not happen here: the call
+    // settled under them and the double is still theirs to place elsewhere,
+    // as the rest of this test proves.
+    expect(await res.json()).toEqual({ error: "settled" });
     const ur = await db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, u.id), eq(schema.userRounds.date, DATE)) });
     expect(ur!.doubleQuestionId).toBeNull();
     // And the double is still there to place on a call that can take it.

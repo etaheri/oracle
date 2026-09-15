@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { jsxTextLiterals } from "./jsxText";
 
 // The vocabulary cut (design §8.1, D12), enforced on the app's own inline
 // literals -- the core lint covers @oracle/core, but roughly eighty player
@@ -13,7 +14,10 @@ import { join } from "node:path";
 // JSX text nodes are prose too, and a plain quoted-literal scan misses them
 // entirely -- `<Mono>Higher confidence makes...</Mono>` prints straight to a
 // player without ever sitting inside a string literal. `jsxTextLiterals`
-// catches those below.
+// (test/jsxText.ts, with its own tests) catches those. It scans the JSX tree
+// rather than matching one narrow `>text</` shape, because most of this app's
+// prose is interrupted by a nested tag or an interpolation and every such run
+// went unread.
 const RETIRED = /\b(vigils?|shields?|exhibitions?|rites?|ledgers?|crowds?|conviction|epithets?|oracle rating|confidence|calibration|rungs?|ladder)\b/i;
 const ROOT = join(__dirname, "..", "src");
 
@@ -39,22 +43,6 @@ function proseLiterals(src: string): string[] {
   return out;
 }
 
-function jsxTextLiterals(src: string): string[] {
-  const out: string[] = [];
-  // A JSX text child sits between a tag's `>` and the next tag's `</` with
-  // nothing else between them -- no nested tag, no `{expression}`. That
-  // narrow shape is what keeps this off TypeScript generics (`Array<T>`),
-  // comparisons (`a > b`), and an embedded field access like
-  // `{highlight.my?.confidence}`, none of which end in a literal `</`.
-  const re = />([^<>{}]*)<\//g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) {
-    const text = m[1].replace(/\s+/g, " ").trim();
-    if (text.includes(" ")) out.push(text);
-  }
-  return out;
-}
-
 describe("the vocabulary cut in the app", () => {
   it("scans the tree", () => {
     expect(walk(ROOT).length).toBeGreaterThan(50);
@@ -64,7 +52,8 @@ describe("the vocabulary cut in the app", () => {
     const offences: string[] = [];
     for (const file of walk(ROOT)) {
       const src = stripComments(readFileSync(file, "utf8"));
-      for (const text of [...proseLiterals(src), ...jsxTextLiterals(src)]) {
+      const jsx = file.endsWith(".tsx") ? jsxTextLiterals(src) : [];
+      for (const text of [...proseLiterals(src), ...jsx]) {
         if (RETIRED.test(text)) offences.push(`${file.slice(ROOT.length + 1)}: "${text}"`);
       }
     }

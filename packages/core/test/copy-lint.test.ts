@@ -59,6 +59,14 @@ describe("copy lint (spec §2/§3 — every line, every rule)", () => {
       expect(worst(l), l.id).not.toMatch(/[+-]\d/);
     }
   });
+  it("asks no per-card HOW SURE — the stake is flat, the double is the only conviction", () => {
+    // Every call stakes the same five percent (INTRO_LINES, the rules' "The
+    // game" rite), so there is no per-card dial to set and no "how sure" to
+    // answer. The two decisions a player actually makes are which side and
+    // where the double goes; a line that asks how sure sells a control the
+    // app removed with the ladder.
+    for (const l of COPY_BANK) expect(l.text, l.id).not.toMatch(/HOW SURE/);
+  });
   it("has the spec'd pool shape", () => {
     const count = (p: string) => COPY_BANK.filter((l) => l.pool === p).length;
     expect(count("noon")).toBeGreaterThanOrEqual(25);

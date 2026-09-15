@@ -120,7 +120,7 @@ Once placed, the round screen shows the crowd finale as today, with the doubled 
 
 ### 5.4 Practice
 
-The practice card is the same component on the practice fortune of 1,000 and the exhibition's line. The hint reads `SWIPE RIGHT FOR YES, LEFT FOR NO.` The retry reads `TRY THE OTHER SIDE`. No tray.
+The practice card is the same component on the practice fortune of 1,000 and the exhibition's line. The hint reads `SWIPE RIGHT FOR YES, LEFT FOR NO`, or `TAP A SIDE TO SEAL` when reduced motion has turned the gesture off. Neither carries a full stop: at iPhone width the stop pushed the swipe hint onto a second line under the card, and the tap hint drops its own for symmetry. The retry reads `TRY THE OTHER SIDE`. No tray.
 
 ## 6. API
 
