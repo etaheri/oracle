@@ -106,7 +106,7 @@ export async function payFortune(db: Db, questionId: string, outcome: "yes" | "n
 // db.execute returns a driver-shaped result: neon-http gives { rows }, PGlite
 // gives { rows } too, but the widened PgDatabase type promises neither, and
 // some drivers hand back a bare array. Read it defensively.
-function executeRows(res: unknown): unknown[] {
+export function executeRows(res: unknown): unknown[] {
   const rows = (res as { rows?: unknown[] } | null)?.rows;
   if (Array.isArray(rows)) return rows;
   return Array.isArray(res) ? res : [];

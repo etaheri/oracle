@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { and, count, eq, sql } from "drizzle-orm";
-import { FORTUNE, PredictionSubmitSchema, stake } from "@oracle/core";
+import { DoubleSubmitSchema, FORTUNE, PredictionSubmitSchema, odds, stake } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
+import { executeRows } from "../resolution";
 
 // The crowd at the instant this player sealed, sealer included (design
 // 2026-09-09 §4.1). Best-effort: a DB hiccup here must leave the snapshot
@@ -87,4 +88,44 @@ export const predictionRoutes = new Hono<AppContext>()
       where: and(eq(schema.predictions.questionId, q.id), eq(schema.predictions.userId, userId)),
     });
     return c.json({ id: existing!.id, first_hour: existing!.firstHour, stake: existing!.stake ?? null });
+  })
+  // The double (design 2026-09-14 §6.2): one per round, on one of the caller's
+  // own sealed calls, before that question's lock. The one-per-round rule is
+  // user_rounds.double_question_id; placing it and doubling the stake are ONE
+  // statement, for the same reason payFortune is (neon-http has no
+  // transactions). The guard_double trigger refuses every other stake change.
+  .post("/double", async (c) => {
+    const parsed = DoubleSubmitSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, parsed.data.question_id) });
+    if (!q) return c.json({ error: "unknown question" }, 404);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, q.roundDate) });
+    if (round?.status !== "open") return c.json({ error: "not open" }, 409);
+    if (Date.now() >= q.locksAt.getTime()) return c.json({ error: "locked" }, 409);
+    const mine = await db.query.predictions.findFirst({
+      where: and(eq(schema.predictions.questionId, q.id), eq(schema.predictions.userId, userId)),
+    });
+    if (!mine || mine.stake === null || mine.linePYes === null) return c.json({ error: "no prediction" }, 404);
+
+    const priced = (s: number) => ({ question_id: q.id, stake: s, wins: Math.round(s * odds(mine.answer, Number(mine.linePYes))) });
+    if (mine.doubled) return c.json(priced(mine.stake));
+
+    const res = await db.execute(sql`
+      WITH placed AS (
+        UPDATE user_rounds SET double_question_id = ${q.id}::uuid
+        WHERE user_id = ${userId}::uuid AND date = ${q.roundDate}::date AND double_question_id IS NULL
+        RETURNING user_id
+      )
+      UPDATE predictions SET stake = stake * ${FORTUNE.DOUBLE_MULT}, doubled = true
+      FROM placed
+      WHERE predictions.question_id = ${q.id}::uuid AND predictions.user_id = placed.user_id AND predictions.settled_at IS NULL
+      RETURNING predictions.stake AS stake
+    `);
+    const rows = executeRows(res) as Array<{ stake: number }>;
+    if (rows.length > 0) return c.json(priced(Number(rows[0]!.stake)));
+    // Zero rows: the double is already placed. On this question the row above
+    // would have read doubled; so it sits on another.
+    return c.json({ error: "placed" }, 409);
   });
