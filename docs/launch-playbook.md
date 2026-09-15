@@ -11,20 +11,22 @@ source placeholders).
 
 ## 0. Where things actually stand
 
-Verified Sept 7, 2026:
+Verified Sept 15, 2026 (after the Hand merged and deployed):
 
 | Thing | State |
 |---|---|
-| `origin/main` | `e542fa8` — everything local is pushed |
-| Tests / typecheck | 959 pass (core 136 / mobile 317 / api 506); typecheck clean |
-| Cloudflare Worker `oracle-api` | **Does not exist.** `wrangler deployments list` → "This Worker does not exist on your account" |
-| Production Neon DB | None. Only `oracle-dev` via `apps/api/.dev.vars` |
-| `oracle-dev` migration state | Behind — at `0006`; `0007` and `0008` unapplied. Any read of `questions`/`rounds` 500s until migrated |
-| Pipeline | Never run in production. `PIPELINE_ENABLED` unset everywhere |
-| App Store Connect | No app record |
-| Auth | `wrangler`, `eas` (etaheri@me.com), `gh` all logged in |
+| `origin/main` | `9966c41` — everything local is pushed (Plans 1–4: the House, mobile, the Council, the Hand) |
+| Tests / typecheck | 1,434 pass (core 241 / mobile 453 / api 740); typecheck clean |
+| Cloudflare Worker `oracle-api` | Deployed `ef800f5a` from `9966c41` with all three Workflow bindings (`oracle-authoring`, `oracle-resolution`, `oracle-council`); `oracle-probe` deleted |
+| Production Neon `oracle-prod` (`lively-river-29150895`) | Migrations 0000–0016 applied and journaled (`last created_at = 1789437975543`); 8 users, one stale v2 round (2026-09-09, still `open`) |
+| Pipeline | `PIPELINE_ENABLED=true` set Sept 15 ~14:20 ET. First unattended authoring tick is 17:00 ET the same day; §3 supervision not yet done |
+| Secrets | All of §2.5 set except `EXA_API_KEY` — the Council runs with empty evidence packs until it is |
+| Site `outseen-site` | Deployed with the Hand's rules and the Standings link |
+| EAS production env | `EXPO_PUBLIC_API_URL`, `_ONESIGNAL_APP_ID`, `_PRIVACY_URL`, `_RC_IOS_KEY` set |
+| TestFlight | Build 10 (1.0.0) finished Sept 15 12:19 and submitted; §4.6 device pass on it not yet done |
+| Admin secret | The deployed `ADMIN_SECRET` is not the one in `.dev.vars`; manual `/admin/*` calls need the production value |
 
-Nothing is deployed. The critical path below is the whole path.
+The critical path from here is §3 (watch the first day), §4.6 (device pass on build 10), then App Review.
 
 ---
 
