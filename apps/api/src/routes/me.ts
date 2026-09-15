@@ -179,12 +179,16 @@ export const meRoutes = new Hono<AppContext>()
       if (you > machine) daysOutseen += 1;
     }
 
-    // Fortune history (design 2026-09-10 §7): one entry per settled round,
-    // in date order, with the running total rebuilt from founding.
+    // Fortune history (design 2026-09-10 §7, 2026-09-14 §6.5): one entry per
+    // settled round of the CURRENT RUN, in date order, with the running total
+    // rebuilt from founding. A bust restarts the run on the next date, so
+    // rounds before run_started_on belong to a fortune the house has taken.
+    const runStart = user?.runStartedOn ?? null;
     const byRound = new Map<string, number>();
     for (const p of preds) {
       const q = qById.get(p.questionId);
       if (!q || p.stake === null || p.payout === null) continue;
+      if (runStart !== null && q.roundDate < runStart) continue;
       byRound.set(q.roundDate, (byRound.get(q.roundDate) ?? 0) + (p.payout - p.stake));
     }
     const settledDates = new Set(playedRounds.filter((r) => r.status === "resolved").map((r) => r.date));
@@ -226,6 +230,8 @@ export const meRoutes = new Hono<AppContext>()
       epithet,
       computed_through: new Date().toISOString().slice(0, 10),
       fortune: user?.fortune ?? null,
+      best_fortune: user?.bestFortune ?? null,
+      run_started_on: runStart,
       fortune_history: fortuneHistory,
       house,
       oracle: {

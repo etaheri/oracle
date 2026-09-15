@@ -96,19 +96,26 @@ export const roundRoutes = new Hono<AppContext>()
     const userId = c.get("userId");
     const found = await openRound(db, new Date());
     if (!found) return c.json({ error: "no open round" }, 404);
-    const { qs } = found;
-    const mine = qs.length
-      ? await db.query.predictions.findMany({
-          where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),
-        })
-      : [];
+    const { round, qs } = found;
+    const [mine, stamped] = await Promise.all([
+      qs.length
+        ? db.query.predictions.findMany({
+            where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))),
+          })
+        : Promise.resolve([]),
+      db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, userId), eq(schema.userRounds.date, round.date)) }),
+    ]);
     return c.json({
+      // The round's double (design 2026-09-14 §6.3): null until placed.
+      double_question_id: stamped?.doubleQuestionId ?? null,
       predictions: mine.map((p) => ({
         question_id: p.questionId,
         answer: p.answer,
         confidence: p.confidence,
         crowd_yes_pct_at_seal: p.crowdYesPctAtSeal === null ? null : Number(p.crowdYesPctAtSeal),
         crowd_count_at_seal: p.crowdCountAtSeal,
+        stake: p.stake,
+        doubled: p.doubled,
       })),
     });
   })
@@ -199,15 +206,25 @@ export const roundRoutes = new Hono<AppContext>()
     const v3 = (round?.rulesVersion ?? 1) >= 3 && decided;
     const roundDelta = v3 && staked.length > 0 ? deltas.reduce((a, b) => a + b, 0) : null;
 
+    // The bust (design 2026-09-14 §6.4): stamped on user_rounds by settlement
+    // with the fortune the house took it at. The reveal shows that number as
+    // fortune_after rather than the new thousand the player wakes up to.
+    const bustFortune = v3 ? (stamped?.bustFortune ?? null) : null;
+
     return c.json({
       date,
       rules_version: round?.rulesVersion ?? 1,
       delta: roundDelta,
       return: v3 && stamped?.fortuneAtOpen ? dayReturn(deltas, stamped.fortuneAtOpen) : null,
       // The caller's fortune as it stands, which equals the post-round fortune
-      // until a later round settles. /me/ledger carries the exact per-round value.
-      fortune_after: v3 ? (user?.fortune ?? null) : null,
+      // until a later round settles. /me/ledger carries the exact per-round
+      // value. A bust shows the fortune the house took it at instead — the
+      // player has already woken up to the new thousand by the time they
+      // read this.
+      fortune_after: v3 ? (bustFortune ?? user?.fortune ?? null) : null,
       house_delta: v3 ? (round?.houseDelta ?? null) : null,
+      // Non-null means this round busted the caller, at this fortune.
+      bust_fortune: bustFortune,
       bonus_points: round && round.rulesVersion >= 2 ? perQuestionPoints.reduce((a, b) => a + b, 0) - base : 0,
       day_points: vigilMult === null ? raw : weighDay(raw, vigilMult),
       vigil_mult: vigilMult,
@@ -243,6 +260,7 @@ export const roundRoutes = new Hono<AppContext>()
                 stake: p.stake,
                 payout: p.payout,
                 delta: p.payout === null || p.stake === null ? null : p.payout - p.stake,
+                doubled: p.doubled,
               }
             : null,
           source_name: q.sourceName,

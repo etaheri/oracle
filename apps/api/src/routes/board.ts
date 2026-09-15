@@ -5,11 +5,11 @@ import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
 
-// The all-time board (design §7, §8.3): every player who has settled at least
-// one stake, ranked by fortune. A player who has never staked stands at
-// founding and is not in the field -- a board of untouched 1,000s ranks
-// nobody. Same floor and window as the daily board; same designations, so
-// nothing a user typed reaches the rows.
+// The all-time board (design §7, §8.3; 2026-09-14 §6.6): every player who has
+// settled at least one stake, ranked by the best fortune they have ever
+// reached. A bust restarts the fortune, not the record: ranking on the live
+// fortune would drop a veteran under a newcomer the morning after. Same floor
+// and window as the daily board; designations only.
 export const boardRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
   .get("/all-time", async (c) => {
@@ -22,17 +22,17 @@ export const boardRoutes = new Hono<AppContext>()
       .groupBy(schema.predictions.userId);
     const ids = staked.map((r) => r.userId);
     const users = ids.length ? await db.query.users.findMany({ where: inArray(schema.users.id, ids) }) : [];
-    const entries = users.map((u) => ({ userId: u.id, fortune: u.fortune }));
-    const field = entries.map((e) => e.fortune);
-    const mine = entries.find((e) => e.userId === userId)?.fortune ?? null;
-    const empty = { field_size: field.length, your_fortune: mine, your_rank: null as number | null, best_fortune: null as number | null, median_fortune: null as number | null, rows: [] as Array<{ name: string; fortune: number; rank: number; is_you: boolean }> };
+    const entries = users.map((u) => ({ userId: u.id, best: u.bestFortune }));
+    const field = entries.map((e) => e.best);
+    const mine = entries.find((e) => e.userId === userId)?.best ?? null;
+    const empty = { field_size: field.length, your_best: mine, your_rank: null as number | null, best: null as number | null, median_best: null as number | null, rows: [] as Array<{ name: string; best: number; rank: number; is_you: boolean }> };
     if (field.length < CONSTANTS.BOARD_MIN_FIELD) return c.json(empty);
     const sorted = [...field].sort((a, b) => b - a);
     const mid = sorted.length >> 1;
     const median = sorted.length % 2 === 1 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
     // Ties share the better rank: one plus the number of strictly richer players.
     const rankIn = (f: number) => 1 + field.filter((x) => x > f).length;
-    const ranked = entries.map((e) => ({ ...e, rank: rankIn(e.fortune), is_you: e.userId === userId })).sort((a, b) => b.fortune - a.fortune);
+    const ranked = entries.map((e) => ({ ...e, rank: rankIn(e.best), is_you: e.userId === userId })).sort((a, b) => b.best - a.best);
     const meIdx = ranked.findIndex((r) => r.is_you);
     const keep = new Set<number>();
     for (let i = 0; i < Math.min(CONSTANTS.BOARD_TOP_ROWS, ranked.length); i++) keep.add(i);
@@ -42,8 +42,8 @@ export const boardRoutes = new Hono<AppContext>()
     return c.json({
       ...empty,
       your_rank: mine === null ? null : rankIn(mine),
-      best_fortune: sorted[0]!,
-      median_fortune: median,
-      rows: shown.map((r, i) => ({ name: names[i]!, fortune: r.fortune, rank: r.rank, is_you: r.is_you })),
+      best: sorted[0]!,
+      median_best: median,
+      rows: shown.map((r, i) => ({ name: names[i]!, best: r.best, rank: r.rank, is_you: r.is_you })),
     });
   });

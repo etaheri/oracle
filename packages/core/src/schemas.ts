@@ -219,16 +219,18 @@ export const RoundBoardSchema = z.object({
 });
 export type RoundBoard = z.infer<typeof RoundBoardSchema>;
 
-// The all-time board (design §7, §8.3): every player who has settled at least
-// one stake, ranked by fortune. Same floor and window as the daily board.
+// The all-time board (design §7, §8.3; 2026-09-14 §6.6): every player who
+// has settled at least one stake, ranked by their best fortune ever reached,
+// so a bust never drops a veteran below a newcomer. Same floor and window as
+// the daily board.
 export const AllTimeBoardSchema = z.object({
   field_size: z.number().int(),
-  // The caller's fortune. Null when the caller has never settled a stake.
-  your_fortune: z.number().int().nullable(),
+  // The caller's best fortune. Null when the caller has never settled a stake.
+  your_best: z.number().int().nullable(),
   your_rank: z.number().int().nullable(),
-  best_fortune: z.number().int().nullable(),
-  median_fortune: z.number().int().nullable(),
-  rows: z.array(z.object({ name: z.string(), fortune: z.number().int(), rank: z.number().int(), is_you: z.boolean() })),
+  best: z.number().int().nullable(),
+  median_best: z.number().int().nullable(),
+  rows: z.array(z.object({ name: z.string(), best: z.number().int(), rank: z.number().int(), is_you: z.boolean() })),
 });
 export type AllTimeBoard = z.infer<typeof AllTimeBoardSchema>;
 

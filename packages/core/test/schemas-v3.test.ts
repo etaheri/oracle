@@ -64,14 +64,14 @@ describe("v3 response fields are optional and typed", () => {
 describe("the all-time board and the ledger's house (spec §7)", () => {
   it("parses a full all-time board", () => {
     const b = AllTimeBoardSchema.parse({
-      field_size: 6, your_fortune: 1140, your_rank: 2, best_fortune: 2002, median_fortune: 940,
-      rows: [{ name: "Quiet Heron", fortune: 2002, rank: 1, is_you: false }, { name: "You", fortune: 1140, rank: 2, is_you: true }],
+      field_size: 6, your_best: 1140, your_rank: 2, best: 2002, median_best: 940,
+      rows: [{ name: "Quiet Heron", best: 2002, rank: 1, is_you: false }, { name: "You", best: 1140, rank: 2, is_you: true }],
     });
     expect(b.rows[1]!.is_you).toBe(true);
   });
 
   it("parses a sparse all-time board with nulls and no rows", () => {
-    const b = AllTimeBoardSchema.parse({ field_size: 2, your_fortune: 1000, your_rank: null, best_fortune: null, median_fortune: null, rows: [] });
+    const b = AllTimeBoardSchema.parse({ field_size: 2, your_best: 1000, your_rank: null, best: null, median_best: null, rows: [] });
     expect(b.your_rank).toBeNull();
   });
 

@@ -5,7 +5,7 @@ import { schema } from "../src/db/client";
 import { createApp } from "../src/app";
 import { resolveQuestion } from "../src/resolution";
 import { settleRound } from "../src/settlement";
-import { RoundTodaySchema, RevealSchema, RoundBoardSchema, MeLedgerSchema } from "@oracle/core";
+import { RoundTodaySchema, RevealSchema, RoundBoardSchema, MeLedgerSchema, MineTodaySchema } from "@oracle/core";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 const DATE = "2026-09-10";
@@ -153,5 +153,96 @@ describe("GET /v1/me/ledger carries the house", () => {
     const { as } = await world(1);
     const json = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
     expect(json.house).toEqual({ total: 0, last_delta: null });
+  });
+});
+
+describe("the Hand on today, the reveal and the ledger (design 2026-09-14 §6)", () => {
+  type As = Awaited<ReturnType<typeof world>>["as"];
+  const dbl = (as: As, i: number, qid: string) =>
+    as(i)("/v1/predictions/double", { method: "POST", body: JSON.stringify({ question_id: qid }) });
+
+  it("mine carries the stake, the doubled flag and the round's double", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { qs, as, seal } = await world(1);
+    for (const q of qs) await seal(0, q.id, true, 75);
+    let mine = MineTodaySchema.parse(await (await as(0)("/v1/round/today/mine")).json());
+    expect(mine.double_question_id).toBeNull();
+    expect(mine.predictions.every((p) => p.stake === (qs.find((q) => q.id === p.question_id)!.slot === 5 ? 100 : 50) && !p.doubled)).toBe(true);
+    const big = qs.find((q) => q.slot === 5)!;
+    await dbl(as, 0, big.id);
+    mine = MineTodaySchema.parse(await (await as(0)("/v1/round/today/mine")).json());
+    expect(mine.double_question_id).toBe(big.id);
+    expect(mine.predictions.find((p) => p.question_id === big.id)).toMatchObject({ stake: 200, doubled: true });
+  });
+
+  it("the reveal marks the doubled call and pays it doubled", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, as, seal } = await world(1);
+    for (const q of qs) await seal(0, q.id, true, 75);
+    await dbl(as, 0, qs[0]!.id);
+    vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+    await settleRound(db, DATE);
+    const json = RevealSchema.parse(await (await as(0)(`/v1/round/${DATE}/reveal`)).json());
+    expect(json.questions.find((q) => q.slot === 1)!.my).toMatchObject({ stake: 100, payout: 286, delta: 186, doubled: true });
+    expect(json.questions.find((q) => q.slot === 2)!.my).toMatchObject({ stake: 50, doubled: false });
+    expect(json.bust_fortune).toBeNull();
+    expect(json.delta).toBe(186 + 93 * 3 + 186);
+  });
+
+  it("a losing night that lands at or above 100 is not a bust", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, as, seal } = await world(1);
+    const me = (await db.query.users.findMany())[0]!;
+    await db.update(schema.users).set({ fortune: 320 }).where(eq(schema.users.id, me.id));
+    for (const q of qs) await seal(0, q.id, true, 75); // stakes 16 × 4 + 32 = 96, all wrong
+    vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
+    for (const q of qs) await resolveQuestion(db, q.id, "no");
+    await settleRound(db, DATE);
+    const json = RevealSchema.parse(await (await as(0)(`/v1/round/${DATE}/reveal`)).json());
+    // 320 − 96 = 224: no bust, and fortune_after is the live fortune.
+    expect(json.bust_fortune).toBeNull();
+    expect(json.fortune_after).toBe(224);
+  });
+
+  it("a fortune that falls under 100 shows the bust on the reveal and the run on the ledger", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, as, seal } = await world(1);
+    const me = (await db.query.users.findMany())[0]!;
+    await db.update(schema.users).set({ fortune: 120 }).where(eq(schema.users.id, me.id));
+    for (const q of qs) await seal(0, q.id, true, 75); // stakes 6 × 4 + 12 = 36 → 84
+    vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
+    for (const q of qs) await resolveQuestion(db, q.id, "no");
+    await settleRound(db, DATE);
+    const reveal = RevealSchema.parse(await (await as(0)(`/v1/round/${DATE}/reveal`)).json());
+    expect(reveal.bust_fortune).toBe(84);
+    expect(reveal.fortune_after).toBe(84);
+    expect(reveal.delta).toBe(-36);
+    const ledger = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
+    expect(ledger.fortune).toBe(1000);
+    expect(ledger.best_fortune).toBe(1000);
+    expect(ledger.run_started_on).toBe("2026-09-11");
+    // The history is the current run's: nothing settled on or after 2026-09-11 yet.
+    expect(ledger.fortune_history).toEqual([]);
+  });
+
+  it("the ledger's history rebuilds from founding over the current run only", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { db, qs, as, seal } = await world(1);
+    const me = (await db.query.users.findMany())[0]!;
+    // A run that started yesterday: the row from the founding run must not appear.
+    await db.update(schema.users).set({ runStartedOn: "2026-09-10" }).where(eq(schema.users.id, me.id));
+    await db.insert(schema.rounds).values({ date: "2026-09-08", status: "resolved", rulesVersion: 3 });
+    const [old] = await db.insert(schema.questions).values({
+      roundDate: "2026-09-08", slot: 1, isBigOne: false, text: "Old?", category: "news", resolutionCriteria: "x", sourceName: "t",
+      opensAt: new Date("2026-09-08T16:00:00Z"), locksAt: new Date("2026-09-09T16:00:00Z"), resolveBy: new Date("2026-09-10T16:00:00Z"), status: "resolved", outcome: "no", linePYes: "0.35",
+    }).returning();
+    await db.insert(schema.predictions).values({ questionId: old!.id, userId: me.id, answer: true, confidence: 75, fortuneAtSeal: 1000, stake: 50, linePYes: "0.35", payout: 0, settledAt: new Date() });
+    for (const q of qs) await seal(0, q.id, true, 75);
+    vi.setSystemTime(new Date("2026-09-12T02:00:00Z"));
+    for (const q of qs) await resolveQuestion(db, q.id, "yes");
+    await settleRound(db, DATE);
+    const ledger = MeLedgerSchema.parse(await (await as(0)("/v1/me/ledger")).json());
+    expect(ledger.fortune_history).toEqual([{ date: DATE, delta: 93 * 4 + 186, fortune_after: 1000 + 93 * 4 + 186 }]);
   });
 });
