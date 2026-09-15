@@ -98,17 +98,20 @@ export function boardRowLines(
 
 export const NO_STAKE_LINE = "NO STAKE SETTLED YET";
 
-// The all-time board (design §7, §8.3): ranked by fortune, same floor and
-// window as the daily board.
+export const ALL_TIME_TITLE = "BEST FORTUNE";
+
+// The all-time board by best fortune (design 2026-09-14 §6.6): a busted
+// veteran keeps the fortune they reached, so a new player never outranks
+// them for merely not having lost yet.
 export function allTimeLines(b: AllTimeBoard | undefined | null): string[] {
   if (!b) return [];
-  if (b.your_fortune === null) return [NO_STAKE_LINE];
+  if (b.your_best === null) return [NO_STAKE_LINE];
   if (b.your_rank === null) return [FIELD_GATHERING_LINE];
-  const shape = b.best_fortune === null || b.median_fortune === null ? null : `BEST ${formatFortune(b.best_fortune)} · MEDIAN ${formatFortune(b.median_fortune)}`;
-  const rank = `RANK ${b.your_rank} OF ${b.field_size} PLAYERS · FORTUNE ${formatFortune(b.your_fortune)}`;
+  const shape = b.best === null || b.median_best === null ? null : `TOP ${formatFortune(b.best)} · MEDIAN ${formatFortune(b.median_best)}`;
+  const rank = `RANK ${b.your_rank} OF ${b.field_size} PLAYERS · BEST ${formatFortune(b.your_best)}`;
   return [shape === null ? rank : `${rank} · ${shape}`];
 }
 
 export function allTimeRowLines(rows: AllTimeBoard["rows"]): string[] {
-  return rows.map((r) => `${r.rank} · ${r.name} · ${formatFortune(r.fortune)}`);
+  return rows.map((r) => `${r.rank} · ${r.name} · ${formatFortune(r.best)}`);
 }

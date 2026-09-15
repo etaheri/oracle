@@ -158,15 +158,15 @@ describe("the board by return (design §8.3)", () => {
   });
 });
 
-describe("the all-time board by fortune", () => {
-  it("ranks by fortune", () => {
-    expect(allTimeLines({ field_size: 6, your_fortune: 2002, your_rank: 1, best_fortune: 2002, median_fortune: 940, rows: [] }))
-      .toEqual(["RANK 1 OF 6 PLAYERS · FORTUNE 2,002 · BEST 2,002 · MEDIAN 940"]);
-    expect(allTimeLines({ field_size: 2, your_fortune: 1000, your_rank: null, best_fortune: null, median_fortune: null, rows: [] })).toEqual(["THE FIELD IS STILL GATHERING"]);
-    expect(allTimeLines({ field_size: 6, your_fortune: null, your_rank: null, best_fortune: 2002, median_fortune: 940, rows: [] })).toEqual(["NO STAKE SETTLED YET"]);
+describe("the all-time board by best fortune", () => {
+  it("ranks by best", () => {
+    expect(allTimeLines({ field_size: 6, your_best: 2002, your_rank: 1, best: 2002, median_best: 940, rows: [] }))
+      .toEqual(["RANK 1 OF 6 PLAYERS · BEST 2,002 · TOP 2,002 · MEDIAN 940"]);
+    expect(allTimeLines({ field_size: 2, your_best: 1000, your_rank: null, best: null, median_best: null, rows: [] })).toEqual(["THE FIELD IS STILL GATHERING"]);
+    expect(allTimeLines({ field_size: 6, your_best: null, your_rank: null, best: 2002, median_best: 940, rows: [] })).toEqual(["NO STAKE SETTLED YET"]);
     expect(allTimeLines(undefined)).toEqual([]);
   });
   it("prints rows", () => {
-    expect(allTimeRowLines([{ name: "Quiet Heron", fortune: 2002, rank: 1, is_you: false }])).toEqual(["1 · Quiet Heron · 2,002"]);
+    expect(allTimeRowLines([{ name: "Quiet Heron", best: 2002, rank: 1, is_you: false }])).toEqual(["1 · Quiet Heron · 2,002"]);
   });
 });

@@ -7,7 +7,7 @@ const entry = (over: Partial<CouncilEntry>): CouncilEntry => ({ question_id: QID
 const item = (rank: number): EvidenceItem => ({ question_id: QID, rank, url: `https://e/${rank}`, title: `Item ${rank}`, source: "e", published_at: "2026-09-09T00:00:00.000Z", highlight: `H${rank}.` });
 const reveal = (council: CouncilEntry[], evidence: EvidenceItem[] = []): Reveal => ({
   rules_version: 3, bonus_points: 0, date: "2026-09-10", day_points: 0, first_hour: false, candidates_written: 0, candidates_rejected: 0, vigil_mult: 1,
-  delta: 0, return: 0, fortune_after: 1000, house_delta: 0, council, evidence,
+  delta: 0, return: 0, fortune_after: 1000, house_delta: 0, bust_fortune: null, council, evidence,
   questions: [{ id: QID, slot: 1, text: "Will it?", outcome: "yes", crowd_yes_pct: 60, crowd_count: 30, market_prob: 0.4, line_p_yes: 0.35, my: null, source_name: "Kalshi", source_url: null, evidence_quote: null, evidence_url: null, void_reason: null, oracle_p_yes: 0.35 }],
   ledger: { settled: true, streak: 1, calls_rated: 5, oracle_score: null },
 });

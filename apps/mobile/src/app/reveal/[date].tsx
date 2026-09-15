@@ -28,9 +28,9 @@ import { useReveal, useRoundBoard, useAllTimeBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { scaledLines, scaledRow } from "../../game/typeScaling";
-import { isFortuneRound, stakedRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark } from "../../game/revealFortune";
+import { isFortuneRound, stakedRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark, bustLines, doubleObservation } from "../../game/revealFortune";
 import { shareBigOneLine, fortuneShareMessage } from "../../game/shareLines";
-import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeRowLines, oracleDayLine, BOARD_MAX_LINES } from "../../game/dailyBoard";
+import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeRowLines, oracleDayLine, BOARD_MAX_LINES, ALL_TIME_TITLE } from "../../game/dailyBoard";
 import { rivalryMoment } from "../../game/rivalryMoment";
 import { capture } from "../../analytics/analytics";
 import { colors, space, displayScale, ROW_H } from "../../theme";
@@ -186,7 +186,9 @@ export default function RevealScreen() {
     if (d2.rules_version >= 2 && viewedFor.current === d2.date) return;
     if (viewedFor.current !== d2.date) {
       viewedFor.current = d2.date;
-      capture("reveal_viewed", { date: d2.date });
+      capture("reveal_viewed", { date: d2.date, delta: d2.delta });
+      // The bust is the run's ending, counted once beside the round it ended.
+      if (d2.bust_fortune !== null) capture("bust_viewed", { best: history.data?.best_fortune ?? null });
       capture("reveal_summary_viewed", { date: d2.date, rules_version: d2.rules_version });
     }
     if (d2.rules_version >= 2) {
@@ -464,6 +466,24 @@ export default function RevealScreen() {
           {fortuneRound && milestone && (
             <Mono {...role.line} color={colors.mutedInk} style={[role.line.style, { marginTop: space(2) }]}>{MILESTONE_COPY[milestone]}</Mono>
           )}
+          {/* The bust, once, under the round's own figure: what the house took,
+              the best the run reached, and when the next fortune opens. It is
+              the run's ending, so it is allowed to grow this block the way the
+              milestone is — it is this page's biggest piece of news. */}
+          {fortuneRound && (() => {
+            const bust = bustLines(d, history.data?.best_fortune ?? null);
+            if (!bust) return null;
+            return (
+              <View style={{ alignItems: "center", gap: space(1), marginTop: space(3) }}>
+                <Ritual bold size={displayScale.epithet} color={colors.vermilion} letterSpacing={3} style={{ marginRight: -3, textAlign: "center" }}>{bust.took}</Ritual>
+                {bust.best && <Mono size={10} color={colors.goldText} letterSpacing={5} style={{ marginRight: -5 }}>{bust.best}</Mono>}
+                <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "center" }]}>{bust.read}</Mono>
+              </View>
+            );
+          })()}
+          {fortuneRound && doubleObservation(d.questions) && (
+            <Mono {...role.line} color={doubleObservation(d.questions) === "YOUR DOUBLE PAID" ? colors.goldText : colors.mutedInk} style={[role.line.style, { marginTop: space(2) }]}>{doubleObservation(d.questions)}</Mono>
+          )}
           {!fortuneRound && (
             <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
               {standingLines}
@@ -681,7 +701,7 @@ export default function RevealScreen() {
             }}
             style={{ alignItems: "center", gap: space(1) }}
           >
-            <Eyebrow>{boardMode === "daily" ? "Daily board" : "All-time board"}</Eyebrow>
+            <Eyebrow>{boardMode === "daily" ? "Daily board" : ALL_TIME_TITLE}</Eyebrow>
             {/* The board rides a SECOND query, later than the reveal. Collapsed
                 it reserves its one summary line; expanded it reserves the whole
                 field, so neither arrival shoves the share button below it. */}

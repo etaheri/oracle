@@ -28,11 +28,9 @@ export function PlaqueShareCanvas({ canvasRef, data }: { canvasRef: ReturnType<t
   const titleFits44 = ritual44 ? ritual44.measureText(fortuneTitle).width <= PLAQUE_W - 2 * INSET : true;
   const ritual = titleFits44 ? ritual44 : ritual34;
 
-  const pct = (v: number | null) => (v === null ? "-" : `${v}%`);
   const statLines = [
     `ROUNDS PLAYED ${data.days_consulted} · STREAK ${data.streak}`,
-    `ACCURACY ${pct(data.accuracy_pct)} · CONFIDENCE ${pct(data.avg_confidence)}`,
-    `YOUR FORECAST RATING ${data.oracle_score ?? "UNWRITTEN"}`,
+    `BEST ${formatFortune(data.best_fortune ?? data.fortune ?? 1000)}`,
   ];
 
   return (

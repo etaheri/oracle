@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 import type { Reveal } from "@oracle/core";
-import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, stakedRound, moneyMark } from "../src/game/revealFortune";
+import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, stakedRound, moneyMark, bustLines, doubleObservation } from "../src/game/revealFortune";
 
 type Q = Reveal["questions"][number];
 const q = (over: Omit<Partial<Q>, "my"> & { my?: Partial<NonNullable<Q["my"]>> | null }): Q => ({
   id: "q", slot: 1, text: "Will it?", outcome: "yes", crowd_yes_pct: 60, crowd_count: 30, market_prob: 0.4, line_p_yes: 0.35,
   source_name: "Kalshi", source_url: null, evidence_quote: null, evidence_url: null, void_reason: null, oracle_p_yes: 0.35,
   ...over,
-  my: over.my === null ? null : { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: 50, payout: 143, delta: 93, ...(over.my ?? {}) },
+  my: over.my === null ? null : { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: 50, payout: 143, delta: 93, doubled: false, ...(over.my ?? {}) },
 });
 const reveal = (over: Partial<Reveal>): Reveal => ({
   rules_version: 3, bonus_points: 0, date: "2026-09-10", day_points: 0, first_hour: false, candidates_written: 0, candidates_rejected: 0,
-  vigil_mult: 1, delta: 140, return: 0.14, fortune_after: 1140, house_delta: -140, questions: [q({})],
+  vigil_mult: 1, delta: 140, return: 0.14, fortune_after: 1140, house_delta: -140, bust_fortune: null, questions: [q({})],
   council: [], evidence: [],
   ledger: { settled: true, streak: 1, calls_rated: 5, oracle_score: null }, ...over,
 });
@@ -48,6 +48,26 @@ describe("the version 3 reveal (design §8.3)", () => {
     expect(stakeReceipt(q({ outcome: null, my: { payout: null, delta: null } }))).toBe("YES · STAKED 50 · PENDING");
     expect(stakeReceipt(q({ my: null }))).toBeNull();
     expect(stakeReceipt(q({ my: { stake: null, payout: null, delta: null } }))).toBe("YES");
+  });
+
+  it("marks the doubled call on its receipt", () => {
+    expect(stakeReceipt(q({ my: { stake: 100, payout: 286, delta: 186, doubled: true } }))).toBe("YES · STAKED 100 · PAID 286 · DOUBLED");
+    expect(stakeReceipt(q({ outcome: null, my: { payout: null, delta: null, doubled: true } }))).toBe("YES · STAKED 50 · PENDING · DOUBLED");
+  });
+
+  it("reads the bust once, with the best beside it", () => {
+    expect(bustLines(reveal({ bust_fortune: 62, delta: -410, fortune_after: 62 }), 3400))
+      .toEqual({ took: "THE HOUSE TOOK IT ALL", best: "BEST 3,400", read: "A new fortune of 1,000 opens at noon." });
+    expect(bustLines(reveal({ bust_fortune: 62 }), null)).toMatchObject({ took: "THE HOUSE TOOK IT ALL", best: null });
+    expect(bustLines(reveal({}), 3400)).toBeNull();
+  });
+
+  it("observes the double only once it is decided", () => {
+    expect(doubleObservation([q({ my: { doubled: true } })])).toBe("YOUR DOUBLE PAID");
+    expect(doubleObservation([q({ outcome: "no", my: { doubled: true, payout: 0, delta: -50 } })])).toBe("YOUR DOUBLE WAS WRONG");
+    expect(doubleObservation([q({ outcome: "void", my: { doubled: true, payout: 50, delta: 0 } })])).toBeNull();
+    expect(doubleObservation([q({ outcome: null, my: { doubled: true, payout: null, delta: null } })])).toBeNull();
+    expect(doubleObservation([q({})])).toBeNull();
   });
 
   it("reads the Oracle comparison as who took whom", () => {

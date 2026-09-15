@@ -1,7 +1,6 @@
 import { View } from "react-native";
 import { calculateDuel, dayCallCounts, type Reveal } from "@oracle/core";
 import { revealSummary } from "../game/revealSummary";
-import { revealObservation } from "../game/revealObservation";
 import { Serif, Mono, Eyebrow, role } from "./Text";
 import { DuelPortrait } from "./DuelPortrait";
 import { GoldFrame } from "./GoldFrame";
@@ -20,7 +19,6 @@ export function RevealSummary({ data, milestone }: { data: Reveal; milestone: st
   }
   const highlight = data.questions.find(q => q.id === summary.highlightId);
   const learning = highlight ? revealLearning({ ...highlight, is_big_one: highlight.slot === 5 }, data.rules_version, duel) : null;
-  const observation = learning ? null : revealObservation(qs);
   return <View style={{ gap: space(4) }}>
     <Serif size={displayScale.epithet} style={{ textAlign: "center" }}>{summary.headline}</Serif>
     {!legacy && duel.status === "complete" && <DuelPortrait duel={duel} />}
@@ -37,6 +35,8 @@ export function RevealSummary({ data, milestone }: { data: Reveal; milestone: st
     </View></GoldFrame>}
     {!legacy && duel.status === "complete" && duel.youCorrect > duel.oracleCorrect && duel.winner === "oracle" && <Mono {...role.supporting}>More right answers, but fewer confidence points.</Mono>}
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{summary.explanation}</Mono>
-    {(milestone || observation) && <Mono {...role.line} color={colors.goldText}>{milestone ?? observation}</Mono>}
+    {/* The most-confident-call line that used to share this slot had no
+        meaning at a flat stake and is gone; the milestone keeps the slot. */}
+    {milestone && <Mono {...role.line} color={colors.goldText}>{milestone}</Mono>}
   </View>;
 }

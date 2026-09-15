@@ -1,4 +1,4 @@
-import type { Reveal } from "@oracle/core";
+import { FORTUNE, type Reveal } from "@oracle/core";
 import { formatFortune, signedFortune } from "./fortuneText";
 import { receiptLine } from "./stakeText";
 import { readingLine } from "./revealRows";
@@ -38,9 +38,34 @@ export function stakeReceipt(q: Question): string | null {
   const side = q.my.answer ? "YES" : "NO";
   if (q.my.stake === null) return receiptLine({ answer: q.my.answer, stake: null, wins: null });
   const head = `${side} · STAKED ${formatFortune(q.my.stake)}`;
-  if (q.outcome === null || q.my.payout === null) return `${head} · PENDING`;
-  if (q.outcome === "void") return `${head} · STAKE RETURNED`;
-  return q.my.payout > 0 ? `${head} · PAID ${formatFortune(q.my.payout)}` : `${head} · LOST ${formatFortune(q.my.stake)}`;
+  // The double is the call's own news, so it rides the receipt in every
+  // state -- pending included, where it is the only place the player can
+  // still see what they doubled on (design 2026-09-14 §8.4).
+  const body =
+    q.outcome === null || q.my.payout === null ? `${head} · PENDING`
+    : q.outcome === "void" ? `${head} · STAKE RETURNED`
+    : q.my.payout > 0 ? `${head} · PAID ${formatFortune(q.my.payout)}`
+    : `${head} · LOST ${formatFortune(q.my.stake)}`;
+  return q.my.doubled ? `${body} · DOUBLED` : body;
+}
+
+// The bust (design 2026-09-14 §8.4): one block, once, under the headline.
+// `bust_fortune` is the fortune the house took it at; the best rides beside
+// it so the run has its one number the moment it ends.
+export function bustLines(d: Reveal, best: number | null): { took: string; best: string | null; read: string } | null {
+  if (d.bust_fortune === null) return null;
+  return {
+    took: "THE HOUSE TOOK IT ALL",
+    best: best === null ? null : `BEST ${formatFortune(best)}`,
+    read: `A new fortune of ${formatFortune(FORTUNE.FOUNDING)} opens at noon.`,
+  };
+}
+
+// The one line about the double, only when it was placed and decided.
+export function doubleObservation(qs: ReadonlyArray<Question>): string | null {
+  const d = qs.find((q) => q.my?.doubled);
+  if (!d || !d.my || d.outcome === null || d.outcome === "void" || d.my.delta === null) return null;
+  return d.my.delta > 0 ? "YOUR DOUBLE PAID" : "YOUR DOUBLE WAS WRONG";
 }
 
 // The Oracle comparison, as who took whom (design §8.3).

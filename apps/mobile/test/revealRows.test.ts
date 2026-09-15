@@ -15,7 +15,7 @@ function question(overrides: Partial<Question> = {}): Question {
     crowd_count: 40,
     market_prob: 0.55,
     line_p_yes: null,
-    my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null },
+    my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false },
     source_name: "reuters",
     source_url: "https://example.com",
     evidence_quote: "It happened, per officials.",
@@ -37,6 +37,7 @@ function reveal({ vigil_mult, outcomes, first_hour = false }: { vigil_mult: numb
     return: null,
     fortune_after: null,
     house_delta: null,
+    bust_fortune: null,
     questions: outcomes.map((outcome, i) => question({ slot: i + 1, outcome })),
     council: [],
     evidence: [],
@@ -56,15 +57,15 @@ describe("revealRows", () => {
       expect(rowState(question({ my: null, outcome: "void" }))).toBe("spectator");
     });
     it("void when outcome is void and my is present", () => {
-      expect(rowState(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("void");
+      expect(rowState(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("void");
     });
     it("win when points positive", () => {
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: 8, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("win");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: 8, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("win");
     });
     it("loss otherwise (zero or negative points)", () => {
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("loss");
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: -4, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("loss");
-      expect(rowState(question({ my: { answer: true, confidence: 60, points: null, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("loss");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("loss");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: -4, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("loss");
+      expect(rowState(question({ my: { answer: true, confidence: 60, points: null, brier: 0.2, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("loss");
     });
   });
 
@@ -80,12 +81,12 @@ describe("revealRows", () => {
 
   describe("rowRight", () => {
     it("signs points for win/loss", () => {
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("+12");
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("0");
-      expect(rowRight(question({ my: { answer: true, confidence: 60, points: -6, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("−6");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("+12");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: 0, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("0");
+      expect(rowRight(question({ my: { answer: true, confidence: 60, points: -6, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("−6");
     });
     it("shows an em dash for void and pending", () => {
-      expect(rowRight(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } }))).toBe("—");
+      expect(rowRight(question({ outcome: "void", my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } }))).toBe("—");
       expect(rowRight(question({ outcome: null }))).toBe("—");
     });
     it("shows the outcome word for spectator rows, including YES", () => {
@@ -102,7 +103,7 @@ describe("revealRows", () => {
           question({
             outcome: "void",
             void_reason: "source retracted the claim",
-            my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null },
+            my: { answer: true, confidence: 60, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false },
           })
         )
       ).toBe("VOID · SOURCE RETRACTED THE CLAIM");
@@ -195,9 +196,9 @@ describe("revealRows", () => {
 describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)", () => {
   describe("callLine", () => {
     it("prints the call and the crowd when the crowd was big enough to read", () => {
-      expect(callLine(question({ my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null }, crowd_yes_pct: 62, crowd_count: 40 })))
+      expect(callLine(question({ my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false }, crowd_yes_pct: 62, crowd_count: 40 })))
         .toBe("YOU: YES @ 75% · PLAYERS 62% YES");
-      expect(callLine(question({ my: { answer: false, confidence: 55, points: -10, brier: 0.3, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null }, crowd_yes_pct: 62, crowd_count: 40 })))
+      expect(callLine(question({ my: { answer: false, confidence: 55, points: -10, brier: 0.3, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false }, crowd_yes_pct: 62, crowd_count: 40 })))
         .toBe("YOU: NO @ 55% · PLAYERS 62% YES");
     });
     it("drops the crowd clause rather than reading a crowd of three", () => {
@@ -216,7 +217,7 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
       expect(callLine(question({ my: null, crowd_yes_pct: null, crowd_count: null }))).toBeNull();
     });
     it("still reads back a call the ledger refused to score", () => {
-      expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null } })))
+      expect(callLine(question({ outcome: "void", my: { answer: true, confidence: 90, points: 0, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: null, payout: null, delta: null, doubled: false } })))
         .toBe("YOU: YES @ 90% · PLAYERS 60% YES");
     });
   });
@@ -238,7 +239,7 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
             outcome: "yes",
             crowd_yes_pct: 60,
             crowd_count: 40,
-            my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: 40, crowd_count_at_seal: 12, stake: null, payout: null, delta: null },
+            my: { answer: true, confidence: 75, points: 12, brier: 0.1, crowd_yes_pct_at_seal: 40, crowd_count_at_seal: 12, stake: null, payout: null, delta: null, doubled: false },
           }),
         ),
       ).toBe("WHEN YOU SEALED 40% SAID YES · IT ENDED AT 60%");
@@ -260,6 +261,7 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
               stake: null,
               payout: null,
               delta: null,
+              doubled: false,
             },
           }),
         ),

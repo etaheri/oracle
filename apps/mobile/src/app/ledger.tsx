@@ -19,10 +19,8 @@ import { plaqueMessage } from "../game/sharePattern";
 import { appleClaim, appleRestore, strikeRecord } from "../api/identity";
 import { usePlusStore } from "../monetization/plusState";
 import { colors, space, displayScale } from "../theme";
-import { LITURGY_LINES, SCORE_GLOSS } from "@oracle/core";
-import { ConfidenceHistory } from "../ui/ConfidenceHistory";
+import { LITURGY_LINES } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
-import { scoreValue } from "../game/scoreProgress";
 import { fortuneHistoryLines } from "../game/fortuneHistory";
 import { formatFortune } from "../game/fortuneText";
 
@@ -30,17 +28,15 @@ import { formatFortune } from "../game/fortuneText";
 // frame exists so the plaque fills rather than flashes, and it only earns
 // that if the two are the same size: at 280 the frame still visibly grew
 // when the record landed. This is the loaded plaque's own height — its
-// padding, the fortune row and its history lines, the two rules, the streak
-// rows, the calibration rows and the score gloss — so the only step left is
-// a long fortune history or the claim row being offered, both of which are
-// the record's own news. Raised from 380 when the gloss was added: it is two
-// lines of size-10 mono plus its gap at ordinary text sizes.
-const PLAQUE_MIN_H = 420;
+// padding, the fortune and best rows and the history lines, the rule and the
+// streak rows — so the only step left is a long fortune history or the claim
+// row being offered, both of which are the record's own news. Dropped from
+// 420 with the calibration rows and the score gloss.
+const PLAQUE_MIN_H = 300;
 
-// Rows at one size read as equal facts. Fortune and the forecast rating are
-// the headlines — they take the temple voice and their own carved numeral —
-// and the supporting stats stay machine voice beneath them (refinement spec
-// §7).
+// Rows at one size read as equal facts. The fortune is the headline — it
+// takes the temple voice and its own carved numeral — and the supporting
+// stats stay machine voice beneath it (refinement spec §7).
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: space(3) }}>
@@ -134,7 +130,6 @@ export default function Ledger() {
   };
 
   const d = ledger.data ?? null;
-  const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
 
   async function handleShare() {
     if (!d) return;
@@ -159,7 +154,7 @@ export default function Ledger() {
     <Screen scroll overlayHeader patina header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>{GAME_TERMS.history}</Eyebrow>
-        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your fortune, your streak, your calibration</Mono>
+        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your fortune, your best, your streak</Mono>
         <QuietLink title={GAME_TERMS.rulesNav} onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })} />
         {/* One column in both states. The frame used to be the only thing
             held steady while the six children below it did not exist yet —
@@ -172,6 +167,10 @@ export default function Ledger() {
             <>
               <View style={{ gap: space(2) }}>
                 <LeadStat label="FORTUNE" value={d.fortune === null ? "UNSETTLED" : formatFortune(d.fortune)} />
+                {/* The best rides beside the fortune, above the history: it is
+                    the run's one durable number, and a bust is the moment it
+                    has to already be on the page (design 2026-09-14 §6.5). */}
+                <Stat label="BEST" value={d.best_fortune === null ? "—" : formatFortune(d.best_fortune)} />
                 {fortuneHistoryLines(d.fortune_history).map((line) => (
                   <Mono key={line} {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{line}</Mono>
                 ))}
@@ -185,22 +184,6 @@ export default function Ledger() {
                     written in. */}
                 <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { paddingBottom: space(1) }]}>Your streak is one call a day. It updates when the round settles. Streak protection can carry it through a missed round. It adds no fortune.</Mono>
                 <Stat label="STREAK PROTECTION" value={shieldStat(d.free_shield_available, d.paid_shields)} />
-                <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
-                <Eyebrow>Your calibration</Eyebrow>
-                <LeadStat label="YOUR FORECAST RATING" value={scoreValue(d.oracle_score, d.calls_rated)} />
-                {/* The score is the premise of the whole app — the record naming
-                    who can actually see — and it used to sit here as a bare label
-                    over a progress string that never said what fifty was fifty OF
-                    (audit 2026-09-02 §1.1). One line, in the row's own register:
-                    how it is earned while it is unwritten, what it measures once
-                    it is. The second half is also the legal wall, stated to the
-                    player rather than only to the spec. */}
-                <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "left" }]}>
-                  {d.oracle_score === null ? SCORE_GLOSS.unwritten : SCORE_GLOSS.written}
-                </Mono>
-                <Stat label="ACCURACY" value={pct(d.accuracy_pct)} />
-                <Stat label="AVG CONFIDENCE" value={pct(d.avg_confidence)} />
-                {d.confidence_history && <ConfidenceHistory history={d.confidence_history} />}
               </View>
               <View style={{ minHeight: 78, justifyContent: "center", marginTop: space(2) }}>
                 {d.claimed ? (
