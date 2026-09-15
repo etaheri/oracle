@@ -94,7 +94,7 @@ authoring and forecast routes are pipeline routes: `buildPipelineDeps` returns
 `POST /admin/rounds/:date/author` and `POST /admin/rounds/:date/forecast`
 answer `503 {"error":"pipeline not configured"}`. Arming early is safe — the
 cron only acts inside its scheduled hours (forecast 09:00–11:xx ET, publish at
-noon, authoring at 17:00 ET, settle hourly after lock), so between deploy and
+noon, authoring at 17:00 ET, resolution after lock: exchange reads hourly, the model resolver every four hours), so between deploy and
 the next of those hours it does nothing at all.
 
 1. Apply `0014`, `0015` and `0016` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`. `0016` is the Hand (design 2026-09-14 §7): best fortune and run start on `users`, the double and the bust on `user_rounds`, `doubled` on `predictions`, and the `guard_double` trigger. No data migration; production has no version 3 rows.
@@ -194,7 +194,7 @@ wrangler secret put ONESIGNAL_APP_ID
 wrangler secret put ONESIGNAL_API_KEY
 ```
 
-**Question resolution pushes:** Each question now pushes its players the moment it resolves (yes/no). One push per player per question, composed from the `resolve` copy pool. The claim is idempotent — a single `UPDATE predictions SET resolve_pushed_at = now() WHERE resolve_pushed_at IS NULL AND points IS NOT NULL RETURNING` — so the hourly re-dispatch never double-sends. Admin resolves, withdrawals, and voids never trigger push. The settle-time hinge push (published round announcement) is unchanged. `GET /v1/me/ledger` now also returns `reading` — the player's latest locked-or-settled round with decided/total counts — which home uses for the IN PLAY line and the ledger CTA. Resolution pushes fire at whatever hour a question actually resolves, since the resolver retries hourly until the void deadline — a late-verifiable question can push overnight. A quiet-hours delivery window is a follow-up, not yet implemented.
+**Question resolution pushes:** Each question now pushes its players the moment it resolves (yes/no). One push per player per question, composed from the `resolve` copy pool. The claim is idempotent — a single `UPDATE predictions SET resolve_pushed_at = now() WHERE resolve_pushed_at IS NULL AND points IS NOT NULL RETURNING` — so the hourly re-dispatch never double-sends. Admin resolves, withdrawals, and voids never trigger push. The settle-time hinge push (published round announcement) is unchanged. `GET /v1/me/ledger` now also returns `reading` — the player's latest locked-or-settled round with decided/total counts — which home uses for the IN PLAY line and the ledger CTA. Resolution pushes fire at whatever hour a question actually resolves, since exchange reads retry hourly and the model resolver every four hours until the void deadline — a late-verifiable question can push overnight. A quiet-hours delivery window is a follow-up, not yet implemented.
 
 `PIPELINE_ENABLED` is armed in §2.3, before the manual deal — the admin
 authoring and forecast routes 503 without it. §3 is where you watch the first
@@ -278,8 +278,11 @@ The cron fires every 10 minutes. The day's shape:
   evergreen bank.
 - **lock** — noon ET the next day, at the stated `locks_at`. Nothing pulls a
   lock forward any more; the probe that used to is retired.
-- **settle** — hourly after lock, retried for a full day before a question
-  voids at noon two days on. A question carrying a `market_source` settles
+- **settle** — retried for a full day after lock before a question voids at
+  noon two days on: every question in the noon hour, then exchange reads
+  hourly and the two-model read every four hours (`MODEL_RESOLVE_EVERY_HOURS`
+  in `apps/api/src/pipeline/state.ts`), six model attempts instead of
+  about twenty-four. A question carrying a `market_source` settles
   from the exchange it was dealt from, which is every question in an ordinary
   round. The two-model read is what remains for bank questions: two
   *different* models, and a disagreement resolves to unverifiable, never a
