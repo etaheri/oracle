@@ -1,7 +1,31 @@
 import { and, count, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { oracleScore, settleStreak, vigilMultiplier, ratingEligible } from "@oracle/core";
+import { FORTUNE, oracleScore, settleStreak, vigilMultiplier, ratingEligible } from "@oracle/core";
 import { schema, type Db } from "./db/client";
-import { payFortune } from "./resolution";
+import { payFortune, executeRows } from "./resolution";
+
+/**
+ * The bust (design 2026-09-14 §4.4). Judged once, when the round settles and
+ * every payout has landed: a fortune under BUST_UNDER returns to founding and
+ * the run restarts on the next date. One statement stamps the round the
+ * player busted on with the fortune the house took it at, so the reveal can
+ * show that number rather than the new thousand. Conditioned on the fortune,
+ * so a retry finds 1000 and does nothing; the round status is settlement's
+ * own guard. best_fortune is untouched: it was kept by payFortune.
+ */
+export async function bustIfUnder(db: Db, userId: string, date: string): Promise<boolean> {
+  const res = await db.execute(sql`
+    WITH busted AS (
+      UPDATE users SET fortune = ${FORTUNE.FOUNDING}, run_started_on = (${date}::date + 1)
+      WHERE id = ${userId}::uuid AND fortune < ${FORTUNE.BUST_UNDER}
+      RETURNING id, (SELECT fortune FROM users u2 WHERE u2.id = ${userId}::uuid) AS was
+    )
+    UPDATE user_rounds SET bust_fortune = busted.was
+    FROM busted
+    WHERE user_rounds.user_id = busted.id AND user_rounds.date = ${date}::date
+    RETURNING user_rounds.user_id
+  `);
+  return executeRows(res).length > 0;
+}
 
 // Round settlement (backend spec L73/L79/L119): streak + shield settlement for
 // every affected user, complete-round scoring, then the round flips to
@@ -86,6 +110,12 @@ export async function settleRound(db: Db, date: string): Promise<{ already: bool
     if (outcome === null) continue;
     await payFortune(db, q.id, outcome, new Date());
   }
+
+  // The bust (design 2026-09-14 §4.4): judged now, after every payout, for
+  // everyone who staked on this round. A player who did not stake cannot
+  // have moved and is not looked at.
+  const stakedUserIds = [...new Set(preds.filter((p) => p.stake !== null).map((p) => p.userId))];
+  for (const id of stakedUserIds) await bustIfUnder(db, id, date);
 
   // The house delta (design 2026-09-10 §4.4): Σ(stake − payout) over the
   // round's staked predictions. Written once; a resettle never revises it.

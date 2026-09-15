@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
 import { resolveQuestion, payFortune } from "../src/resolution";
-import { settleRound } from "../src/settlement";
+import { settleRound, bustIfUnder } from "../src/settlement";
 
 const DATE = "2026-09-10";
 
@@ -174,5 +174,63 @@ describe("settlement recovers a crashed fortune pass", () => {
     expect(all.length).toBe(rows.length * 2);
     expect(all.filter((p) => p.settledAt !== null && p.payout === null)).toEqual([]);
     expect(all.filter((p) => p.payout !== null && p.settledAt === null)).toEqual([]);
+  });
+});
+
+describe("the bust at settlement (design 2026-09-14 §4.4, §6.7)", () => {
+  // alice loses every card: 40 × 4 + 80 = 240. From 300 she lands on 60 and busts;
+  // from 340 she lands on 100 and does not. bob takes NO and wins on a NO night.
+  async function night(aliceFortune: number) {
+    const staged = await stagedRound();
+    const { db, rows, alice } = staged;
+    await db.update(schema.users).set({ fortune: aliceFortune }).where(eq(schema.users.id, alice.id));
+    await db.insert(schema.userRounds).values({ userId: alice.id, date: DATE, vigilMult: "1", fortuneAtOpen: aliceFortune });
+    const [carol] = await db.insert(schema.users).values({ fortune: 50 }).returning(); // never played this round
+    for (const r of rows) await resolveQuestion(db, r.id, "no");
+    return { ...staged, carol: carol! };
+  }
+  const user = (db: Awaited<ReturnType<typeof stagedRound>>["db"], id: string) => db.query.users.findFirst({ where: eq(schema.users.id, id) });
+
+  it("busts a fortune under 100: back to founding, the run restarts tomorrow, the round is stamped", async () => {
+    const { db, alice } = await night(300);
+    await settleRound(db, DATE);
+    const a = await user(db, alice.id);
+    expect(a!.fortune).toBe(1000);
+    expect(a!.runStartedOn).toBe("2026-09-11");
+    expect(a!.bestFortune).toBe(1000);
+    const ur = await db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, alice.id), eq(schema.userRounds.date, DATE)) });
+    expect(ur!.bustFortune).toBe(60);
+  });
+  it("does not bust at exactly 100", async () => {
+    const { db, alice } = await night(340);
+    await settleRound(db, DATE);
+    const a = await user(db, alice.id);
+    expect(a!.fortune).toBe(100);
+    expect(a!.runStartedOn).toBeNull();
+    const ur = await db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, alice.id), eq(schema.userRounds.date, DATE)) });
+    expect(ur!.bustFortune).toBeNull();
+  });
+  it("leaves a winner and a non-player alone, even one sitting under 100", async () => {
+    const { db, bob, carol } = await night(300);
+    await settleRound(db, DATE);
+    expect((await user(db, bob.id))!.fortune).toBe(1031); // +5 × 4 + 11
+    expect((await user(db, bob.id))!.runStartedOn).toBeNull();
+    expect((await user(db, carol.id))!.fortune).toBe(50);
+    expect((await user(db, carol.id))!.runStartedOn).toBeNull();
+  });
+  it("cannot bust twice: a retried bust finds a fortune of 1000", async () => {
+    const { db, alice } = await night(300);
+    await settleRound(db, DATE);
+    expect(await bustIfUnder(db, alice.id, DATE)).toBe(false);
+    const a = await user(db, alice.id);
+    expect(a!.fortune).toBe(1000);
+    expect(a!.runStartedOn).toBe("2026-09-11");
+  });
+  it("stamps only the busted round: an earlier user_rounds row keeps its null", async () => {
+    const { db, alice } = await night(300);
+    await db.insert(schema.userRounds).values({ userId: alice.id, date: "2026-09-09", vigilMult: "1", fortuneAtOpen: 1000 });
+    await settleRound(db, DATE);
+    const earlier = await db.query.userRounds.findFirst({ where: and(eq(schema.userRounds.userId, alice.id), eq(schema.userRounds.date, "2026-09-09")) });
+    expect(earlier!.bustFortune).toBeNull();
   });
 });
