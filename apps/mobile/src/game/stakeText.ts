@@ -14,6 +14,17 @@ export function sideLine(_answer: boolean, stake: number, wins: number, isBigOne
   return isBigOne ? `THE BIG ONE · ${body}` : body;
 }
 
+// How a side is taken, in one line. Two ways in, so two lines: the swipe is
+// the seal, but reduced motion turns the gesture off and leaves the buttons,
+// and a caption that says "swipe" beside a dead gesture teaches a lie. The
+// card and the practice caption both read this, so they can never disagree.
+export const SWIPE_HINT = "SWIPE RIGHT FOR YES, LEFT FOR NO.";
+export const TAP_HINT = "TAP A SIDE TO SEAL.";
+
+export function sealHint(reducedMotion: boolean): string {
+  return reducedMotion ? TAP_HINT : SWIPE_HINT;
+}
+
 // The receipt under the stage. An unstaked round (no line committed, design
 // §5.5) has only the side to say.
 export function receiptLine(input: { answer: boolean; stake: number | null; wins: number | null; doubled?: boolean }): string {

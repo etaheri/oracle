@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { PRACTICE_FORTUNE, practiceLine, type Exhibition, type RoundToday } from "@oracle/core";
 import { CardChrome } from "./CardChrome";
 import { DecodeLine } from "./DecodeText";
 import { practiceResult } from "../game/practiceResult";
+import { sealHint } from "../game/stakeText";
 import { formatFortune, signedFortune } from "../game/fortuneText";
 import { beginExhibition, revealExhibition, retryExhibition, sealExhibition } from "../game/exhibitionFlow";
 import { CardStage } from "./CardStage";
@@ -23,6 +25,10 @@ function exhibitionQuestion(exhibition: Exhibition): RoundToday["questions"][num
 
 export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibition; onCompleted: () => void }) {
   const [attempt, setAttempt] = useState(0);
+  // The caption teaches the way in that this device actually offers: the
+  // card disables its pan under reduced motion and keeps the buttons, so the
+  // two read the same hint from one place rather than drifting apart.
+  const reducedMotion = useReducedMotion();
   const [flow, setFlow] = useState(() => beginExhibition(exhibition));
   const receipt = flow.prediction;
   const revealed = flow.phase === "revealed";
@@ -62,7 +68,7 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
     </View>}</CardStage>
     <View style={{ minHeight: 48, gap: space(1), justifyContent: "center" }}>
       <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>
-        {result ? "UNRANKED · YOUR FORTUNE, RECORD AND STREAK ARE UNCHANGED." : "SWIPE RIGHT FOR YES, LEFT FOR NO."}
+        {result ? "UNRANKED · YOUR FORTUNE, RECORD AND STREAK ARE UNCHANGED." : sealHint(reducedMotion)}
       </Mono>
     </View>
     {revealed && <QuietLink title="TRY THE OTHER SIDE" onPress={() => {

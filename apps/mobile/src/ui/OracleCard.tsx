@@ -12,7 +12,7 @@ import { cardStatus } from "../game/cardStatus";
 import { useNow } from "../game/useNow";
 import { capture } from "../analytics/analytics";
 import { INITIAL_CHOICE, canSeal, chooseSide, type SealChoice } from "../game/sealFlow";
-import { lineLabel, receiptLine, sideLine } from "../game/stakeText";
+import { lineLabel, receiptLine, sealHint, sideLine } from "../game/stakeText";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
 import { CardChrome, numeral } from "./CardChrome";
@@ -23,10 +23,13 @@ import { odds, sidePreview, type RoundToday } from "@oracle/core";
 // screen edge of the side you took, one heavy thunk at dispatch. The next card
 // deals in under it. If the oracle refuses, the card flies back in.
 const THROW_MS = 320;
-// The lean while a finger drags, and the fraction of the card's width past
-// which a release seals (design 2026-09-14 §5.2). A flick faster than
+// The fraction of the card's width past which a release seals (design
+// 2026-09-14 §5.2), and the floor under that distance in points -- a card
+// that has not been measured yet has a width of 0, and without the floor
+// every twitch would clear the bar. The same floor divides the wash, so the
+// colour cannot saturate on the first pixel either. A flick faster than
 // SWIPE_VELOCITY seals from anywhere.
-const LEAN_PX = 18;
+const MIN_COMMIT_PX = 18;
 const SWIPE_COMMIT = 0.35;
 const SWIPE_VELOCITY = 900;
 
@@ -97,8 +100,8 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
   // The side washes: the side the finger is heading for bleeds in behind the
   // question, tracking the drag as a fraction of the commit distance, so the
   // colour is full at exactly the point a release will seal.
-  const yesWashStyle = useAnimatedStyle(() => ({ opacity: dragX.value > 0 ? Math.min(1, dragX.value / Math.max(LEAN_PX, cardW.value * SWIPE_COMMIT)) : 0 }));
-  const noWashStyle = useAnimatedStyle(() => ({ opacity: dragX.value < 0 ? Math.min(1, -dragX.value / Math.max(LEAN_PX, cardW.value * SWIPE_COMMIT)) : 0 }));
+  const yesWashStyle = useAnimatedStyle(() => ({ opacity: dragX.value > 0 ? Math.min(1, dragX.value / Math.max(MIN_COMMIT_PX, cardW.value * SWIPE_COMMIT)) : 0 }));
+  const noWashStyle = useAnimatedStyle(() => ({ opacity: dragX.value < 0 ? Math.min(1, -dragX.value / Math.max(MIN_COMMIT_PX, cardW.value * SWIPE_COMMIT)) : 0 }));
 
   // The round advances only after the throw: the store's sealed flag is the
   // thing that swaps `current`, so it must not flip mid-flight.
@@ -125,7 +128,14 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
   // call flies with it. On refusal the card flies back in, unsealed, sealable
   // again.
   async function seal(answer: boolean) {
-    if (sealed || thrown || submit.isPending) return;
+    if (sealed || thrown || submit.isPending) {
+      // A pan that cleared the bar left the card leaning, and this refusal
+      // means nothing will throw it -- put it back rather than strand it
+      // mid-lean. Not while `thrown`: a throw already owns dragX and is
+      // carrying the card off-screen, and springing here would yank it back.
+      if (!thrown && !reducedMotion) dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
+      return;
+    }
     const choice: SealChoice = chooseSide(INITIAL_CHOICE, answer);
     if (!canSeal(choice)) return;
     setError(null);
@@ -178,10 +188,16 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
     .activeOffsetX([-12, 12])
     .failOffsetY([-16, 16])
     .onUpdate((e) => { dragX.value = e.translationX; })
-    .onEnd((e) => {
-      const commit = Math.max(LEAN_PX, cardW.value * SWIPE_COMMIT);
+    // `success` is false when the pan was cancelled or failed rather than
+    // finished by the player -- the OS edge-swipe stealing the touch, the app
+    // backgrounding, another handler winning, or `.enabled` flipping false
+    // mid-drag. Every one of those fires onEnd too, and a seal is
+    // irreversible, so a release is the only thing allowed to place the bet.
+    // Same reading of the second argument as the orb's onFinalize.
+    .onEnd((e, success) => {
+      const commit = Math.max(MIN_COMMIT_PX, cardW.value * SWIPE_COMMIT);
       const past = Math.abs(e.translationX) >= commit || Math.abs(e.velocityX) >= SWIPE_VELOCITY;
-      if (past) {
+      if (past && success) {
         const answer = (Math.abs(e.translationX) >= commit ? e.translationX : e.velocityX) > 0;
         runOnJS(seal)(answer);
       } else {
@@ -238,7 +254,7 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
               <View style={{ minHeight: 16, justifyContent: "center" }}>
                 {error
                   ? <Mono size={11} color={colors.vermilion} style={{ textAlign: "center" }}>{error}</Mono>
-                  : <DecodeLine text={submit.isPending ? "SEALING…" : reducedMotion ? "TAP A SIDE TO SEAL" : "SWIPE RIGHT FOR YES, LEFT FOR NO"} size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />}
+                  : <DecodeLine text={submit.isPending ? "SEALING…" : sealHint(reducedMotion)} size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />}
               </View>
             </View>
           </CardChrome>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lineLabel, sideLine, receiptLine } from "../src/game/stakeText";
+import { lineLabel, sideLine, receiptLine, sealHint, SWIPE_HINT, TAP_HINT } from "../src/game/stakeText";
 
 describe("the card's money text (design §5.1)", () => {
   it("prints the Oracle's line as a YES percentage, and nothing when there is no line", () => {
@@ -15,5 +15,11 @@ describe("the card's money text (design §5.1)", () => {
     expect(receiptLine({ answer: true, stake: 50, wins: 93 })).toBe("YES · STAKED 50 · WINS 93");
     expect(receiptLine({ answer: true, stake: 100, wins: 186, doubled: true })).toBe("YES · STAKED 100 · WINS 186 · DOUBLED");
     expect(receiptLine({ answer: false, stake: null, wins: null })).toBe("NO");
+  });
+  it("teaches the way in that actually works, so reduced motion is never told to swipe a dead gesture", () => {
+    expect(SWIPE_HINT).toBe("SWIPE RIGHT FOR YES, LEFT FOR NO.");
+    expect(TAP_HINT).toBe("TAP A SIDE TO SEAL.");
+    expect(sealHint(false)).toBe(SWIPE_HINT);
+    expect(sealHint(true)).toBe(TAP_HINT);
   });
 });
