@@ -23,7 +23,7 @@ Verified Sept 15, 2026 (after the Hand merged and deployed):
 | Secrets | All of §2.5 set except `EXA_API_KEY` — the Council runs with empty evidence packs until it is |
 | Site `outseen-site` | Deployed with the Hand's rules and the Standings link |
 | EAS production env | `EXPO_PUBLIC_API_URL`, `_ONESIGNAL_APP_ID`, `_PRIVACY_URL`, `_RC_IOS_KEY` set |
-| TestFlight | Build 10 (1.0.0) finished Sept 15 12:19 and submitted; §4.6 device pass on it not yet done |
+| TestFlight | Build 11 (1.0.0) from `56f07d8` queued Sept 15 with auto-submit (reminder copy asks which side, not how sure); supersedes build 10. §4.6 device pass not yet done |
 | Admin secret | The deployed `ADMIN_SECRET` is not the one in `.dev.vars`; manual `/admin/*` calls need the production value |
 
 The critical path from here is §3 (watch the first day), §4.6 (device pass on build 10), then App Review.
