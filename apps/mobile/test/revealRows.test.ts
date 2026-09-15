@@ -169,6 +169,25 @@ describe("revealRows", () => {
         "YOUR STREAK UPDATES WHEN THE ROUND SETTLES",
       ]);
     });
+    // Spec H8: confidence and calibration leave every player-facing surface at
+    // version 3, and the reveal's SHOW DETAILS fold is a surface. The streak
+    // survives -- it is a fact about turning up, not about calibration.
+    it("keeps the rating out of a version 3 round, written or unwritten", () => {
+      expect(ledgerLines({ settled: true, streak: 6, calls_rated: 50, oracle_score: 73 }, 3)).toEqual(["STREAK: 6 DAYS"]);
+      expect(ledgerLines({ settled: true, streak: 0, calls_rated: 12, oracle_score: null }, 3)).toEqual(["A NEW STREAK CAN BEGIN. YOUR RECORD REMAINS"]);
+      expect(ledgerLines({ settled: false, streak: 6, calls_rated: 50, oracle_score: 73 }, 3)).toEqual(["YOUR STREAK UPDATES WHEN THE ROUND SETTLES"]);
+    });
+    it("still prints the rating at version 2", () => {
+      expect(ledgerLines({ settled: true, streak: 6, calls_rated: 50, oracle_score: 73 }, 2)).toEqual([
+        "STREAK: 6 DAYS",
+        "YOUR FORECAST RATING 73",
+      ]);
+      expect(ledgerLines({ settled: true, streak: 6, calls_rated: 12, oracle_score: null }, 2)).toEqual([
+        "STREAK: 6 DAYS",
+        "YOUR FORECAST RATING UNWRITTEN",
+        "12 OF 50 RATED CALLS · CUMULATIVE QUALIFYING CALLS",
+      ]);
+    });
   });
 
   describe("pendingLine", () => {

@@ -69,6 +69,10 @@ export function receiptLine(q: Question): string | null {
 export function ledgerLines(l: Reveal["ledger"], version = 1): string[] {
   if (!l.settled) return ["YOUR STREAK UPDATES WHEN THE ROUND SETTLES"];
   const streakLine = l.streak > 0 ? `STREAK: ${l.streak} DAYS` : "A NEW STREAK CAN BEGIN. YOUR RECORD REMAINS";
+  // Spec H8: confidence and calibration leave every player-facing surface at
+  // version 3, and the SHOW DETAILS fold this feeds is a surface. The streak
+  // stays for every version -- it counts turning up, not calibration.
+  if (version >= 3) return [streakLine];
   if (l.oracle_score !== null) return [streakLine, `YOUR FORECAST RATING ${l.oracle_score}`];
   // This used to read "0 OF 50 CALLS WRITTEN" — a progress bar toward an
   // unnamed thing, in which nothing said what a CALL was, what 50 bought, or

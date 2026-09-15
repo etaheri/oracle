@@ -165,6 +165,12 @@ export default function RevealScreen() {
   // focus refetches), so the resolved-outcomes effect below can re-run for
   // the same date many times — the guard fires the capture once per date.
   const viewedFor = useRef<string | null>(null);
+  // The bust is counted on its own clock. The ceremony effect below fires the
+  // instant the reveal lands and never runs again for the date, but the best
+  // rides a SECOND query -- so counting the bust inside that guard sent
+  // `best: null` on every cold open. Its own ref and its own effect wait for
+  // the record, then count the date exactly once.
+  const bustCapturedFor = useRef<string | null>(null);
   // The board exists only once every row carries an outcome — the endpoint
   // 409s before that, for the same reason the day's number is withheld.
   const dayRead = !!reveal.data && !("pending" in reveal.data) && reveal.data.questions.every((q) => q.outcome !== null);
@@ -187,8 +193,6 @@ export default function RevealScreen() {
     if (viewedFor.current !== d2.date) {
       viewedFor.current = d2.date;
       capture("reveal_viewed", { date: d2.date, delta: d2.delta });
-      // The bust is the run's ending, counted once beside the round it ended.
-      if (d2.bust_fortune !== null) capture("bust_viewed", { best: history.data?.best_fortune ?? null });
       capture("reveal_summary_viewed", { date: d2.date, rules_version: d2.rules_version });
     }
     if (d2.rules_version >= 2) {
@@ -218,6 +222,16 @@ export default function RevealScreen() {
     }
     return () => timers.forEach(clearTimeout);
   }, [loaded, reducedMotion, reveal.data]);
+
+  // The bust, counted once per date and never without the best beside it.
+  useEffect(() => {
+    const d2 = reveal.data;
+    if (!d2 || "pending" in d2 || d2.bust_fortune === null) return;
+    if (!history.data) return;
+    if (bustCapturedFor.current === d2.date) return;
+    bustCapturedFor.current = d2.date;
+    capture("bust_viewed", { best: history.data.best_fortune });
+  }, [reveal.data, history.data]);
 
   if (reveal.isLoading) return (
     <Screen>
@@ -293,6 +307,8 @@ export default function RevealScreen() {
         }
       : {}),
   };
+  // The one line about the double, read once for the block below.
+  const doubleRead = doubleObservation(d.questions);
   // Your standing, which is NOT this round's news. Rendered inline under the
   // day's number at versions 1 and 2; folded behind SHOW DETAILS at version 3.
   const standingLines = (
@@ -481,8 +497,8 @@ export default function RevealScreen() {
               </View>
             );
           })()}
-          {fortuneRound && doubleObservation(d.questions) && (
-            <Mono {...role.line} color={doubleObservation(d.questions) === "YOUR DOUBLE PAID" ? colors.goldText : colors.mutedInk} style={[role.line.style, { marginTop: space(2) }]}>{doubleObservation(d.questions)}</Mono>
+          {fortuneRound && doubleRead && (
+            <Mono {...role.line} color={doubleRead === "YOUR DOUBLE PAID" ? colors.goldText : colors.mutedInk} style={[role.line.style, { marginTop: space(2) }]}>{doubleRead}</Mono>
           )}
           {!fortuneRound && (
             <View style={{ alignItems: "center", gap: space(1), marginTop: space(2) }}>
@@ -674,12 +690,13 @@ export default function RevealScreen() {
           </Animated.View>
         )}
         {/* Version 3's standing lines, folded away. The delta is the round's
-            one piece of news; the streak, the rating and the night's
-            provenance are all true before the page loads and stay true after
-            it, so they open only when asked for. */}
+            one piece of news; the streak and the night's provenance are both
+            true before the page loads and stay true after it, so they open
+            only when asked for. Two rows, not three: the forecast rating left
+            this fold with the rest of the calibration (spec H8). */}
         {fortuneRound && !allSpectator && (
           <View style={{ alignItems: "center", gap: space(1) }}>
-            <View style={{ minHeight: standing ? scaledRow(ROW_H.meta, fontScale) * 3 : 0, alignItems: "center", justifyContent: "center", gap: space(1) }}>
+            <View style={{ minHeight: standing ? scaledRow(ROW_H.meta, fontScale) * 2 : 0, alignItems: "center", justifyContent: "center", gap: space(1) }}>
               {standing && standingLines}
             </View>
             <QuietLink title={standing ? "HIDE DETAILS" : "SHOW DETAILS"} onPress={() => setStanding((open) => !open)} />
