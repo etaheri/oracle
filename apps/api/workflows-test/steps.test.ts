@@ -97,4 +97,51 @@ describe("resolution workflow step semantics", () => {
 		const err = await instance.getError();
 		expect(err.message).toBe("pipeline: daily call budget exhausted");
 	});
+
+	it("an opinion-kind instance's candidates step skips the exchange fetch entirely (design 2026-09-22 T3)", async () => {
+		// This is the one test in the file capable of exercising
+		// AuthoringWorkflow.run's real, UNMOCKED branch on `kind` (mocking a
+		// step replaces its callback outright, per this file's header note, so
+		// every other AUTHORING_WORKFLOW test here — which mocks "candidates"
+		// directly — proves nothing about which branch of that ternary would
+		// have run). Only "editable" is mocked (it is a real DB read against
+		// this suite's unreachable DATABASE_URL); "candidates" is left real.
+		// For roundKind "opinion" that callback is a synchronous
+		// `Promise.resolve({ fetched: 0, candidates: [] })` with no DB and no
+		// network touched at all — safe to run unmocked in this sandbox, and
+		// the exact production code path this task added.
+		await using instance = await introspectWorkflowInstance(env.AUTHORING_WORKFLOW, "t-4");
+		await instance.modify(async (m) => {
+			await m.disableRetryDelays();
+			await m.mockStepResult({ name: "editable" }, true);
+		});
+		await env.AUTHORING_WORKFLOW.create({ id: "t-4", params: { date: "2026-09-08", roundKind: "opinion" } });
+		const candidates = await instance.waitForStepResult({ name: "candidates" });
+		expect(candidates).toEqual({ fetched: 0, candidates: [] });
+		// The instance goes on to run the real (unmocked) "draft" step next,
+		// which will fail against this suite's unreachable database — that's
+		// fine and expected; this test only asserts the "candidates" step's
+		// own, already-resolved result.
+	});
+
+	// A contrasting unmocked "candidates" step for roundKind "market" is not
+	// included: fetchCandidates' only observable effect at this granularity
+	// is its RETURN SHAPE, and that shape is `{ fetched, candidates }` on
+	// EVERY path, success or failure — its per-feed try/catch (market-round.ts)
+	// swallows a live network failure and returns the very same
+	// `{ fetched: 0, candidates: [] }` this test asserts for the opinion
+	// branch. Leaving it real for a market-kind instance would (a) issue
+	// genuine outbound HTTP requests to Kalshi/Polymarket from this
+	// workerd sandbox — not hermetic, and not something this suite does
+	// anywhere else — and (b) even if those requests fail, as they likely
+	// would here, the result would be indistinguishable by shape from the
+	// opinion branch's early return. The introspector exposes no call-count
+	// or call-args spy on the step's own callback (only mockStepResult /
+	// mockStepError / waitForStepResult / waitForStatus / getOutput /
+	// getError, per @cloudflare/vitest-plugin's types), so there is no way
+	// to assert "fetchCandidates was invoked" short of a real network call.
+	// What IS proven, by the AuthoringWorkflow diff's own shape plus the
+	// PGlite suite (test/pipeline-tick.test.ts, test/admin-rounds.test.ts):
+	// the market branch is the pre-existing, previously-covered code path —
+	// this task changed which branch runs, not what the market branch does.
 });
