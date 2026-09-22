@@ -343,9 +343,9 @@ export function provenanceLine(written: number, rejected: number): string | null
 // stake, a seal. That is the one gesture the app turns on, so a first-time
 // player has to meet it here before their first card.
 export const INTRO_LINES = [
-  "The Oracle posts its line on five questions a day.",
-  "Swipe right for YES, left for NO. Every call stakes five percent of your fortune.",
-  "After your fifth seal, place your double on the call you're surest of. Right calls pay at the Oracle's odds.",
+  "Five hot takes a day. The Oracle has already guessed what the room will say.",
+  "Swipe right for YES, left for NO. Nothing about the room shows until you seal.",
+  "You win when you land with the majority. After your fifth seal, place your double on the call you are surest of.",
 ] as const;
 
 // RITES_LINES and OPENING_RITES_LINES above are the archived version-1 canon.
@@ -377,16 +377,16 @@ export const RITES_V2_SECTIONS = [
   // caps in the source AND in `defines` says the same thing twice, and the
   // two drift.
   rite("The game", ["line", "stake", "fortune", "big one", "double"], [
-    "Five questions a day about what happens next, each a live market.",
-    "On every question the Oracle posts its line: its own chance of YES.",
+    "Five hot takes a day. Each is an opinion, and the answer is whatever most of the players say.",
+    "On every question the Oracle posts its line: the share of the room it expects to say YES. You see it once you seal.",
     "Swipe right for YES or left for NO; the swipe is the seal.",
     "Every call stakes five percent of your fortune; the Big One stakes ten.",
-    "A right call wins the stake at the Oracle's odds; a wrong call loses it.",
+    "A call with the majority wins the stake at the Oracle's odds; a call against it loses the stake.",
     `Your fortune starts at ${FORTUNE.FOUNDING.toLocaleString("en-US")}. If it falls under ${FORTUNE.BUST_UNDER} the house has taken it, and a new fortune of ${FORTUNE.FOUNDING.toLocaleString("en-US")} opens at noon.`,
     "After your fifth seal, place your double on the call you are surest of. Its stake doubles, and it stacks on the Big One.",
   ]),
   rite("Results and the board", ["reveal", "return", "void"], [
-    "Questions settle from their markets after they close.",
+    "Questions settle on the players' majority at lock.",
     "The reveal shows each stake, what it paid, and whether the house won or lost the night.",
     "The daily board ranks players by return: what the day won or lost as a share of the fortune they started it with.",
     "The all-time board ranks players by their best fortune.",
@@ -402,7 +402,7 @@ export const RITES_V2_SECTIONS = [
   ]),
   rite("Timing and fairness", ["lock"], [
     "Every question has its own lock; nothing seals after it.",
-    "Results follow the market's settlement, not a guaranteed time.",
+    "Results land at the next noon, when the round locks.",
     "Unsettled questions are pending, never losses.",
     "A correction can update your record and your fortune.",
     "Older rounds keep their own rules; open one to read them.",

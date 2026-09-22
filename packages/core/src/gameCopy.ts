@@ -8,7 +8,7 @@ export const GAME_TERMS = {
 export const CURRENT_GAME_COPY = {
   purpose: "Make your call. Beat the Oracle's line. Grow your fortune.",
   oracleIdentity: 'The Oracle makes predictions using AI.',
-  opponentChallenge: 'Can you outsee it?',
+  opponentChallenge: 'Can you read the room better?',
   streakMeaning: 'Your streak is one call a day. It adds no fortune.',
   lapse: 'A new streak begins with your next call. Your fortune, results and record remain.',
   protectionUsed: 'Streak protection held your streak. No calls were added.',
