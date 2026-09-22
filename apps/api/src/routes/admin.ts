@@ -11,6 +11,7 @@ import { stampOracleForecast } from "../pipeline/forecast";
 import { commitLine } from "../pipeline/line";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
+import { roundKindOf } from "../pipeline/round-kind";
 import type { WorkflowInstanceBinding } from "../pipeline/workflows";
 
 const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
@@ -193,9 +194,13 @@ export const adminRoutes = new Hono<AppContext>()
     const pipeline = c.get("deps").pipeline;
     if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
     const date = c.req.param("date");
+    // A one-off kind (design 2026-09-22 §8): ?kind=opinion or ?kind=market
+    // wins over PIPELINE_ROUND_KIND for this dispatch only.
+    const kind = c.req.query("kind");
+    if (kind !== undefined && kind !== "opinion" && kind !== "market") return c.json({ error: "unknown round kind" }, 400);
     const existing = await c.get("deps").db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
     if (existing) return c.json({ error: "round already exists" }, 409);
-    await pipeline.workflows.start(pipeline, "author", `author-${date}-manual-${Date.now()}`, { date });
+    await pipeline.workflows.start(pipeline, "author", `author-${date}-manual-${Date.now()}`, { date, roundKind: kind ?? roundKindOf(pipeline) });
     return c.json({ ok: true, date });
   })
   // Stamp the Oracle's forecast for a date, by hand.

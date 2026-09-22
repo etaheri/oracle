@@ -322,16 +322,33 @@ describe("POST /admin/rounds/:date/author", () => {
 
   it("dispatches authoring for the named date", async () => {
     const { db } = await makeTestDb();
-    const started: { kind: string; date: string }[] = [];
+    const started: { kind: string; date: string; roundKind?: string }[] = [];
     const pipeline = {
       ...fakePipeline(db, "2026-09-09T14:00:00Z"),
-      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string }) => { started.push({ kind, date: params.date }); } },
+      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string; roundKind?: string }) => { started.push({ kind, ...params }); } },
     } as unknown as PipelineDeps;
     const app = createApp({ db, env, pipeline });
     const res = await admin(app)("/admin/rounds/2026-09-09/author", { method: "POST" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, date: "2026-09-09" });
-    expect(started).toEqual([{ kind: "author", date: "2026-09-09" }]);
+    expect(started).toEqual([{ kind: "author", date: "2026-09-09", roundKind: "market" }]);
+  });
+
+  it("passes ?kind= through to the workflow, and refuses a kind it does not know", async () => {
+    const { db } = await makeTestDb();
+    const started: { kind: string; date: string; roundKind?: string }[] = [];
+    const pipeline = {
+      ...fakePipeline(db, "2026-09-09T14:00:00Z"),
+      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string; roundKind?: string }) => { started.push({ kind, ...params }); } },
+    } as unknown as PipelineDeps;
+    const app = createApp({ db, env, pipeline });
+    expect((await admin(app)("/admin/rounds/2026-09-23/author?kind=opinion", { method: "POST" })).status).toBe(200);
+    expect(started).toEqual([{ kind: "author", date: "2026-09-23", roundKind: "opinion" }]);
+    expect((await admin(app)("/admin/rounds/2026-09-24/author?kind=market", { method: "POST" })).status).toBe(200);
+    expect(started[1]).toEqual({ kind: "author", date: "2026-09-24", roundKind: "market" });
+    const bad = await admin(app)("/admin/rounds/2026-09-25/author?kind=nonsense", { method: "POST" });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ error: "unknown round kind" });
   });
 
   it("POST /rounds/:date/author deals a version 3 round from the injected exchanges", async () => {
