@@ -38,7 +38,7 @@ export function splitRows(entries: CouncilEntry[], linePYes: number | null): Spl
     label: `${e.member.toUpperCase()} ${pct(e.p_yes)}`,
     tone: e.on_right_side === null ? "mute" : e.on_right_side ? "win" : "loss",
   }));
-  if (linePYes !== null) rows.push({ member: "line", label: `THE ORACLE'S LINE ${pct(linePYes)}`, tone: "mute" });
+  if (linePYes !== null) rows.push({ member: "line", label: `THE ORACLE EXPECTED ${pct(linePYes)}`, tone: "mute" });
   return rows;
 }
 

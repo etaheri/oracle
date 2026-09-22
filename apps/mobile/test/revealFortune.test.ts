@@ -70,16 +70,16 @@ describe("the version 3 reveal (design §8.3)", () => {
     expect(doubleObservation([q({})])).toBeNull();
   });
 
-  it("reads the Oracle comparison as who took whom", () => {
-    expect(oracleTake(q({}))).toBe("YOU TOOK THE ORACLE FOR 93");
-    expect(oracleTake(q({ outcome: "no", my: { payout: 0, delta: -50 } }))).toBe("THE ORACLE TOOK 50");
+  it("reads the call as with or against the room (design 2026-09-22 §9.3)", () => {
+    expect(oracleTake(q({}))).toBe("YOU WERE WITH THE ROOM · +93");
+    expect(oracleTake(q({ outcome: "no", my: { payout: 0, delta: -50 } }))).toBe("YOU WERE AGAINST THE ROOM · −50");
     expect(oracleTake(q({ outcome: "void", my: { payout: 50, delta: 0 } }))).toBeNull();
     expect(oracleTake(q({ my: null }))).toBeNull();
   });
 
-  it("gives the line and the market as context", () => {
-    expect(lineContext(q({}))).toBe("THE LINE 35% YES · THE MARKET 40%");
-    expect(lineContext(q({ market_prob: null }))).toBe("THE LINE 35% YES");
+  it("gives what the Oracle expected and what the room said as context", () => {
+    expect(lineContext(q({ line_p_yes: 0.38, crowd_yes_pct: 62 }))).toBe("THE ORACLE EXPECTED 38% YES · THE ROOM SAID 62%");
+    expect(lineContext(q({ crowd_yes_pct: null }))).toBe("THE ORACLE EXPECTED 35% YES");
     expect(lineContext(q({ line_p_yes: null }))).toBeNull();
   });
 

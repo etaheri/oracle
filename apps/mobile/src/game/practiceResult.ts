@@ -15,11 +15,18 @@ export function practiceResult(prediction: PracticePrediction, exhibition: Exhib
   const counterfactual = out.oppositeDelta >= 0
     ? `Had it gone ${other}, the same call would have won ${formatFortune(out.oppositeDelta)}.`
     : `Had it gone ${other}, the same call would have lost ${formatFortune(-out.oppositeDelta)}.`;
+  // The room's result on a past hot take (design 2026-09-22 §9.5): the
+  // majority's side and its share. A market question keeps the plain outcome.
+  const outcomeSide = side(exhibition.outcome === "yes");
+  const roomPct = exhibition.crowdYesPct;
+  const roomSidePct = roomPct === null ? null : exhibition.outcome === "yes" ? roomPct : 100 - roomPct;
+  const roomLine = roomSidePct === null ? `Actual outcome: ${outcomeSide}.` : `The room said ${outcomeSide}, ${roomSidePct}%.`;
   return {
     ...out,
-    receipt: receiptLine({ answer: prediction.answer, stake: out.stake, wins: out.wins }),
+    receipt: receiptLine({ answer: prediction.answer, line: out.line }),
     verdict,
     counterfactual,
+    roomLine,
     oracleLine: lineLabel(out.line)!,
   };
 }

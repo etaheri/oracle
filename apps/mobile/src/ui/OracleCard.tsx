@@ -12,12 +12,12 @@ import { cardStatus } from "../game/cardStatus";
 import { useNow } from "../game/useNow";
 import { capture } from "../analytics/analytics";
 import { INITIAL_CHOICE, canSeal, chooseSide, type SealChoice } from "../game/sealFlow";
-import { lineLabel, receiptLine, sealHint, sideLine } from "../game/stakeText";
+import { lineLabel, receiptLine, sealHint } from "../game/stakeText";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
 import { CardChrome, numeral } from "./CardChrome";
 import { DecodeLine } from "./DecodeText";
-import { odds, sidePreview, type RoundToday } from "@oracle/core";
+import { sidePreview, type RoundToday } from "@oracle/core";
 
 // The throw IS the seal: take a side and the card leaves your hand -- off the
 // screen edge of the side you took, one heavy thunk at dispatch. The next card
@@ -115,12 +115,11 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
     markSealed(q.id, serverStake);
     const preview = answer ? yesPreview : noPreview;
     const stake = serverStake ?? preview?.stake ?? null;
-    const wins = serverStake !== null && line !== null ? Math.round(serverStake * odds(answer, line)) : preview?.wins ?? null;
     capture("question_answered", { question_id: q.id, is_big_one: q.is_big_one, side: answer ? "yes" : "no", stake, line });
     // Habitual-hour history (design 2026-09-09 §4.2): fire-and-forget --
     // withSealHour already no-ops repeat seals on the same local day.
     void recordSealHour(new Date());
-    onSealed(receiptLine({ answer, stake, wins }));
+    onSealed(receiptLine({ answer, line }));
   }
 
   // The swipe IS the seal (design H2): the moment the side is set the card is
@@ -224,8 +223,11 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
             <View style={{ flex: 1, minHeight: 0 }}>
               <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: space(2) }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
                 <QuestionFace text={q.text} seed={q.id} />
-                {/* The house posts its line before the seal (design D2). */}
-                {lineText && <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{lineText}</Mono>}
+                {/* Nothing about the room before the seal (design 2026-09-22 T9):
+                    the estimate is a common signal, and shown first the crowd
+                    converges on it. The receipt under the stage carries it
+                    the moment the card is thrown. */}
+                {sealed && lineText && <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{lineText}</Mono>}
                 {practice?.context && <Mono size={11} style={{ textAlign: "center" }}>{practice.context}</Mono>}
                 {q.context && <View style={{ gap: space(1) }}>
                   <Pressable accessibilityRole="button" onPress={() => setShowContext(!showContext)} style={{ minHeight: 44, justifyContent: "center" }}><Mono size={11}>{showContext ? "CLOSE CONTEXT" : "CONTEXT"}</Mono></Pressable>
@@ -240,14 +242,12 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
               <View style={{ flexDirection: "row", gap: space(2) }}>
                 {([true, false] as const).map((v) => {
                   const tone = v ? colors.ultramarine : colors.vermilion;
-                  const preview = v ? yesPreview : noPreview;
                   return (
                     <Pressable key={String(v)} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { void seal(v); }}
-                      accessibilityLabel={preview ? `${v ? "Yes" : "No"}, stake ${preview.stake}, wins ${preview.wins}` : v ? "Yes" : "No"}
+                      accessibilityLabel={v ? "Yes" : "No"}
                       accessibilityHint="Seals your call."
                       style={{ flex: 1, borderWidth: 1, borderColor: tone, minHeight: 48, justifyContent: "center", alignItems: "center", gap: 2 }}>
                       <Mono size={12} color={tone} letterSpacing={5} style={{ marginRight: -5 }}>{v ? "YES" : "NO"}</Mono>
-                      {preview && <Mono size={9} color={colors.mutedInk} letterSpacing={1}>{sideLine(v, preview.stake, preview.wins, q.is_big_one)}</Mono>}
                     </Pressable>
                   );
                 })}

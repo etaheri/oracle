@@ -16,7 +16,7 @@ describe("the Council split (spec §15.2)", () => {
   it("orders the entries and prints one row per member then the house line", () => {
     const d = reveal([entry({ member: "market", p_yes: 0.4, on_right_side: false, reasoning: null, cited: [] }), entry({ member: "haiku", p_yes: 0.44 }), entry({ member: "sonnet", p_yes: 0.40, on_right_side: false })]);
     const rows = splitRows(councilFor(d, QID), 0.35);
-    expect(rows.map((r) => r.label)).toEqual(["SONNET 40", "HAIKU 44", "MARKET 40", "THE ORACLE'S LINE 35"]);
+    expect(rows.map((r) => r.label)).toEqual(["SONNET 40", "HAIKU 44", "MARKET 40", "THE ORACLE EXPECTED 35"]);
     expect(rows.map((r) => r.tone)).toEqual(["loss", "win", "loss", "mute"]);
   });
   it("is empty with no entries, so the slot keeps no height", () => {
