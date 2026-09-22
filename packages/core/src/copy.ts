@@ -304,6 +304,11 @@ export const PIPELINE_LINES = Object.freeze({
   withdrawnUnresolvable: "CANNOT SETTLE IN TIME. VOID FOR EVERYONE",
   // The v2 fallback when a struck question carries no server-stated reason.
   struck: "STRUCK · VOID FOR EVERYONE",
+  // The crowd's two voids (design 2026-09-22 §6.1, §10): a question the
+  // players did not answer in numbers, and a room that split exactly in
+  // half. Both render as the reveal's void reason, verbatim.
+  crowdTooFew: "TOO FEW PLAYERS ANSWERED",
+  crowdSplit: "THE ROOM SPLIT EXACTLY IN HALF",
 } as const);
 
 // The home call slot's lines for the reading round (design 2026-09-09 §2.2,
