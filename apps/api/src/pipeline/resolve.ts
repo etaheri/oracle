@@ -163,16 +163,20 @@ export async function resolveFromCrowd(deps: PipelineDeps, questionId: string): 
   // resolution may have landed while the counts were read.
   const current = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId), columns: { status: true } });
   if (!current || current.status !== "locked") return false;
-  await resolveQuestion(deps.db, questionId, outcome, evidence);
 
   // No trickle on a crowd round (design 2026-09-22 T7): five outcomes land
   // in one minute, and five pushes in one minute is not the contract the
-  // summons promises. Stamp every prediction as pushed in this same pass so
-  // claimResolutionPushes finds nothing; the hinge push at settle is the one
-  // push, and it fires within ten minutes of this.
+  // summons promises. Stamp every prediction as pushed BEFORE resolveQuestion
+  // runs, not after: a failure between the two steps must not leave the
+  // predictions unstamped, which is what let claimResolutionPushes compose
+  // the very per-question pushes T7 suppresses. Stamping here and then
+  // failing the resolve is harmless -- a crowd question never pushes per
+  // question, so there is nothing this stamp promised that the resolve
+  // still owes.
   await deps.db.update(schema.predictions)
     .set({ resolvePushedAt: now })
     .where(and(eq(schema.predictions.questionId, questionId), isNull(schema.predictions.resolvePushedAt)));
+  await resolveQuestion(deps.db, questionId, outcome, evidence);
   return true;
 }
 

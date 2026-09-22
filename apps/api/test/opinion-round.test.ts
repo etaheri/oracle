@@ -136,17 +136,59 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
     expect(sent[0]).toContain("the bank covers noon");
   });
 
-  it("rejects a set whose first four slots do not span four categories", async () => {
+  it("fails validation twice, and gives up, on a set whose first four slots do not span four categories", async () => {
     const calls: StructuredCall[] = [];
     const deps = await depsWith(claudeWith({ calls, answer: () => ({ questions: (["markets", "markets", "weather", "culture", "news"] as const).map((category, i) => ({ slot: i + 1, category, text: `Is take ${i + 1} the right one?` })) }) }), []);
-    await expect(buildOpinionDraft(deps, DATE)).rejects.toThrow(/four distinct categories/);
+    const { draft, reason } = await buildOpinionDraft(deps, DATE);
+    expect(draft).toBeNull();
+    expect(reason).toMatch(/failed validation twice/);
+    expect(reason).toMatch(/four distinct categories/);
+    expect(calls.filter((c) => c.schemaName === "opinion_round").length).toBe(2);
   });
 
-  it("rejects a text over 120 characters, one without a question mark, one with an exclamation mark, and one opening with 'Do you think'", async () => {
+  // A malformed voice response no longer throws the whole night away (a
+  // single Zod failure used to burn the Workflow's retries and skip
+  // narrate entirely): a bad response is an expected outcome the retry loop
+  // in buildOpinionDraft handles, naming the issue in the re-ask and giving
+  // up on a second failure of either kind.
+  it("rejects a text over 120 characters, one without a question mark, one with an exclamation mark, and one opening with 'Do you think' -- failing validation twice and giving up", async () => {
     for (const bad of ["x".repeat(118) + "ok?", "Is this fine", "Is this fine!?", "Do you think this is fine?"]) {
       const deps = await depsWith(claudeWith({ calls: [], answer: () => five([bad, "Is take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"]) }), []);
-      await expect(buildOpinionDraft(deps, DATE), bad).rejects.toThrow(/opinion: response failed validation/);
+      const { draft, reason } = await buildOpinionDraft(deps, DATE);
+      expect(draft, bad).toBeNull();
+      expect(reason, bad).toMatch(/failed validation twice/);
     }
+  });
+
+  it("re-asks once after a validation failure, naming the issue in the second call's prompt, then commits", async () => {
+    const calls: StructuredCall[] = [];
+    const sent: string[] = [];
+    const bad121 = "x".repeat(120) + "?"; // 121 characters, over the 120 max
+    const claude = claudeWith({
+      calls,
+      answer: (_c, n) => (n === 1 ? five([bad121, "Is take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"]) : five()),
+    });
+    const deps = await depsWith(claude, sent);
+    const r = await runOpinionRound(deps, DATE);
+    expect(r.published).toBe(true);
+    const opinionCalls = calls.filter((c) => c.schemaName === "opinion_round");
+    expect(opinionCalls.length).toBe(2);
+    expect(opinionCalls[1]!.user).toContain("Your previous set failed validation:");
+    const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE) });
+    expect(qs.length).toBe(5);
+  });
+
+  it("gives up after two validation failures, tells the bank story and writes no round", async () => {
+    const calls: StructuredCall[] = [];
+    const sent: string[] = [];
+    const bad121 = "x".repeat(120) + "?";
+    const claude = claudeWith({ calls, answer: () => five([bad121, "Is take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"]) });
+    const deps = await depsWith(claude, sent);
+    const r = await runOpinionRound(deps, DATE);
+    expect(r.published).toBe(false);
+    expect(r.reason).toMatch(/failed validation twice/);
+    expect(await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) })).toBeUndefined();
+    expect(sent[0]).toContain("no opinion round");
   });
 
   it("leaves a round that is no longer editable alone", async () => {

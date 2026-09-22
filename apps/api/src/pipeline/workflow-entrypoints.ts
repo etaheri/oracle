@@ -26,7 +26,7 @@ import { POLICY, type StepPolicy } from "./steps";
 import { BudgetExhausted, meterClaude, reportBudgetExhaustion } from "./spend";
 import { etNow } from "./clock";
 import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound, tooFewReason } from "./market-round";
-import { buildOpinionDraft, narrateOpinionRound, opinionResult } from "./opinion-round";
+import { buildOpinionDraft, commitOpinionDraft, narrateOpinionRound, opinionResult } from "./opinion-round";
 import { SELECT } from "./exchanges/select";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
 import { councilEditable, isCrowdRound, narrateCouncil, type CouncilRun } from "./council";
@@ -134,7 +134,11 @@ export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowPar
       return buildMarketDraft(deps, date, candidates);
     });
     const result = await durableStep(step, "commit", POLICY.db, deps, async () => {
-      if (built.draft) await commitMarketDraft(deps, date, built.draft); // upsertDraft at version 3; shared by both kinds
+      // Each kind's own wrapper, though both do the same upsertDraft at
+      // version 3 underneath -- dispatching by name here rather than always
+      // through commitMarketDraft keeps the opinion path readable as its own
+      // thing at the one call site that commits it.
+      if (built.draft) await (kind === "opinion" ? commitOpinionDraft(deps, date, built.draft) : commitMarketDraft(deps, date, built.draft));
       return { published: built.draft !== null, fetched, eligible: candidates.length, reason: built.reason };
     });
     await durableStep(step, "narrate", POLICY.narrate, deps, () =>

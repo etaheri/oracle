@@ -42,6 +42,30 @@ export const councilJsonSchema = {
   required: ["lines"], additionalProperties: false,
 };
 
+// A crowd round asks a member to read the room, not the evidence (design
+// 2026-09-22 §6): the market schema's `reasoning` invites a citation trail
+// that does not exist here, and its `cited` description tells the member to
+// cite evidence it was never given. Byte-identical otherwise.
+export const crowdCouncilJsonSchema = {
+  type: "object",
+  properties: {
+    lines: {
+      type: "array", minItems: 5, maxItems: 5,
+      items: {
+        type: "object",
+        properties: {
+          slot: { type: "integer", minimum: 1, maximum: 5 },
+          p_yes: { type: "number", minimum: P_MIN, maximum: P_MAX, description: "Your probability that the answer is YES." },
+          reasoning: { type: "string", description: "Two to five plain sentences on why the room will lean the way you say. Shown to players as written." },
+          cited: { type: "array", items: { type: "integer", minimum: 1 }, description: "Always empty on an opinion question; there is nothing to cite." },
+        },
+        required: ["slot", "p_yes", "reasoning", "cited"], additionalProperties: false,
+      },
+    },
+  },
+  required: ["lines"], additionalProperties: false,
+};
+
 function systemPrompt(date: string, now: Date): string {
   return `You are one voice of THE ORACLE's Council. You are preparing the round dated ${date}, before it opens at noon ET; it locks at noon ET the following day. It is now ${now.toISOString()}.
 
@@ -113,7 +137,7 @@ export async function commitMember(deps: PipelineDeps, date: string, member: Mod
       system: crowd ? crowdSystemPrompt(date, now) : systemPrompt(date, now),
       user,
       schemaName: "council_lines",
-      schema: councilJsonSchema,
+      schema: crowd ? crowdCouncilJsonSchema : councilJsonSchema,
     });
   } catch (err) {
     if (err instanceof BudgetExhausted) throw err;

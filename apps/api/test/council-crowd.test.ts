@@ -60,6 +60,9 @@ describe("the Council on a crowd round (design 2026-09-22 §5)", () => {
     expect(c.model).toBe("m-sonnet");
     expect(c.webSearch).toBeUndefined();
     expect(c.schemaName).toBe("council_lines");
+    const citedDesc = (c.schema as { properties: { lines: { items: { properties: { cited: { description: string } } } } } }).properties.lines.items.properties.cited.description;
+    expect(citedDesc).toContain("nothing to cite");
+    expect(citedDesc).not.toContain("evidence");
     expect(c.system).toContain(DATE);
     expect(c.system).toContain(NOW.toISOString());
     expect(c.system).toContain("share of players who will answer YES");

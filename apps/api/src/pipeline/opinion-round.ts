@@ -82,13 +82,22 @@ export async function recentCrowdTexts(db: Db, date: string): Promise<string[]> 
   return rows.map((r) => r.text);
 }
 
-async function askFive(deps: PipelineDeps, date: string, recent: string[], refused: string[]): Promise<OpinionEntry[]> {
+type AskFiveResult = { ok: true; entries: OpinionEntry[] } | { ok: false; issue: string };
+
+// A discriminated result, not a throw: a malformed response is an expected
+// outcome buildOpinionDraft's retry loop handles, not a defect. Only
+// BudgetExhausted escapes deps.claude.structured uncaught here — the same
+// carve-out taste.ts and council/member.ts make around their own calls.
+async function askFive(deps: PipelineDeps, date: string, recent: string[], refused: string[], validationIssue?: string): Promise<AskFiveResult> {
   if (!deps.claude) throw new Error("pipeline: no claude client");
   const recentBlock = `Do not ask anything already asked in the last ${RECENT_DAYS} days:\n${recent.length === 0 ? "None yet." : recent.map((t) => `- ${t}`).join("\n")}`;
   const refusedBlock = refused.length === 0
     ? ""
     : `\n\nThese were refused by the taste gate and must not be asked again, in any form:\n${refused.map((t) => `- ${t}`).join("\n")}`;
-  const user = `Write the five hot takes for ${date} now. ${recentBlock}${refusedBlock}`;
+  const validationBlock = validationIssue === undefined
+    ? ""
+    : `\n\nYour previous set failed validation: ${validationIssue}. Write a corrected set.`;
+  const user = `Write the five hot takes for ${date} now. ${recentBlock}${refusedBlock}${validationBlock}`;
   const response = await deps.claude.structured({
     model: deps.models.voice,
     system: systemPrompt(date, recent),
@@ -98,8 +107,8 @@ async function askFive(deps: PipelineDeps, date: string, recent: string[], refus
     effort: "low",
   });
   const parsed = OpinionSchema.safeParse(response);
-  if (!parsed.success) throw new Error(`opinion: response failed validation: ${parsed.error.issues[0]?.message ?? "unknown"}`);
-  return [...parsed.data.questions].sort((a, b) => a.slot - b.slot);
+  if (!parsed.success) return { ok: false, issue: parsed.error.issues[0]?.message ?? "unknown" };
+  return { ok: true, entries: [...parsed.data.questions].sort((a, b) => a.slot - b.slot) };
 }
 
 export function toOpinionDraft(deps: PipelineDeps, date: string, entries: OpinionEntry[]): Draft {
@@ -124,8 +133,19 @@ export function toOpinionDraft(deps: PipelineDeps, date: string, entries: Opinio
 export async function buildOpinionDraft(deps: PipelineDeps, date: string): Promise<{ draft: Draft | null; reason: string | null }> {
   const recent = await recentCrowdTexts(deps.db, date);
   let refused: string[] = [];
+  let validationIssue: string | undefined;
+  // The taste-refusal attempt counter and the validation retry share this
+  // loop: two failures of either kind, in any combination, end the night at
+  // two voice calls total.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const entries = await askFive(deps, date, recent, refused);
+    const asked = await askFive(deps, date, recent, refused, validationIssue);
+    if (!asked.ok) {
+      if (attempt === 1) return { draft: null, reason: `the voice's questions failed validation twice: ${asked.issue}` };
+      validationIssue = asked.issue;
+      continue;
+    }
+    validationIssue = undefined;
+    const entries = asked.entries;
     const taste = await tasteTexts(deps, entries.map((e) => e.text));
     if (taste.detail !== null) return { draft: null, reason: taste.detail };
     const bad = entries.filter((_, i) => !taste.allowed[i]).map((e) => e.text);
