@@ -25,7 +25,13 @@
     "PIPELINE_COUNCIL_SONNET_MODEL": "claude-sonnet-5",
     "PIPELINE_COUNCIL_OPUS_MODEL": "claude-opus-5",
     "PIPELINE_COUNCIL_HAIKU_MODEL": "claude-haiku-4-5-20251001",
-    "PIPELINE_LESSON_MODEL": "claude-haiku-4-5-20251001"
+    "PIPELINE_LESSON_MODEL": "claude-haiku-4-5-20251001",
+    // The round kind (design 2026-09-22 T3): "opinion" deals five hot takes
+    // resolved by the players' majority; "market" deals five exchange
+    // markets. One switch, one deploy.
+    "PIPELINE_ROUND_KIND": "opinion",
+    // Where the crowd question's source link points (§4.2).
+    "SITE_URL": "https://outseen-site.etaheri.workers.dev"
   }
   // secrets (wrangler secret put) — this list is WorkerEnv in src/worker.ts;
   // keep the two in step.
