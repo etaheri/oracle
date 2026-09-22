@@ -20,6 +20,7 @@ const historical: Exhibition = {
   oraclePYes: 0.65,
   outcome: "yes",
   linePYes: null,
+  crowdYesPct: null,
 };
 
 const replacement: Exhibition = {

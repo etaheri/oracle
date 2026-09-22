@@ -106,6 +106,7 @@ describe("selectExhibition", () => {
       oraclePYes: 0.7,
       outcome: "yes",
       linePYes: 0.7, // clampLine(0.7, null): no market on this question, so the line is the forecast itself.
+      crowdYesPct: null,
     });
     expect(ExhibitionSchema.parse(selected)).toEqual(selected);
   });
@@ -177,6 +178,27 @@ describe("selectExhibition", () => {
     await resolvedRound(db, "2099-08-29", { oraclePYes: 0.7 });
     const ex = await selectExhibition(db);
     expect(ex?.linePYes).toBeCloseTo(0.7, 10);
+  });
+
+  it("offers a crowd question without a context block, carrying the room's share (design 2026-09-22 T10)", async () => {
+    const { db } = await makeTestDb();
+    const date = "2026-09-23";
+    // sourceName is set at seed time, before commit_oracle_forecast: once a
+    // round is committed, oracle_question_commitment_guard freezes source_name
+    // (and context) on the row, so a post-commit rewrite of either is
+    // rejected. context is left untouched here for the same reason — it
+    // doesn't need to move, because selectExhibition never reads it for a
+    // crowd question (Step 5), so the row's stale context has no bearing on
+    // the exhibition's context, which is forced null by marketSource alone.
+    await resolvedRound(db, date, { sourceName: "THE PLAYERS" });
+    await db.update(schema.questions).set({ marketSource: "crowd", marketId: date, crowdYesPct: "62", crowdCount: 41, linePYes: "0.38" }).where(eq(schema.questions.roundDate, date));
+    const ex = await selectExhibition(db);
+    expect(ex).not.toBeNull();
+    expect(ex!.kind).toBe("historical");
+    expect(ex!.context).toBeNull();
+    expect(ex!.crowdYesPct).toBe(62);
+    expect(ex!.linePYes).toBe(0.38);
+    expect(ex!.sourceName).toBe("THE PLAYERS");
   });
 });
 

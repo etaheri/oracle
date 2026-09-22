@@ -4,7 +4,7 @@ import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
 import { createApp } from "../src/app";
 import { StandingsSchema } from "@oracle/core";
-import { loadSettledCalls, standings, standingsCsv } from "../src/standings";
+import { loadSettledCalls, standings, standingsCsv, standingsHtml } from "../src/standings";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
 const DATE = "2026-09-10";
@@ -109,5 +109,10 @@ describe("the routes", () => {
     const s = StandingsSchema.parse(await (await app.request("/v1/standings")).json());
     expect(s.rows.every((r) => r.calls === 0)).toBe(true);
     expect((await app.request("/standings")).status).toBe(200);
+  });
+
+  it("footnotes the crowd as the baseline on opinion rounds (design 2026-09-22 §7)", () => {
+    const html = standingsHtml(standings([], new Date("2026-09-24T17:00:00Z")));
+    expect(html).toContain("On opinion rounds the players are the answer, so their row is the baseline the machines are measured against.");
   });
 });

@@ -7,7 +7,10 @@ export const ExhibitionSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(["historical", "fictional"]),
   question: z.string().min(1),
-  context: z.string().min(1),
+  // A market question carries the context it opened with; a past hot take
+  // (design 2026-09-22 T10) has none, because an opinion has nothing to
+  // look up.
+  context: z.string().min(1).nullable().default(null),
   sourceName: z.string().min(1),
   roundDate: z.string().nullable(),
   oraclePYes: z.number().min(0).max(1),
@@ -16,6 +19,9 @@ export const ExhibitionSchema = z.object({
   // API for historical questions; null on the fallback fixture, where
   // practiceLine derives one from the Oracle's own forecast.
   linePYes: z.number().min(0).max(1).nullable().default(null),
+  // The room's share of YES at lock on a past hot take; null on a market
+  // question and on the fictional fallback.
+  crowdYesPct: z.number().int().min(0).max(100).nullable().default(null),
 });
 
 export type Exhibition = z.infer<typeof ExhibitionSchema>;

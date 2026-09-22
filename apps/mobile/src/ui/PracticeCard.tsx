@@ -62,7 +62,7 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
           const next = revealExhibition(flow); setFlow(next.flow); if (next.completedNow) onCompleted();
         }} />}
       </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} fortune={PRACTICE_FORTUNE} onSealed={() => {}}
-        practice={{ context: exhibition.context, stamp: "PRACTICE · UNRANKED", onSeal: (answer) => {
+        practice={{ context: exhibition.context ?? undefined, stamp: "PRACTICE · UNRANKED", onSeal: (answer) => {
           setFlow(current => sealExhibition(current, { answer }));
         } }} />}
     </View>}</CardStage>

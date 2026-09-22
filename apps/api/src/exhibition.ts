@@ -30,24 +30,34 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
     if (typeof question.oracleProbYes !== "string" && typeof question.oracleProbYes !== "number") continue;
     const oraclePYes = Number(question.oracleProbYes);
     if (!Number.isFinite(oraclePYes) || oraclePYes < 0 || oraclePYes > 1) continue;
-    const context = QuestionContextSchema.safeParse(question.context);
-    if (!context.success || context.data.text.trim().length === 0) continue;
-    if (new Date(context.data.asOf).getTime() > question.opensAt.getTime()) continue;
+    const crowd = question.marketSource === "crowd";
+    let contextText: string | null = null;
+    if (!crowd) {
+      const context = QuestionContextSchema.safeParse(question.context);
+      if (!context.success || context.data.text.trim().length === 0) continue;
+      if (new Date(context.data.asOf).getTime() > question.opensAt.getTime()) continue;
+      contextText = context.data.text;
+    }
     if (question.text.trim().length === 0 || question.sourceName.trim().length === 0) continue;
 
     const marketP = question.marketProb === null || question.marketProb === undefined ? null : Number(question.marketProb);
-    const linePYes = clampLine(oraclePYes, Number.isFinite(marketP as number) ? marketP : null);
+    // The line the card is priced at is the one the round was played at,
+    // when the row carries it; the clamp is the fallback for rounds that
+    // predate line_p_yes.
+    const linePYes = question.linePYes !== null && question.linePYes !== undefined ? Number(question.linePYes) : clampLine(oraclePYes, Number.isFinite(marketP as number) ? marketP : null);
+    const crowdYesPct = crowd && question.crowdYesPct !== null && question.crowdYesPct !== undefined ? Math.round(Number(question.crowdYesPct)) : null;
 
     const projected = ExhibitionSchema.safeParse({
       id: question.id,
       kind: "historical",
       question: question.text,
-      context: context.data.text,
+      context: contextText,
       sourceName: question.sourceName,
       roundDate: question.roundDate,
       oraclePYes,
       outcome: question.outcome,
       linePYes,
+      crowdYesPct,
     });
     if (projected.success) return projected.data;
   }
