@@ -449,6 +449,11 @@ Rollout order (design 2026-09-22 §13, steps 2–4):
 5. Build 12 to TestFlight and App Review the same day. Build 11 is the
    fallback.
 
+Build 11's practice card falls back to the fictional example once a hot take
+is the newest resolved question, because its shipped `ExhibitionSchema`
+requires a `context` and a crowd question never carries one — so "build 11
+renders an opinion round" covers the daily round, not practice.
+
 ---
 
 ## 5. Validation debt
