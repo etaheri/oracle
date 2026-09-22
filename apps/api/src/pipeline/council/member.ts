@@ -67,29 +67,50 @@ function questionBlock(q: { slot: number; isBigOne: boolean; text: string; resol
   return `${head}\n${ev}${mem}`;
 }
 
+function crowdSystemPrompt(date: string, now: Date): string {
+  return `You are one voice of THE ORACLE's Council. The round dated ${date} opens at noon ET and locks at noon ET the following day. It is now ${now.toISOString()}.
+
+- Each question is an opinion. Players answer YES or NO from their own view. Estimate the share of players who will answer YES, between ${P_MIN} and ${P_MAX}. Exactly 0.5 is valid when you expect an even room.
+- The players are a general US audience on their phones at lunchtime. Weigh what people say when asked directly, not what they believe privately.
+- Your reasoning is two to five plain sentences on why the room will lean the way you say. It will be shown to players as written.
+- Where lessons from your own earlier calls are given, weigh them; they are yours.
+- Leave cited empty; there is nothing to cite.
+
+Call the council_lines tool exactly once with exactly one entry for each slot 1 through 5.`;
+}
+
+function crowdQuestionBlock(q: { slot: number; isBigOne: boolean; text: string }, lessons: LessonReceived[]): string {
+  const head = `[slot ${q.slot}${q.isBigOne ? " · THE BIG ONE" : ""}] ${q.text}`;
+  const mem = lessons.length === 0 ? "" : `\nWHAT YOU LEARNED BEFORE:\n${lessons.map((l) => `(${l.seriesKey}, settled ${fmtDate(l.resolvedAt)}) ${l.text}`).join("\n")}`;
+  return `${head}${mem}`;
+}
+
 export async function commitMember(deps: PipelineDeps, date: string, member: ModelMemberId): Promise<MemberResult> {
   const qs = await deps.db.query.questions.findMany({
     where: eq(schema.questions.roundDate, date),
     orderBy: (q, { asc }) => [asc(q.slot)],
-    columns: { id: true, slot: true, isBigOne: true, text: true, resolutionCriteria: true, marketProb: true, marketSeriesKey: true, category: true },
+    columns: { id: true, slot: true, isBigOne: true, text: true, resolutionCriteria: true, marketProb: true, marketSeriesKey: true, category: true, marketSource: true },
   });
   const allSlots = qs.map((q) => q.slot);
   const abstainAll = (error: string): MemberResult => ({ member, lines: [], abstained: allSlots, error });
   if (qs.length !== 5) return abstainAll("five questions required");
   if (!deps.claude) return abstainAll("no claude client");
 
+  const crowd = qs.every((q) => q.marketSource === "crowd");
   const now = deps.now();
-  const packRows = await deps.db.query.evidence.findMany({ where: inArray(schema.evidence.questionId, qs.map((q) => q.id)), orderBy: (e, { asc }) => [asc(e.rank)] });
+  const packRows = crowd ? [] : await deps.db.query.evidence.findMany({ where: inArray(schema.evidence.questionId, qs.map((q) => q.id)), orderBy: (e, { asc }) => [asc(e.rank)] });
   const packs = new Map(qs.map((q) => [q.id, packRows.filter((e) => e.questionId === q.id)]));
   const received = new Map<string, LessonReceived[]>();
   for (const q of qs) received.set(q.id, await lessonsFor(deps.db, member, seriesKeyOf(q), now));
 
-  const user = qs.map((q) => questionBlock(q, packs.get(q.id)!, received.get(q.id)!)).join("\n\n");
+  const user = crowd
+    ? qs.map((q) => crowdQuestionBlock(q, received.get(q.id)!)).join("\n\n")
+    : qs.map((q) => questionBlock(q, packs.get(q.id)!, received.get(q.id)!)).join("\n\n");
   let response: unknown;
   try {
     response = await deps.claude.structured({
       model: memberModel(deps, member),
-      system: systemPrompt(date, now),
+      system: crowd ? crowdSystemPrompt(date, now) : systemPrompt(date, now),
       user,
       schemaName: "council_lines",
       schema: councilJsonSchema,

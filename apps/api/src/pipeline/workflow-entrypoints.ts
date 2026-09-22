@@ -29,7 +29,7 @@ import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRoun
 import { buildOpinionDraft, narrateOpinionRound, opinionResult } from "./opinion-round";
 import { SELECT } from "./exchanges/select";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
-import { councilEditable, narrateCouncil, type CouncilRun } from "./council";
+import { councilEditable, isCrowdRound, narrateCouncil, type CouncilRun } from "./council";
 import { retrieveEvidence } from "./council/evidence";
 import { commitMember, type MemberResult } from "./council/member";
 import { commitCouncil } from "./council/commit";
@@ -183,7 +183,8 @@ export class CouncilWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowParam
     const { date } = event.payload;
     const editable = await durableStep(step, "editable", POLICY.db, deps, () => councilEditable(deps, date));
     if (!editable) return { committed: false, reason: "not editable" };
-    const evidence = await durableStep(step, "evidence", POLICY.sourceFetch, deps, () => retrieveEvidence(deps, date));
+    const crowd = await durableStep(step, "crowd", POLICY.db, deps, () => isCrowdRound(deps, date));
+    const evidence = crowd ? null : await durableStep(step, "evidence", POLICY.sourceFetch, deps, () => retrieveEvidence(deps, date));
     // One step per member (design 2026-09-11 §4.2): a timeout in one cannot
     // lose the others, and a retry of the commit step never re-asks a model.
     const members: MemberResult[] = [];
