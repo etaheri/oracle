@@ -9,6 +9,7 @@ import { upsertDraft } from "./draft";
 import { addDays, noonET, fastResolveBy, voidDeadline } from "./clock";
 import { fetchMarketSignals, type MarketSignal } from "./feeds";
 import { loadQualityRows, qualityReport, questionQuality } from "./quality";
+import { rerollOpinionSlot } from "./opinion-round";
 
 const CATEGORIES = ["markets", "sports", "weather", "culture", "news"] as const;
 
@@ -228,6 +229,13 @@ export async function rerollSlot(deps: PipelineDeps, date: string, slot: number,
   const target = questions.find((q) => q.slot === slot);
   if (!target || target.status !== "scheduled") {
     throw new Error(`draft already published for ${date}`);
+  }
+
+  // A crowd slot (design 2026-09-22 §4) is rewritten by the voice, not the
+  // author: there is no source to research and no market to match.
+  if (target.marketSource === "crowd") {
+    await rerollOpinionSlot(deps, date, slot, guidance);
+    return;
   }
 
   const others = questions.filter((q) => q.slot !== slot).sort((a, b) => a.slot - b.slot);
