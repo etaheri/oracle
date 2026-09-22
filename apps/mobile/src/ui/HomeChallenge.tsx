@@ -40,7 +40,7 @@ export function HomeChallenge({
     : state.kind === "partial"
       ? `${input.openCount} ${input.openCount === 1 ? "QUESTION REMAINS" : "QUESTIONS REMAIN"} · A PLACING NEEDS EVERY NON-VOID QUESTION. YOUR STAKES STILL SETTLE.`
       : state.kind === "submitted"
-        ? "YOUR CALLS ARE SEALED. SEE WHERE THE PLAYERS LEAN WHILE THE MARKETS SETTLE."
+        ? "YOUR CALLS ARE SEALED. SEE WHERE THE PLAYERS LEAN UNTIL NOON."
         : state.kind === "waiting"
           // The state only. This line used to carry the state AND the offer
           // joined by a middot — "THE NEXT ROUND HASN'T BEEN ANNOUNCED. · TRY
@@ -52,7 +52,7 @@ export function HomeChallenge({
             ? `NEXT ROUND OPENS ${localOpening(input.nextOpensAt)}`
             : "THE NEXT ROUND HASN'T BEEN ANNOUNCED"
           : state.kind === "live"
-            ? "THE ORACLE HAS POSTED FIVE LINES."
+            ? "THE ORACLE HAS READ THE ROOM ON FIVE TAKES."
             : "LOADING TODAY'S CHALLENGE…";
 
   return (

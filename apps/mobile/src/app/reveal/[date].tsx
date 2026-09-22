@@ -29,6 +29,7 @@ import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { scaledLines, scaledRow } from "../../game/typeScaling";
 import { isFortuneRound, stakedRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark, bustLines, doubleObservation } from "../../game/revealFortune";
+import { lineLabel } from "../../game/stakeText";
 import { shareBigOneLine, fortuneShareMessage } from "../../game/shareLines";
 import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeRowLines, oracleDayLine, BOARD_MAX_LINES, ALL_TIME_TITLE } from "../../game/dailyBoard";
 import { rivalryMoment } from "../../game/rivalryMoment";
@@ -637,7 +638,7 @@ export default function RevealScreen() {
                   {fortuneRound ? (
                     big.line_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
                       <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
-                        THE ORACLE'S LINE {Math.round(big.line_p_yes * 100)}% YES{" "}
+                        {lineLabel(big.line_p_yes)}{" "}
                         {oracleCallRight(big.line_p_yes, big.outcome) === null
                           ? ""
                           : oracleCallRight(big.line_p_yes, big.outcome)

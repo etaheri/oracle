@@ -58,7 +58,7 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
   // (version 1/2, or a version 3 round that opened unstaked).
   fortune: number | null;
   // Fires when the seal ceremony completes, with the receipt the round's
-  // footer prints under the next card: "YES · STAKED 50 · WINS 93".
+  // footer prints under the next card: "YES · THE ORACLE EXPECTED 38% YES".
   onSealed: (receipt: string) => void;
   practice?: { onSeal: (answer: boolean) => void; context?: string; stamp: string };
   height?: number;
