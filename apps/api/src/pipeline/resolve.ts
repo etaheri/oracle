@@ -17,7 +17,8 @@
 // honest "we could not read this"; a coin-flip between two disagreeing readings
 // is a lie with a number attached. resettleRound remains available if a human
 // ever corrects one by hand.
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+import { PIPELINE_LINES } from "@oracle/core";
 import { schema } from "../db/client";
 import type { PipelineDeps } from "./index";
 import { resolveQuestion } from "../resolution";
@@ -28,6 +29,7 @@ import { sendPushes } from "../push/onesignal";
 import { DEFAULT_EXCHANGES } from "./market-round";
 import type { ExchangeSource } from "./exchanges/types";
 import { writeLessons } from "./council/lessons";
+import { siteUrlOf } from "./round-kind";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -117,6 +119,63 @@ export async function resolveFromExchange(deps: PipelineDeps, questionId: string
   return true;
 }
 
+/**
+ * The crowd's floor (design 2026-09-22 T6): fewer sealed answers than this
+ * and the question voids rather than pretend one player is a room. It is 1
+ * this week, while the field is a handful; it rises to 20 once there are
+ * twenty players. A constant, not a var, on purpose — it is a rule.
+ */
+export const CROWD_RESOLVE_MIN = 1;
+
+/**
+ * Crowd settlement (design 2026-09-22 §6.1): the players' own majority is the
+ * outcome. No model, no exchange. YES above half, NO below, void on an exact
+ * split or under the floor. Every crowd question is resolvable the moment the
+ * round locks, so the first resolve tick after lock settles all five together.
+ */
+export async function resolveFromCrowd(deps: PipelineDeps, questionId: string): Promise<boolean> {
+  const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId) });
+  if (!q) throw new Error(`resolve: question not found: ${questionId}`);
+  if (q.marketSource !== "crowd") throw new Error(`resolve: ${questionId} is not a crowd question`);
+  const now = deps.now();
+  if (q.status !== "locked" || now.getTime() < q.locksAt.getTime()) return false;
+
+  const preds = await deps.db.query.predictions.findMany({ where: eq(schema.predictions.questionId, questionId), columns: { answer: true } });
+  const n = preds.length;
+  const yes = preds.filter((p) => p.answer).length;
+  const pct = n === 0 ? 50 : Math.round((100 * yes) / n);
+  const base = { resolver: "crowd", crowd_yes_pct: pct, crowd_count: n, checked_at: now.toISOString() };
+
+  let outcome: "yes" | "no" | "void";
+  let evidence: Record<string, unknown>;
+  if (n < CROWD_RESOLVE_MIN) {
+    outcome = "void";
+    evidence = { ...base, reason: PIPELINE_LINES.crowdTooFew };
+  } else if (yes * 2 === n) {
+    outcome = "void";
+    evidence = { ...base, reason: PIPELINE_LINES.crowdSplit };
+  } else {
+    outcome = yes * 2 > n ? "yes" : "no";
+    evidence = { ...base, quotes: [{ quote: `${pct}% of ${n} player${n === 1 ? "" : "s"} said YES.`, url: `${siteUrlOf(deps)}/play` }] };
+  }
+
+  // Same late-write guard as the other two paths: a void or a hand
+  // resolution may have landed while the counts were read.
+  const current = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId), columns: { status: true } });
+  if (!current || current.status !== "locked") return false;
+  await resolveQuestion(deps.db, questionId, outcome, evidence);
+
+  // No trickle on a crowd round (design 2026-09-22 T7): five outcomes land
+  // in one minute, and five pushes in one minute is not the contract the
+  // summons promises. Stamp every prediction as pushed in this same pass so
+  // claimResolutionPushes finds nothing; the hinge push at settle is the one
+  // push, and it fires within ten minutes of this.
+  await deps.db.update(schema.predictions)
+    .set({ resolvePushedAt: now })
+    .where(and(eq(schema.predictions.questionId, questionId), isNull(schema.predictions.resolvePushedAt)));
+  return true;
+}
+
 export interface ResolveOutcome {
   questionId: string;
   resolved: boolean;
@@ -144,7 +203,11 @@ export async function resolveOne(deps: PipelineDeps, questionId: string): Promis
   let error: string | undefined;
   try {
     const q = await deps.db.query.questions.findFirst({ where: eq(schema.questions.id, questionId), columns: { marketSource: true } });
-    resolved = q?.marketSource ? await resolveFromExchange(deps, questionId) : await resolveWithClaude(deps, questionId);
+    resolved = q?.marketSource === "crowd"
+      ? await resolveFromCrowd(deps, questionId)
+      : q?.marketSource
+        ? await resolveFromExchange(deps, questionId)
+        : await resolveWithClaude(deps, questionId);
   } catch (err) {
     if (err instanceof BudgetExhausted) throw err;
     error = err instanceof Error ? err.message : String(err);
