@@ -15,6 +15,11 @@ async function resolvedRound(db: TestDb, date: string, options: {
   oraclePYes?: number;
   questionText?: string;
   sourceName?: string;
+  // A crowd question carries no context, matching opinion-round.ts's
+  // pre-commit insert (draft.ts: `context: q.context ?? null`): the pipeline
+  // never writes a context for one and never mutates it after commit, since
+  // the guard trigger (0009) freezes context once a round is committed.
+  noContext?: boolean;
 } = {}) {
   const questions = await seedRound(db, {
     date,
@@ -24,7 +29,7 @@ async function resolvedRound(db: TestDb, date: string, options: {
   await db.update(schema.rounds).set({ status: "scheduled" }).where(eq(schema.rounds.date, date));
   await db.update(schema.questions).set({
     status: "scheduled",
-    context: {
+    context: options.noContext ? null : {
       text: options.contextText ?? `Context ${date}`,
       asOf: options.contextAsOf ?? `${date}T15:00:00Z`,
       sourceUrl: "https://example.com/context",
@@ -183,14 +188,13 @@ describe("selectExhibition", () => {
   it("offers a crowd question without a context block, carrying the room's share (design 2026-09-22 T10)", async () => {
     const { db } = await makeTestDb();
     const date = "2026-09-23";
-    // sourceName is set at seed time, before commit_oracle_forecast: once a
-    // round is committed, oracle_question_commitment_guard freezes source_name
-    // (and context) on the row, so a post-commit rewrite of either is
-    // rejected. context is left untouched here for the same reason — it
-    // doesn't need to move, because selectExhibition never reads it for a
-    // crowd question (Step 5), so the row's stale context has no bearing on
-    // the exhibition's context, which is forced null by marketSource alone.
-    await resolvedRound(db, date, { sourceName: "THE PLAYERS" });
+    // sourceName and context are set at seed time, before commit_oracle_forecast:
+    // once a round is committed, oracle_question_commitment_guard freezes both
+    // fields on the row, so a post-commit rewrite of either is rejected. This
+    // matches production: opinion-round.ts's authoring insert (draft.ts:
+    // `context: q.context ?? null`) writes a crowd question's null context
+    // before the round is ever committed, and never touches it again.
+    await resolvedRound(db, date, { sourceName: "THE PLAYERS", noContext: true });
     await db.update(schema.questions).set({ marketSource: "crowd", marketId: date, crowdYesPct: "62", crowdCount: 41, linePYes: "0.38" }).where(eq(schema.questions.roundDate, date));
     const ex = await selectExhibition(db);
     expect(ex).not.toBeNull();
