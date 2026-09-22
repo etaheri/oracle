@@ -21,6 +21,10 @@ import { z } from "zod";
 // stayed answerable after its answer existed (audit 2026-09-01 §1.1).
 export const RESOLVES_AFTER_LOCK = "after-lock";
 
+// The crowd question's own criteria (design 2026-09-22 §4.2). One string,
+// exported so the opinion round and the tests cannot drift.
+export const CROWD_RESOLUTION_CRITERIA = "YES if more than half of the players who sealed this question answered YES when the round locked. A tie is void.";
+
 export const DraftQuestionSchema = z
   .object({
     slot: z.number().int().min(1).max(5),
@@ -51,7 +55,9 @@ export const DraftQuestionSchema = z
     // at rules version 3, refused by upsertDraft when absent there; ignored
     // at 1 and 2.
     market: z.object({
-      source: z.enum(["kalshi", "polymarket"]),
+      // "crowd" is the players' own majority (design 2026-09-22 T2): the id
+      // is the round date, the event key the slot, the close the lock.
+      source: z.enum(["kalshi", "polymarket", "crowd"]),
       id: z.string().min(1),
       event_key: z.string().min(1),
       series_key: z.string().min(1).optional(),
@@ -61,8 +67,10 @@ export const DraftQuestionSchema = z
   .superRefine((q, ctx) => {
     // Weather's information arrives continuously, so "after-lock" is never
     // true of it — a forecast is always partly knowable. Forcing an instant
-    // forces the lock to the end of the measurement window.
-    if (q.category === "weather" && q.resolves_at === RESOLVES_AFTER_LOCK) {
+    // forces the lock to the end of the measurement window. An OPINION about
+    // the weather (design 2026-09-22 §4.1, "the outdoors and the seasons")
+    // has no information arriving at all: the crowd decides it at the lock.
+    if (q.category === "weather" && q.resolves_at === RESOLVES_AFTER_LOCK && q.market?.source !== "crowd") {
       ctx.addIssue({ code: "custom", message: "weather must name a resolves_at instant", path: ["resolves_at"] });
     }
   });
@@ -145,18 +153,27 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
   const locksAtDefault = noonET(addDays(date, 1));
   const resolveBy = new Date(locksAtDefault.getTime() + 3_600_000);
 
+  if (rulesVersion < 3 && draft.questions.some((q) => q.market?.source === "crowd")) {
+    throw new Error("a crowd question needs rules version 3");
+  }
   if (rulesVersion === 2) {
     const fast = checkFastRound(draft.questions, { fastBy: fastResolveBy(date), voidAt: voidDeadline(date) });
     if (fast) throw new Error(fast);
   }
   if (rulesVersion >= 3) {
     // The market window (design 2026-09-10 §5.2) replaces the fast-round
-    // rule: every question closes between lock + 2h and lock + 30h.
+    // rule: every question closes between lock + 2h and lock + 30h. A crowd
+    // question (design 2026-09-22 §4.2) closes AT the lock, by definition,
+    // and skips the window.
     const minClose = locksAtDefault.getTime() + SELECT.CLOSE_AFTER_LOCK_MIN_H * 3_600_000;
     const maxClose = locksAtDefault.getTime() + SELECT.CLOSE_AFTER_LOCK_MAX_H * 3_600_000;
     for (const q of draft.questions) {
       if (!q.market) throw new Error(`slot ${q.slot}: every version 3 question names its market`);
       const t = Date.parse(q.market.closes_at);
+      if (q.market.source === "crowd") {
+        if (t !== locksAtDefault.getTime()) throw new Error(`slot ${q.slot}: a crowd question closes at the lock`);
+        continue;
+      }
       if (t < minClose) throw new Error(`slot ${q.slot}: market closes before lock + 2h`);
       if (t > maxClose) throw new Error(`slot ${q.slot}: market closes later than lock + 30h`);
     }
