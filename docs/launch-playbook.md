@@ -194,6 +194,14 @@ wrangler secret put ONESIGNAL_APP_ID
 wrangler secret put ONESIGNAL_API_KEY
 ```
 
+Two more pipeline knobs are `wrangler.jsonc` **vars**, not secrets — set in
+the repo, not run through `wrangler secret put`:
+
+```
+PIPELINE_ROUND_KIND    "opinion" (default) deals five hot takes resolved by the players' majority; "market" restores the exchange round. A wrangler.jsonc var, not a secret.
+SITE_URL               the site's origin, for the crowd question's source link; defaults to https://outseen-site.etaheri.workers.dev.
+```
+
 **Question resolution pushes:** Each question now pushes its players the moment it resolves (yes/no). One push per player per question, composed from the `resolve` copy pool. The claim is idempotent — a single `UPDATE predictions SET resolve_pushed_at = now() WHERE resolve_pushed_at IS NULL AND points IS NOT NULL RETURNING` — so the hourly re-dispatch never double-sends. Admin resolves, withdrawals, and voids never trigger push. The settle-time hinge push (published round announcement) is unchanged. `GET /v1/me/ledger` now also returns `reading` — the player's latest locked-or-settled round with decided/total counts — which home uses for the IN PLAY line and the ledger CTA. Resolution pushes fire at whatever hour a question actually resolves, since exchange reads retry hourly and the model resolver every four hours until the void deadline — a late-verifiable question can push overnight. A quiet-hours delivery window is a follow-up, not yet implemented.
 
 `PIPELINE_ENABLED` is armed in §2.3, before the manual deal — the admin
@@ -425,6 +433,21 @@ submitted to review:**
 - A swipe abandoned **short** of the threshold springs the card back and seals
   nothing.
 - A tap on a tray tile places the double and that tile reads `DOUBLED`.
+
+### 4.7 Build 12 — hot takes
+
+App Store subtitle (set in App Store Connect; not in the repo):
+`Three AIs try to predict what you think. Five hot takes a day.`
+
+Rollout order (design 2026-09-22 §13, steps 2–4):
+
+1. Deploy the API with `PIPELINE_ROUND_KIND=opinion`.
+2. `POST /admin/rounds/<date>/author?kind=opinion`, read the Telegram draft,
+   `/reroll <slot>` anything flat.
+3. `POST /admin/rounds/<date>/forecast` (the Council) before noon.
+4. `POST /admin/rounds/<date>/publish` at noon.
+5. Build 12 to TestFlight and App Review the same day. Build 11 is the
+   fallback.
 
 ---
 
