@@ -444,7 +444,7 @@ Rollout order (design 2026-09-22 §13, steps 2–4):
 1. Deploy the API with `PIPELINE_ROUND_KIND=opinion`.
 2. `POST /admin/rounds/<date>/author?kind=opinion`, read the Telegram draft,
    `/reroll <slot>` anything flat.
-3. `POST /admin/rounds/<date>/forecast` (the Council) before noon.
+3. `POST /admin/rounds/<date>/council` before noon.
 4. `POST /admin/rounds/<date>/publish` at noon.
 5. Build 12 to TestFlight and App Review the same day. Build 11 is the
    fallback.

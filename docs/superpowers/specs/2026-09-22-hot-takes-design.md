@@ -239,3 +239,4 @@ The 7 PM lock, the crowd floor of 20, the Oracle's remark on the reveal, removal
 - `CROWD_RESOLVE_MIN`, `PIPELINE_ROUND_KIND`, `SITE_URL` and the two void lines are where §4.2, §6.1 and §10 put them.
 - The intro's reading-register lint no longer requires the word "stake" in `INTRO_LINES`; it requires "seal" and "room" instead. The spec's intro lines are verbatim and do not say stake; the rules' fourth claim still does.
 - The standings footnote says "the players" where §7 says "the crowd", because `crowd` is a retired word on every player-facing surface.
+- §13 step 2's "`/council`" is the admin route `POST /admin/rounds/<date>/council`; `/forecast` remains the version 2 single-model stamp and is not part of this rollout.
