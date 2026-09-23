@@ -6,6 +6,7 @@ import { makeClaudeClient } from "./pipeline/claude";
 import { recordUsage } from "./pipeline/usage";
 import { etNow } from "./pipeline/clock";
 import { bindingStarter, inlineStarter, type WorkflowInstanceBinding } from "./pipeline/workflows";
+import { parseRoundKind, parseSiteUrl } from "./pipeline/round-kind";
 
 // Cloudflare requires Workflow classes to be exported from the Worker's main
 // module, which is why this re-export lives here rather than the classes being
@@ -31,6 +32,10 @@ export interface WorkerEnv {
   PIPELINE_COUNCIL_OPUS_MODEL?: string;
   PIPELINE_COUNCIL_HAIKU_MODEL?: string;
   PIPELINE_LESSON_MODEL?: string;
+  // "opinion" (default) or "market" (design 2026-09-22 T3).
+  PIPELINE_ROUND_KIND?: string;
+  // The site's origin, for the crowd question's source link (§4.2).
+  SITE_URL?: string;
   EXA_API_KEY?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   APPLE_BUNDLE_ID?: string;
@@ -93,6 +98,8 @@ export function buildPipelineDeps(env: WorkerEnv): PipelineDeps | undefined {
       haiku: env.PIPELINE_COUNCIL_HAIKU_MODEL,
       lesson: env.PIPELINE_LESSON_MODEL,
     },
+    roundKind: parseRoundKind(env.PIPELINE_ROUND_KIND),
+    siteUrl: parseSiteUrl(env.SITE_URL),
   };
 }
 

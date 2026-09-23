@@ -1,18 +1,10 @@
-import { odds } from "@oracle/core";
-import { formatFortune } from "./fortuneText";
-
-// The card's money text (design 2026-09-14 §5.1). Money, never a percent:
-// the flat stake and what it wins on each side. Machine register throughout.
+// The card's estimate text (design 2026-09-22 §9). Before the seal the card
+// shows nothing about the room; after it, the side and what the Oracle
+// expected. Money moved to the tray, where the double decision needs it.
+// Machine register throughout.
 export function lineLabel(line: number | null): string | null {
   if (line === null) return null;
-  return `THE ORACLE'S LINE · ${Math.round(line * 100)}% YES`;
-}
-
-// One side's stake and winnings. The Big One names itself, because its
-// stake is the one that is already doubled before the player's double.
-export function sideLine(_answer: boolean, stake: number, wins: number, isBigOne: boolean): string {
-  const body = `STAKE ${formatFortune(stake)} · WINS ${formatFortune(wins)}`;
-  return isBigOne ? `THE BIG ONE · ${body}` : body;
+  return `THE ORACLE EXPECTED ${Math.round(line * 100)}% YES`;
 }
 
 // How a side is taken, in one line. Two ways in, so two lines: the swipe is
@@ -30,24 +22,19 @@ export function sealHint(reducedMotion: boolean): string {
 }
 
 // The receipt under the stage. An unstaked round (no line committed, design
-// §5.5) has only the side to say.
-export function receiptLine(input: { answer: boolean; stake: number | null; wins: number | null; doubled?: boolean }): string {
+// 2026-09-10 §5.5) has only the side to say.
+export function receiptLine(input: { answer: boolean; line: number | null; doubled?: boolean }): string {
   const side = input.answer ? "YES" : "NO";
-  if (input.stake === null || input.wins === null) return side;
-  const body = `${side} · STAKED ${formatFortune(input.stake)} · WINS ${formatFortune(input.wins)}`;
+  const label = lineLabel(input.line);
+  if (label === null) return side;
+  const body = `${side} · ${label}`;
   return input.doubled ? `${body} · DOUBLED` : body;
 }
 
-// The round screen's line per sealed call (design §5.3, last paragraph): once
-// the double is placed the finale must show it, so a staked call prints its
-// whole receipt -- side, stake, winnings, and DOUBLED when it carries the
-// double. The stake here is the server's frozen one, ALREADY doubled on the
-// doubled call, so the winnings price off it directly and need no second
-// multiplication. An unstaked round (no line committed, §5.5) has no money to
-// print and keeps saying only whose side it is.
-export function crowdCallLine(input: { answer: boolean; stake: number | null; line: number | null; doubled: boolean }): string {
-  const side = input.answer ? "YES" : "NO";
-  if (input.stake === null || input.line === null) return `YOU: ${side}`;
-  const wins = Math.round(input.stake * odds(input.answer, input.line));
-  return receiptLine({ answer: input.answer, stake: input.stake, wins, doubled: input.doubled });
+// The round screen's line per sealed call (design 2026-09-22 §9.2): the side,
+// the estimate the player played against, and DOUBLED when it carries the
+// double. An unstaked round keeps saying only whose side it is.
+export function crowdCallLine(input: { answer: boolean; line: number | null; doubled: boolean }): string {
+  if (input.line === null) return `YOU: ${input.answer ? "YES" : "NO"}`;
+  return receiptLine({ answer: input.answer, line: input.line, doubled: input.doubled });
 }

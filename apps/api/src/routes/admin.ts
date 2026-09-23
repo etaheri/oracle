@@ -11,6 +11,7 @@ import { stampOracleForecast } from "../pipeline/forecast";
 import { commitLine } from "../pipeline/line";
 import { makeTelegramClient } from "../pipeline/telegram";
 import { runTick } from "../pipeline";
+import { roundKindOf } from "../pipeline/round-kind";
 import type { WorkflowInstanceBinding } from "../pipeline/workflows";
 
 const ResolveSchema = z.object({ outcome: z.enum(["yes", "no", "void"]), evidence: z.unknown().optional(), force: z.boolean().optional() });
@@ -135,8 +136,8 @@ export const adminRoutes = new Hono<AppContext>()
     // default stays 1 so nothing already posting drafts shifts underneath
     // itself; v2 is opt-in, and brings the full-window rule with it.
     const rv = c.req.query("rules_version");
-    if (rv !== undefined && rv !== "1" && rv !== "2") return c.json({ error: "rules_version must be 1 or 2" }, 400);
-    const rulesVersion = rv === "2" ? 2 : 1;
+    if (rv !== undefined && rv !== "1" && rv !== "2" && rv !== "3") return c.json({ error: "rules_version must be 1, 2, or 3" }, 400);
+    const rulesVersion = rv === "3" ? 3 : rv === "2" ? 2 : 1;
     try {
       await upsertDraft(c.get("deps").db, c.req.param("date"), parsed.data, rulesVersion);
       return c.json({ ok: true });
@@ -149,8 +150,15 @@ export const adminRoutes = new Hono<AppContext>()
         "new rounds require the full common answering window",
         FAST_ROUND_ERRORS.pastVoidDeadline,
         FAST_ROUND_ERRORS.slowNotBigOne,
+        "a crowd question needs rules version 3",
+        "every version 3 question names its market",
+        "a crowd question closes at the lock",
       ]);
-      if (BAD_DRAFT.has(msg)) return c.json({ error: msg }, 400);
+      // A per-slot version 3 error carries a "slot N: " prefix the allowlist
+      // above doesn't — match the reason underneath it too, so a hand-posted
+      // crowd draft's mistakes come back as 400s and not an opaque 500.
+      const reason = msg.replace(/^slot \d+: /, "");
+      if (BAD_DRAFT.has(msg) || BAD_DRAFT.has(reason)) return c.json({ error: msg }, 400);
       return c.json({ error: "upsert failed" }, 500);
     }
   })
@@ -193,9 +201,13 @@ export const adminRoutes = new Hono<AppContext>()
     const pipeline = c.get("deps").pipeline;
     if (!pipeline) return c.json({ error: "pipeline not configured" }, 503);
     const date = c.req.param("date");
+    // A one-off kind (design 2026-09-22 §8): ?kind=opinion or ?kind=market
+    // wins over PIPELINE_ROUND_KIND for this dispatch only.
+    const kind = c.req.query("kind");
+    if (kind !== undefined && kind !== "opinion" && kind !== "market") return c.json({ error: "unknown round kind" }, 400);
     const existing = await c.get("deps").db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
     if (existing) return c.json({ error: "round already exists" }, 409);
-    await pipeline.workflows.start(pipeline, "author", `author-${date}-manual-${Date.now()}`, { date });
+    await pipeline.workflows.start(pipeline, "author", `author-${date}-manual-${Date.now()}`, { date, roundKind: kind ?? roundKindOf(pipeline) });
     return c.json({ ok: true, date });
   })
   // Stamp the Oracle's forecast for a date, by hand.

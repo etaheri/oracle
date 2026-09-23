@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { validDraft } from "./helpers/draft";
-import { upsertDraft } from "../src/pipeline/draft";
+import { upsertDraft, CROWD_RESOLUTION_CRITERIA, RESOLVES_AFTER_LOCK } from "../src/pipeline/draft";
 import type { PipelineDeps } from "../src/pipeline";
 import * as schema from "../src/db/schema";
 import { inlineStarter } from "../src/pipeline/workflows";
@@ -322,16 +322,33 @@ describe("POST /admin/rounds/:date/author", () => {
 
   it("dispatches authoring for the named date", async () => {
     const { db } = await makeTestDb();
-    const started: { kind: string; date: string }[] = [];
+    const started: { kind: string; date: string; roundKind?: string }[] = [];
     const pipeline = {
       ...fakePipeline(db, "2026-09-09T14:00:00Z"),
-      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string }) => { started.push({ kind, date: params.date }); } },
+      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string; roundKind?: string }) => { started.push({ kind, ...params }); } },
     } as unknown as PipelineDeps;
     const app = createApp({ db, env, pipeline });
     const res = await admin(app)("/admin/rounds/2026-09-09/author", { method: "POST" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, date: "2026-09-09" });
-    expect(started).toEqual([{ kind: "author", date: "2026-09-09" }]);
+    expect(started).toEqual([{ kind: "author", date: "2026-09-09", roundKind: "market" }]);
+  });
+
+  it("passes ?kind= through to the workflow, and refuses a kind it does not know", async () => {
+    const { db } = await makeTestDb();
+    const started: { kind: string; date: string; roundKind?: string }[] = [];
+    const pipeline = {
+      ...fakePipeline(db, "2026-09-09T14:00:00Z"),
+      workflows: { start: async (_d: unknown, kind: string, _id: string, params: { date: string; roundKind?: string }) => { started.push({ kind, ...params }); } },
+    } as unknown as PipelineDeps;
+    const app = createApp({ db, env, pipeline });
+    expect((await admin(app)("/admin/rounds/2026-09-23/author?kind=opinion", { method: "POST" })).status).toBe(200);
+    expect(started).toEqual([{ kind: "author", date: "2026-09-23", roundKind: "opinion" }]);
+    expect((await admin(app)("/admin/rounds/2026-09-24/author?kind=market", { method: "POST" })).status).toBe(200);
+    expect(started[1]).toEqual({ kind: "author", date: "2026-09-24", roundKind: "market" });
+    const bad = await admin(app)("/admin/rounds/2026-09-25/author?kind=nonsense", { method: "POST" });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ error: "unknown round kind" });
   });
 
   it("POST /rounds/:date/author deals a version 3 round from the injected exchanges", async () => {
@@ -374,12 +391,56 @@ describe("POST /admin/rounds/:date?rules_version=2", () => {
     expect(round?.rulesVersion).toBe(2);
   });
 
-  it("rejects a rules_version that is neither 1 nor 2", async () => {
+  it("rejects a rules_version that is neither 1, 2, nor 3", async () => {
     const { db } = await makeTestDb();
     const app = createApp({ db, env });
     const res = await admin(app)("/admin/rounds/2026-09-09?rules_version=7", { method: "POST", body: JSON.stringify(validDraft) });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "rules_version must be 1 or 2" });
+    expect(await res.json()).toEqual({ error: "rules_version must be 1, 2, or 3" });
+  });
+});
+
+describe("POST /admin/rounds/:date?rules_version=3 (crowd)", () => {
+  // Spec §8: this route is how a crowd round gets seeded by hand, and §13
+  // step 1 relies on it. upsertDraft already enforces that a version 3
+  // question names its market; this route only needed to let a crowd draft
+  // (rules_version 3) through and turn its rejections into 400s instead of
+  // an opaque 500.
+  const lock = noonET(addDays("2026-09-23", 1));
+  function crowdDraft(closesAt: (slot: number) => string = () => lock.toISOString(), categories = ["markets", "sports", "weather", "culture", "news"] as const) {
+    return {
+      questions: validDraft.questions.map((q) => ({
+        ...q,
+        category: categories[q.slot - 1],
+        resolution_criteria: CROWD_RESOLUTION_CRITERIA,
+        source_name: "THE PLAYERS",
+        source_url: "https://outseen-site.etaheri.workers.dev/play",
+        author_probability: 0.5,
+        market_prob: null,
+        resolves_at: RESOLVES_AFTER_LOCK,
+        market: { source: "crowd" as const, id: "2026-09-23", event_key: String(q.slot), closes_at: closesAt(q.slot) },
+      })),
+    };
+  }
+
+  it("seeds five market_source = 'crowd' rows at rules_version 3", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-23?rules_version=3", { method: "POST", body: JSON.stringify(crowdDraft()) });
+    expect(res.status).toBe(200);
+    const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, "2026-09-23") });
+    expect(round?.rulesVersion).toBe(3);
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-09-23") });
+    expect(qs.length).toBe(5);
+    expect(qs.every((q) => q.marketSource === "crowd")).toBe(true);
+  });
+
+  it("400s the same crowd draft posted at rules_version 2, naming the reason", async () => {
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const res = await admin(app)("/admin/rounds/2026-09-23?rules_version=2", { method: "POST", body: JSON.stringify(crowdDraft()) });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "a crowd question needs rules version 3" });
   });
 });
 

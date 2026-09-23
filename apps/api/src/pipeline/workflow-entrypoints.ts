@@ -26,16 +26,18 @@ import { POLICY, type StepPolicy } from "./steps";
 import { BudgetExhausted, meterClaude, reportBudgetExhaustion } from "./spend";
 import { etNow } from "./clock";
 import { buildMarketDraft, commitMarketDraft, fetchCandidates, narrateMarketRound, tooFewReason } from "./market-round";
+import { buildOpinionDraft, commitOpinionDraft, narrateOpinionRound, opinionResult } from "./opinion-round";
 import { SELECT } from "./exchanges/select";
 import { resolveOne, narrateResolution, type ResolveOutcome } from "./resolve";
-import { councilEditable, narrateCouncil, type CouncilRun } from "./council";
+import { councilEditable, isCrowdRound, narrateCouncil, type CouncilRun } from "./council";
 import { retrieveEvidence } from "./council/evidence";
 import { commitMember, type MemberResult } from "./council/member";
 import { commitCouncil } from "./council/commit";
 import { writeLessons } from "./council/lessons";
+import { roundKindOf, type RoundKind } from "./round-kind";
+import type { MarketCandidate } from "./exchanges/types";
 import type { PipelineDeps } from "./index";
-
-interface Params { date: string; questionIds?: string[] }
+import type { WorkflowParams } from "./workflows";
 
 // A Workflow instance builds its own deps from env — it is on the far side of
 // the dispatch and shares nothing with the tick that started it. The spend
@@ -109,32 +111,45 @@ export async function durableStep<T extends Rpc.Serializable<T>>(
   });
 }
 
-export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
-  async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
+export class AuthoringWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowParams> {
+  async run(event: Readonly<WorkflowEvent<WorkflowParams>>, step: WorkflowStep) {
     const deps = metered(this.env);
     if (!deps) return;
     const { date } = event.payload;
+    // The kind on the payload wins (an admin one-off); otherwise the
+    // deployment's PIPELINE_ROUND_KIND (design 2026-09-22 T3).
+    const kind: RoundKind = event.payload.roundKind ?? roundKindOf(deps);
     const editable = await durableStep(step, "editable", POLICY.db, deps, async () => {
       const r = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, date) });
       return !(r && (r.status !== "scheduled" || r.oracleCommittedAt !== null));
     });
     if (!editable) return;
-    const { fetched, candidates } = await durableStep(step, "candidates", POLICY.sourceFetch, deps, () => fetchCandidates(deps, date));
+    // An opinion round has no candidates: the step returns an empty pool
+    // without touching an exchange (§4).
+    const { fetched, candidates } = await durableStep(step, "candidates", POLICY.sourceFetch, deps, () =>
+      kind === "opinion" ? Promise.resolve({ fetched: 0, candidates: [] as MarketCandidate[] }) : fetchCandidates(deps, date));
     const built = await durableStep(step, "draft", POLICY.model, deps, async () => {
+      if (kind === "opinion") return buildOpinionDraft(deps, date);
       if (candidates.length < SELECT.ROUND_SIZE) return { draft: null, reason: tooFewReason(candidates.length) };
       return buildMarketDraft(deps, date, candidates);
     });
     const result = await durableStep(step, "commit", POLICY.db, deps, async () => {
-      if (!built.draft) return { published: false, fetched, eligible: candidates.length, reason: built.reason };
-      await commitMarketDraft(deps, date, built.draft);
-      return { published: true, fetched, eligible: candidates.length, reason: null };
+      // Each kind's own wrapper, though both do the same upsertDraft at
+      // version 3 underneath -- dispatching by name here rather than always
+      // through commitMarketDraft keeps the opinion path readable as its own
+      // thing at the one call site that commits it.
+      if (built.draft) await (kind === "opinion" ? commitOpinionDraft(deps, date, built.draft) : commitMarketDraft(deps, date, built.draft));
+      return { published: built.draft !== null, fetched, eligible: candidates.length, reason: built.reason };
     });
-    await durableStep(step, "narrate", POLICY.narrate, deps, () => narrateMarketRound(deps, date, result));
+    await durableStep(step, "narrate", POLICY.narrate, deps, () =>
+      kind === "opinion"
+        ? narrateOpinionRound(deps, date, opinionResult(built.draft, built.reason))
+        : narrateMarketRound(deps, date, result));
   }
 }
 
-export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
-  async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
+export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowParams> {
+  async run(event: Readonly<WorkflowEvent<WorkflowParams>>, step: WorkflowStep) {
     const deps = metered(this.env);
     if (!deps) return;
     const { date, questionIds = [] } = event.payload;
@@ -165,14 +180,15 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
   }
 }
 
-export class CouncilWorkflow extends WorkflowEntrypoint<WorkerEnv, Params> {
-  async run(event: Readonly<WorkflowEvent<Params>>, step: WorkflowStep) {
+export class CouncilWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowParams> {
+  async run(event: Readonly<WorkflowEvent<WorkflowParams>>, step: WorkflowStep) {
     const deps = metered(this.env);
     if (!deps) return;
     const { date } = event.payload;
     const editable = await durableStep(step, "editable", POLICY.db, deps, () => councilEditable(deps, date));
     if (!editable) return { committed: false, reason: "not editable" };
-    const evidence = await durableStep(step, "evidence", POLICY.sourceFetch, deps, () => retrieveEvidence(deps, date));
+    const crowd = await durableStep(step, "crowd", POLICY.db, deps, () => isCrowdRound(deps, date));
+    const evidence = crowd ? null : await durableStep(step, "evidence", POLICY.sourceFetch, deps, () => retrieveEvidence(deps, date));
     // One step per member (design 2026-09-11 §4.2): a timeout in one cannot
     // lose the others, and a retry of the commit step never re-asks a model.
     const members: MemberResult[] = [];

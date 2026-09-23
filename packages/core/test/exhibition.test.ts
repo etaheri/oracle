@@ -11,6 +11,7 @@ const exhibition = (overrides: Partial<Exhibition> = {}): Exhibition => ({
   oraclePYes: 0.7,
   outcome: "yes",
   linePYes: null,
+  crowdYesPct: null,
   ...overrides,
 });
 
@@ -19,6 +20,14 @@ describe("ExhibitionSchema", () => {
     expect(ExhibitionSchema.parse(exhibition({ oraclePYes: 0 })).oraclePYes).toBe(0);
     expect(ExhibitionSchema.parse(exhibition({ oraclePYes: 1 })).oraclePYes).toBe(1);
     expect(ExhibitionSchema.safeParse(exhibition({ context: "" })).success).toBe(false);
+  });
+
+  it("accepts a null context and a crowd share, defaulting both when absent", () => {
+    const parsed = ExhibitionSchema.parse({ id: "x", kind: "historical", question: "Is it?", context: null, sourceName: "THE PLAYERS", roundDate: "2026-09-23", oraclePYes: 0.38, outcome: "yes", crowdYesPct: 62 });
+    expect(parsed.context).toBeNull();
+    expect(parsed.crowdYesPct).toBe(62);
+    const legacy = ExhibitionSchema.parse({ id: "y", kind: "fictional", question: "Is it?", context: "7 blue, 3 amber.", sourceName: "F", roundDate: null, oraclePYes: 0.7, outcome: "yes" });
+    expect(legacy.crowdYesPct).toBeNull();
   });
 });
 

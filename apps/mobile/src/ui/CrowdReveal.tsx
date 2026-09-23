@@ -107,7 +107,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
                   <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
                     {!gathering && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "left" }]}>{c!.crowd_yes_pct}% SAY YES</Mono>}
                     <Mono {...role.caption} color={against ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
-                      {crowdCallLine({ answer: mine.answer, stake: mine.stake, line: q.line_p_yes, doubled: mine.doubled })}{against ? " · AGAINST THE TIDE" : ""}
+                      {crowdCallLine({ answer: mine.answer, line: q.line_p_yes, doubled: mine.doubled })}{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>
                   </View>
                   {movement && (

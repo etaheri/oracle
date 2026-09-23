@@ -13,10 +13,10 @@ describe("practice on the practice fortune (design §8.3)", () => {
     expect(r.stake).toBe(50);
     expect(r.wins).toBe(21);
     expect(r.delta).toBe(21);
-    expect(r.receipt).toBe("YES · STAKED 50 · WINS 21");
+    expect(r.receipt).toBe("YES · THE ORACLE EXPECTED 70% YES");
     expect(r.verdict).toBe("You took the Oracle for 21.");
     expect(r.counterfactual).toBe("Had it gone NO, the same call would have lost 50.");
-    expect(r.oracleLine).toBe("THE ORACLE'S LINE · 70% YES");
+    expect(r.oracleLine).toBe("THE ORACLE EXPECTED 70% YES");
   });
   it("loses the stake on a wrong call", () => {
     const r = practiceResult({ answer: false }, ex);
@@ -28,5 +28,11 @@ describe("practice on the practice fortune (design §8.3)", () => {
   it("derives a line when the fixture has none", () => {
     const r = practiceResult({ answer: true }, { ...ex, linePYes: null });
     expect(r.line).toBe(0.7);
+  });
+
+  it("reads the room's result on a past hot take, and the plain outcome otherwise", () => {
+    expect(practiceResult({ answer: true }, ex).roomLine).toBe("Actual outcome: YES.");
+    expect(practiceResult({ answer: true }, { ...ex, kind: "historical", roundDate: "2026-09-23", crowdYesPct: 62 }).roomLine).toBe("The room said YES, 62%.");
+    expect(practiceResult({ answer: true }, { ...ex, outcome: "no", crowdYesPct: 31 }).roomLine).toBe("The room said NO, 69%.");
   });
 });

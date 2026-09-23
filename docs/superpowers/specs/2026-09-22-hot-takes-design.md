@@ -230,3 +230,15 @@ No new events. `question_answered` keeps `line`; it now records the hidden estim
 ## 14. Out of scope
 
 The 7 PM lock, the crowd floor of 20, the Oracle's remark on the reveal, removal of fortune, rate-based boards, calendar-sourced forecast questions, machine cards, the inspector reskin. All recorded in the audit and the one-pager for October.
+
+## 15. As built (September 22)
+
+- The "Timing and fairness" rite's market sentence was replaced with "Results land at the next noon, when the round locks." §9.4 said the rest was unchanged; that sentence would have been false.
+- `/reroll` on a crowd slot goes through the voice model with the opinion rules (`rerollOpinionSlot`), not the author, since §13 step 2 asks for it and the author prompt researches a source.
+- Practice (T10) needed one change after all: `selectExhibition` required a context block, which an opinion never has. A crowd question is offered without one, and carries the room's share for the result line.
+- `CROWD_RESOLVE_MIN`, `PIPELINE_ROUND_KIND`, `SITE_URL` and the two void lines are where §4.2, §6.1 and §10 put them.
+- The intro's reading-register lint no longer requires the word "stake" in `INTRO_LINES`; it requires "seal" and "room" instead. The spec's intro lines are verbatim and do not say stake; the rules' fourth claim still does.
+- The standings footnote says "the players" where §7 says "the crowd", because `crowd` is a retired word on every player-facing surface.
+- §13 step 2's "`/council`" is the admin route `POST /admin/rounds/<date>/council`; `/forecast` remains the version 2 single-model stamp and is not part of this rollout.
+- `PIPELINE_ROUND_KIND=market` on build 12 reads with the room-reading strings and drops the market price from the reveal, so the switch is one-way for the app this week.
+- With `CROWD_RESOLVE_MIN = 1` a lone player is 100% of the room and wins every card; two players either agree or tie to a void. Expected in the first days, not a bug — the floor rises to 20.

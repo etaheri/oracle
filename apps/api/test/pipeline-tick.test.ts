@@ -290,6 +290,27 @@ describe("runTick", () => {
     expect(rows.filter((r) => r.usedOn === "2026-08-27").length).toBe(5); // bounded, not all 7
     expect(sent.filter((t) => t.includes("failed validation and was skipped")).length).toBe(5);
   });
+
+  it("authors tomorrow through the opinion round when the deps say so (design 2026-09-22 T3)", async () => {
+    const { db } = await makeTestDb();
+    const { deps, sent } = fakeDeps(db, "2026-09-22T21:05:00Z"); // 17:05 ET
+    const calls: string[] = [];
+    deps.roundKind = "opinion";
+    deps.claude = {
+      async structured(call) {
+        calls.push(call.schemaName);
+        if (call.schemaName === "opinion_round") return { questions: (["markets", "sports", "weather", "culture", "news"] as const).map((category, i) => ({ slot: i + 1, category, text: `Is take ${i + 1} the right one?` })) };
+        return { verdicts: [0, 1, 2, 3, 4].map((index) => ({ index, allowed: true, reason: "" })) };
+      },
+    };
+    const done = await runTick(deps);
+    expect(done).toContain("author:2026-09-23");
+    expect(calls).toEqual(["opinion_round", "taste_verdicts"]);
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, "2026-09-23") });
+    expect(qs.length).toBe(5);
+    expect(qs.every((q) => q.marketSource === "crowd")).toBe(true);
+    expect(sent.some((t) => t.includes("opinion round authored"))).toBe(true);
+  });
 });
 
 describe("voidQuestions", () => {

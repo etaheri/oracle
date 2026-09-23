@@ -23,9 +23,16 @@ export async function councilEditable(deps: PipelineDeps, date: string): Promise
   return !!r && r.status === "scheduled" && r.oracleCommittedAt === null && r.rulesVersion >= 3;
 }
 
+/** True when the round's five questions are all the players' own (design 2026-09-22 §5). */
+export async function isCrowdRound(deps: PipelineDeps, date: string): Promise<boolean> {
+  const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date), columns: { marketSource: true } });
+  return qs.length === 5 && qs.every((q) => q.marketSource === "crowd");
+}
+
 export async function runCouncil(deps: PipelineDeps, date: string): Promise<CouncilRun> {
   if (!(await councilEditable(deps, date))) return { editable: false, evidence: null, members: [], commit: null };
-  const evidence = await retrieveEvidence(deps, date);
+  // No evidence on a crowd round: an opinion has nothing to look up (§5).
+  const evidence = (await isCrowdRound(deps, date)) ? null : await retrieveEvidence(deps, date);
   const members: MemberResult[] = [];
   for (const m of MODEL_MEMBER_IDS) members.push(await commitMember(deps, date, m));
   const commit = await commitCouncil(deps, date, members);
@@ -38,7 +45,8 @@ const pct = (p: number) => String(Math.round(p * 100));
 
 export async function narrateCouncil(deps: PipelineDeps, date: string, run: CouncilRun): Promise<void> {
   if (!run.editable || !run.commit) return;
-  const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date), orderBy: (q, { asc }) => [asc(q.slot)], columns: { id: true, slot: true, marketProb: true, linePYes: true } });
+  const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date), orderBy: (q, { asc }) => [asc(q.slot)], columns: { id: true, slot: true, marketProb: true, linePYes: true, marketSource: true } });
+  const crowd = qs.length === 5 && qs.every((q) => q.marketSource === "crowd");
   // "already committed" carries slots: [] (commitCouncil never computed the
   // medians for a round already staked), so the member/median form below
   // would read "no median" on every slot under a head that already says the
@@ -53,10 +61,10 @@ export async function narrateCouncil(deps: PipelineDeps, date: string, run: Coun
       const l = run.members.find((r) => r.member === m)?.lines.find((x) => x.questionId === q.id);
       return `${m} ${l ? pct(l.pYes) : "—"}`;
     });
-    parts.push(`market ${q.marketProb === null ? "—" : pct(Number(q.marketProb))}`);
+    if (!crowd) parts.push(`market ${q.marketProb === null ? "—" : pct(Number(q.marketProb))}`);
     const items = run.evidence?.packs.find((p) => p.questionId === q.id)?.count ?? 0;
     const tail = s?.median === null || s === undefined ? "no median" : `median ${pct(s.median)}, line ${q.linePYes === null ? "—" : pct(Number(q.linePYes))}`;
-    return `slot ${q.slot}: ${parts.join(" · ")} → ${tail} (${items} item${items === 1 ? "" : "s"})`;
+    return `slot ${q.slot}: ${parts.join(" · ")} → ${tail}${crowd ? "" : ` (${items} item${items === 1 ? "" : "s"})`}`;
   });
   const abstentions = run.members.filter((m) => m.abstained.length > 0).map((m) => `${m.member} abstained${m.error ? ` (${m.error})` : ""} on ${m.abstained.length === 5 ? "every slot" : `slot${m.abstained.length === 1 ? "" : "s"} ${m.abstained.join(", ")}`}`);
   const packErrors = (run.evidence?.packs ?? []).filter((p) => p.error).map((p) => `slot ${p.slot}: ${p.error}`);
@@ -69,6 +77,6 @@ export async function narrateCouncil(deps: PipelineDeps, date: string, run: Coun
     : run.commit.reason === "already committed"
       ? `council ${date}: already committed; nothing written`
       : `‼️ council ${date}: no line — ${run.commit.reason}; the round opens unstaked`;
-  const body = [head, ...slotLines, ...abstentions, ...(packErrors.length ? [`evidence: ${packErrors.join(" · ")}`] : []), cost].join("\n");
+  const body = [head, ...slotLines, ...abstentions, ...(packErrors.length ? [`evidence: ${packErrors.join(" · ")}`] : []), ...(crowd ? [] : [cost])].join("\n");
   await deps.telegram.send(body);
 }

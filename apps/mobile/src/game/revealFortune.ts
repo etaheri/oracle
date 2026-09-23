@@ -36,7 +36,7 @@ export function fortuneHeadline(d: Reveal): FortuneHeadline {
 export function stakeReceipt(q: Question): string | null {
   if (!q.my) return null;
   const side = q.my.answer ? "YES" : "NO";
-  if (q.my.stake === null) return receiptLine({ answer: q.my.answer, stake: null, wins: null });
+  if (q.my.stake === null) return receiptLine({ answer: q.my.answer, line: null });
   const head = `${side} · STAKED ${formatFortune(q.my.stake)}`;
   // The double is the call's own news, so it rides the receipt in every
   // state -- pending included, where it is the only place the player can
@@ -68,18 +68,19 @@ export function doubleObservation(qs: ReadonlyArray<Question>): string | null {
   return d.my.delta > 0 ? "YOUR DOUBLE PAID" : "YOUR DOUBLE WAS WRONG";
 }
 
-// The Oracle comparison, as who took whom (design §8.3).
+// With or against the room (design 2026-09-22 §9.3): the side of the
+// majority, and the money it moved.
 export function oracleTake(q: Question): string | null {
   if (!q.my || q.my.delta === null || q.outcome === null || q.outcome === "void") return null;
-  if (q.my.delta > 0) return `YOU TOOK THE ORACLE FOR ${formatFortune(q.my.delta)}`;
-  if (q.my.delta < 0) return `THE ORACLE TOOK ${formatFortune(-q.my.delta)}`;
+  if (q.my.delta > 0) return `YOU WERE WITH THE ROOM · ${signedFortune(q.my.delta)}`;
+  if (q.my.delta < 0) return `YOU WERE AGAINST THE ROOM · ${signedFortune(q.my.delta)}`;
   return null;
 }
 
 export function lineContext(q: Question): string | null {
   if (q.line_p_yes === null) return null;
-  const line = `THE LINE ${Math.round(q.line_p_yes * 100)}% YES`;
-  return q.market_prob === null ? line : `${line} · THE MARKET ${Math.round(q.market_prob * 100)}%`;
+  const expected = `THE ORACLE EXPECTED ${Math.round(q.line_p_yes * 100)}% YES`;
+  return q.crowd_yes_pct === null ? expected : `${expected} · THE ROOM SAID ${Math.round(q.crowd_yes_pct)}%`;
 }
 
 export function fortuneRowRight(q: Question): string {

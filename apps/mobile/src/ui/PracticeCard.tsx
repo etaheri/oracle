@@ -46,7 +46,7 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
         know — what this is, and that it is free to get wrong. */}
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>
       {exhibition.kind === "historical"
-        ? "A real question from a past round, with its context as it stood. You play it on a practice fortune of 1,000; nothing here touches your record."
+        ? "A hot take from a past round. You play it on a practice fortune of 1,000; nothing here touches your record."
         : "A made-up example — no real draw occurred. You play it on a practice fortune of 1,000; nothing here touches your record."}
     </Mono>
     <CardStage>{height => <View>
@@ -62,7 +62,7 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
           const next = revealExhibition(flow); setFlow(next.flow); if (next.completedNow) onCompleted();
         }} />}
       </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} fortune={PRACTICE_FORTUNE} onSealed={() => {}}
-        practice={{ context: exhibition.context, stamp: "PRACTICE · UNRANKED", onSeal: (answer) => {
+        practice={{ context: exhibition.context ?? undefined, stamp: "PRACTICE · UNRANKED", onSeal: (answer) => {
           setFlow(current => sealExhibition(current, { answer }));
         } }} />}
     </View>}</CardStage>
@@ -77,14 +77,11 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
   </View>;
 }
 
-const call = (answer: boolean) => answer ? "YES" : "NO";
-
 function PracticeResult({ result, exhibition }: { result: ReturnType<typeof practiceResult>; exhibition: Exhibition }) {
-  const outcome = exhibition.outcome === "yes";
   const roundDate = exhibition.roundDate;
 
   return <>
-    <DecodeLine serif text={`Actual outcome: ${call(outcome)}.`} size={22} style={{ textAlign: "center", lineHeight: 32 }} />
+    <DecodeLine serif text={result.roomLine} size={22} style={{ textAlign: "center", lineHeight: 32 }} />
     <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>{exhibition.kind === "fictional" ? "FICTIONAL OUTCOME" : `PAST ROUND${roundDate ? ` · ${roundDate}` : ""}`}</Mono>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{result.oracleLine}</Mono>
     <View style={{ flexDirection: "row", justifyContent: "space-around", gap: space(2) }}>
@@ -94,6 +91,6 @@ function PracticeResult({ result, exhibition }: { result: ReturnType<typeof prac
     <Serif size={displayScale.lead} style={{ textAlign: "center", lineHeight: 28 }}>{result.verdict}</Serif>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{result.counterfactual}</Mono>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Practice fortune, nothing changed.</Mono>
-    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Next: a daily round against the Oracle's lines, with your real fortune.</Mono>
+    <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Next: five hot takes against the Oracle, with your real fortune.</Mono>
   </>;
 }

@@ -1,23 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { lineLabel, sideLine, receiptLine, crowdCallLine, sealHint, SWIPE_HINT, TAP_HINT } from "../src/game/stakeText";
+import { lineLabel, receiptLine, crowdCallLine, sealHint, SWIPE_HINT, TAP_HINT } from "../src/game/stakeText";
 
-describe("the card's money text (design §5.1)", () => {
-  it("prints the Oracle's line as a YES percentage, and nothing when there is no line", () => {
-    expect(lineLabel(0.35)).toBe("THE ORACLE'S LINE · 35% YES");
+describe("the card's estimate text (design 2026-09-22 §9)", () => {
+  it("prints what the Oracle expected as a YES percentage, and nothing when there is no line", () => {
+    expect(lineLabel(0.38)).toBe("THE ORACLE EXPECTED 38% YES");
     expect(lineLabel(null)).toBeNull();
   });
-  it("prints a side's stake and winnings, and names the Big One", () => {
-    expect(sideLine(true, 50, 93, false)).toBe("STAKE 50 · WINS 93");
-    expect(sideLine(false, 1240, 2303, false)).toBe("STAKE 1,240 · WINS 2,303");
-    expect(sideLine(true, 100, 186, true)).toBe("THE BIG ONE · STAKE 100 · WINS 186");
+  it("writes the receipt as the side and the estimate, marks the double, and says only the side without a line", () => {
+    expect(receiptLine({ answer: true, line: 0.38 })).toBe("YES · THE ORACLE EXPECTED 38% YES");
+    expect(receiptLine({ answer: true, line: 0.38, doubled: true })).toBe("YES · THE ORACLE EXPECTED 38% YES · DOUBLED");
+    expect(receiptLine({ answer: false, line: null })).toBe("NO");
   });
-  it("writes the receipt in money, marks the double, and says only the side on an unstaked round", () => {
-    expect(receiptLine({ answer: true, stake: 50, wins: 93 })).toBe("YES · STAKED 50 · WINS 93");
-    expect(receiptLine({ answer: true, stake: 100, wins: 186, doubled: true })).toBe("YES · STAKED 100 · WINS 186 · DOUBLED");
-    expect(receiptLine({ answer: false, stake: null, wins: null })).toBe("NO");
-  });
-  // The hint sits under the card at iPhone width; a trailing full stop tipped
-  // the swipe line onto a second row (assets/hand/hand-card.png).
   it("keeps both hints to one line by ending neither with a full stop", () => {
     expect(SWIPE_HINT.endsWith(".")).toBe(false);
     expect(TAP_HINT.endsWith(".")).toBe(false);
@@ -30,19 +23,12 @@ describe("the card's money text (design §5.1)", () => {
   });
 });
 
-describe("the round screen's line per sealed call (design §5.3)", () => {
-  // The line is 0.35, so YES pays 0.65/0.35 per unit staked and NO pays
-  // 0.35/0.65. The staked figures are the server's frozen ones.
-  it("prints the whole receipt for a staked call", () => {
-    expect(crowdCallLine({ answer: true, stake: 50, line: 0.35, doubled: false })).toBe("YES · STAKED 50 · WINS 93");
-    expect(crowdCallLine({ answer: false, stake: 50, line: 0.35, doubled: false })).toBe("NO · STAKED 50 · WINS 27");
+describe("the round screen's line per sealed call (design 2026-09-22 §9.2)", () => {
+  it("prints the side and the estimate, and the double", () => {
+    expect(crowdCallLine({ answer: true, line: 0.38, doubled: false })).toBe("YES · THE ORACLE EXPECTED 38% YES");
+    expect(crowdCallLine({ answer: false, line: 0.38, doubled: true })).toBe("NO · THE ORACLE EXPECTED 38% YES · DOUBLED");
   });
-  it("marks the call that took the double, pricing off the already-doubled stake", () => {
-    expect(crowdCallLine({ answer: true, stake: 100, line: 0.35, doubled: true })).toBe("YES · STAKED 100 · WINS 186 · DOUBLED");
-  });
-  it("says only whose side it is on an unstaked round, and when no line was committed", () => {
-    expect(crowdCallLine({ answer: true, stake: null, line: 0.35, doubled: false })).toBe("YOU: YES");
-    expect(crowdCallLine({ answer: false, stake: null, line: null, doubled: false })).toBe("YOU: NO");
-    expect(crowdCallLine({ answer: false, stake: 50, line: null, doubled: false })).toBe("YOU: NO");
+  it("says only whose side it is when no line was committed", () => {
+    expect(crowdCallLine({ answer: true, line: null, doubled: false })).toBe("YOU: YES");
   });
 });

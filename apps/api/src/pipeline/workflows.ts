@@ -28,8 +28,12 @@
 // rather than awaiting it.
 import type { ETNow } from "./clock";
 import type { PipelineDeps } from "./index";
+import type { RoundKind } from "./round-kind";
+import { roundKindOf } from "./round-kind";
 
 export type WorkflowKind = "author" | "resolve" | "council";
+
+export interface WorkflowParams { date: string; questionIds?: string[]; roundKind?: RoundKind }
 
 export interface WorkflowStarter {
   // deps is passed AT START TIME rather than captured at construction, so
@@ -40,7 +44,7 @@ export interface WorkflowStarter {
     deps: PipelineDeps,
     kind: WorkflowKind,
     id: string,
-    params: { date: string; questionIds?: string[] },
+    params: WorkflowParams,
   ): Promise<void>;
 }
 
@@ -60,7 +64,7 @@ export function hourBucket(now: ETNow): string {
 // What the STARTER needs: dispatch, nothing else. bindingStarter never reads
 // an instance back, which is why its tests can pass a one-method fake.
 export interface WorkflowBinding {
-  create(options: { id: string; params: { date: string; questionIds?: string[] } }): Promise<unknown>;
+  create(options: { id: string; params: WorkflowParams }): Promise<unknown>;
 }
 export interface WorkflowBindings {
   AUTHORING_WORKFLOW: WorkflowBinding;
@@ -120,8 +124,15 @@ export function inlineStarter(): WorkflowStarter {
   return {
     async start(deps, kind, _id, params) {
       if (kind === "author") {
-        const { runMarketRound } = await import("./market-round");
-        await runMarketRound(deps, params.date);
+        // The kind on the params wins (an admin one-off, design 2026-09-22
+        // §8); otherwise the deployment's own.
+        if ((params.roundKind ?? roundKindOf(deps)) === "opinion") {
+          const { runOpinionRound } = await import("./opinion-round");
+          await runOpinionRound(deps, params.date);
+        } else {
+          const { runMarketRound } = await import("./market-round");
+          await runMarketRound(deps, params.date);
+        }
       } else if (kind === "council") {
         const { runCouncil } = await import("./council");
         await runCouncil(deps, params.date);

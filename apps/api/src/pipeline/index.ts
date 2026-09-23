@@ -18,6 +18,7 @@ import type { TelegramClient } from "./telegram";
 import type { ClaudeClient } from "./claude";
 import type { ExchangeFeed } from "./exchanges/types";
 import type { PushEnv } from "../push/onesignal";
+import type { RoundKind } from "./round-kind";
 
 export interface PipelineDeps {
   db: Db;
@@ -57,6 +58,11 @@ export interface PipelineDeps {
   // Optional with defaults in council/members.ts, so every existing test's
   // models literal stays valid.
   councilModels?: { sonnet?: string; opus?: string; haiku?: string; lesson?: string };
+  // The round kind (design 2026-09-22 T3) and the site the crowd question
+  // points at (§4.2). Both optional with defaults in round-kind.ts, so every
+  // existing test's deps literal stays valid; worker.ts always sets them.
+  roundKind?: RoundKind;
+  siteUrl?: string;
 }
 
 function errorMessage(err: unknown): string {

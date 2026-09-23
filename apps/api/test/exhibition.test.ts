@@ -15,6 +15,11 @@ async function resolvedRound(db: TestDb, date: string, options: {
   oraclePYes?: number;
   questionText?: string;
   sourceName?: string;
+  // A crowd question carries no context, matching opinion-round.ts's
+  // pre-commit insert (draft.ts: `context: q.context ?? null`): the pipeline
+  // never writes a context for one and never mutates it after commit, since
+  // the guard trigger (0009) freezes context once a round is committed.
+  noContext?: boolean;
 } = {}) {
   const questions = await seedRound(db, {
     date,
@@ -24,7 +29,7 @@ async function resolvedRound(db: TestDb, date: string, options: {
   await db.update(schema.rounds).set({ status: "scheduled" }).where(eq(schema.rounds.date, date));
   await db.update(schema.questions).set({
     status: "scheduled",
-    context: {
+    context: options.noContext ? null : {
       text: options.contextText ?? `Context ${date}`,
       asOf: options.contextAsOf ?? `${date}T15:00:00Z`,
       sourceUrl: "https://example.com/context",
@@ -106,6 +111,7 @@ describe("selectExhibition", () => {
       oraclePYes: 0.7,
       outcome: "yes",
       linePYes: 0.7, // clampLine(0.7, null): no market on this question, so the line is the forecast itself.
+      crowdYesPct: null,
     });
     expect(ExhibitionSchema.parse(selected)).toEqual(selected);
   });
@@ -177,6 +183,26 @@ describe("selectExhibition", () => {
     await resolvedRound(db, "2099-08-29", { oraclePYes: 0.7 });
     const ex = await selectExhibition(db);
     expect(ex?.linePYes).toBeCloseTo(0.7, 10);
+  });
+
+  it("offers a crowd question without a context block, carrying the room's share (design 2026-09-22 T10)", async () => {
+    const { db } = await makeTestDb();
+    const date = "2026-09-23";
+    // sourceName and context are set at seed time, before commit_oracle_forecast:
+    // once a round is committed, oracle_question_commitment_guard freezes both
+    // fields on the row, so a post-commit rewrite of either is rejected. This
+    // matches production: opinion-round.ts's authoring insert (draft.ts:
+    // `context: q.context ?? null`) writes a crowd question's null context
+    // before the round is ever committed, and never touches it again.
+    await resolvedRound(db, date, { sourceName: "THE PLAYERS", noContext: true });
+    await db.update(schema.questions).set({ marketSource: "crowd", marketId: date, crowdYesPct: "62", crowdCount: 41, linePYes: "0.38" }).where(eq(schema.questions.roundDate, date));
+    const ex = await selectExhibition(db);
+    expect(ex).not.toBeNull();
+    expect(ex!.kind).toBe("historical");
+    expect(ex!.context).toBeNull();
+    expect(ex!.crowdYesPct).toBe(62);
+    expect(ex!.linePYes).toBe(0.38);
+    expect(ex!.sourceName).toBe("THE PLAYERS");
   });
 });
 

@@ -402,3 +402,10 @@ describe("the reading lines (design 2026-09-09 §2.2, §3.1)", () => {
     }
   });
 });
+
+describe("the crowd's void reasons (design 2026-09-22 §10)", () => {
+  it("are in the machine voice and name the room, never the crowd", () => {
+    expect(PIPELINE_LINES.crowdTooFew).toBe("TOO FEW PLAYERS ANSWERED");
+    expect(PIPELINE_LINES.crowdSplit).toBe("THE ROOM SPLIT EXACTLY IN HALF");
+  });
+});

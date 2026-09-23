@@ -62,14 +62,15 @@ describe("the reading register", () => {
     }
   });
 
-  it("teaches the swipe, the stake and the double", () => {
-    // The one interaction the whole app turns on (design 2026-09-14 "The
-    // Hand" §8.1): a side, a stake, a seal. It lives in the opening lines,
+  it("teaches the swipe, the seal, the room and the double", () => {
+    // The one interaction the whole app turns on (design 2026-09-22 hot takes
+    // §9.4): a side, a seal, the room. It lives in the opening lines,
     // which every first-time player is shown.
     const intro = INTRO_LINES.join(" ").toLowerCase();
     expect(intro, "the opening lines must say how a side is chosen").toContain("swipe");
-    expect(intro, "the opening lines must say what is chosen next").toContain("stake");
-    expect(intro, "the opening lines must say how a call is committed").toContain("seal");
+    expect(intro, "the opening lines must say what the seal decides").toContain("seal");
+    expect(intro, "the opening lines must say what decides the game").toContain("room");
+    expect(intro, "the opening lines must teach the double").toContain("double");
   });
 });
 
