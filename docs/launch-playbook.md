@@ -436,6 +436,19 @@ submitted to review:**
 
 ### 4.7 Build 12 — hot takes
 
+**Why no round published Sept 20–23 (design §13 step 1, found Sept 22).** Every
+17:00 ET authoring instance completed in two seconds with
+`10 eligible markets across too few categories` (560 fetched, 10 eligible),
+and the evergreen bank was empty, so the market round dealt nothing and noon
+had nothing to fall through to. The opinion round has no exchange dependency,
+which is the fix; the market round stays available behind
+`PIPELINE_ROUND_KIND=market` but needs a stocked bank to be safe.
+
+Deployed Sept 22 20:20 ET: Worker version `d147df71` (from `d0638a2`, the
+hot-takes merge) with `PIPELINE_ROUND_KIND=opinion`; site `dc19d858`; EAS
+production build 12 (`41f32824-9120-4e5c-8f49-9956474802b0`) with auto-submit
+(submission `69dd9be0-e6a8-4b28-beda-0cbf87d18568`).
+
 App Store subtitle (set in App Store Connect; not in the repo):
 `Three AIs try to predict what you think. Five hot takes a day.`
 
