@@ -29,6 +29,7 @@ import { sendPushes } from "../push/onesignal";
 import { DEFAULT_EXCHANGES } from "./market-round";
 import type { ExchangeSource } from "./exchanges/types";
 import { writeLessons } from "./council/lessons";
+import { writeReactions, type ReactionsOutcome } from "./council/reactions";
 import { siteUrlOf } from "./round-kind";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
@@ -257,12 +258,20 @@ export async function narrateResolution(
   deps: PipelineDeps,
   date: string,
   outcomes: ResolveOutcome[],
+  reactions: ReactionsOutcome[] = [],
 ): Promise<void> {
   const failed = outcomes.filter((o) => o.error);
   if (failed.length > 0) {
     await deps.telegram.send(
       `⚠ resolve failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
     );
+  }
+  const attempted = reactions.filter((r) => r.written + r.dropped > 0 || r.error);
+  if (attempted.length > 0) {
+    const written = attempted.reduce((s, r) => s + r.written, 0);
+    const dropped = attempted.reduce((s, r) => s + r.dropped, 0);
+    const errs = attempted.filter((r) => r.error).map((r) => `${r.questionId}: ${r.error}`);
+    await deps.telegram.send(`reactions: ${written} written, ${dropped} dropped${errs.length ? ` · ⚠ ${errs.join(" · ")}` : ""}`);
   }
   // The trickle's own summary (audit finding B): resolveOne discarded
   // sendPushes's sent/skipped, so this channel reported failures but never a
@@ -294,10 +303,14 @@ export async function runResolution(
   questionIds: string[],
 ): Promise<ResolveOutcome[]> {
   const outcomes: ResolveOutcome[] = [];
+  const reactions: ReactionsOutcome[] = [];
   for (const questionId of questionIds) {
     outcomes.push(await resolveOne(deps, questionId));
+    // The night shift reacts before it learns (design 2026-09-25 §5.3): the
+    // reaction is in the moment, the lesson is the morning after.
+    reactions.push(await writeReactions(deps, questionId));
     await writeLessons(deps, questionId);
   }
-  await narrateResolution(deps, date, outcomes);
+  await narrateResolution(deps, date, outcomes, reactions);
   return outcomes;
 }

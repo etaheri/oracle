@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { PIPELINE_LINES } from "@oracle/core";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
-import { resolveOne, resolveFromCrowd, CROWD_RESOLVE_MIN } from "../src/pipeline/resolve";
+import { resolveOne, resolveFromCrowd, runResolution, CROWD_RESOLVE_MIN } from "../src/pipeline/resolve";
 import { claimResolutionPushes } from "../src/push/compose";
 import { loadPipelineState } from "../src/pipeline/state";
 import { inlineStarter } from "../src/pipeline/workflows";
@@ -116,5 +116,32 @@ describe("the tick's view of a crowd question", () => {
     const st = await loadPipelineState(db, new Date("2026-09-24T16:10:00Z"), true);
     expect(st.lockedRound!.unresolvedIds).toContain(qId);
     expect(st.lockedRound!.modelIds).not.toContain(qId);
+  });
+});
+
+describe("reactions on the inline path (design 2026-09-25 §9)", () => {
+  it("writes reactions after the crowd resolves, before lessons, and narrates the count", async () => {
+    const { db, deps, qId } = await world([true, true, false]);
+    await db.insert(schema.lines).values([
+      { questionId: qId, member: "haiku", pYes: "0.31", committedAt: new Date("2026-09-23T13:00:00Z"), model: "m", promptVersion: "council-v2", reasoning: "no" },
+      { questionId: qId, member: "opus", pYes: "0.70", committedAt: new Date("2026-09-23T13:00:00Z"), model: "m", promptVersion: "council-v2", reasoning: "yes" },
+    ]);
+    const order: string[] = [];
+    const sent: string[] = [];
+    deps.telegram = { send: async (t) => { sent.push(t); } };
+    deps.claude = {
+      async structured(call) {
+        order.push(call.schemaName);
+        if (call.schemaName === "reaction") return { text: "ok the room is wrong" };
+        if (call.schemaName === "taste_verdicts") return { verdicts: [{ index: 0, allowed: true, reason: "" }] };
+        if (call.schemaName === "lesson") return { text: "L." };
+        throw new Error(`unexpected ${call.schemaName}`);
+      },
+    };
+    await runResolution(deps, DATE, [qId]);
+    expect(order).toEqual(["reaction", "taste_verdicts", "lesson", "lesson"]);
+    const rows = await db.query.reactions.findMany();
+    expect(rows.map((r) => r.member)).toEqual(["haiku"]);
+    expect(sent.some((t) => t.includes("reactions: 1 written, 0 dropped"))).toBe(true);
   });
 });
