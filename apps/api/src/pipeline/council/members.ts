@@ -4,7 +4,7 @@
 import type { ModelMemberId } from "@oracle/core";
 import type { PipelineDeps } from "../index";
 
-export const COUNCIL_PROMPT_VERSION = "council-v1";
+export const COUNCIL_PROMPT_VERSION = "council-v2";
 export const LESSON_PROMPT_VERSION = "lesson-v1";
 
 const DEFAULT_MODELS: Record<ModelMemberId, string> = {

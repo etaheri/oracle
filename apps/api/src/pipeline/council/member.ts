@@ -5,7 +5,7 @@
 // escapes, as it does from resolveOne.
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import type { ModelMemberId } from "@oracle/core";
+import { MEMBER_PROFILE, MODEL_MEMBER_IDS, type ModelMemberId } from "@oracle/core";
 import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
 import { BudgetExhausted } from "../spend";
@@ -66,6 +66,35 @@ export const crowdCouncilJsonSchema = {
   required: ["lines"], additionalProperties: false,
 };
 
+// Reasoning caps per member (design 2026-09-25 §5.2): the register is a
+// length as much as a voice. Over the cap the slot abstains, as a bad p_yes does.
+export const REASONING_CAP: Record<ModelMemberId, number> = { haiku: 200, sonnet: 500, opus: 800 };
+
+const REASONING_ASK: Record<ModelMemberId, string> = {
+  haiku: "one or two lines, lowercase, no punctuation beyond a full stop, no hedging",
+  sonnet: "two to four plain sentences",
+  opus: "three to six sentences, and you may refer to your own earlier calls by name",
+};
+
+export function crowdCouncilJsonSchemaFor(member: ModelMemberId) {
+  const base = crowdCouncilJsonSchema as { properties: { lines: { items: { properties: { reasoning: Record<string, unknown> } } } } };
+  return {
+    ...crowdCouncilJsonSchema,
+    properties: {
+      lines: {
+        ...base.properties.lines,
+        items: {
+          ...base.properties.lines.items,
+          properties: {
+            ...base.properties.lines.items.properties,
+            reasoning: { ...base.properties.lines.items.properties.reasoning, maxLength: REASONING_CAP[member], description: `Why the room will lean the way you say: ${REASONING_ASK[member]}. Shown to players as written, in #nightshift.` },
+          },
+        },
+      },
+    },
+  };
+}
+
 function systemPrompt(date: string, now: Date): string {
   return `You are one voice of THE ORACLE's Council. You are preparing the round dated ${date}, before it opens at noon ET; it locks at noon ET the following day. It is now ${now.toISOString()}.
 
@@ -91,12 +120,16 @@ function questionBlock(q: { slot: number; isBigOne: boolean; text: string; resol
   return `${head}\n${ev}${mem}`;
 }
 
-function crowdSystemPrompt(date: string, now: Date): string {
-  return `You are one voice of THE ORACLE's Council. The round dated ${date} opens at noon ET and locks at noon ET the following day. It is now ${now.toISOString()}.
+function crowdSystemPrompt(date: string, now: Date, member: ModelMemberId): string {
+  const me = MEMBER_PROFILE[member];
+  const others = MODEL_MEMBER_IDS.filter((m) => m !== member).map((m) => `${MEMBER_PROFILE[m].name} (${MEMBER_PROFILE[m].title})`).join(" and ");
+  return `You are ${me.name}, ${me.title} on THE ORACLE's Council. ${me.register} You post in #nightshift, the Council's channel, which players read after they seal. Your co-workers are ${others}.
 
-- Each question is an opinion. Players answer YES or NO from their own view. Estimate the share of players who will answer YES, between ${P_MIN} and ${P_MAX}. Exactly 0.5 is valid when you expect an even room.
-- The players are a general US audience on their phones at lunchtime. Weigh what people say when asked directly, not what they believe privately.
-- Your reasoning is two to five plain sentences on why the room will lean the way you say. It will be shown to players as written.
+The round dated ${date} opens at noon ET and locks at noon ET the following day. It is now ${now.toISOString()}.
+
+- Each take is a statement. Players answer YES (agree) or NO (disagree) from their own view. Estimate the share of players who will answer YES, between ${P_MIN} and ${P_MAX}. Exactly 0.5 is valid when you expect an even room.
+- The players are people who post. They are online more than is good for them, they have opinions about everything, and they answer from the gut. Weigh what people say when asked, not what they believe privately.
+- Your reasoning is ${REASONING_ASK[member]}. It will be shown to players as written.
 - Where lessons from your own earlier calls are given, weigh them; they are yours.
 - Leave cited empty; there is nothing to cite.
 
@@ -134,10 +167,10 @@ export async function commitMember(deps: PipelineDeps, date: string, member: Mod
   try {
     response = await deps.claude.structured({
       model: memberModel(deps, member),
-      system: crowd ? crowdSystemPrompt(date, now) : systemPrompt(date, now),
+      system: crowd ? crowdSystemPrompt(date, now, member) : systemPrompt(date, now),
       user,
       schemaName: "council_lines",
-      schema: crowd ? crowdCouncilJsonSchema : councilJsonSchema,
+      schema: crowd ? crowdCouncilJsonSchemaFor(member) : councilJsonSchema,
     });
   } catch (err) {
     if (err instanceof BudgetExhausted) throw err;
@@ -152,6 +185,7 @@ export async function commitMember(deps: PipelineDeps, date: string, member: Mod
     if (!e.success) continue;
     const q = qs.find((x) => x.slot === e.data.slot);
     if (!q || e.data.p_yes < P_MIN || e.data.p_yes > P_MAX) continue;
+    if (crowd && e.data.reasoning.length > REASONING_CAP[member]) continue;
     if (lines.some((l) => l.slot === q.slot)) continue;
     const ranks = new Set(packs.get(q.id)!.map((x) => x.rank));
     lines.push({

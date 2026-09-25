@@ -9,8 +9,15 @@ import { runOpinionRound } from "../src/pipeline/opinion-round";
 import { commitMember } from "../src/pipeline/council/member";
 import { runCouncil, isCrowdRound } from "../src/pipeline/council";
 
-const DATE = "2026-09-23";
-const NOW = new Date("2026-09-23T13:00:00Z"); // 09:00 ET on the round date
+// Dates are relative to the real clock, not pinned, so this file does not
+// rot: DATE is tomorrow (UTC calendar date), NOW is 09:00 ET on the round
+// date, and world() authors the round the day before at 21:05Z.
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+const DATE = isoDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+const NOW = new Date(`${DATE}T13:00:00Z`); // 09:00 ET on the round date
+const DAY_BEFORE = isoDate(new Date(new Date(`${DATE}T00:00:00Z`).getTime() - 24 * 60 * 60 * 1000));
 const CATS = ["markets", "sports", "weather", "culture", "news"] as const;
 const TAKES = ["a car payment is a personality trait", "the nfl is better on the radio", "fall is the worst season and everyone is lying", "cereal is a soup", "nobody actually likes going to the airport early"];
 
@@ -35,7 +42,7 @@ async function world(p: (member: string, slot: number) => number = () => 0.4) {
     db, telegram: { send: async (t) => { sent.push(t); } }, claude: claude(calls, p),
     models: { author: "a", resolve: "r", resolveB: "rb", forecast: "f", taste: "t", voice: "v" },
     councilModels: { sonnet: "m-sonnet", opus: "m-opus", haiku: "m-haiku" },
-    now: () => new Date("2026-09-22T21:05:00Z"), workflows: inlineStarter(), roundKind: "opinion",
+    now: () => new Date(`${DAY_BEFORE}T21:05:00Z`), workflows: inlineStarter(), roundKind: "opinion",
     exaApiKey: "exa-key",
     exaFetch: (async () => { exaCalls += 1; return new Response(JSON.stringify({ results: [] }), { status: 200 }); }) as unknown as typeof fetch,
     marketFetch: (async () => { throw new Error("no network in tests"); }) as unknown as typeof fetch,
@@ -67,10 +74,14 @@ describe("the Council on a crowd round (design 2026-09-22 §5)", () => {
     expect(c.system).toContain(DATE);
     expect(c.system).toContain(NOW.toISOString());
     expect(c.system).toContain("share of players who will answer YES");
-    expect(c.system).toContain("general US audience on their phones at lunchtime");
+    expect(c.system).toContain("people who post");
+    expect(c.system).not.toContain("lunchtime");
+    expect(c.system).toContain("You are SONNET, day shift");
+    expect(c.system).toContain("#nightshift");
+    expect(c.system).toContain("two to four plain sentences");
     expect(c.system).not.toContain("evidence");
-    expect(c.user).toContain("[slot 1] Is take 1 the right one?");
-    expect(c.user).toContain("[slot 5 · THE BIG ONE] Is take 5 the right one?");
+    expect(c.user).toContain(`[slot 1] ${TAKES[0]}`);
+    expect(c.user).toContain(`[slot 5 · THE BIG ONE] ${TAKES[4]}`);
     expect(c.user).not.toContain("RESOLVES BY");
     expect(c.user).not.toContain("THE MARKET'S PRICE");
     expect(c.user).not.toContain("EVIDENCE");
@@ -106,5 +117,43 @@ describe("the Council on a crowd round (design 2026-09-22 §5)", () => {
     expect(sent[0]).not.toContain("market");
     expect(sent[0]).not.toContain("exa $");
     expect(sent[0]).not.toContain("item");
+  });
+});
+
+describe("personas on a crowd round (design 2026-09-25 §5.2)", () => {
+  it("gives each member its own register and names the other two", async () => {
+    const { deps, calls } = await world();
+    await commitMember(deps, DATE, "haiku");
+    await commitMember(deps, DATE, "opus");
+    const haiku = calls[0]!.system;
+    const opus = calls[1]!.system;
+    expect(haiku).toContain("You are HAIKU, night shift");
+    expect(haiku).toContain("lowercase");
+    expect(haiku).toContain("SONNET (day shift)");
+    expect(haiku).toContain("OPUS (senior forecaster)");
+    expect(opus).toContain("You are OPUS, senior forecaster");
+    expect(opus).toContain("three to six sentences");
+    expect(opus).toContain("HAIKU (night shift)");
+  });
+  it("caps reasoning per member in the schema and abstains a slot over the cap", async () => {
+    const long = "x".repeat(201);
+    const { deps, calls } = await world();
+    deps.claude = {
+      async structured(call) {
+        calls.push(call);
+        return { lines: [1, 2, 3, 4, 5].map((slot) => ({ slot, p_yes: 0.4, reasoning: slot === 2 ? long : "short", cited: [] })) };
+      },
+    };
+    const r = await commitMember(deps, DATE, "haiku");
+    const cap = (calls[0]!.schema as { properties: { lines: { items: { properties: { reasoning: { maxLength: number } } } } } }).properties.lines.items.properties.reasoning.maxLength;
+    expect(cap).toBe(200);
+    expect(r.abstained).toEqual([2]);
+    expect(r.lines.length).toBe(4);
+  });
+  it("stamps council-v2 on the committed lines", async () => {
+    const { deps } = await world();
+    await runCouncil(deps, DATE);
+    const rows = await deps.db.query.lines.findMany();
+    expect(rows.filter((l) => l.member !== "market").every((l) => l.promptVersion === "council-v2")).toBe(true);
   });
 });
