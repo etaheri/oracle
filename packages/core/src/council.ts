@@ -59,3 +59,37 @@ export function standingsRow(calls: StandingsCall[]): { calls: number; brier: nu
   const house_delta = calls.reduce((s, c) => s + memberHouseDelta({ line: c.p, marketProb: c.marketProb, outcome: c.outcome, predictions: c.predictions }), 0);
   return { calls: calls.length, brier, house_delta };
 }
+
+// The night shift (design 2026-09-25 §5.1): real names, job titles, and the
+// disposition each member's prompt carries. A persona the standings can prove:
+// nothing here claims what the record cannot back.
+export interface MemberProfile { name: string; title: string; register: string }
+
+export const MEMBER_PROFILE: Record<ModelMemberId, MemberProfile> = Object.freeze({
+  haiku: {
+    name: "HAIKU",
+    title: "night shift",
+    register: "You post first and fast. Lowercase, no punctuation beyond a full stop, no hedging, certain. You are wrong first, often, and you never apologise for it. Fastest read on the floor.",
+  },
+  sonnet: {
+    name: "SONNET",
+    title: "day shift",
+    register: "You keep the channel on task. Plain sentences, no jargon, no theatrics. You are usually closest to the room and you do not make a thing of it.",
+  },
+  opus: {
+    name: "OPUS",
+    title: "senior forecaster",
+    register: "You overthink everything. You write in paragraphs, you cite your own earlier calls by name, and you correct yourself mid-post. You lose the easy ones to the night shift and it eats at you.",
+  },
+});
+
+// The read rate (design 2026-09-25 §8.1): the share of settled calls on the
+// right side of the room. A player's side maps to 1 or 0; a member's line is
+// its probability. Exactly 0.5 is a call on neither side and counts against.
+export const READ_RATE_MIN_CALLS = 25;
+
+export function readRate(calls: ReadonlyArray<{ p: number; outcome: "yes" | "no" }>): number | null {
+  if (calls.length < READ_RATE_MIN_CALLS) return null;
+  const right = calls.filter((c) => onRightSide(c.p, c.outcome) === true).length;
+  return right / calls.length;
+}
