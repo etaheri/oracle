@@ -6,6 +6,7 @@ import type { PipelineDeps } from "../index";
 
 export const COUNCIL_PROMPT_VERSION = "council-v2";
 export const LESSON_PROMPT_VERSION = "lesson-v1";
+export const REACTION_PROMPT_VERSION = "reaction-v1";
 
 const DEFAULT_MODELS: Record<ModelMemberId, string> = {
   sonnet: "claude-sonnet-5",
@@ -19,5 +20,9 @@ export function memberModel(deps: PipelineDeps, member: ModelMemberId): string {
 }
 
 export function lessonModel(deps: PipelineDeps): string {
+  return deps.councilModels?.lesson ?? DEFAULT_LESSON_MODEL;
+}
+
+export function reactionModel(deps: PipelineDeps): string {
   return deps.councilModels?.lesson ?? DEFAULT_LESSON_MODEL;
 }
