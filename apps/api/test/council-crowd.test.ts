@@ -12,12 +12,13 @@ import { runCouncil, isCrowdRound } from "../src/pipeline/council";
 const DATE = "2026-09-23";
 const NOW = new Date("2026-09-23T13:00:00Z"); // 09:00 ET on the round date
 const CATS = ["markets", "sports", "weather", "culture", "news"] as const;
+const TAKES = ["a car payment is a personality trait", "the nfl is better on the radio", "fall is the worst season and everyone is lying", "cereal is a soup", "nobody actually likes going to the airport early"];
 
 function claude(calls: StructuredCall[], p: (member: string, slot: number) => number) {
   return {
     async structured(call: StructuredCall) {
       calls.push(call);
-      if (call.schemaName === "opinion_round") return { questions: CATS.map((category, i) => ({ slot: i + 1, category, text: `Is take ${i + 1} the right one?` })) };
+      if (call.schemaName === "opinion_round") return { questions: CATS.map((category, i) => ({ slot: i + 1, category, text: TAKES[i]!, unhinged: i + 1 === 4, seen_on: null })) };
       if (call.schemaName === "taste_verdicts") return { verdicts: [0, 1, 2, 3, 4].map((index) => ({ index, allowed: true, reason: "" })) };
       if (call.schemaName === "council_lines") return { lines: [1, 2, 3, 4, 5].map((slot) => ({ slot, p_yes: p(call.model, slot), reasoning: `The room leans ${slot}.`, cited: [1] })) };
       throw new Error(`unexpected call ${call.schemaName}`);
