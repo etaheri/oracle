@@ -112,6 +112,18 @@ export const EvidenceItemSchema = z.object({
 });
 export type EvidenceItem = z.infer<typeof EvidenceItemSchema>;
 
+// One line of #nightshift (design 2026-09-25 §6.1). Built by the API from
+// lines, reactions and lessons; rendered by the app in order.
+export const LogLineSchema = z.object({
+  at: z.string(),
+  kind: z.enum(["system", "say", "note"]),
+  member: z.enum(["sonnet", "opus", "haiku"]).nullable(),
+  text: z.string(),
+  p_yes: z.number().nullable(),
+  tone: z.enum(["win", "loss", "mute"]),
+});
+export type LogLine = z.infer<typeof LogLineSchema>;
+
 export const RevealSchema = z.object({
   rules_version: z.number().int().min(1).max(3).default(1),
   bonus_points: z.number().int().default(0),
