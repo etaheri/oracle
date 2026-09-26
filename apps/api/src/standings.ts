@@ -66,9 +66,12 @@ export function standings(calls: SettledCall[], asOf: Date): Standings {
     as_of: asOf.toISOString(),
     rounds: new Set(calls.map((c) => c.date)).size,
     questions: calls.length,
+    // read_rate and title are computed elsewhere (design 2026-09-25 §11); this
+    // endpoint doesn't have them yet, so it withholds both, and the window.
+    window: null,
     rows: [
-      ...MEMBER_ORDER.map((member) => ({ member, ...standingsRow(forMember(member)) })),
-      { member: "crowd" as const, ...standingsRow(crowd) },
+      ...MEMBER_ORDER.map((member) => ({ member, read_rate: null, title: null, ...standingsRow(forMember(member)) })),
+      { member: "crowd" as const, read_rate: null, title: null, ...standingsRow(crowd) },
     ],
   };
 }

@@ -59,7 +59,7 @@ describe("standings", () => {
     expect(sonnet.brier).toBeCloseTo((4 * 0.49 + 0.09) / 5, 10);
     // Sonnet's 0.30 sits inside the band around 0.40, so it prices as is. Player YES 50 at 0.30 pays 50 + round(50 × 0.7/0.3) = 167 → house −117 on four cards, +50 on the fifth.
     expect(sonnet.house_delta).toBe(-468 + 50);
-    expect(s.rows[2]).toEqual({ member: "haiku", calls: 0, brier: null, house_delta: 0 });
+    expect(s.rows[2]).toEqual({ member: "haiku", calls: 0, brier: null, house_delta: 0, read_rate: null, title: null });
     const crowd = s.rows[4]!;
     expect(crowd.calls).toBe(5);
     expect(crowd.brier).toBeCloseTo((4 * 0.16 + 0.36) / 5, 10);

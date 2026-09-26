@@ -21,6 +21,8 @@ function question(overrides: Partial<Question> = {}): Question {
     evidence_quote: "It happened, per officials.",
     void_reason: null,
     oracle_p_yes: 0.7,
+    seen_on: null,
+    unhinged: false,
     ...overrides,
   };
 }
@@ -41,6 +43,8 @@ function reveal({ vigil_mult, outcomes, first_hour = false }: { vigil_mult: numb
     questions: outcomes.map((outcome, i) => question({ slot: i + 1, outcome })),
     council: [],
     evidence: [],
+    reactions: [],
+    lessons: [],
     ledger: { settled: true, streak: 3, calls_rated: 12, oracle_score: null },
   };
 }
