@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
-import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal, onRightSide, MEMBER_ORDER } from "@oracle/core";
+import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal, onRightSide, MEMBER_ORDER, buildLog, MODEL_MEMBER_IDS, type ModelMemberId } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -20,6 +20,23 @@ async function openRound(db: Db, now: Date) {
     if (qs.length > 0 && now.getTime() < lastLock) return { round, qs, lastLock: new Date(lastLock) };
   }
   return null;
+}
+
+// The channel's rows for a set of questions (design 2026-09-25 §6.1): model
+// members only, ordered by commit; the market member never posts.
+async function channelRows(db: Db, qIds: string[]) {
+  if (qIds.length === 0) return { lines: [], reactions: [], lessons: [] };
+  const [lines, reactions, lessons] = await Promise.all([
+    db.query.lines.findMany({ where: inArray(schema.lines.questionId, qIds) }),
+    db.query.reactions.findMany({ where: inArray(schema.reactions.questionId, qIds) }),
+    db.query.lessons.findMany({ where: inArray(schema.lessons.questionId, qIds) }),
+  ]);
+  const isModel = (m: string): m is ModelMemberId => (MODEL_MEMBER_IDS as readonly string[]).includes(m);
+  return {
+    lines: lines.filter((l) => isModel(l.member)).map((l) => ({ questionId: l.questionId, member: l.member as ModelMemberId, pYes: Number(l.pYes), reasoning: l.reasoning, committedAt: l.committedAt.toISOString() })),
+    reactions: reactions.filter((r) => isModel(r.member)).map((r) => ({ questionId: r.questionId, member: r.member as ModelMemberId, text: r.text, createdAt: r.createdAt.toISOString() })),
+    lessons: lessons.filter((l) => isModel(l.member)).map((l) => ({ questionId: l.questionId, member: l.member as ModelMemberId, text: l.text, createdAt: l.createdAt.toISOString() })),
+  };
 }
 
 export const roundRoutes = new Hono<AppContext>()
@@ -45,6 +62,14 @@ export const roundRoutes = new Hono<AppContext>()
       db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
       houseSummary(db),
     ]);
+    // The line is a common signal before the seal (design 2026-09-22 T9) and
+    // the leak the hot-takes design accepted for a week closes here: it is
+    // served only on the caller's own sealed questions (design 2026-09-25 N5).
+    const sealed = new Set(
+      qIds.length
+        ? (await db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qIds)), columns: { questionId: true } })).map((p) => p.questionId)
+        : [],
+    );
     return c.json({
       date: round.date,
       rules_version: round.rulesVersion,
@@ -52,6 +77,8 @@ export const roundRoutes = new Hono<AppContext>()
       player_count: Number(players?.n ?? 0),
       fortune: user?.fortune ?? null,
       house,
+      // When the Council clocked in (design 2026-09-25 §6.5); null when it never committed.
+      council_committed_at: round.oracleCommittedAt?.toISOString() ?? null,
       questions: qs.map((q) => ({
         id: q.id,
         slot: q.slot,
@@ -69,7 +96,10 @@ export const roundRoutes = new Hono<AppContext>()
         // mean "struck", so historical rounds keep their meaning.
         struck: q.lockHealedAt !== null || q.withdrawnAt !== null,
         struck_reason: q.lockHealedAt !== null || q.withdrawnAt !== null ? (evidenceSummary(q.resolutionEvidence).reason ?? null) : null,
-        line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
+        line_p_yes: sealed.has(q.id) && q.linePYes !== null ? Number(q.linePYes) : null,
+        crowd: q.marketSource === "crowd",
+        seen_on: q.seenOnLabel === null ? null : { label: q.seenOnLabel, url: q.seenOnUrl },
+        unhinged: q.unhinged,
       })),
     });
   })
@@ -118,6 +148,32 @@ export const roundRoutes = new Hono<AppContext>()
         doubled: p.doubled,
       })),
     });
+  })
+  // The channel after the seal (design 2026-09-25 §6.2). Only the caller's
+  // sealed questions; before lock there is no outcome, so every tone is mute.
+  .get("/today/log", async (c) => {
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const found = await openRound(db, new Date());
+    if (!found) return c.json({ error: "no open round" }, 404);
+    const { qs } = found;
+    const mine = qs.length
+      ? await db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))), columns: { questionId: true } })
+      : [];
+    const sealedIds = mine.map((p) => p.questionId);
+    const rows = await channelRows(db, sealedIds);
+    const questions = qs.filter((q) => sealedIds.includes(q.id)).map((q) => ({
+      question_id: q.id,
+      line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
+      log: buildLog({
+        lines: rows.lines.filter((l) => l.questionId === q.id),
+        outcome: null,
+        crowd: { yesPct: null, count: null, resolvedAt: null, voidReason: null },
+        reactions: [],
+        lessons: [],
+      }),
+    }));
+    return c.json({ questions });
   })
   .get("/next", async (c) => {
     const { db } = c.get("deps");

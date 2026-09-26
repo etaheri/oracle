@@ -37,7 +37,16 @@ describe("GET /v1/round/today at version 3", () => {
     expect(json.rules_version).toBe(3);
     expect(json.fortune).toBe(1000);
     expect(json.house).toEqual({ total: 0, last_delta: null });
-    expect(json.questions.every((q) => q.line_p_yes === 0.35)).toBe(true);
+    expect(json.questions.every((q) => q.line_p_yes === null)).toBe(true);
+  });
+
+  it("serves the line on a sealed question", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-10T16:30:00Z"), toFake: ["Date"] });
+    const { qs, as, seal } = await world(1);
+    await seal(0, qs[0]!.id, true, 75);
+    const json = RoundTodaySchema.parse(await (await as(0)("/v1/round/today")).json());
+    expect(json.questions.find((q) => q.slot === 1)!.line_p_yes).toBe(0.35);
+    expect(json.questions.find((q) => q.slot === 2)!.line_p_yes).toBeNull();
   });
 });
 
