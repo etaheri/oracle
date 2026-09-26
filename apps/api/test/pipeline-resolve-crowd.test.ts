@@ -35,6 +35,7 @@ async function world(answers: boolean[], opts: { locked?: boolean; now?: string 
     now: () => new Date(opts.now ?? "2026-09-24T16:10:00Z"), workflows: inlineStarter(), siteUrl: "https://example.test",
     exchangeFeeds: [{ source: "kalshi", list: async () => [], read: async () => { throw new Error("no exchange read on a crowd question"); } }],
     marketFetch: (async () => { throw new Error("no network"); }) as unknown as typeof fetch,
+    crowdResolveMin: 1,
   };
   return { db, deps, qId: rows[0]!.id, users, calls };
 }
@@ -73,13 +74,19 @@ describe("resolveFromCrowd (design 2026-09-22 §6.1)", () => {
     const preds = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, qId) });
     expect(preds.every((p) => p.payout === 50)).toBe(true); // stake returned
   });
-  it("voids an empty room and honours the floor", async () => {
-    expect(CROWD_RESOLVE_MIN).toBe(1);
-    const { db, deps, qId } = await world([]);
+  it("voids when below the floor of 4 and honours the configured floor", async () => {
+    const { db, deps, qId } = await world([true, true, false]);
+    deps.crowdResolveMin = 4;
     expect(await resolveFromCrowd(deps, qId)).toBe(true);
     const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, qId) });
     expect(q!.status).toBe("void");
-    expect(q!.resolutionEvidence).toMatchObject({ resolver: "crowd", reason: PIPELINE_LINES.crowdTooFew, crowd_count: 0 });
+    expect(q!.resolutionEvidence).toMatchObject({ resolver: "crowd", reason: PIPELINE_LINES.crowdTooFew, crowd_count: 3 });
+  });
+  it("voids a three-player room at the default floor of 20", async () => {
+    const { db, deps, qId } = await world([true, true, false]);
+    delete deps.crowdResolveMin;
+    expect(await resolveFromCrowd(deps, qId)).toBe(true);
+    expect((await db.query.questions.findFirst({ where: eq(schema.questions.id, qId) }))!.outcome).toBe("void");
   });
   it("does nothing before the lock, and nothing on an already-resolved row", async () => {
     const early = await world([true, true], { now: "2026-09-24T15:59:00Z" });

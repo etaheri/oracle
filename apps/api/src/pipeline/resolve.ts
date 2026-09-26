@@ -30,7 +30,7 @@ import { DEFAULT_EXCHANGES } from "./market-round";
 import type { ExchangeSource } from "./exchanges/types";
 import { writeLessons } from "./council/lessons";
 import { writeReactions, type ReactionsOutcome } from "./council/reactions";
-import { siteUrlOf } from "./round-kind";
+import { siteUrlOf, DEFAULT_CROWD_RESOLVE_MIN, crowdResolveMinOf } from "./round-kind";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -120,13 +120,10 @@ export async function resolveFromExchange(deps: PipelineDeps, questionId: string
   return true;
 }
 
-/**
- * The crowd's floor (design 2026-09-22 T6): fewer sealed answers than this
- * and the question voids rather than pretend one player is a room. It is 1
- * this week, while the field is a handful; it rises to 20 once there are
- * twenty players. A constant, not a var, on purpose — it is a rule.
- */
-export const CROWD_RESOLVE_MIN = 1;
+// The crowd's floor (design 2026-09-25 N11): the operating fact that decides
+// when a crowd room has enough seals. The rule, set by hand while the field
+// is a handful, may be lowered by the Worker var CROWD_RESOLVE_MIN.
+export const CROWD_RESOLVE_MIN = DEFAULT_CROWD_RESOLVE_MIN;
 
 /**
  * Crowd settlement (design 2026-09-22 §6.1): the players' own majority is the
@@ -149,7 +146,8 @@ export async function resolveFromCrowd(deps: PipelineDeps, questionId: string): 
 
   let outcome: "yes" | "no" | "void";
   let evidence: Record<string, unknown>;
-  if (n < CROWD_RESOLVE_MIN) {
+  const floor = crowdResolveMinOf(deps);
+  if (n < floor) {
     outcome = "void";
     evidence = { ...base, reason: PIPELINE_LINES.crowdTooFew };
   } else if (yes * 2 === n) {

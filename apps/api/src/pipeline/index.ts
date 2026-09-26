@@ -63,6 +63,9 @@ export interface PipelineDeps {
   // existing test's deps literal stays valid; worker.ts always sets them.
   roundKind?: RoundKind;
   siteUrl?: string;
+  // The crowd floor (design 2026-09-25 N11). Optional with default in
+  // round-kind.ts; worker.ts always sets it.
+  crowdResolveMin?: number;
 }
 
 function errorMessage(err: unknown): string {
