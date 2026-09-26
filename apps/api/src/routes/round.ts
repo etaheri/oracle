@@ -24,12 +24,16 @@ async function openRound(db: Db, now: Date) {
 
 // The channel's rows for a set of questions (design 2026-09-25 §6.1): model
 // members only, ordered by commit; the market member never posts.
-async function channelRows(db: Db, qIds: string[]) {
+//
+// Before lock, reactions and lessons are always empty (design 2026-09-25
+// §6.2), so a caller reading the channel pre-lock (/today/log) can skip both
+// queries with { remarks: false } rather than fetch and discard them.
+async function channelRows(db: Db, qIds: string[], opts: { remarks: boolean } = { remarks: true }) {
   if (qIds.length === 0) return { lines: [], reactions: [], lessons: [] };
   const [lines, reactions, lessons] = await Promise.all([
     db.query.lines.findMany({ where: inArray(schema.lines.questionId, qIds) }),
-    db.query.reactions.findMany({ where: inArray(schema.reactions.questionId, qIds) }),
-    db.query.lessons.findMany({ where: inArray(schema.lessons.questionId, qIds) }),
+    opts.remarks ? db.query.reactions.findMany({ where: inArray(schema.reactions.questionId, qIds) }) : Promise.resolve([]),
+    opts.remarks ? db.query.lessons.findMany({ where: inArray(schema.lessons.questionId, qIds) }) : Promise.resolve([]),
   ]);
   const isModel = (m: string): m is ModelMemberId => (MODEL_MEMBER_IDS as readonly string[]).includes(m);
   return {
@@ -161,7 +165,7 @@ export const roundRoutes = new Hono<AppContext>()
       ? await db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))), columns: { questionId: true } })
       : [];
     const sealedIds = mine.map((p) => p.questionId);
-    const rows = await channelRows(db, sealedIds);
+    const rows = await channelRows(db, sealedIds, { remarks: false });
     const questions = qs.filter((q) => sealedIds.includes(q.id)).map((q) => ({
       question_id: q.id,
       line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
@@ -222,12 +226,20 @@ export const roundRoutes = new Hono<AppContext>()
         reasoning: l.reasoning,
         cited: l.cited,
         lessons_received: l.lessonsReceived.length,
+        committed_at: l.committedAt.toISOString(),
       })),
     );
     const evidence = pack.map((e) => ({
       question_id: e.questionId, rank: e.rank, url: e.url, title: e.title, source: e.source,
       published_at: e.publishedAt === null ? null : e.publishedAt.toISOString(), highlight: e.highlight,
     }));
+    // The channel after lock (design 2026-09-25 §6.3): reactions and lessons,
+    // model members only. This re-reads `lines` even though councilRows above
+    // already has them — one extra query on a route read once a day per
+    // player, accepted rather than refactoring the existing councilRows read.
+    const channel = await channelRows(db, qIds);
+    const reactions = channel.reactions.map((r) => ({ question_id: r.questionId, member: r.member, text: r.text, created_at: r.createdAt }));
+    const lessons = channel.lessons.map((l) => ({ question_id: l.questionId, member: l.member, text: l.text, created_at: l.createdAt }));
     const byQ = new Map(mine.map((p) => [p.questionId, p]));
     const perQuestionPoints = mine.map((p) => p.points ?? 0);
     const allFirstHour = mine.length === qs.length && mine.every((p) => p.firstHour);
@@ -289,6 +301,8 @@ export const roundRoutes = new Hono<AppContext>()
       candidates_rejected: round?.candidatesRejected ?? 0,
       council,
       evidence,
+      reactions,
+      lessons,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);
         const ev = evidenceSummary(q.resolutionEvidence);
@@ -325,6 +339,8 @@ export const roundRoutes = new Hono<AppContext>()
           evidence_url: ev.quoteUrl,
           void_reason: q.outcome === "void" ? (ev.reason ?? "UNVERIFIABLE") : null,
           oracle_p_yes: q.oracleProbYes === null ? null : Number(q.oracleProbYes),
+          seen_on: q.seenOnLabel === null ? null : { label: q.seenOnLabel, url: q.seenOnUrl },
+          unhinged: q.unhinged,
         };
       }),
       ledger: {

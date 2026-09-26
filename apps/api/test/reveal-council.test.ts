@@ -58,6 +58,22 @@ describe("the reveal's council and evidence (spec §13)", () => {
   });
 });
 
+describe("the reveal's channel (design 2026-09-25 §6.3)", () => {
+  it("carries commit instants, reactions and lessons for model members, and each take's provenance", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-12T02:00:00Z"), toFake: ["Date"] });
+    const { db, qs, get } = await world();
+    await db.update(schema.questions).set({ status: "resolved", outcome: "no", resolvedAt: new Date("2026-09-11T16:01:00Z"), seenOnLabel: "the replies", unhinged: true }).where(eq(schema.questions.id, qs[0]!.id));
+    await db.insert(schema.reactions).values({ questionId: qs[0]!.id, member: "haiku", text: "ok the room is wrong", model: "m", promptVersion: "reaction-v1", createdAt: new Date("2026-09-11T16:02:00Z") });
+    await db.insert(schema.lessons).values({ questionId: qs[0]!.id, member: "sonnet", seriesKey: "news", text: "Warmer than I model.", resolvedAt: new Date("2026-09-11T16:01:00Z"), createdAt: new Date("2026-09-11T16:03:00Z") });
+    const r = RevealSchema.parse(await (await get(`/v1/round/${DATE}/reveal`)).json());
+    expect(r.council.find((e) => e.member === "sonnet")!.committed_at).toBe("2026-09-10T14:00:00.000Z");
+    expect(r.reactions).toEqual([{ question_id: qs[0]!.id, member: "haiku", text: "ok the room is wrong", created_at: "2026-09-11T16:02:00.000Z" }]);
+    expect(r.lessons).toEqual([{ question_id: qs[0]!.id, member: "sonnet", text: "Warmer than I model.", created_at: "2026-09-11T16:03:00.000Z" }]);
+    expect(r.questions[0]).toMatchObject({ seen_on: { label: "the replies", url: null }, unhinged: true });
+    expect(r.questions[1]).toMatchObject({ seen_on: null, unhinged: false });
+  });
+});
+
 describe("GET /admin/rounds/:date", () => {
   it("counts lines and evidence per question", async () => {
     const { app, qs } = await world();

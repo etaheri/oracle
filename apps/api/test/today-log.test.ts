@@ -58,8 +58,13 @@ describe("GET /v1/round/today (design 2026-09-25 §11)", () => {
 
 describe("GET /v1/round/today/log (design 2026-09-25 §6.2)", () => {
   it("serves the log only for the caller's sealed questions, ordered by commit time, mute before lock", async () => {
-    const { qs, as, seal } = await world();
+    const { db, qs, as, seal } = await world();
     await seal(qs[0]!.id, true);
+    // A reactions row exists for this sealed question, but before lock every
+    // tone is mute and there is no outcome to react to — /today/log must not
+    // carry it (design 2026-09-25 §6.2), which is what channelRows({ remarks:
+    // false }) buys back on the route's hottest read.
+    await db.insert(schema.reactions).values({ questionId: qs[0]!.id, member: "haiku", text: "should not appear", model: "m", promptVersion: "reaction-v1" });
     const out = TodayLogSchema.parse(await (await as("/v1/round/today/log")).json());
     expect(out.questions.map((q) => q.question_id)).toEqual([qs[0]!.id]);
     const q = out.questions[0]!;
