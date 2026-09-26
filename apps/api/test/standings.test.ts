@@ -144,6 +144,7 @@ describe("the read rate on the standings (design 2026-09-25 §8.1)", () => {
     expect(row("opus").read_rate).toBeCloseTo(0.4, 6);
     expect(row("sonnet").title).toBe(MEMBER_PROFILE.sonnet.title);
     expect(row("haiku")).toMatchObject({ calls: 0, read_rate: null, title: "night shift" });
+    expect(row("market").title).toBeNull();
     expect(row("crowd")).toMatchObject({ read_rate: null, title: null });
     expect(s.window).toBeNull();
   });
@@ -166,5 +167,17 @@ describe("the read rate on the standings (design 2026-09-25 §8.1)", () => {
     const csv = await (await app.request("/v1/standings?format=csv")).text();
     expect(csv.split("\n")[0]).toContain("right_side");
     expect(csv.split("\n")[1]!.endsWith(",yes,1") || csv.split("\n")[1]!.endsWith(",yes,0")).toBe(true);
+  });
+  it("treats anything but a plain positive integer as no window", async () => {
+    const db = await thirty();
+    const app = createApp({ db, env });
+    const noParam = StandingsSchema.parse(await (await app.request("/v1/standings")).json());
+    expect(noParam.window).toBeNull();
+    expect(noParam.questions).toBe(30);
+    for (const days of ["0", "-1", "abc", "1e3", "+30", "0x10"]) {
+      const s = StandingsSchema.parse(await (await app.request(`/v1/standings?days=${days}`)).json());
+      expect(s.window).toBeNull();
+      expect(s.questions).toBe(30);
+    }
   });
 });

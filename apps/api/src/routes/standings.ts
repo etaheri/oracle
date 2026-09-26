@@ -8,8 +8,8 @@ import { loadSettledCalls, standings, standingsCsv, standingsHtml } from "../sta
 const CACHE = "public, max-age=300";
 
 function parseWindow(raw: string | undefined, asOf: Date): { since: Date | undefined; window: number | null } {
-  const days = raw === undefined ? NaN : Number(raw);
-  if (!Number.isInteger(days) || days <= 0) return { since: undefined, window: null };
+  if (raw === undefined || !/^[1-9]\d*$/.test(raw)) return { since: undefined, window: null };
+  const days = Number(raw);
   return { since: new Date(asOf.getTime() - days * 86_400_000), window: days };
 }
 
