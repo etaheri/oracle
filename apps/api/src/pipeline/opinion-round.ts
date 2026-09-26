@@ -226,7 +226,7 @@ export async function rerollOpinionSlot(deps: PipelineDeps, date: string, slot: 
   const system = `You write one replacement hot take for OUTSEE's round dated ${date}, slot ${slot}${isBigOne ? " (THE BIG ONE: the take everyone will have a view on, in any category)" : ` (category: ${target.category})`}. The players are people who post. A hot take is a statement a person would post, that half the room will agree with and half will not.
 ${SEARCH}
 ${RULES}
-${isBigOne ? "" : `- Keep the category ${target.category}.\n`}- Do not overlap these takes already in the round:\n${others.map((q) => `- [${q.category}] ${q.text}`).join("\n")}
+${target.unhinged ? "- This slot is THE UNHINGED ONE: absurd on its face, and people will still argue about it. Keep it that way.\n" : ""}${isBigOne ? "" : `- Keep the category ${target.category}.\n`}- Do not overlap these takes already in the round:\n${others.map((q) => `- [${q.category}] ${q.text}`).join("\n")}
 - Do not post anything already posted in the last ${RECENT_DAYS} days:\n${recent.length === 0 ? "None yet." : recent.map((t) => `- ${t}`).join("\n")}
 Operator guidance: ${guidance || "none"}
 Call the opinion_question tool exactly once.`;
@@ -250,7 +250,13 @@ Call the opinion_question tool exactly once.`;
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
 
   const updated = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
-  await deps.telegram.send(draftMessage(date, [...updated].sort((a, b) => a.slot - b.slot).map((row) => ({
+  const sorted = [...updated].sort((a, b) => a.slot - b.slot);
+  await deps.telegram.send(draftMessage(date, sorted.map((row) => ({
     slot: row.slot, category: row.category, text: row.text, resolution_criteria: row.resolutionCriteria, is_big_one: row.isBigOne, resolves_at: null,
   }))));
+  // draftMessage's shared signature (author.ts) has no room for seen_on or
+  // unhinged, so the reroll's provenance follows as its own line.
+  await deps.telegram.send(
+    `provenance: ${sorted.map((row) => `${row.slot}. ${row.unhinged ? "[UNHINGED] " : ""}${row.seenOnLabel ? `seen on ${row.seenOnLabel}` : "—"}`).join(" · ")}`,
+  );
 }

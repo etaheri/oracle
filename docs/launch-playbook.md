@@ -156,6 +156,10 @@ the next of those hours it does nothing at all.
    The build on the store sends `confidence` and shows the ladder priced at
    the old fractions; the server ignores the number and stakes flat, so an
    old client's receipt may disagree with its ladder until it updates.
+   Build 12 itself, once shipped, prices its tray from `line_p_yes`, which is
+   null before the caller's own seal (N5): its card shows no estimate ladder
+   pre-seal and its first receipt reads bare YES/NO until the post-seal
+   refetch lands, both correct until build 13 reads the log instead.
 
 ### 2.4 The Council (design 2026-09-11 §17)
 

@@ -299,3 +299,6 @@ The 7 PM lock. A weekly shared take. Cross-vendor members and the silent fourth 
 - **Tests and the clock.** `commit_oracle_forecast` and `commit_council` compare the round's opening to the database's real clock, so any test fixture with a past round date rots. `council-crowd.test.ts` now computes its date relative to today; `exhibition.test.ts` uses 2099 dates throughout.
 - **§6.2 the log route's reads.** `channelRows(db, qIds, { remarks })` skips the reactions and lessons queries when `remarks` is false; `/today/log` passes false because before lock both are always empty.
 - **§5.3 reaction order.** Wrong-side members are asked in `MODEL_MEMBER_IDS` order (sonnet, opus, haiku), so a round where two are wrong asks Sonnet before Haiku.
+- **§8.1 CSV.** The CSV gained `right_side` (1, 0, or empty for a 0.5 line) per member row rather than a `read_rate` column; the rate is a row aggregate and the CSV is the per-call dataset.
+- **N5 on build 12.** With `line_p_yes` null before the seal, build 12's card shows no estimate ladder before the seal and its first receipt reads bare YES/NO until the post-seal refetch lands. Both are correct under N5 and last until build 13.
+- **§8.1 players' Brier.** Blank, as the spec says; the crowd row keeps calls and house delta.

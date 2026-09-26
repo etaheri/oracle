@@ -113,6 +113,7 @@ describe("selectExhibition", () => {
       linePYes: 0.7, // clampLine(0.7, null): no market on this question, so the line is the forecast itself.
       crowdYesPct: null,
       log: [],
+      crowd: false,
     });
     expect(ExhibitionSchema.parse(selected)).toEqual(selected);
   });
@@ -204,6 +205,7 @@ describe("selectExhibition", () => {
     expect(ex!.crowdYesPct).toBe(62);
     expect(ex!.linePYes).toBe(0.38);
     expect(ex!.sourceName).toBe("THE PLAYERS");
+    expect(ex!.crowd).toBe(true);
   });
 });
 

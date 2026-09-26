@@ -30,7 +30,7 @@ import { DEFAULT_EXCHANGES } from "./market-round";
 import type { ExchangeSource } from "./exchanges/types";
 import { writeLessons } from "./council/lessons";
 import { writeReactions, type ReactionsOutcome } from "./council/reactions";
-import { siteUrlOf, DEFAULT_CROWD_RESOLVE_MIN, crowdResolveMinOf } from "./round-kind";
+import { siteUrlOf, crowdResolveMinOf } from "./round-kind";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -119,11 +119,6 @@ export async function resolveFromExchange(deps: PipelineDeps, questionId: string
   });
   return true;
 }
-
-// The crowd's floor (design 2026-09-25 N11): the operating fact that decides
-// when a crowd room has enough seals. The rule, set by hand while the field
-// is a handful, may be lowered by the Worker var CROWD_RESOLVE_MIN.
-export const CROWD_RESOLVE_MIN = DEFAULT_CROWD_RESOLVE_MIN;
 
 /**
  * Crowd settlement (design 2026-09-22 §6.1): the players' own majority is the

@@ -6,6 +6,7 @@ import type { PipelineDeps } from "../src/pipeline";
 import type { ClaudeClient, StructuredCall } from "../src/pipeline/claude";
 import { inlineStarter } from "../src/pipeline/workflows";
 import { writeReactions } from "../src/pipeline/council/reactions";
+import { BudgetExhausted } from "../src/pipeline/spend";
 
 const DATE = "2026-09-25";
 const NOW = new Date("2026-09-26T16:02:00Z");
@@ -80,13 +81,30 @@ describe("writeReactions (design 2026-09-25 §5.3)", () => {
     const rows = await db.query.reactions.findMany({ orderBy: (x, { asc }) => [asc(x.member)] });
     expect(rows.map((x) => [x.member, x.text, x.promptVersion])).toEqual([["haiku", "haiku reacts", "reaction-v1"], ["sonnet", "sonnet reacts", "reaction-v1"]]);
   });
-  it("writes nothing for a void, a market question, a version 2 round, or an unresolved question", async () => {
+  it("writes nothing for a void, a market question, or a version 2 round", async () => {
     for (const [outcome, opts] of [["void", {}], ["yes", { crowd: false }], ["yes", { version: 2 }]] as const) {
       const { db, q } = await resolved(outcome, opts);
       const r = await writeReactions(makeDeps(db, claude([])), q.id);
       expect(r.written).toBe(0);
       expect((await db.query.reactions.findMany()).length).toBe(0);
     }
+  });
+  it("writes nothing, and makes no call, for a crowd question still unresolved", async () => {
+    const { db } = await makeTestDb();
+    const rows = await seedRound(db, { date: DATE, opensAt: new Date("2026-09-25T16:00:00Z"), locksAt: new Date("2026-09-26T16:00:00Z") });
+    await db.update(schema.rounds).set({ rulesVersion: 3, status: "locked" }).where(eq(schema.rounds.date, DATE));
+    const q = rows[0]!;
+    await db.update(schema.questions).set({
+      text: "cereal is a soup", status: "locked", outcome: null, resolvedAt: null, marketSource: "crowd", linePYes: "0.44",
+    }).where(eq(schema.questions.id, q.id));
+    await db.insert(schema.lines).values([
+      { questionId: q.id, member: "haiku", pYes: "0.31", committedAt: new Date("2026-09-25T13:00:00Z"), model: "m", promptVersion: "council-v2", reasoning: "no chance" },
+    ]);
+    const calls: StructuredCall[] = [];
+    const r = await writeReactions(makeDeps(db, claude(calls)), q.id);
+    expect(r).toEqual({ questionId: q.id, written: 0, dropped: 0 });
+    expect(calls.length).toBe(0);
+    expect((await db.query.reactions.findMany()).length).toBe(0);
   });
   it("a member exactly at 0.5 is on neither side and stays silent", async () => {
     // outcome NO: haiku 0.31 and sonnet 0.44 are right; opus at 0.5 is neither.
@@ -107,6 +125,16 @@ describe("writeReactions (design 2026-09-25 §5.3)", () => {
     expect(r.dropped).toBe(2);
     expect(r.error).toContain("taste");
     expect((await db.query.reactions.findMany()).length).toBe(0);
+  });
+  it("lets a BudgetExhausted from a member's reaction call propagate, rather than swallowing it as an error", async () => {
+    const { db, q } = await resolved("yes");
+    const budgetClaude = {
+      async structured(call: StructuredCall) {
+        if (call.schemaName === "reaction") throw new BudgetExhausted(DATE, 1, true);
+        throw new Error(`unexpected ${call.schemaName}`);
+      },
+    };
+    await expect(writeReactions(makeDeps(db, budgetClaude), q.id)).rejects.toBeInstanceOf(BudgetExhausted);
   });
   it("is idempotent and never throws on a failed member call", async () => {
     const { db, q } = await resolved("yes");

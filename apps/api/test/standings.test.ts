@@ -62,7 +62,7 @@ describe("standings", () => {
     expect(s.rows[2]).toEqual({ member: "haiku", calls: 0, brier: null, house_delta: 0, read_rate: null, title: "night shift" });
     const crowd = s.rows[4]!;
     expect(crowd.calls).toBe(5);
-    expect(crowd.brier).toBeCloseTo((4 * 0.16 + 0.36) / 5, 10);
+    expect(crowd.brier).toBeNull();
   });
 });
 
@@ -161,6 +161,8 @@ describe("the read rate on the standings (design 2026-09-25 §8.1)", () => {
     const windowed = StandingsSchema.parse(await (await app.request("/v1/standings?days=3")).json());
     expect(windowed.window).toBe(3);
     expect(windowed.questions).toBeLessThan(30);
+    const atMax = StandingsSchema.parse(await (await app.request("/v1/standings?days=3650")).json());
+    expect(atMax.window).toBe(3650);
     const html = await (await app.request("/standings")).text();
     expect(html).toContain("night shift");
     expect(html).toContain("<th>Read</th>");
@@ -174,7 +176,7 @@ describe("the read rate on the standings (design 2026-09-25 §8.1)", () => {
     const noParam = StandingsSchema.parse(await (await app.request("/v1/standings")).json());
     expect(noParam.window).toBeNull();
     expect(noParam.questions).toBe(30);
-    for (const days of ["0", "-1", "abc", "1e3", "+30", "0x10"]) {
+    for (const days of ["0", "-1", "abc", "1e3", "+30", "0x10", "200000000", "3651"]) {
       const s = StandingsSchema.parse(await (await app.request(`/v1/standings?days=${days}`)).json());
       expect(s.window).toBeNull();
       expect(s.questions).toBe(30);

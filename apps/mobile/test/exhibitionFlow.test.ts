@@ -22,6 +22,7 @@ const historical: Exhibition = {
   linePYes: null,
   crowdYesPct: null,
   log: [],
+  crowd: false,
 };
 
 const replacement: Exhibition = {

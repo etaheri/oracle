@@ -28,10 +28,11 @@ export function buildLog(input: LogInput): LogLine[] {
     at: l.committedAt, kind: "say", member: l.member, text: (l.reasoning ?? "").trim(), p_yes: l.pYes, tone: toneOf(l.pYes, input.outcome),
   }));
   const { outcome, crowd } = input;
-  if (outcome !== null && crowd.resolvedAt !== null) {
-    const text = outcome === "void"
-      ? (crowd.voidReason ?? "VOID")
-      : roomLine(outcome, crowd.yesPct ?? 0, crowd.count ?? 0);
+  // On yes/no, a missing crowd split or count is not a room of zero — it is
+  // no room line at all (reactions and notes still print).
+  const roomKnown = outcome === "void" || (crowd.yesPct !== null && crowd.count !== null);
+  if (outcome !== null && crowd.resolvedAt !== null && roomKnown) {
+    const text = outcome === "void" ? (crowd.voidReason ?? "VOID") : roomLine(outcome, crowd.yesPct!, crowd.count!);
     out.push({ at: crowd.resolvedAt, kind: "system", member: null, text, p_yes: null, tone: "mute" });
   }
   for (const r of input.reactions) out.push({ at: r.createdAt, kind: "say", member: r.member, text: r.text, p_yes: null, tone: "loss" });

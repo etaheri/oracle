@@ -57,8 +57,9 @@ describe("/reroll on a crowd slot (design 2026-09-22 §13)", () => {
     expect(q!.category).toBe("sports"); // the slot keeps its category; only the Big One may move
     expect(q!.marketSource).toBe("crowd");
     expect(q!.marketEventKey).toBe("2");
-    expect(sent.length).toBe(1);
+    expect(sent.length).toBe(2);
     expect(sent[0]).toContain("a rerolled take is the right one");
+    expect(sent[1]).toMatch(/^provenance: /);
   });
   it("lets the Big One take the model's category", async () => {
     const { deps } = await world({ category: "culture", text: "a rerolled big one is the right one", seen_on: null });
@@ -91,5 +92,27 @@ describe("/reroll at version 2 (design 2026-09-25 §4.4)", () => {
     expect(q).toMatchObject({ text: "a car payment is a personality trait", seenOnLabel: "r/personalfinance", unhinged: false });
     const unhinged = await deps.db.query.questions.findMany({ where: and(eq(schema.questions.roundDate, DATE), eq(schema.questions.unhinged, true)) });
     expect(unhinged.map((u) => u.slot)).toEqual([4]);
+  });
+
+  it("tells the voice when the slot is THE UNHINGED ONE, and does not on other slots", async () => {
+    const unhinged = await world({ category: "culture", text: "cereal is definitely a soup", seen_on: null });
+    await rerollSlot(unhinged.deps, DATE, 4, "");
+    const unhingedVoice = unhinged.calls.find((c) => c.schemaName === "opinion_question")!;
+    expect(unhingedVoice.system).toContain("THE UNHINGED ONE");
+
+    const plain = await world({ category: "markets", text: "a rerolled take is the right one", seen_on: null });
+    await rerollSlot(plain.deps, DATE, 1, "");
+    const plainVoice = plain.calls.find((c) => c.schemaName === "opinion_question")!;
+    expect(plainVoice.system).not.toContain("THE UNHINGED ONE");
+  });
+
+  it("sends the provenance line after the reroll, with the unhinged slot marked", async () => {
+    const { deps, sent } = await world({ category: "markets", text: "a car payment is a personality trait", seen_on: { label: "r/personalfinance", url: null } });
+    // Slot 4 is the fixture's unhinged slot; give it a seen-on directly so the
+    // provenance line has something real to report for it.
+    await deps.db.update(schema.questions).set({ seenOnLabel: "the replies" }).where(and(eq(schema.questions.roundDate, DATE), eq(schema.questions.slot, 4)));
+    await rerollSlot(deps, DATE, 1, "");
+    expect(sent.length).toBe(2);
+    expect(sent[1]).toBe("provenance: 1. seen on r/personalfinance · 2. — · 3. — · 4. [UNHINGED] seen on the replies · 5. —");
   });
 });

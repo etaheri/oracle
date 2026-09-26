@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { PIPELINE_LINES } from "@oracle/core";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
-import { resolveOne, resolveFromCrowd, runResolution, CROWD_RESOLVE_MIN } from "../src/pipeline/resolve";
+import { resolveOne, resolveFromCrowd, runResolution } from "../src/pipeline/resolve";
 import { claimResolutionPushes } from "../src/push/compose";
 import { loadPipelineState } from "../src/pipeline/state";
 import { inlineStarter } from "../src/pipeline/workflows";

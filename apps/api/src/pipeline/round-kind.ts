@@ -32,8 +32,8 @@ export function siteUrlOf(deps: Pick<PipelineDeps, "siteUrl">): string {
 export const DEFAULT_CROWD_RESOLVE_MIN = 20;
 
 export function parseCrowdResolveMin(raw: string | undefined): number {
-  const n = Number.parseInt((raw ?? "").trim(), 10);
-  return Number.isInteger(n) && n > 0 ? n : DEFAULT_CROWD_RESOLVE_MIN;
+  if (raw === undefined || !/^[1-9]\d*$/.test(raw)) return DEFAULT_CROWD_RESOLVE_MIN;
+  return Number(raw);
 }
 
 export function crowdResolveMinOf(deps: Pick<PipelineDeps, "crowdResolveMin">): number {

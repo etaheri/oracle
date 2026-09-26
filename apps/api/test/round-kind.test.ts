@@ -27,17 +27,18 @@ describe("the round kind (design 2026-09-22 T3)", () => {
   });
 });
 
-import { parseCrowdResolveMin, crowdResolveMinOf } from "../src/pipeline/round-kind";
-import { CROWD_RESOLVE_MIN } from "../src/pipeline/resolve";
+import { parseCrowdResolveMin, crowdResolveMinOf, DEFAULT_CROWD_RESOLVE_MIN } from "../src/pipeline/round-kind";
 
 describe("the crowd floor as a var (design 2026-09-25 N11)", () => {
   it("defaults to 20 and parses a positive integer", () => {
-    expect(CROWD_RESOLVE_MIN).toBe(20);
+    expect(DEFAULT_CROWD_RESOLVE_MIN).toBe(20);
     expect(parseCrowdResolveMin(undefined)).toBe(20);
     expect(parseCrowdResolveMin("3")).toBe(3);
     expect(parseCrowdResolveMin("0")).toBe(20);
     expect(parseCrowdResolveMin("-2")).toBe(20);
     expect(parseCrowdResolveMin("abc")).toBe(20);
+    expect(parseCrowdResolveMin("3abc")).toBe(20);
+    expect(parseCrowdResolveMin(" 3")).toBe(20);
     expect(crowdResolveMinOf({ crowdResolveMin: 3 })).toBe(3);
     expect(crowdResolveMinOf({})).toBe(20);
   });

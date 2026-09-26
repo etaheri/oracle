@@ -40,6 +40,18 @@ describe("buildLog (design 2026-09-25 §6.1)", () => {
     const log = buildLog({ lines: [say("sonnet", 0.5, null)], outcome: "yes", crowd: { yesPct: 60, count: 30, resolvedAt: "2026-09-26T16:01:00.000Z", voidReason: null }, reactions: [], lessons: [] });
     expect(log[0]).toMatchObject({ tone: "mute", text: "" });
   });
+  it("emits no system line on yes/no when the crowd split or count is missing, but keeps reactions and notes", () => {
+    const base = {
+      lines: [say("haiku", 0.6)],
+      outcome: "yes" as const,
+      reactions: [{ member: "haiku" as const, text: "ok the room is wrong", createdAt: "2026-09-26T16:02:00.000Z" }],
+      lessons: [{ member: "opus" as const, text: "The room is warmer on food than I model.", createdAt: "2026-09-26T16:03:00.000Z" }],
+    };
+    const noPct = buildLog({ ...base, crowd: { yesPct: null, count: 30, resolvedAt: "2026-09-26T16:01:00.000Z", voidReason: null } });
+    expect(noPct.map((l) => l.kind)).toEqual(["say", "say", "note"]);
+    const noCount = buildLog({ ...base, crowd: { yesPct: 60, count: null, resolvedAt: "2026-09-26T16:01:00.000Z", voidReason: null } });
+    expect(noCount.map((l) => l.kind)).toEqual(["say", "say", "note"]);
+  });
   it("is empty with no lines", () => {
     expect(buildLog({ lines: [], outcome: "yes", crowd: { yesPct: 60, count: 30, resolvedAt: "2026-09-26T16:01:00.000Z", voidReason: null }, reactions: [], lessons: [] })).toEqual([]);
   });

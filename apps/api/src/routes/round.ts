@@ -28,12 +28,18 @@ async function openRound(db: Db, now: Date) {
 // Before lock, reactions and lessons are always empty (design 2026-09-25
 // §6.2), so a caller reading the channel pre-lock (/today/log) can skip both
 // queries with { remarks: false } rather than fetch and discard them.
-async function channelRows(db: Db, qIds: string[], opts: { remarks: boolean } = { remarks: true }) {
+//
+// The reveal already reads `lines` itself (councilRows, below) to sort and
+// annotate every member including the market, so it skips this helper's own
+// lines query with { lines: false } rather than fetch the same rows twice.
+async function channelRows(db: Db, qIds: string[], opts: { remarks?: boolean; lines?: boolean } = {}) {
+  const remarks = opts.remarks ?? true;
+  const withLines = opts.lines ?? true;
   if (qIds.length === 0) return { lines: [], reactions: [], lessons: [] };
   const [lines, reactions, lessons] = await Promise.all([
-    db.query.lines.findMany({ where: inArray(schema.lines.questionId, qIds) }),
-    opts.remarks ? db.query.reactions.findMany({ where: inArray(schema.reactions.questionId, qIds) }) : Promise.resolve([]),
-    opts.remarks ? db.query.lessons.findMany({ where: inArray(schema.lessons.questionId, qIds) }) : Promise.resolve([]),
+    withLines ? db.query.lines.findMany({ where: inArray(schema.lines.questionId, qIds) }) : Promise.resolve([]),
+    remarks ? db.query.reactions.findMany({ where: inArray(schema.reactions.questionId, qIds) }) : Promise.resolve([]),
+    remarks ? db.query.lessons.findMany({ where: inArray(schema.lessons.questionId, qIds) }) : Promise.resolve([]),
   ]);
   const isModel = (m: string): m is ModelMemberId => (MODEL_MEMBER_IDS as readonly string[]).includes(m);
   return {
@@ -62,18 +68,17 @@ export const roundRoutes = new Hono<AppContext>()
     // null while no round has settled. Both are read as aggregates: the row
     // set grows by one a day forever, and /today is the hottest route we
     // serve, so neither may become an unbounded select summed in JavaScript.
-    const [user, house] = await Promise.all([
-      db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
-      houseSummary(db),
-    ]);
     // The line is a common signal before the seal (design 2026-09-22 T9) and
     // the leak the hot-takes design accepted for a week closes here: it is
     // served only on the caller's own sealed questions (design 2026-09-25 N5).
-    const sealed = new Set(
+    const [user, house, sealedRows] = await Promise.all([
+      db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
+      houseSummary(db),
       qIds.length
-        ? (await db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qIds)), columns: { questionId: true } })).map((p) => p.questionId)
-        : [],
-    );
+        ? db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qIds)), columns: { questionId: true } })
+        : Promise.resolve([]),
+    ]);
+    const sealed = new Set(sealedRows.map((p) => p.questionId));
     return c.json({
       date: round.date,
       rules_version: round.rulesVersion,
@@ -234,10 +239,9 @@ export const roundRoutes = new Hono<AppContext>()
       published_at: e.publishedAt === null ? null : e.publishedAt.toISOString(), highlight: e.highlight,
     }));
     // The channel after lock (design 2026-09-25 §6.3): reactions and lessons,
-    // model members only. This re-reads `lines` even though councilRows above
-    // already has them — one extra query on a route read once a day per
-    // player, accepted rather than refactoring the existing councilRows read.
-    const channel = await channelRows(db, qIds);
+    // model members only. `lines` is skipped — councilRows above already has
+    // them.
+    const channel = await channelRows(db, qIds, { lines: false });
     const reactions = channel.reactions.map((r) => ({ question_id: r.questionId, member: r.member, text: r.text, created_at: r.createdAt }));
     const lessons = channel.lessons.map((l) => ({ question_id: l.questionId, member: l.member, text: l.text, created_at: l.createdAt }));
     const byQ = new Map(mine.map((p) => [p.questionId, p]));

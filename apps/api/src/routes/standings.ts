@@ -7,9 +7,13 @@ import { loadSettledCalls, standings, standingsCsv, standingsHtml } from "../sta
 
 const CACHE = "public, max-age=300";
 
+/** A window is a plain positive integer string, at most this many days. */
+export const MAX_WINDOW_DAYS = 3650;
+
 function parseWindow(raw: string | undefined, asOf: Date): { since: Date | undefined; window: number | null } {
   if (raw === undefined || !/^[1-9]\d*$/.test(raw)) return { since: undefined, window: null };
   const days = Number(raw);
+  if (days > MAX_WINDOW_DAYS) return { since: undefined, window: null };
   return { since: new Date(asOf.getTime() - days * 86_400_000), window: days };
 }
 

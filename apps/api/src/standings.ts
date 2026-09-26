@@ -71,7 +71,10 @@ export function standings(calls: SettledCall[], asOf: Date, window: number | nul
     window,
     rows: [
       ...MEMBER_ORDER.map((member) => { const xs = forMember(member); return { member, ...standingsRow(xs), read_rate: rate(xs), title: titleOf(member) }; }),
-      { member: "crowd" as const, ...standingsRow(crowd), read_rate: null, title: null },
+      // The players' Brier is blank (spec §8.1): the crowd is the baseline on
+      // opinion rounds, not a scored member, so calls and house delta stand
+      // but brier does not.
+      { member: "crowd" as const, ...standingsRow(crowd), brier: null, read_rate: null, title: null },
     ],
   };
 }
@@ -113,11 +116,11 @@ table{border-collapse:collapse;width:100%;margin:12px 0 24px}
 th{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
 td{padding:10px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 td.n{text-align:right}a{color:var(--gold-text)}
-.title{color:#666;font-size:12px;margin-left:6px}`;
+.title{color:var(--muted);font-size:12px;margin-left:6px}`;
 
 export function standingsHtml(s: Standings): string {
   const rows = s.rows.map((r) =>
-    `<tr><td>${escapeHtml(NAMES[r.member] ?? r.member)}${r.title ? ` <span class="title">${escapeHtml(r.title)}</span>` : ""}</td><td class="n">${r.calls}</td><td class="n">${r.brier === null ? "—" : r.brier.toFixed(3)}</td><td class="n">${r.house_delta > 0 ? "+" : ""}${r.house_delta}</td><td class="n">${r.read_rate === null ? "—" : `${Math.round(r.read_rate * 100)}%`}</td></tr>`,
+    `<tr><td>${escapeHtml(NAMES[r.member] ?? r.member)}${r.title ? ` <span class="title">${escapeHtml(r.title)}</span>` : ""}</td><td class="n">${r.calls}</td><td class="n">${r.read_rate === null ? "—" : `${Math.round(r.read_rate * 100)}%`}</td><td class="n">${r.brier === null ? "—" : r.brier.toFixed(3)}</td><td class="n">${r.house_delta > 0 ? "+" : ""}${r.house_delta}</td></tr>`,
   ).join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standings · Outsee</title><style>${STYLE}</style></head><body><div class="wrap"><a class="brand" href="https://outseen-site.etaheri.workers.dev/">Outsee</a><h1>Standings</h1><p>Each member of the Council commits a line on every question before it opens. Brier is the mean squared error of the line, lower is better; house delta is what the purse would have done with that member alone, at the stakes players actually placed. On opinion rounds the players are the answer, so their row is the baseline the machines are measured against. The players are people who post.</p><table><thead><tr><th>Member</th><th>Calls</th><th>Brier</th><th>House delta</th><th>Read</th></tr></thead><tbody>${rows}</tbody></table><p>${s.questions} questions over ${s.rounds} rounds, as of ${escapeHtml(s.as_of.slice(0, 10))}. <a href="/v1/standings?format=csv">Download the record as CSV</a> · <a href="/v1/standings">JSON</a></p></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standings · Outsee</title><style>${STYLE}</style></head><body><div class="wrap"><a class="brand" href="https://outseen-site.etaheri.workers.dev/">Outsee</a><h1>Standings</h1><p>Each member of the Council commits a line on every question before it opens. Brier is the mean squared error of the line, lower is better; house delta is what the purse would have done with that member alone, at the stakes players actually placed. On opinion rounds the players are the answer, so their row is the baseline the machines are measured against. The players are people who post.</p><table><thead><tr><th>Member</th><th>Calls</th><th>Read</th><th>Brier</th><th>House delta</th></tr></thead><tbody>${rows}</tbody></table><p>${s.questions} questions over ${s.rounds} rounds, as of ${escapeHtml(s.as_of.slice(0, 10))}. <a href="/v1/standings?format=csv">Download the record as CSV</a> · <a href="/v1/standings">JSON</a></p></div></body></html>`;
 }

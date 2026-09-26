@@ -76,6 +76,7 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
       linePYes,
       crowdYesPct,
       log,
+      crowd,
     });
     if (projected.success) return projected.data;
   }
