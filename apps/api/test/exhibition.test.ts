@@ -112,6 +112,7 @@ describe("selectExhibition", () => {
       outcome: "yes",
       linePYes: 0.7, // clampLine(0.7, null): no market on this question, so the line is the forecast itself.
       crowdYesPct: null,
+      log: [],
     });
     expect(ExhibitionSchema.parse(selected)).toEqual(selected);
   });
@@ -187,7 +188,7 @@ describe("selectExhibition", () => {
 
   it("offers a crowd question without a context block, carrying the room's share (design 2026-09-22 T10)", async () => {
     const { db } = await makeTestDb();
-    const date = "2026-09-23";
+    const date = "2099-08-30";
     // sourceName and context are set at seed time, before commit_oracle_forecast:
     // once a round is committed, oracle_question_commitment_guard freezes both
     // fields on the row, so a post-commit rewrite of either is rejected. This
@@ -203,6 +204,21 @@ describe("selectExhibition", () => {
     expect(ex!.crowdYesPct).toBe(62);
     expect(ex!.linePYes).toBe(0.38);
     expect(ex!.sourceName).toBe("THE PLAYERS");
+  });
+});
+
+describe("the channel on a past hot take (design 2026-09-25 §11)", () => {
+  it("carries the log with the room's line, reactions and notes, and nothing on a market question", async () => {
+    const { db } = await makeTestDb();
+    const [q] = await resolvedRound(db, "2099-08-31", { noContext: true, sourceName: "THE PLAYERS" });
+    await db.update(schema.questions).set({ marketSource: "crowd", crowdYesPct: "62", crowdCount: 41, outcome: "yes", resolvedAt: new Date("2099-09-01T16:01:00Z"), linePYes: "0.38" }).where(eq(schema.questions.id, q!.id));
+    await db.insert(schema.lines).values({ questionId: q!.id, member: "haiku", pYes: "0.31", committedAt: new Date("2099-08-31T13:00:00Z"), reasoning: "no chance" });
+    await db.insert(schema.reactions).values({ questionId: q!.id, member: "haiku", text: "ok", createdAt: new Date("2099-09-01T16:02:00Z") });
+    const e = ExhibitionSchema.parse(await selectExhibition(db));
+    expect(e.id).toBe(q!.id);
+    expect(e.log.map((l) => l.kind)).toEqual(["say", "system", "say"]);
+    expect(e.log[1]!.text).toBe("THE ROOM AGREED · 62% · 41 PLAYERS");
+    expect(e.log[0]!.tone).toBe("loss");
   });
 });
 

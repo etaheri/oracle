@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { ExhibitionSchema, QuestionContextSchema, clampLine, type Exhibition } from "@oracle/core";
+import { ExhibitionSchema, QuestionContextSchema, buildLog, clampLine, MODEL_MEMBER_IDS, type Exhibition, type ModelMemberId } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 export async function selectExhibition(db: Db): Promise<Exhibition | null> {
@@ -47,6 +47,23 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
     const linePYes = question.linePYes !== null && question.linePYes !== undefined ? Number(question.linePYes) : clampLine(oraclePYes, Number.isFinite(marketP as number) ? marketP : null);
     const crowdYesPct = crowd && question.crowdYesPct !== null && question.crowdYesPct !== undefined ? Math.round(Number(question.crowdYesPct)) : null;
 
+    let log: ReturnType<typeof buildLog> = [];
+    if (crowd) {
+      const isModel = (m: string): m is ModelMemberId => (MODEL_MEMBER_IDS as readonly string[]).includes(m);
+      const [lines, reactions, lessons] = await Promise.all([
+        db.query.lines.findMany({ where: eq(schema.lines.questionId, question.id) }),
+        db.query.reactions.findMany({ where: eq(schema.reactions.questionId, question.id) }),
+        db.query.lessons.findMany({ where: eq(schema.lessons.questionId, question.id) }),
+      ]);
+      log = buildLog({
+        lines: lines.filter((l) => isModel(l.member)).map((l) => ({ member: l.member as ModelMemberId, pYes: Number(l.pYes), reasoning: l.reasoning, committedAt: l.committedAt.toISOString() })),
+        outcome: question.outcome,
+        crowd: { yesPct: crowdYesPct, count: question.crowdCount, resolvedAt: question.resolvedAt?.toISOString() ?? null, voidReason: null },
+        reactions: reactions.filter((r) => isModel(r.member)).map((r) => ({ member: r.member as ModelMemberId, text: r.text, createdAt: r.createdAt.toISOString() })),
+        lessons: lessons.filter((l) => isModel(l.member)).map((l) => ({ member: l.member as ModelMemberId, text: l.text, createdAt: l.createdAt.toISOString() })),
+      });
+    }
+
     const projected = ExhibitionSchema.safeParse({
       id: question.id,
       kind: "historical",
@@ -58,6 +75,7 @@ export async function selectExhibition(db: Db): Promise<Exhibition | null> {
       outcome: question.outcome,
       linePYes,
       crowdYesPct,
+      log,
     });
     if (projected.success) return projected.data;
   }
