@@ -122,29 +122,32 @@ the next of those hours it does nothing at all.
    SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1;
    ```
 
-   It must read `1789437975543` — `0016_whole_bishop`'s `when` in
-   `apps/api/drizzle/meta/_journal.json` (2026-09-15T02:06:15.543Z). A smaller
-   number means `0016` never landed and the Hand's columns are not there,
+   It must read `1790374181865` — `0017_nightshift`'s `when` in
+   `apps/api/drizzle/meta/_journal.json` (2026-09-25T14:29:41.865Z). A smaller
+   number means `0017` never landed and the night shift columns are not there,
    whatever the CLI's exit code said.
-2. Deploy the API.
-3. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
+2. Apply `0017` to production: `cd apps/api && DATABASE_URL='<prod>' pnpm db:migrate`. `0017` is the night shift (design 2026-09-25 §10): `seen_on_label`, `seen_on_url` and `unhinged` on `questions`, and the `reactions` table. No data migration.
+3. `wrangler.jsonc` now carries `CROWD_RESOLVE_MIN` (design 2026-09-25 N11). It is `3` while the field is a handful; the rule is 20. Raise it in one deploy once twenty players seal a round.
+4. The first night on `opinion-v2` (design 2026-09-25 §4): read the Telegram draft for the `seen on` labels and the `[UNHINGED]` mark; `/reroll <slot> <guidance>` still works and searches. The Council commits at 09:00 as `council-v2`; reactions land at the first resolve tick after lock and print in the day report as `reactions: N written, M dropped`.
+5. Deploy the API.
+6. Set `PIPELINE_ENABLED` to `true`: `echo -n true | npx wrangler secret put PIPELINE_ENABLED`.
    Wait for the new deployment to go live before the next step.
-4. Deal tomorrow's round by hand and inspect it in Telegram:
+7. Deal tomorrow's round by hand and inspect it in Telegram:
    `curl -X POST -H 'x-admin-secret: …' https://<api>/admin/rounds/<tomorrow>/author`
    Then commit the forecast and the line:
    `curl -X POST … /admin/rounds/<tomorrow>/forecast` and `curl -X POST … /admin/rounds/<tomorrow>/line`
    Check `GET /admin/rounds/<tomorrow>` shows five questions with `market_source`, `market_id`, `line_p_yes`.
-   A `503 {"error":"pipeline not configured"}` here means step 3 has not taken
+   A `503 {"error":"pipeline not configured"}` here means step 6 has not taken
    effect yet, not that the round failed.
-5. Delete the retired probe Workflow from the account. Version 3 has no probe
+8. Delete the retired probe Workflow from the account. Version 3 has no probe
    and `wrangler.jsonc` no longer binds it, so `oracle-probe` survives the
    deploy as an orphan that still holds any instances it had:
    `cd apps/api && npx wrangler workflows list` to confirm it is there, then
    `npx wrangler workflows delete oracle-probe` (deleting a Workflow also
    deletes its own instances). The dashboard's Workers → Workflows page does
    the same thing.
-6. The round publishes at the next noon ET. The 17:00 ET tick deals the following day's round without help.
-7. Ship the mobile build only after the API is live; the response schemas
+9. The round publishes at the next noon ET. The 17:00 ET tick deals the following day's round without help.
+10. Ship the mobile build only after the API is live; the response schemas
    default every new field, so the old build keeps parsing in the meantime.
    **The build currently on the store renders a version 3 daily board empty** —
    it reads points and comparisons that a version 3 round no longer carries, so
