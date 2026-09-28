@@ -40,6 +40,7 @@ import { CouncilReading } from "../../ui/CouncilReading";
 import { ChannelLog } from "../../ui/ChannelLog";
 import { CrowdBar } from "../../ui/CrowdReveal";
 import { revealLog, channelCounts } from "../../game/channel";
+import { shareExcerpt, excerptEnds } from "../../game/shareExcerpt";
 
 const easeOut = Easing.out(Easing.poly(4));
 const ROW_DELAY = 0;
@@ -309,6 +310,9 @@ export default function RevealScreen() {
   const rivalry = rivalryMoment(d.questions.map(q => ({ ...q, is_big_one: q.slot === 5 })), duel);
   const oracleLine = d.rules_version >= 2 ? duelLine(duel) : oracleDayLine(d.questions);
   const oracleCounts = oracleLine !== null ? dayCallCounts(d.questions) : null;
+  const excerpt = bigRoom && big
+    ? shareExcerpt({ date: d.date, log: revealLog(d, big), my: big.my ? { answer: big.my.answer, sealedAt: big.my.sealed_at } : null })
+    : [];
   const cardData: ShareCardData = {
     date: d.date,
     dayPoints: d.day_points,
@@ -334,6 +338,7 @@ export default function RevealScreen() {
           }),
         }
       : {}),
+    ...(excerpt.length > 0 ? { excerpt } : {}),
   };
   // The one line about the double, read once for the block below.
   const doubleRead = doubleObservation(d.questions);
@@ -361,7 +366,7 @@ export default function RevealScreen() {
     setShareError(null);
     try {
       await (fortuneRound
-        ? shareSnapshot(canvasRef, `oracle-${d.date}.png`, fortuneShareMessage({ date: d.date, delta: d.delta!, fortuneAfter: d.fortune_after!, results }))
+        ? shareSnapshot(canvasRef, `oracle-${d.date}.png`, fortuneShareMessage({ date: d.date, delta: d.delta!, fortuneAfter: d.fortune_after!, results, excerpt: excerptEnds(excerpt) }))
         : shareCard(canvasRef, cardData));
     } catch {
       // Every other failure in this app has a written line; this one used to

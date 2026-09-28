@@ -17,10 +17,13 @@ export function shareBigOneLine(input: { line: number | null; answer: boolean | 
 }
 
 export function fortuneShareMessage(
-  d: { date: string; delta: number; fortuneAfter: number; results: ReadonlyArray<QuestionResult> },
+  d: { date: string; delta: number; fortuneAfter: number; results: ReadonlyArray<QuestionResult>; excerpt?: [string, string] | null },
   url: string | null = SHARE_URL,
 ): string {
   const body = `🔮 OUTSEEN ${d.date} — ${patternLine(d.results)} · ${signedFortune(d.delta)} · FORTUNE ${formatFortune(d.fortuneAfter)} · can you beat the house?`;
+  // With the channel on the card, the message quotes it: each on its own
+  // line, so the link still ends the message where a client can find it.
+  if (d.excerpt) return [body, d.excerpt[0], d.excerpt[1], ...(url ? [url] : [])].join("\n");
   return url ? `${body} ${url}` : body;
 }
 

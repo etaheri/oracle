@@ -31,4 +31,10 @@ describe("the share card's lines (design §8.3)", () => {
     expect(fortuneShareMessage({ date: "2026-09-10", delta: -60, fortuneAfter: 940, results: ["loss", "loss", "loss", "loss", "loss"] }, "https://x.y"))
       .toBe("🔮 OUTSEEN 2026-09-10 — I✗ II✗ III✗ IV✗ V✗ · −60 · FORTUNE 940 · can you beat the house? https://x.y");
   });
+
+  it("carries the excerpt's first and last lines, each on its own line, ahead of the link", () => {
+    const d = { date: "2026-09-25", delta: 140, fortuneAfter: 1140, results: ["win", "loss", "win", "win", "void"] as const, excerpt: ["#nightshift · 09-25", "12:01 <haiku> ok the room is wrong"] as [string, string] };
+    expect(fortuneShareMessage(d, "https://x.y")).toBe("🔮 OUTSEEN 2026-09-25 — I✓ II✗ III✓ IV✓ V∅ · +140 · FORTUNE 1,140 · can you beat the house?\n#nightshift · 09-25\n12:01 <haiku> ok the room is wrong\nhttps://x.y");
+    expect(fortuneShareMessage(d, null).endsWith("12:01 <haiku> ok the room is wrong")).toBe(true);
+  });
 });
