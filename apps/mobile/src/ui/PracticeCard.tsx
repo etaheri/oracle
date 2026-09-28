@@ -3,6 +3,7 @@ import { ScrollView, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { practiceLine, type Exhibition, type RoundToday } from "@oracle/core";
 import { CardChrome } from "./CardChrome";
+import { ChannelLog } from "./ChannelLog";
 import { DecodeLine } from "./DecodeText";
 import { practiceResult } from "../game/practiceResult";
 import { sealHint } from "../game/stakeText";
@@ -91,6 +92,12 @@ function PracticeResult({ result, exhibition }: { result: ReturnType<typeof prac
     </View>
     <Serif size={displayScale.lead} style={{ textAlign: "center", lineHeight: 28 }}>{result.verdict}</Serif>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>{result.counterfactual}</Mono>
+    {/* Practice ends where a real round does: with what the machines guessed
+        and what they said when the room proved them wrong (design 2026-09-25
+        §11). A market question and the made-up example have no channel. */}
+    {exhibition.crowd && exhibition.log.length > 0 && (
+      <ChannelLog date={roundDate ?? ""} log={exhibition.log} defaultOpen collapsible={false} />
+    )}
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Practice fortune, nothing changed.</Mono>
     <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Next: five hot takes against the Oracle, with your real fortune.</Mono>
   </>;
