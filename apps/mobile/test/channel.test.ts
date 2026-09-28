@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { LogLine, Reveal } from "@oracle/core";
-import { etClock, channelHeader, nick, printLines, summaryRow, channelCounts, revealLog, DARK_FLOOR, CHANNEL_NAME } from "../src/game/channel";
+import { etClock, channelHeader, nick, printLines, summaryRow, spokenLine, spokenSummary, channelCounts, revealLog, DARK_FLOOR, CHANNEL_NAME } from "../src/game/channel";
 
 const QID = "5d3f0d2a-6a3e-4a1f-9b8e-0c2a1b3c4d5e";
 const say = (member: "haiku" | "sonnet" | "opus", p: number | null, text: string, at = "2026-09-25T13:00:00.000Z", tone: LogLine["tone"] = "mute"): LogLine => ({ at, kind: "say", member, text, p_yes: p, tone });
@@ -62,6 +62,32 @@ describe("the channel's lines", () => {
   });
   it("names the empty floor", () => {
     expect(DARK_FLOOR).toBe("THE FLOOR WAS DARK");
+  });
+});
+
+describe("what a screen reader hears", () => {
+  it("speaks a guess as a clock, a share and a verdict", () => {
+    expect(spokenLine(LOG[0]!)).toBe("09:00. Haiku, 31 percent, wrong. no chance");
+  });
+  it("ends a wordless guess on its verdict", () => {
+    expect(spokenLine(LOG[2]!)).toBe("09:00. Opus, 62 percent, right.");
+  });
+  it("speaks the room's line as the room", () => {
+    expect(spokenLine(LOG[3]!)).toBe("12:00. The room: THE ROOM AGREED · 62% · 41 PLAYERS");
+  });
+  it("speaks a reaction as the member talking", () => {
+    expect(spokenLine(LOG[4]!)).toBe("12:01. Haiku: ok the room is wrong");
+  });
+  it("speaks a note as a note to self", () => {
+    expect(spokenLine(LOG[5]!)).toBe("12:02. Sonnet, note to self: weigh the villain.");
+  });
+  it("carries the spoken label on every print line", () => {
+    expect(printLines(LOG).map((l) => l.spoken)).toEqual(LOG.map(spokenLine));
+  });
+  it("speaks the collapsed summary as names and shares", () => {
+    expect(spokenSummary(LOG)).toBe("Haiku 31, Sonnet 44, Opus 62");
+    expect(spokenSummary([])).toBeNull();
+    expect(spokenSummary([LOG[3]!])).toBeNull();
   });
 });
 

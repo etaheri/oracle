@@ -36,7 +36,7 @@ export function sharePct(p: number): string {
   return String(Math.round(p * 100));
 }
 
-export interface PrintLine { key: string; stamp: string; nick: string; body: string; tone: LogLine["tone"]; kind: LogLine["kind"] }
+export interface PrintLine { key: string; stamp: string; nick: string; body: string; spoken: string; tone: LogLine["tone"]; kind: LogLine["kind"] }
 
 function bodyOf(l: LogLine): string {
   if (l.kind === "note") return `${NOTE_PREFIX}${l.text}`;
@@ -44,8 +44,27 @@ function bodyOf(l: LogLine): string {
   return l.text;
 }
 
+// The printed line reads `09:00 <haiku> 31  no chance`, which a screen reader
+// says as punctuation and a bare number, and the tone colour that carries
+// right and wrong is not spoken at all. So each line is written out once more,
+// in words: the stamp as a clock, the share as a percentage, the tone as a
+// verdict, the member by name.
+function memberName(member: LogLine["member"]): string {
+  return member === null ? "The room" : member.charAt(0).toUpperCase() + member.slice(1);
+}
+
+export function spokenLine(l: LogLine): string {
+  const clock = etClock(l.at);
+  const name = memberName(l.member);
+  if (l.kind === "note") return `${clock}. ${name}, ${NOTE_PREFIX}${l.text}`;
+  if (l.kind === "system" || l.p_yes === null) return `${clock}. ${name}: ${l.text}`;
+  const verdict = l.tone === "win" ? ", right" : l.tone === "loss" ? ", wrong" : "";
+  const head = `${clock}. ${name}, ${sharePct(l.p_yes)} percent${verdict}`;
+  return l.text ? `${head}. ${l.text}` : `${head}.`;
+}
+
 export function printLines(log: ReadonlyArray<LogLine>): PrintLine[] {
-  return log.map((l, i) => ({ key: `${i}-${l.at}`, stamp: etClock(l.at), nick: nick(l.member), body: bodyOf(l), tone: l.tone, kind: l.kind }));
+  return log.map((l, i) => ({ key: `${i}-${l.at}`, stamp: etClock(l.at), nick: nick(l.member), body: bodyOf(l), spoken: spokenLine(l), tone: l.tone, kind: l.kind }));
 }
 
 const guesses = (log: ReadonlyArray<LogLine>) => log.filter((l) => l.kind === "say" && l.member !== null && l.p_yes !== null);
@@ -55,6 +74,14 @@ export function summaryRow(log: ReadonlyArray<LogLine>): string | null {
   const rows = guesses(log);
   if (rows.length === 0) return null;
   return rows.map((l) => `${nick(l.member)} ${sharePct(l.p_yes!)}`).join(" · ");
+}
+
+// The same row in words, for the collapsed header's label: the middle dots and
+// the angle brackets are noise to a screen reader.
+export function spokenSummary(log: ReadonlyArray<LogLine>): string | null {
+  const rows = guesses(log);
+  if (rows.length === 0) return null;
+  return rows.map((l) => `${memberName(l.member)} ${sharePct(l.p_yes!)}`).join(", ");
 }
 
 export function channelCounts(log: ReadonlyArray<LogLine>): { member_count: number; reaction_count: number } {

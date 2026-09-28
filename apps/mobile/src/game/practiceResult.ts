@@ -21,10 +21,14 @@ export function practiceResult(prediction: PracticePrediction, exhibition: Exhib
   const agreed = exhibition.outcome === "yes";
   const roomPct = exhibition.crowdYesPct;
   const roomSidePct = roomPct === null ? null : agreed ? roomPct : 100 - roomPct;
-  const roomLine = roomSidePct === null
-    ? `Actual outcome: ${agreed ? "YES" : "NO"}.`
-    : room
-      ? `The room ${agreed ? "agreed" : "disagreed"}, ${roomSidePct}%.`
+  // A hot take never prints YES or NO, share or no share: with nothing behind
+  // it the room simply agreed or disagreed.
+  const roomLine = room
+    ? roomSidePct === null
+      ? `The room ${agreed ? "agreed" : "disagreed"}.`
+      : `The room ${agreed ? "agreed" : "disagreed"}, ${roomSidePct}%.`
+    : roomSidePct === null
+      ? `Actual outcome: ${agreed ? "YES" : "NO"}.`
       : `The room said ${agreed ? "YES" : "NO"}, ${roomSidePct}%.`;
   return {
     ...out,

@@ -111,7 +111,12 @@ export function CrowdReveal({ round, logs }: { round: RoundToday; logs: Map<stri
                       and DOUBLED on the call that took the double -- the
                       finale is the only place the placed double is ever shown
                       back. An unstaked round still reads "YOU: YES". */}
-                  <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
+                  {/* A hot take's two lines stack. Side by side they read
+                      "THE ROOM AGREED · 62%" against "AGREE · 44% TO AGREE" —
+                      two long strings on one row, and the second clipped at
+                      iPhone width. A market question's are short enough to
+                      share the row, and do. */}
+                  <View style={room ? { gap: 2 } : { flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
                     {!gathering && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "left" }]}>{shareSoFar(c!.crowd_yes_pct, room)}</Mono>}
                     <Mono {...role.caption} color={against ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
                       {crowdCallLine({ answer: mine.answer, line: sealedLog?.line ?? null, doubled: mine.doubled, room })}{against ? " · AGAINST THE TIDE" : ""}

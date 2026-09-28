@@ -13,7 +13,7 @@ import { crowdAnticipation } from "../game/crowdAnticipation";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
 import { DoubleTray } from "../ui/DoubleTray";
-import { trayTiles, trayState, trayStage, DOUBLE_FAILED, TRAY_HOLD_MS } from "../game/doubleTray";
+import { trayTiles, trayState, trayStage, handKnown, DOUBLE_FAILED, TRAY_HOLD_MS, TRAY_TITLE } from "../game/doubleTray";
 import { capture } from "../analytics/analytics";
 import { receiptLine } from "../game/stakeText";
 import { SleepsPanel } from "../ui/SleepsPanel";
@@ -81,13 +81,6 @@ export default function Round() {
   const lineOf = (id: string) => logs.get(id)?.line ?? null;
   const lastLog = lastSealedId ? logs.get(lastSealedId) : undefined;
   const lastRoom = (lastSealedId ? qs.find((q) => q.id === lastSealedId)?.crowd : false) ?? false;
-  const openedLogFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!lastSealedId || !lastLog || !lastRoom || openedLogFor.current === lastSealedId) return;
-    openedLogFor.current = lastSealedId;
-    setLogOpen(true);
-    capture("log_opened", { question_id: lastSealedId, line: lastLog.line });
-  }, [lastSealedId, lastLog, lastRoom]);
   const double = useDouble();
   // After the double lands the tray holds for a beat, then hands over to the
   // crowd finale — the finale is the payoff, the tray is the decision.
@@ -113,17 +106,50 @@ export default function Round() {
   // The server's row is the truth; `placedId` only covers the beat between
   // the mutation landing and /today/mine coming back carrying it.
   const doubleId = mine.data?.double_question_id ?? placedId;
-  // The hand is known once both the player's rows and their lines have
-  // landed. The line rides the channel, which the fifth seal refetches, so the
-  // tray waits on it the way it already waits on /today/mine -- otherwise it
-  // opens with four tiles and grows a fifth.
-  const handKnown = !mine.isFetching && !mine.isPending && (!anySealed || (!log.isFetching && !log.isPending));
-  const tray = trayDone ? "placed" : doubleId !== null || handKnown ? trayState(qs, minePreds, doubleId, lineOf, now) : "hidden";
+  // The hand is known once the player's rows have landed and the channel has a
+  // line for every one of them: the line rides the channel, which the fifth
+  // seal refetches, so the tray waits on it the way it waits on /today/mine or
+  // it opens with four tiles and grows a fifth. Keyed on what has ARRIVED, not
+  // on whether a fetch is in flight — gating on `isFetching` blanked an open
+  // tray on every background refetch and after every refused double.
+  //
+  // The one thing the fetch flags covered that coverage does not: on the fifth
+  // seal the local store says sealed before /today/mine has come back, so
+  // `minePreds` is a row short of the hand for one round trip and every line it
+  // names is present. Count the locally sealed questions and call the hand
+  // unknown while they outnumber the server's rows.
+  const locallySealed = qs.filter((q) => answers[q.id]?.sealed).length;
+  const known = handKnown({
+    mineLoaded: mine.data !== undefined || mine.isError,
+    sealedIds: minePreds.map((p) => p.question_id),
+    hasLog: (id) => logs.has(id),
+    logFailed: log.isError,
+  }) && (mine.isError || locallySealed <= minePreds.length);
+  const tray = trayDone ? "placed" : doubleId !== null || known ? trayState(qs, minePreds, doubleId, lineOf, now) : "hidden";
   const tiles = trayTiles(qs, minePreds, lineOf, now);
   const current = nextOpenQuestion(qs, (id) => !!answers[id]?.sealed, now);
   // Card, tray, an empty beat, or the finale — see trayStage for why the
   // empty beat exists.
-  const stage = trayStage({ hasOpenCard: !!current, tray, mineSettled: handKnown, holdPlaced: !trayDone && placedId !== null });
+  const stage = trayStage({ hasOpenCard: !!current, tray, mineSettled: known, holdPlaced: !trayDone && placedId !== null });
+  // The channel opens itself on the take just sealed — over the next card, or
+  // over the tray once the fifth is sealed and the Big One's floor would
+  // otherwise never be read. Never on the finale: the block is in that frame
+  // already. An empty floor has nothing to open for, and the footer's summary
+  // row is absent there too.
+  const openedLogFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastSealedId || !lastLog || !lastRoom || openedLogFor.current === lastSealedId) return;
+    if (stage !== "card" && stage !== "tray") return;
+    if (lastLog.log.length === 0) return;
+    openedLogFor.current = lastSealedId;
+    setLogOpen(true);
+    capture("log_opened", { question_id: lastSealedId, line: lastLog.line });
+  }, [lastSealedId, lastLog, lastRoom, stage]);
+  // The open panel takes the screen from the reader, so it says so — once, and
+  // however it was opened.
+  useEffect(() => {
+    if (logOpen) AccessibilityInfo.announceForAccessibility("The channel is open.");
+  }, [logOpen]);
   // The placed tile holds its DOUBLED mark for a beat, then the stage moves
   // on. In an effect, so leaving mid-beat cancels the timer with it.
   useEffect(() => {
@@ -223,17 +249,23 @@ export default function Round() {
             lies over the lower stage rather than resizing it: the next card is
             already dealt beneath, and a card that changed height as the log
             opened and closed would move under the player's thumb. A tap on the
-            stage above it, or the link, closes it. */}
-        {current && logOpen && lastLog && lastSealedId && (
-          <>
+            stage above it, or the link, closes it. It lies over the tray as
+            well: the fifth take's floor has no other place to be read, since
+            the fifth seal is followed by the double, not by a sixth card.
+
+            The scrim and the panel share one modal wrapper, so a reader that
+            opens the channel is inside it and cannot wander back out into the
+            card and the numerals behind it. */}
+        {(current || stage === "tray") && logOpen && lastLog && lastSealedId && (
+          <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
             <Pressable accessibilityRole="button" accessibilityLabel="Close the channel" onPress={() => setLogOpen(false)} style={StyleSheet.absoluteFill} />
             <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "62%", backgroundColor: colors.museumWhite, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: space(3), gap: space(2) }}>
               <ScrollView contentContainerStyle={{ paddingBottom: space(2) }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false} showsVerticalScrollIndicator={false}>
                 <ChannelLog key={lastSealedId} date={today.data.date} log={lastLog.log} defaultOpen collapsible={false} />
               </ScrollView>
-              <QuietLink title="DRAW THE NEXT CARD" onPress={() => setLogOpen(false)} />
+              <QuietLink title={current ? "DRAW THE NEXT CARD" : TRAY_TITLE} onPress={() => setLogOpen(false)} />
             </View>
-          </>
+          </View>
         )}
       </View>
       {/* A struck question is the most dramatic thing this system does, and without

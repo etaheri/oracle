@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RoundToday, MineToday } from "@oracle/core";
-import { trayTiles, trayState, trayStage } from "../src/game/doubleTray";
+import { trayTiles, trayState, trayStage, handKnown } from "../src/game/doubleTray";
 
 type Q = RoundToday["questions"][number];
 const NOW = Date.parse("2026-09-14T17:00:00Z");
@@ -78,5 +78,26 @@ describe("the stage after the last card (design §5.3)", () => {
     expect(trayStage({ hasOpenCard: false, tray: "placed", mineSettled: true, holdPlaced: false })).toBe("finale");
     // A double placed on an earlier visit is settled fact: never a wait.
     expect(trayStage({ hasOpenCard: false, tray: "placed", mineSettled: false, holdPlaced: false })).toBe("finale");
+  });
+});
+
+describe("the hand the tray prices (design §5.3)", () => {
+  const known = (over: Partial<Parameters<typeof handKnown>[0]> = {}) =>
+    handKnown({ mineLoaded: true, sealedIds: ["q1", "q2"], hasLog: () => true, logFailed: false, ...over });
+
+  it("is unknown before the player's rows have loaded", () => {
+    expect(known({ mineLoaded: false })).toBe(false);
+  });
+  it("is unknown while a sealed call has no line in the channel", () => {
+    expect(known({ hasLog: (id) => id === "q1" })).toBe(false);
+  });
+  it("is known once every sealed call has one", () => {
+    expect(known()).toBe(true);
+  });
+  it("is known when nothing is sealed yet", () => {
+    expect(known({ sealedIds: [] })).toBe(true);
+  });
+  it("is known when the channel failed, so the stage falls through rather than hanging", () => {
+    expect(known({ hasLog: () => false, logFailed: true })).toBe(true);
   });
 });

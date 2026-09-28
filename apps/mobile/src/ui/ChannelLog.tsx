@@ -8,7 +8,7 @@ import { Pressable, Text, View } from "react-native";
 import type { LogLine } from "@oracle/core";
 import { Mono, role } from "./Text";
 import { DecodeLine } from "./DecodeText";
-import { channelHeader, printLines, summaryRow, DARK_FLOOR, type PrintLine } from "../game/channel";
+import { channelHeader, printLines, summaryRow, spokenSummary, DARK_FLOOR, type PrintLine } from "../game/channel";
 import { colors, space } from "../theme";
 
 const LINE_STAGGER_MS = 120;
@@ -28,7 +28,7 @@ function ChannelLine({ line, index }: { line: PrintLine; index: number }) {
       delayMs={index * LINE_STAGGER_MS}
       durationMs={LINE_PRINT_MS}
       color={line.kind === "say" ? colors.ink : colors.mutedInk}
-      accessibilityLabel={`${line.stamp} ${line.nick} ${line.body}`}
+      accessibilityLabel={line.spoken}
       style={[base.style, LEFT, line.kind === "note" ? { opacity: 0.7 } : null]}
       prefix={
         <>
@@ -55,6 +55,9 @@ export function ChannelLog({ date, log, defaultOpen, collapsible = true, onOpen 
   const header = channelHeader(date);
   const lines = printLines(log);
   const summary = summaryRow(log);
+  // The collapsed row is the only thing the closed block shows, so the label
+  // that opens it says it too — otherwise the shares are visible and unspoken.
+  const spoken = spokenSummary(log);
   const head = <Mono {...role.meta} color={colors.goldText} style={[role.meta.style, LEFT]}>{header}</Mono>;
 
   if (lines.length === 0) {
@@ -73,7 +76,7 @@ export function ChannelLog({ date, log, defaultOpen, collapsible = true, onOpen 
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
-          accessibilityLabel={open ? "Close the channel" : "Open the channel"}
+          accessibilityLabel={open ? "Close the channel" : spoken ? `Open the channel. ${spoken}` : "Open the channel"}
           onPress={() => { if (!open) onOpen?.(); setOpen((v) => !v); }}
           style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", gap: space(1), opacity: pressed ? 0.5 : 1 })}
         >

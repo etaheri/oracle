@@ -391,7 +391,7 @@ export default function Index() {
             record and a reveal, both of which land after first paint. */}
         <View style={{ minHeight: scaledRow(ROW_H.meta, chromeScale) * 2, alignItems: "center", justifyContent: "center" }}>
           {lastNight && reading && (
-            <Pressable accessibilityRole="button" hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => leaveHome(() => router.push(`/reveal/${reading.date}`))}>
+            <Pressable accessibilityRole="button" accessibilityHint="Opens that round's result." hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => leaveHome(() => router.push(`/reveal/${reading.date}`))}>
               <Mono {...role.meta} color={colors.goldText} style={[role.meta.style, { textDecorationLine: "underline" }]}>{lastNight}</Mono>
             </Pressable>
           )}

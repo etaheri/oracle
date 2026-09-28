@@ -50,6 +50,15 @@ export function trayTiles(questions: RoundToday["questions"], mine: MineToday["p
     });
 }
 
+// The hand is known once the player's rows have loaded and the channel has a
+// line for every one of them. Keyed on what has arrived, never on whether a
+// fetch is in flight: a background refetch must not blank an open tray.
+export function handKnown(input: { mineLoaded: boolean; sealedIds: ReadonlyArray<string>; hasLog: (id: string) => boolean; logFailed: boolean }): boolean {
+  if (!input.mineLoaded) return false;
+  if (input.logFailed) return true;
+  return input.sealedIds.every((id) => input.hasLog(id));
+}
+
 // Hidden while any card is still dealable, or when no sealed call is still
 // open to double; placed once the server has the double; open otherwise.
 export function trayState(questions: RoundToday["questions"], mine: MineToday["predictions"], doubleQuestionId: string | null, lineOf: LineOf, now: number): TrayState {
