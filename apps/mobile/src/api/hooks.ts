@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, AllTimeBoardSchema, CrowdSoFarSchema, MineTodaySchema, MeLedgerSchema, SubmitResSchema, DoubleResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
+import { RoundTodaySchema, RoundNextSchema, RevealSchema, RoundBoardSchema, AllTimeBoardSchema, CrowdSoFarSchema, MineTodaySchema, TodayLogSchema, MeLedgerSchema, SubmitResSchema, DoubleResSchema, ExhibitionSchema, type PredictionSubmit } from "@oracle/core";
 import { api, ApiError } from "./client";
 import { getDeviceToken } from "./auth";
 
@@ -78,6 +78,26 @@ export function useMineToday(enabled: boolean) {
   });
 }
 
+// The channel after the seal (design 2026-09-25 §6.2): the log, and the line
+// the tray prices the double from, for the caller's sealed questions only.
+// The server checks the seal, so nothing here can leak a take that is still
+// on the table.
+export function useTodayLog(enabled: boolean) {
+  return useQuery({
+    queryKey: ["round", "log"],
+    enabled,
+    queryFn: async () => {
+      const token = await getDeviceToken();
+      try {
+        return await api("/v1/round/today/log", TodayLogSchema, { token });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
+}
+
 export function useReveal(date: string | null) {
   return useQuery({
     queryKey: ["reveal", date],
@@ -132,6 +152,8 @@ export function useSubmit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["round", "crowd"] });
       qc.invalidateQueries({ queryKey: ["round", "mine"] });
+      // The seal opens the channel on this take.
+      qc.invalidateQueries({ queryKey: ["round", "log"] });
       // The seal spent fortune, and an earlier round settling mid-window moves
       // it too — refetch so the next card's stake is priced at the real one.
       qc.invalidateQueries({ queryKey: ["round", "today"] });

@@ -10,6 +10,8 @@ export type AnalyticsEvent =
   | "house_headline_viewed"
   | "resolution_evidence_opened"
   | "reading_opened"
+  | "log_opened"
+  | "channel_expanded"
   | "practice_started"
   | "practice_completed"
   | "practice_skipped"
