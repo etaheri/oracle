@@ -13,6 +13,10 @@ import { asciiGauge } from "../game/terminalPrint";
 import { GATHERING_LINE, VERDICT_MIN_PLAYERS } from "../game/crowdVerdict";
 import { crowdMovement } from "../game/crowdMovement";
 import { crowdCallLine } from "../game/stakeText";
+import { ChannelLog } from "./ChannelLog";
+import type { SealedLog } from "../game/todayLog";
+import { shareSoFar } from "../game/sideWords";
+import { capture } from "../analytics/analytics";
 import { contrarianApplies, type RoundToday } from "@oracle/core";
 
 // The crowd bar in the machine's own alphabet: [#######·····], the fill
@@ -46,7 +50,7 @@ export function CrowdBar({ pct }: { pct: number }) {
   );
 }
 
-export function CrowdReveal({ round }: { round: RoundToday }) {
+export function CrowdReveal({ round, logs }: { round: RoundToday; logs: Map<string, SealedLog> }) {
   const router = useRouter();
   const { fontScale } = useWindowDimensions();
   const crowd = useCrowdSoFar(true);
@@ -72,10 +76,12 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
               replaces did. */}
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: space(4) }} showsVerticalScrollIndicator contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
             {sealed.map((q) => {
+              const room = q.crowd;
+              const sealedLog = logs.get(q.id);
               const c = byId.get(q.id);
               const mine = answers[q.id]!;
               const mySidePct = mine.answer ? (c?.crowd_yes_pct ?? 50) : 100 - (c?.crowd_yes_pct ?? 50);
-              const against = contrarianApplies(mySidePct, c?.player_count ?? 0);
+              const against = !room && contrarianApplies(mySidePct, c?.player_count ?? 0);
               // Under the floor the percentage is mostly the player: at one
               // sealed answer this frame printed a full gauge and "100% SAY
               // YES" directly above a footer reading "1 ORACLE HAS SPOKEN".
@@ -92,6 +98,7 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
                 mine.atSeal,
                 c ? { pct: c.crowd_yes_pct, count: c.player_count } : null,
                 false,
+                room,
               );
               return (
                 <View key={q.id} style={{ gap: space(2) }}>
@@ -105,13 +112,16 @@ export function CrowdReveal({ round }: { round: RoundToday }) {
                       finale is the only place the placed double is ever shown
                       back. An unstaked round still reads "YOU: YES". */}
                   <View style={{ flexDirection: "row", justifyContent: gathering ? "flex-end" : "space-between" }}>
-                    {!gathering && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "left" }]}>{c!.crowd_yes_pct}% SAY YES</Mono>}
+                    {!gathering && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "left" }]}>{shareSoFar(c!.crowd_yes_pct, room)}</Mono>}
                     <Mono {...role.caption} color={against ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
-                      {crowdCallLine({ answer: mine.answer, line: q.line_p_yes, doubled: mine.doubled })}{against ? " · AGAINST THE TIDE" : ""}
+                      {crowdCallLine({ answer: mine.answer, line: sealedLog?.line ?? null, doubled: mine.doubled, room })}{against ? " · AGAINST THE TIDE" : ""}
                     </Mono>
                   </View>
                   {movement && (
                     <Mono {...role.meta} color={colors.mutedInk}>{movement}</Mono>
+                  )}
+                  {room && sealedLog && (
+                    <ChannelLog date={round.date} log={sealedLog.log} defaultOpen={false} onOpen={() => capture("log_opened", { question_id: q.id, line: sealedLog.line })} />
                   )}
                 </View>
               );

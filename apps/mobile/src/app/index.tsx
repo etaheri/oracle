@@ -1,7 +1,7 @@
 import { roundAvailability } from "../game/roundAvailability";
 import { shouldOfferReminder } from "../game/reminderOffer";
 import { useNotificationPermission } from "../notifications/permission";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, View, Pressable, Linking } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, Ritual, role } from "../ui/Text";
@@ -14,9 +14,10 @@ import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { OracleClock } from "../ui/OracleClock";
 import { HomeChallenge } from "../ui/HomeChallenge";
 import { useQueryClient } from "@tanstack/react-query";
-import { useToday, useCrowdSoFar, useMeLedger, useMineToday, useNextRound, useReveal } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMeLedger, useMineToday, useNextRound, useReveal, useTodayLog } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
+import { logIndex } from "../game/todayLog";
 import { crowdLean } from "../game/orbMood";
 import { isBootDone, isOrbLanded, onBootDone, onOrbLanded } from "../game/bootGate";
 import { useHeroCues } from "../ui/useHeroCues";
@@ -107,6 +108,10 @@ export default function Index() {
   // here for the stake rows and the round's double, not fetched a second time.
   const mine = useMineToday(!!round);
   const sealedIds = new Set([...localSealedIds, ...hydration.sealedQuestionIds]);
+  // The tray is priced from the channel's line (design 2026-09-25 N5), so the
+  // unplaced-double notice below needs it too.
+  const log = useTodayLog(!!round && sealedIds.size > 0);
+  const logs = useMemo(() => logIndex(log.data), [log.data]);
   const availability = round ? roundAvailability(round.questions, sealedIds, availabilityNow, round.rules_version) : null;
   const requiredQuestions = round?.questions.filter((question) => !(round.rules_version >= 2 && question.struck)) ?? [];
   const submittedFromData = requiredQuestions.length > 0 && requiredQuestions.every((question) => sealedIds.has(question.id));
@@ -190,7 +195,7 @@ export default function Index() {
   const now = useNow(30_000);
   // The unplaced double outranks the risk line: it is an action still open on
   // TODAY's round, where risk and lapse are about the streak around it.
-  const tray = round ? trayState(round.questions, mine.data?.predictions ?? [], mine.data?.double_question_id ?? null, now) : "hidden";
+  const tray = round ? trayState(round.questions, mine.data?.predictions ?? [], mine.data?.double_question_id ?? null, (id) => logs.get(id)?.line ?? null, now) : "hidden";
   const dbl = doubleNotice(tray);
   const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
   const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${calendarYesterday}`);
