@@ -296,6 +296,20 @@ describe("the reveal reads the player's own call back (audit 2026-09-02 §3.1)",
     it("says nothing without a seal snapshot", () => {
       expect(movementLine(question({ outcome: "yes", crowd_yes_pct: 60, crowd_count: 40 }))).toBeNull();
     });
+
+    it("says agreed when the tide moved on a hot take", () => {
+      expect(
+        movementLine(
+          question({
+            crowd: true,
+            outcome: "yes",
+            crowd_yes_pct: 55,
+            crowd_count: 40,
+            my: { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: 40, crowd_count_at_seal: 12, stake: 50, payout: 143, delta: 93, doubled: false, sealed_at: null },
+          }),
+        ),
+      ).toBe("WHEN YOU SEALED 40% AGREED · IT ENDED AT 55%");
+    });
   });
 });
 

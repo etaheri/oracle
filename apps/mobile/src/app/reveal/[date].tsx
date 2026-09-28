@@ -28,7 +28,7 @@ import { useReveal, useRoundBoard, useAllTimeBoard } from "../../api/hooks";
 import { markRevealSeen } from "../../api/flags";
 import { rowState, rowMark, rowRight, receiptLine, callLine, movementLine, crowdReadable, ledgerLines, pendingLine, lapsedLine, readingLine, pointsWithheld, weightLine, TOO_FEW_LINE } from "../../game/revealRows";
 import { scaledLines, scaledRow } from "../../game/typeScaling";
-import { isFortuneRound, stakedRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark, bustLines, doubleObservation } from "../../game/revealFortune";
+import { isFortuneRound, stakedRound, fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, moneyMark, bustLines, doubleObservation, roomVerdict } from "../../game/revealFortune";
 import { lineLabel } from "../../game/stakeText";
 import { shareBigOneLine, fortuneShareMessage } from "../../game/shareLines";
 import { boardLines, boardSupportingLines, boardRowLines, allTimeLines, allTimeRowLines, oracleDayLine, BOARD_MAX_LINES, ALL_TIME_TITLE } from "../../game/dailyBoard";
@@ -37,6 +37,9 @@ import { capture } from "../../analytics/analytics";
 import { colors, space, displayScale, ROW_H } from "../../theme";
 import { councilFor, splitRows, evidenceFor, SPLIT_ROW_H, type SplitRow } from "../../game/council";
 import { CouncilReading } from "../../ui/CouncilReading";
+import { ChannelLog } from "../../ui/ChannelLog";
+import { CrowdBar } from "../../ui/CrowdReveal";
+import { revealLog, channelCounts } from "../../game/channel";
 
 const easeOut = Easing.out(Easing.poly(4));
 const ROW_DELAY = 0;
@@ -102,6 +105,28 @@ function CouncilSplit({ d, questionId, linePYes, fontScale, align = "left" }: { 
           </View>
         );
       })}
+    </View>
+  );
+}
+
+// The channel on one take (design 2026-09-25 §6.3): open on the Big One,
+// collapsed to its row of shares on the others. It replaces the Council split
+// and the readings on a hot take; a market round keeps both.
+function RevealChannel({ d, q, open }: { d: Reveal; q: Reveal["questions"][number]; open: boolean }) {
+  const log = revealLog(d, q);
+  return (
+    <ChannelLog date={d.date} log={log} defaultOpen={open} onOpen={() => capture("channel_expanded", { question_id: q.id, ...channelCounts(log) })} />
+  );
+}
+
+// The room's gauge and its verdict, on one row.
+function RoomRow({ q }: { q: Reveal["questions"][number] }) {
+  const verdict = roomVerdict(q);
+  if (verdict === null || q.crowd_yes_pct === null) return null;
+  return (
+    <View style={{ flexDirection: "row", gap: space(2), alignItems: "center" }}>
+      <CrowdBar pct={Math.round(q.crowd_yes_pct)} />
+      <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{verdict}</Mono>
     </View>
   );
 }
@@ -260,6 +285,7 @@ export default function RevealScreen() {
   const d = reveal.data;
   const big = d.questions.find((q) => q.slot === 5);
   const bigState = big ? rowState(big) : null;
+  const bigRoom = big?.crowd ?? false;
   // Version 3 reads the whole page in money: the headline is a delta, the
   // rows are stakes, and the duel -- which had no money in it -- is gone.
   // An unstaked version 3 round (no line committed, design §5.5) and a version
@@ -304,6 +330,7 @@ export default function RevealScreen() {
             answer: big?.my?.answer ?? null,
             stake: big?.my?.stake ?? null,
             delta: big?.my?.delta ?? null,
+            room: bigRoom,
           }),
         }
       : {}),
@@ -518,6 +545,7 @@ export default function RevealScreen() {
             // At version 3 a row's fortune is its own verdict: the sign of the
             // delta, not the win/loss the points ladder used to hand out.
             const money = fortuneRound;
+            const room = q.crowd;
             const color = money
               ? (q.my?.delta == null ? colors.mutedInk : q.my.delta > 0 ? colors.goldText : q.my.delta < 0 ? colors.vermilion : colors.mutedInk)
               : st === "win" ? colors.goldText : st === "loss" ? colors.vermilion : colors.mutedInk;
@@ -538,6 +566,7 @@ export default function RevealScreen() {
                 </Ritual>
                 <View style={{ flex: 1, gap: space(1) }}>
                   <Serif size={displayScale.inline} color={colors.ink} numberOfLines={scaledLines(3, fontScale)} style={{ lineHeight: 21 }}>{q.text}</Serif>
+                  {room && <RoomRow q={q} />}
                   {/* What you said, and what the crowd said — the Big One's
                       block has always read both back; the four ordinary calls
                       showed only their points, so a day later the ledger could
@@ -554,13 +583,13 @@ export default function RevealScreen() {
                   {context ? (
                     <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{context}</Mono>
                   ) : null}
-                  {money && <CouncilSplit d={d} questionId={q.id} linePYes={q.line_p_yes} fontScale={fontScale} />}
                   {/* How the tide moved after this player sealed (design
                       2026-09-09 §4.1) — no reserved space: rows are already
                       variable height, and most days say nothing here. */}
                   {movement ? (
                     <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textAlign: "left" }]}>{movement}</Mono>
                   ) : null}
+                  {room ? <RevealChannel d={d} q={q} open={false} /> : money && <CouncilSplit d={d} questionId={q.id} linePYes={q.line_p_yes} fontScale={fontScale} />}
                   <ResolutionEvidence question={q} />
                   {receipt ? (
                     <Mono {...role.caption} color={colors.mutedInk} numberOfLines={2} style={[role.caption.style, { textAlign: "left" }]}>{receipt}</Mono>
@@ -627,7 +656,9 @@ export default function RevealScreen() {
                   {/* Same floor as the round footer and the finale: over a
                       handful of players the percentage is mostly the reader,
                       and this frame is the one people screenshot. */}
-                  <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{crowdReadable(big) ? `PLAYERS SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>
+                  {bigRoom
+                    ? <RoomRow q={big} />
+                    : <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{crowdReadable(big) ? `PLAYERS SAID ${big.crowd_yes_pct}% YES` : TOO_FEW_LINE}</Mono>}
                   {big.market_prob != null && (
                     <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>THE MARKET SAID {Math.round(big.market_prob * 100)}% YES</Mono>
                   )}
@@ -638,7 +669,7 @@ export default function RevealScreen() {
                   {fortuneRound ? (
                     big.line_p_yes != null && big.outcome !== "void" && big.outcome !== null && (
                       <Mono {...role.caption} color={colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>
-                        {lineLabel(big.line_p_yes)}{" "}
+                        {lineLabel(big.line_p_yes, bigRoom)}{" "}
                         {oracleCallRight(big.line_p_yes, big.outcome) === null
                           ? ""
                           : oracleCallRight(big.line_p_yes, big.outcome)
@@ -658,7 +689,7 @@ export default function RevealScreen() {
                       </Mono>
                     )
                   )}
-                  {fortuneRound && <CouncilSplit d={d} questionId={big.id} linePYes={big.line_p_yes} fontScale={fontScale} />}
+                  {bigRoom ? <RevealChannel d={d} q={big} open /> : fortuneRound && <CouncilSplit d={d} questionId={big.id} linePYes={big.line_p_yes} fontScale={fontScale} />}
                   {fortuneRound && oracleTake(big) && (
                     <Mono {...role.caption} color={(big.my?.delta ?? 0) > 0 ? colors.goldText : colors.mutedInk} style={[role.caption.style, { textAlign: "left" }]}>{oracleTake(big)}</Mono>
                   )}
