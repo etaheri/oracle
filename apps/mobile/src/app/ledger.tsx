@@ -23,6 +23,7 @@ import { LITURGY_LINES } from "@oracle/core";
 import { shieldStat } from "../game/shieldStat";
 import { fortuneHistoryLines } from "../game/fortuneHistory";
 import { formatFortune } from "../game/fortuneText";
+import { roomRows, ROOM_READ_LABEL, ROOM_MISSED_LABEL } from "../game/roomRecord";
 
 // The plaque's floor, shared by the frame that waits for it. The loading
 // frame exists so the plaque fills rather than flashes, and it only earns
@@ -130,6 +131,7 @@ export default function Ledger() {
   };
 
   const d = ledger.data ?? null;
+  const room = roomRows(d?.room);
 
   async function handleShare() {
     if (!d) return;
@@ -154,7 +156,7 @@ export default function Ledger() {
     <Screen scroll overlayHeader patina header={<TopBar />}>
       <View style={{ flexGrow: 1, justifyContent: "center", gap: space(4), paddingVertical: space(4) }}>
         <Eyebrow>{GAME_TERMS.history}</Eyebrow>
-        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your fortune, your best, your streak</Mono>
+        <Mono {...role.supporting} style={[role.supporting.style, { textAlign: "center" }]}>Your fortune, your best, your streak, the room</Mono>
         <QuietLink title={GAME_TERMS.rulesNav} onPress={() => router.push({ pathname: "/rites", params: { all: "1" } })} />
         {/* One column in both states. The frame used to be the only thing
             held steady while the six children below it did not exist yet —
@@ -180,6 +182,18 @@ export default function Ledger() {
                 <View style={{ height: 1, backgroundColor: colors.lineSoft, marginVertical: space(1) }} />
                 <Stat label="ROUNDS PLAYED" value={String(d.days_consulted)} />
                 <Stat label="STREAK" value={`${d.streak} ${d.streak === 1 ? "DAY" : "DAYS"}`} />
+                {/* Reading the room (design 2026-09-25 §6.4), under the two
+                    counts it belongs with. Absent until the first hot take
+                    settles, so a new record shows no empty rows. */}
+                {room && (
+                  <>
+                    <Stat label={ROOM_READ_LABEL} value={room.read} />
+                    <Stat label={ROOM_MISSED_LABEL} value={room.missed} />
+                    {room.verdict && (
+                      <Mono {...role.line} color={room.gold ? colors.goldText : colors.mutedInk} style={[role.line.style, { textAlign: "left" }]}>{room.verdict}</Mono>
+                    )}
+                  </>
+                )}
                 {/* A gloss on the row above it, in the register a gloss is
                     written in. */}
                 <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { paddingBottom: space(1) }]}>Your streak is one call a day. It updates when the round settles. Streak protection can carry it through a missed round. It adds no fortune.</Mono>
