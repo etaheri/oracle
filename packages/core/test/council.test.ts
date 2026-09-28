@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { medianLine, sideOf, onRightSide, memberBrier, memberHouseDelta, standingsRow, MEMBER_ORDER, MEMBER_PROFILE, MODEL_MEMBER_IDS, readRate, READ_RATE_MIN_CALLS } from "../src/council";
+import { medianLine, sideOf, onRightSide, memberBrier, memberHouseDelta, standingsRow, MEMBER_ORDER, MEMBER_PROFILE, MODEL_MEMBER_IDS, readRate, READ_RATE_MIN_CALLS, roomRecord, ROOM_WINDOW_DAYS } from "../src/council";
 import { payout, clampLine } from "../src/fortune";
 
 describe("the median (spec §7)", () => {
@@ -109,5 +109,42 @@ describe("the read rate (design 2026-09-25 §8.1)", () => {
   it("maps a player's side to 1 and 0", () => {
     const calls = [...Array.from({ length: 25 }, (_, i) => call(i % 5 === 0 ? 0 : 1, "yes"))];
     expect(readRate(calls)).toBeCloseTo(20 / 25, 6);
+  });
+});
+
+describe("the room record (design 2026-09-25 §6.4)", () => {
+  const NOW = Date.parse("2026-09-28T16:00:00Z");
+  const DAY = 86_400_000;
+  const call = (date: string, answer: boolean, line: number | null, outcome: "yes" | "no", daysAgo = 1) => ({ date, answer, line, outcome, lockedAt: NOW - daysAgo * DAY });
+
+  it("is empty with no settled calls", () => {
+    expect(roomRecord([], NOW)).toEqual({ days: 0, days_read: 0, days_machines_missed: 0, read_rate_30d: null, calls_30d: 0 });
+  });
+  it("counts a day as read when the caller was with the room on more calls than against", () => {
+    const r = roomRecord([
+      call("2026-09-25", true, 0.7, "yes"), call("2026-09-25", true, 0.7, "yes"), call("2026-09-25", true, 0.7, "no"),
+      call("2026-09-26", true, 0.7, "no"), call("2026-09-26", false, 0.7, "yes"),
+      // Level is not read: one with, one against.
+      call("2026-09-27", true, 0.7, "yes"), call("2026-09-27", true, 0.7, "no"),
+    ], NOW);
+    expect(r).toMatchObject({ days: 3, days_read: 1 });
+  });
+  it("counts a day the machines missed when the line was on the wrong side more often than the right", () => {
+    const r = roomRecord([
+      call("2026-09-25", true, 0.3, "yes"), call("2026-09-25", true, 0.3, "yes"), call("2026-09-25", true, 0.7, "yes"),
+      call("2026-09-26", true, 0.7, "yes"),
+      // A 0.5 line and a missing line are on neither side.
+      call("2026-09-27", true, 0.5, "yes"), call("2026-09-27", true, null, "yes"),
+    ], NOW);
+    expect(r).toMatchObject({ days: 3, days_machines_missed: 1 });
+  });
+  it("rates the last thirty days only, and only from twenty-five calls", () => {
+    expect(ROOM_WINDOW_DAYS).toBe(30);
+    const recent = Array.from({ length: 25 }, (_, i) => call(`2026-09-${String(1 + (i % 25)).padStart(2, "0")}`, true, 0.7, i < 20 ? "yes" : "no", 5));
+    const old = Array.from({ length: 10 }, () => call("2026-08-01", true, 0.7, "no", 45));
+    const r = roomRecord([...recent, ...old], NOW);
+    expect(r.calls_30d).toBe(25);
+    expect(r.read_rate_30d).toBeCloseTo(20 / 25, 6);
+    expect(roomRecord(recent.slice(0, 24), NOW).read_rate_30d).toBeNull();
   });
 });

@@ -208,6 +208,9 @@ export const RevealSchema = z.object({
           payout: z.number().int().nullable().default(null),
           delta: z.number().int().nullable().default(null),
           doubled: z.boolean().default(false),
+          // When the caller sealed (design 2026-09-25 §6.6): the share card's
+          // `<you>` line carries it.
+          sealed_at: z.string().nullable().default(null),
         })
         .nullable(),
       source_name: z.string(),
@@ -218,6 +221,11 @@ export const RevealSchema = z.object({
       oracle_p_yes: z.number().nullable(),
       seen_on: SeenOnSchema.nullable().default(null),
       unhinged: z.boolean().default(false),
+      // A hot take (design 2026-09-25 §7): the reveal keys agree and disagree
+      // on this, never on source_name. Defaulted for an older server.
+      crowd: z.boolean().default(false),
+      // When the room's verdict landed; the channel's system line prints at it.
+      resolved_at: z.string().nullable().default(null),
     }),
   ),
   ledger: z.object({
@@ -372,5 +380,18 @@ export const MeLedgerSchema = z.object({
   // The purse, so home can print the house headline without an open round
   // (design §8.3). Same shape as /today's `house`. Defaulted for older servers.
   house: z.object({ total: z.number().int(), last_delta: z.number().int().nullable() }).nullable().default(null),
+  // Reading the room (design 2026-09-25 §6.4), over the caller's settled hot
+  // takes. `days` is the denominator both counts are out of. Null from a
+  // server that predates it.
+  room: z
+    .object({
+      days: z.number().int().min(0),
+      days_read: z.number().int().min(0),
+      days_machines_missed: z.number().int().min(0),
+      read_rate_30d: z.number().min(0).max(1).nullable(),
+      calls_30d: z.number().int().min(0),
+    })
+    .nullable()
+    .default(null),
 });
 export type MeLedger = z.infer<typeof MeLedgerSchema>;

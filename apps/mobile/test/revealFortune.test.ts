@@ -6,9 +6,9 @@ type Q = Reveal["questions"][number];
 const q = (over: Omit<Partial<Q>, "my"> & { my?: Partial<NonNullable<Q["my"]>> | null }): Q => ({
   id: "q", slot: 1, text: "Will it?", outcome: "yes", crowd_yes_pct: 60, crowd_count: 30, market_prob: 0.4, line_p_yes: 0.35,
   source_name: "Kalshi", source_url: null, evidence_quote: null, evidence_url: null, void_reason: null, oracle_p_yes: 0.35,
-  seen_on: null, unhinged: false,
+  seen_on: null, unhinged: false, crowd: false, resolved_at: null,
   ...over,
-  my: over.my === null ? null : { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: 50, payout: 143, delta: 93, doubled: false, ...(over.my ?? {}) },
+  my: over.my === null ? null : { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: 50, payout: 143, delta: 93, doubled: false, sealed_at: null, ...(over.my ?? {}) },
 });
 const reveal = (over: Partial<Reveal>): Reveal => ({
   rules_version: 3, bonus_points: 0, date: "2026-09-10", day_points: 0, first_hour: false, candidates_written: 0, candidates_rejected: 0,

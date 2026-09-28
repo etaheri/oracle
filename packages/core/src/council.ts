@@ -93,3 +93,35 @@ export function readRate(calls: ReadonlyArray<{ p: number; outcome: "yes" | "no"
   const right = calls.filter((c) => onRightSide(c.p, c.outcome) === true).length;
   return right / calls.length;
 }
+
+// The record's room rows (design 2026-09-25 §6.4). A day is read when the
+// caller landed with the room on more calls than against; the machines missed
+// a day when the line sat on the wrong side of the majority more often than
+// the right, over the same days. A 0.5 line, and a call with no line, are on
+// neither side. The rate is the read rate over the last thirty days.
+export const ROOM_WINDOW_DAYS = 30;
+
+export interface RoomCall { date: string; answer: boolean; line: number | null; outcome: "yes" | "no"; lockedAt: number }
+export interface RoomRecord { days: number; days_read: number; days_machines_missed: number; read_rate_30d: number | null; calls_30d: number }
+
+export function roomRecord(calls: ReadonlyArray<RoomCall>, now: number): RoomRecord {
+  const byDate = new Map<string, RoomCall[]>();
+  for (const c of calls) byDate.set(c.date, [...(byDate.get(c.date) ?? []), c]);
+  let daysRead = 0;
+  let daysMissed = 0;
+  for (const day of byDate.values()) {
+    const withRoom = day.filter((c) => c.answer === (c.outcome === "yes")).length;
+    if (withRoom > day.length - withRoom) daysRead += 1;
+    const sides = day.map((c) => (c.line === null ? null : onRightSide(c.line, c.outcome)));
+    if (sides.filter((s) => s === false).length > sides.filter((s) => s === true).length) daysMissed += 1;
+  }
+  const since = now - ROOM_WINDOW_DAYS * 86_400_000;
+  const recent = calls.filter((c) => c.lockedAt >= since);
+  return {
+    days: byDate.size,
+    days_read: daysRead,
+    days_machines_missed: daysMissed,
+    read_rate_30d: readRate(recent.map((c) => ({ p: c.answer ? 1 : 0, outcome: c.outcome }))),
+    calls_30d: recent.length,
+  };
+}
