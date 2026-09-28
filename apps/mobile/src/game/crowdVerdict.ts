@@ -1,4 +1,5 @@
 import { CONSTANTS as C, contrarianApplies } from "@oracle/core";
+import { shareSoFar } from "./sideWords";
 
 // The per-seal payout line: one mono verdict printed in the stationary
 // footer the moment a card is thrown, while the next card deals. `against`
@@ -20,9 +21,17 @@ export const GATHERING_LINE = "THE PLAYERS ARE STILL GATHERING";
 // used to be carried by colour alone (brief §11).
 export const UNCOUNTED_TIDE = "FEW STAND WHERE YOU STAND";
 
-export function crowdVerdict(answer: boolean, crowdYesPct: number, playerCount: number): { line: string; against: boolean } {
+export function crowdVerdict(answer: boolean, crowdYesPct: number, playerCount: number, room = false): { line: string; against: boolean } {
   if (playerCount < VERDICT_MIN_PLAYERS) return { line: GATHERING_LINE, against: false };
   const sidePct = answer ? crowdYesPct : 100 - crowdYesPct;
+  if (room) {
+    // A hot take has no bounty (design 2026-09-10 D8): the odds already pay
+    // for standing against the room, so the words carry no promise to keep
+    // and need no second floor.
+    const minority = sidePct < C.CONTRARIAN_CROWD_PCT;
+    const tide = minority ? "AGAINST THE ROOM" : sidePct >= 100 - C.CONTRARIAN_CROWD_PCT ? "WITH THE ROOM" : "THE PLAYERS SPLIT";
+    return { line: `${shareSoFar(crowdYesPct, true)} · ${tide}`, against: minority };
+  }
   // The engine's own rule, crowd floor included — gold only when the bounty
   // can truly pay, and now the words only when it can too.
   const against = contrarianApplies(sidePct, playerCount);
@@ -34,5 +43,5 @@ export function crowdVerdict(answer: boolean, crowdYesPct: number, playerCount: 
       : sidePct >= 100 - C.CONTRARIAN_CROWD_PCT
         ? "WITH THE TIDE"
         : "THE PLAYERS SPLIT";
-  return { line: `${crowdYesPct}% SAY YES · ${tide}`, against };
+  return { line: `${shareSoFar(crowdYesPct, false)} · ${tide}`, against };
 }

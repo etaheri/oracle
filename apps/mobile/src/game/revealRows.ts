@@ -145,6 +145,7 @@ export function movementLine(q: Question): string | null {
       : null,
     q.crowd_yes_pct != null && q.crowd_count != null ? { pct: q.crowd_yes_pct, count: q.crowd_count } : null,
     q.outcome !== null,
+    q.crowd,
   );
 }
 

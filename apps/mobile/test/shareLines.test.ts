@@ -19,10 +19,22 @@ describe("the share card's lines (design §8.3)", () => {
     expect(splitShareLine("A".repeat(50))).toEqual(["A".repeat(50), null]);
   });
 
+  it("says the Big One in agree and disagree on a hot take", () => {
+    expect(shareBigOneLine({ line: 0.35, answer: true, stake: 100, delta: 186, room: true })).toBe("THE ORACLE EXPECTED 35% TO AGREE · YOU AGREED FOR 100 · +186");
+    expect(shareBigOneLine({ line: 0.35, answer: false, stake: 100, delta: -100, room: true })).toBe("THE ORACLE EXPECTED 35% TO AGREE · YOU DISAGREED FOR 100 · −100");
+    expect(shareBigOneLine({ line: 0.35, answer: null, stake: null, delta: null, room: true })).toBe("THE ORACLE EXPECTED 35% TO AGREE · YOU SAT IT OUT");
+  });
+
   it("composes the share message around the fortune delta", () => {
     expect(fortuneShareMessage({ date: "2026-09-10", delta: 140, fortuneAfter: 1140, results: ["win", "loss", "win", "win", "void"] }, null))
       .toBe("🔮 OUTSEEN 2026-09-10 — I✓ II✗ III✓ IV✓ V∅ · +140 · FORTUNE 1,140 · can you beat the house?");
     expect(fortuneShareMessage({ date: "2026-09-10", delta: -60, fortuneAfter: 940, results: ["loss", "loss", "loss", "loss", "loss"] }, "https://x.y"))
       .toBe("🔮 OUTSEEN 2026-09-10 — I✗ II✗ III✗ IV✗ V✗ · −60 · FORTUNE 940 · can you beat the house? https://x.y");
+  });
+
+  it("carries the excerpt's first and last lines, each on its own line, ahead of the link", () => {
+    const d = { date: "2026-09-25", delta: 140, fortuneAfter: 1140, results: ["win", "loss", "win", "win", "void"] as const, excerpt: ["#nightshift · 09-25", "12:01 <haiku> ok the room is wrong"] as [string, string] };
+    expect(fortuneShareMessage(d, "https://x.y")).toBe("🔮 OUTSEEN 2026-09-25 — I✓ II✗ III✓ IV✓ V∅ · +140 · FORTUNE 1,140 · can you beat the house?\n#nightshift · 09-25\n12:01 <haiku> ok the room is wrong\nhttps://x.y");
+    expect(fortuneShareMessage(d, null).endsWith("12:01 <haiku> ok the room is wrong")).toBe(true);
   });
 });

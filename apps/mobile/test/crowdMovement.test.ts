@@ -23,4 +23,7 @@ describe("crowdMovement (design 2026-09-09 §4.1)", () => {
     const l = crowdMovement({ pct: 40, count: 12 }, { pct: 55, count: 40 }, true)!;
     expect(l).toBe(l.toUpperCase()); expect(l).not.toContain("!"); expect(l.length).toBeLessThanOrEqual(60);
   });
+  it("says agreed on a hot take", () => {
+    expect(crowdMovement({ pct: 40, count: 12 }, { pct: 55, count: 40 }, true, true)).toBe("WHEN YOU SEALED 40% AGREED · IT ENDED AT 55%");
+  });
 });

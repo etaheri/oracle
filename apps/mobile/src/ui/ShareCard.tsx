@@ -7,6 +7,7 @@ import { colors } from "../theme";
 import { PatinaHalo } from "./TerminalPatina";
 import { shareMessage, type QuestionResult } from "../game/sharePattern";
 import { splitShareLine } from "../game/shareLines";
+import type { ExcerptLine } from "../game/shareExcerpt";
 import { formatFortune, signedFortune } from "../game/fortuneText";
 import { capture } from "../analytics/analytics";
 import { DUEL_ART } from "./DuelPortrait";
@@ -25,6 +26,10 @@ const OVER = 9;
 export const NIGHT_LINE = "rgba(247,246,242,0.16)";
 export const NIGHT_DIM = "rgba(247,246,242,0.55)";
 const NIGHT_LOSS = "#D9705A"; // text-tier vermilion for the midnight ground (5.3:1)
+const EXCERPT_X = INSET + 40;
+const EXCERPT_Y = 268;
+const EXCERPT_ROW = 32;
+const EXCERPT_TONE: Record<ExcerptLine["tone"], string> = { head: colors.agedGold, win: colors.warmCenter, loss: NIGHT_LOSS, mute: NIGHT_DIM, you: colors.museumWhite };
 
 export interface ShareCardData {
   duelText?: string;
@@ -47,6 +52,10 @@ export interface ShareCardData {
   fortuneDelta?: number;
   fortuneAfter?: number;
   bigOneLine?: string | null;
+  // The Big One's channel (design 2026-09-25 §6.6). PRESENCE is the switch,
+  // as with `fortuneDelta`: a caller with a log sets it and the canvas prints
+  // the excerpt where the orb stood; a market round omits the key.
+  excerpt?: ReadonlyArray<ExcerptLine>;
 }
 
 export async function shareSnapshot(ref: RefObject<any>, filename: string, message: string): Promise<void> {
@@ -149,6 +158,7 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
   // every one of them from the single prop the caller sets.
   const fortune = data.fortuneDelta !== undefined;
   const duelScores = fortune ? undefined : data.duelScores;
+  const excerpt = data.excerpt && data.excerpt.length > 0 ? data.excerpt : null;
   const points = data.dayPoints >= 0 ? `+${data.dayPoints}` : String(data.dayPoints);
   const wins = data.results.filter((r) => r === "win").length;
   const answered = data.results.filter((r) => r !== "none").length;
@@ -182,6 +192,13 @@ export function ShareCardCanvas({ canvasRef, data }: { canvasRef: ReturnType<typ
           x={(index === 0 ? 180 : 460) - mono.measureText(label).width / 2} y={582} color={colors.agedGold} />)}
         {score && [duelScores.you, duelScores.oracle].map((value, index) => <SkText key={index} font={score} text={String(value)}
           x={(index === 0 ? 180 : 460) - score.measureText(String(value)).width / 2} y={626} color={colors.museumWhite} />)}
+      </> : excerpt ? <>
+        {/* The card keeps its frame, numeral and wordmark; the middle block
+            is the channel (design 2026-09-25 §6.6). Left-aligned on the
+            card's inner margin, because a log is read down its columns. */}
+        {mono && excerpt.map((l, i) => (
+          <SkText key={i} font={mono} text={l.text} x={EXCERPT_X} y={EXCERPT_Y + i * EXCERPT_ROW} color={EXCERPT_TONE[l.tone]} />
+        ))}
       </> : <>
       <Circle cx={CARD_W / 2} cy={432} r={280}>
         <RadialGradient c={vec(CARD_W / 2, 432)} r={280} colors={["rgba(247,246,242,0.28)", "rgba(183,169,228,0.12)", "rgba(18,26,43,0)"]} />

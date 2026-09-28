@@ -12,12 +12,14 @@ import { cardStatus } from "../game/cardStatus";
 import { useNow } from "../game/useNow";
 import { capture } from "../analytics/analytics";
 import { INITIAL_CHOICE, canSeal, chooseSide, type SealChoice } from "../game/sealFlow";
-import { lineLabel, receiptLine, sealHint } from "../game/stakeText";
+import { sealHint } from "../game/stakeText";
+import { sideWord } from "../game/sideWords";
+import { cardCoordinate, cardModifiers } from "../game/cardCaption";
 import { colors, space } from "../theme";
 import { Mono } from "./Text";
-import { CardChrome, numeral } from "./CardChrome";
+import { CardChrome } from "./CardChrome";
 import { DecodeLine } from "./DecodeText";
-import { sidePreview, type RoundToday } from "@oracle/core";
+import type { RoundToday } from "@oracle/core";
 
 // The throw IS the seal: take a side and the card leaves your hand -- off the
 // screen edge of the side you took, one heavy thunk at dispatch. The next card
@@ -49,17 +51,15 @@ function QuestionFace({ text, seed }: { text: string; seed: string }) {
   );
 }
 
-export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, height }: {
+export function OracleCard({ q, roundLocksAt, onSealed, practice, height }: {
   q: RoundToday["questions"][number];
   // The round's overall lock (if any): a question whose own lock differs
   // from it closes ahead of the round, and the title says so.
   roundLocksAt: string | null;
-  // The player's fortune at this moment; null on a round without stakes
-  // (version 1/2, or a version 3 round that opened unstaked).
-  fortune: number | null;
-  // Fires when the seal ceremony completes, with the receipt the round's
-  // footer prints under the next card: "YES · THE ORACLE EXPECTED 38% YES".
-  onSealed: (receipt: string) => void;
+  // Fires when the seal ceremony completes, with the side that was taken.
+  // The round prints the receipt: it holds the line, which arrives from the
+  // channel after the seal and is never on the card.
+  onSealed: (answer: boolean) => void;
   practice?: { onSeal: (answer: boolean) => void; context?: string; stamp: string };
   height?: number;
 }) {
@@ -86,10 +86,7 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
   // Skia canvases for a line that will never change again.
   const now = useNow(sealed ? null : 1000);
 
-  const line = q.line_p_yes;
-  const staked = fortune !== null && line !== null;
-  const yesPreview = staked ? sidePreview({ fortune, isBigOne: q.is_big_one, line, answer: true }) : null;
-  const noPreview = staked ? sidePreview({ fortune, isBigOne: q.is_big_one, line, answer: false }) : null;
+  const room = q.crowd;
 
   const frontStyle = useAnimatedStyle(() => ({
     transform: [
@@ -113,13 +110,13 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
   // server stake to prefer.
   function finishSeal(answer: boolean, serverStake: number | null) {
     markSealed(q.id, serverStake);
-    const preview = answer ? yesPreview : noPreview;
-    const stake = serverStake ?? preview?.stake ?? null;
-    capture("question_answered", { question_id: q.id, is_big_one: q.is_big_one, side: answer ? "yes" : "no", stake, line });
+    // No `line` here (design 2026-09-25 §13): the estimate is not on the
+    // client at seal time. `log_opened` carries it, joined on question_id.
+    capture("question_answered", { question_id: q.id, is_big_one: q.is_big_one, side: answer ? "yes" : "no", stake: serverStake });
     // Habitual-hour history (design 2026-09-09 §4.2): fire-and-forget --
     // withSealHour already no-ops repeat seals on the same local day.
     void recordSealHour(new Date());
-    onSealed(receiptLine({ answer, line }));
+    onSealed(answer);
   }
 
   // The swipe IS the seal (design H2): the moment the side is set the card is
@@ -204,15 +201,10 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
       }
     });
 
-  // Slot and provenance only. The day used to ride here too, but source_name
-  // is unbounded and the card's margin is now one shared row with the live
-  // status field -- so something had to give, and the date is the redundant
-  // half: the round's own TopBar prints DAY <date> a few inches above this.
-  const coordinate = `:: ${numeral(q.slot)} / PER ${q.source_name.toUpperCase()}`;
+  const coordinate = cardCoordinate(q);
   const closesEarly = roundLocksAt !== null && q.locks_at !== roundLocksAt;
   const title = q.is_big_one ? "✶ THE BIG ONE" : q.category;
-  const modifiers = [q.is_big_one ? "STAKES DOUBLE" : null, closesEarly ? "CLOSES EARLY" : null].filter(Boolean).join(" · ");
-  const lineText = lineLabel(line);
+  const modifiers = cardModifiers(q, closesEarly);
 
   return (
     <View>
@@ -223,11 +215,6 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
             <View style={{ flex: 1, minHeight: 0 }}>
               <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center", gap: space(2) }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false}>
                 <QuestionFace text={q.text} seed={q.id} />
-                {/* Nothing about the room before the seal (design 2026-09-22 T9):
-                    the estimate is a common signal, and shown first the crowd
-                    converges on it. The receipt under the stage carries it
-                    the moment the card is thrown. */}
-                {sealed && lineText && <Mono size={10} color={colors.goldText} letterSpacing={3} style={{ textAlign: "center" }}>{lineText}</Mono>}
                 {practice?.context && <Mono size={11} style={{ textAlign: "center" }}>{practice.context}</Mono>}
                 {q.context && <View style={{ gap: space(1) }}>
                   <Pressable accessibilityRole="button" onPress={() => setShowContext(!showContext)} style={{ minHeight: 44, justifyContent: "center" }}><Mono size={11}>{showContext ? "CLOSE CONTEXT" : "CONTEXT"}</Mono></Pressable>
@@ -236,18 +223,21 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
               </ScrollView>
             </View>
             <View style={{ gap: space(3) }}>
-              {/* The side is the seal: tapping YES or NO throws the card the
-                  same way a swipe does. Sleeve semantics from the art: YES
-                  wears the ultramarine sleeve, NO the vermilion. */}
+              {/* The side is the seal: tapping a side throws the card the
+                  same way a swipe does. Sleeve semantics from the art: the
+                  right-hand side wears the ultramarine sleeve, the left the
+                  vermilion. A hot take agrees and disagrees; a market
+                  question keeps its two storage words. */}
               <View style={{ flexDirection: "row", gap: space(2) }}>
                 {([true, false] as const).map((v) => {
                   const tone = v ? colors.ultramarine : colors.vermilion;
+                  const word = sideWord(v, room);
                   return (
                     <Pressable key={String(v)} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { void seal(v); }}
-                      accessibilityLabel={v ? "Yes" : "No"}
+                      accessibilityLabel={word.charAt(0) + word.slice(1).toLowerCase()}
                       accessibilityHint="Seals your call."
                       style={{ flex: 1, borderWidth: 1, borderColor: tone, minHeight: 48, justifyContent: "center", alignItems: "center", gap: 2 }}>
-                      <Mono size={12} color={tone} letterSpacing={5} style={{ marginRight: -5 }}>{v ? "YES" : "NO"}</Mono>
+                      <Mono size={12} color={tone} letterSpacing={room ? 3 : 5} style={{ marginRight: room ? -3 : -5 }}>{word}</Mono>
                     </Pressable>
                   );
                 })}
@@ -255,7 +245,7 @@ export function OracleCard({ q, roundLocksAt, fortune, onSealed, practice, heigh
               <View style={{ minHeight: 16, justifyContent: "center" }}>
                 {error
                   ? <Mono size={11} color={colors.vermilion} style={{ textAlign: "center" }}>{error}</Mono>
-                  : <DecodeLine text={submit.isPending ? "SEALING…" : sealHint(reducedMotion)} size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />}
+                  : <DecodeLine text={submit.isPending ? "SEALING…" : sealHint(reducedMotion, room)} size={11} color={colors.mutedInk} letterSpacing={3} style={{ textAlign: "center" }} />}
               </View>
             </View>
           </CardChrome>

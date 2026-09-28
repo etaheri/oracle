@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import type { Reveal } from "@oracle/core";
-import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, stakedRound, moneyMark, bustLines, doubleObservation } from "../src/game/revealFortune";
+import { fortuneHeadline, stakeReceipt, oracleTake, lineContext, fortuneRowRight, houseNightLine, isFortuneRound, stakedRound, moneyMark, bustLines, doubleObservation, roomVerdict } from "../src/game/revealFortune";
 
 type Q = Reveal["questions"][number];
 const q = (over: Omit<Partial<Q>, "my"> & { my?: Partial<NonNullable<Q["my"]>> | null }): Q => ({
   id: "q", slot: 1, text: "Will it?", outcome: "yes", crowd_yes_pct: 60, crowd_count: 30, market_prob: 0.4, line_p_yes: 0.35,
   source_name: "Kalshi", source_url: null, evidence_quote: null, evidence_url: null, void_reason: null, oracle_p_yes: 0.35,
-  seen_on: null, unhinged: false,
+  seen_on: null, unhinged: false, crowd: false, resolved_at: null,
   ...over,
-  my: over.my === null ? null : { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: 50, payout: 143, delta: 93, doubled: false, ...(over.my ?? {}) },
+  my: over.my === null ? null : { answer: true, confidence: 75, points: null, brier: null, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: 50, payout: 143, delta: 93, doubled: false, sealed_at: null, ...(over.my ?? {}) },
 });
 const reveal = (over: Partial<Reveal>): Reveal => ({
   rules_version: 3, bonus_points: 0, date: "2026-09-10", day_points: 0, first_hour: false, candidates_written: 0, candidates_rejected: 0,
@@ -105,5 +105,22 @@ describe("the version 3 reveal (design §8.3)", () => {
     expect(houseNightLine(1240)).toBe("THE HOUSE WON 1,240 LAST NIGHT");
     expect(houseNightLine(0)).toBe("THE HOUSE BROKE EVEN LAST NIGHT");
     expect(houseNightLine(null)).toBeNull();
+  });
+
+  it("reads a hot take back in agree and disagree", () => {
+    expect(stakeReceipt(q({ crowd: true }))).toBe("AGREE · STAKED 50 · PAID 143");
+    expect(stakeReceipt(q({ crowd: true, outcome: "no", my: { answer: false, payout: 143, delta: 93 } }))).toBe("DISAGREE · STAKED 50 · PAID 143");
+    expect(stakeReceipt(q({ crowd: true, my: { stake: null, payout: null, delta: null } }))).toBe("AGREE");
+    expect(lineContext(q({ crowd: true }))).toBe("THE ORACLE EXPECTED 35% TO AGREE");
+    expect(fortuneRowRight(q({ crowd: true, my: null }))).toBe("AGREED");
+    expect(fortuneRowRight(q({ crowd: true, outcome: "no", my: null }))).toBe("DISAGREED");
+  });
+  it("prints the room's verdict on a settled hot take and nothing otherwise", () => {
+    expect(roomVerdict(q({ crowd: true, crowd_yes_pct: 62 }))).toBe("THE ROOM AGREED · 62%");
+    expect(roomVerdict(q({ crowd: true, outcome: "no", crowd_yes_pct: 38 }))).toBe("THE ROOM DISAGREED · 38% AGREED");
+    expect(roomVerdict(q({ crowd: true, outcome: null }))).toBeNull();
+    expect(roomVerdict(q({ crowd: true, outcome: "void" }))).toBeNull();
+    expect(roomVerdict(q({ crowd: true, crowd_yes_pct: null }))).toBeNull();
+    expect(roomVerdict(q({ crowd: false }))).toBeNull();
   });
 });

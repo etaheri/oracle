@@ -64,3 +64,15 @@ describe("crowdVerdict", () => {
     expect(crowdVerdict(true, 100 - edge, 50).line).toContain("WITH THE TIDE");
   });
 });
+
+describe("the room's verdict after a seal (design 2026-09-25 §7)", () => {
+  it("reads with, against and split in the room's words", () => {
+    expect(crowdVerdict(true, 62, 50, true)).toEqual({ line: "62% AGREE · WITH THE ROOM", against: false });
+    expect(crowdVerdict(true, 28, 50, true)).toEqual({ line: "28% AGREE · AGAINST THE ROOM", against: true });
+    expect(crowdVerdict(false, 72, 50, true)).toEqual({ line: "72% AGREE · AGAINST THE ROOM", against: true });
+    expect(crowdVerdict(true, 41, 50, true)).toEqual({ line: "41% AGREE · THE PLAYERS SPLIT", against: false });
+  });
+  it("still holds its tongue under five players", () => {
+    expect(crowdVerdict(true, 100, 4, true)).toEqual({ line: GATHERING_LINE, against: false });
+  });
+});

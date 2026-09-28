@@ -1,7 +1,7 @@
 import { roundAvailability } from "../game/roundAvailability";
 import { shouldOfferReminder } from "../game/reminderOffer";
 import { useNotificationPermission } from "../notifications/permission";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, View, Pressable, Linking } from "react-native";
 import { Screen } from "../ui/Screen";
 import { Mono, Ritual, role } from "../ui/Text";
@@ -14,9 +14,10 @@ import { MaterializeTitle } from "../ui/MaterializeTitle";
 import { OracleClock } from "../ui/OracleClock";
 import { HomeChallenge } from "../ui/HomeChallenge";
 import { useQueryClient } from "@tanstack/react-query";
-import { useToday, useCrowdSoFar, useMeLedger, useMineToday, useNextRound, useReveal } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMeLedger, useMineToday, useNextRound, useReveal, useTodayLog } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
+import { logIndex } from "../game/todayLog";
 import { crowdLean } from "../game/orbMood";
 import { isBootDone, isOrbLanded, onBootDone, onOrbLanded } from "../game/bootGate";
 import { useHeroCues } from "../ui/useHeroCues";
@@ -26,7 +27,8 @@ import { readingSlot } from "../game/readingSlot";
 import { homeDates } from "../game/homeDates";
 import { riskLine, lapseNotice, doubleNotice } from "../game/homeLines";
 import { trayState } from "../game/doubleTray";
-import { houseLines } from "../game/houseLine";
+import { shiftLine } from "../game/shiftLine";
+import { lastNightLine } from "../game/lastNight";
 import { formatFortune } from "../game/fortuneText";
 import { arrivalInputForRound, arrivalState } from "../game/arrivalState";
 import { beginHomeAction, invalidateHomeAction, ownsHomeAction, type HomeActionGate } from "../game/homeActionGate";
@@ -107,6 +109,10 @@ export default function Index() {
   // here for the stake rows and the round's double, not fetched a second time.
   const mine = useMineToday(!!round);
   const sealedIds = new Set([...localSealedIds, ...hydration.sealedQuestionIds]);
+  // The tray is priced from the channel's line (design 2026-09-25 N5), so the
+  // unplaced-double notice below needs it too.
+  const log = useTodayLog(!!round && sealedIds.size > 0);
+  const logs = useMemo(() => logIndex(log.data), [log.data]);
   const availability = round ? roundAvailability(round.questions, sealedIds, availabilityNow, round.rules_version) : null;
   const requiredQuestions = round?.questions.filter((question) => !(round.rules_version >= 2 && question.struck)) ?? [];
   const submittedFromData = requiredQuestions.length > 0 && requiredQuestions.every((question) => sealedIds.has(question.id));
@@ -177,6 +183,19 @@ export default function Index() {
   });
   const arrival = arrivalState(arrivalInput);
   const allSealed = arrival.kind === "submitted";
+  // Last night, from the reading round once it has settled: the latest round
+  // this player answered, whatever its date (homeDates.ts explains why that
+  // is not calendar yesterday). React Query shares the fetch with the
+  // `reveal` above when the two dates coincide.
+  const reading = ledger.data?.reading ?? null;
+  const lastReveal = useReveal(reading?.settled ? reading.date : null);
+  const lastNight = lastNightLine(lastReveal.data);
+  const shift = shiftLine({
+    open: !!round && arrival.kind !== "waiting",
+    allSealed,
+    room: round?.questions.some((q) => q.crowd) ?? false,
+    councilCommittedAt: round?.council_committed_at ?? null,
+  });
   useEffect(() => {
     if (round && (arrival.kind === "live" || arrival.kind === "partial") && openedFor.current !== round.date) {
       openedFor.current = round.date;
@@ -190,7 +209,7 @@ export default function Index() {
   const now = useNow(30_000);
   // The unplaced double outranks the risk line: it is an action still open on
   // TODAY's round, where risk and lapse are about the streak around it.
-  const tray = round ? trayState(round.questions, mine.data?.predictions ?? [], mine.data?.double_question_id ?? null, now) : "hidden";
+  const tray = round ? trayState(round.questions, mine.data?.predictions ?? [], mine.data?.double_question_id ?? null, (id) => logs.get(id)?.line ?? null, now) : "hidden";
   const dbl = doubleNotice(tray);
   const risk = riskLine(ledger.data?.streak ?? 0, anySealed, msUntil(round?.locks_at ?? null, now), `risk:${round?.date ?? ""}`);
   const lapse = lapseNotice(ledger.data?.days_consulted ?? 0, ledger.data?.streak ?? 0, playedYesterday, `lapse:${calendarYesterday}`);
@@ -253,13 +272,6 @@ export default function Index() {
     arrivalEvent.current = key;
     capture("arrival_viewed", { state: arrival.kind, first_visit: arrivalInput.firstVisit, has_schedule: arrivalInput.hasRound || !!arrivalInput.nextOpensAt });
   }, [arrival.kind, arrivalInput.firstVisit, arrivalInput.hasRound, arrivalInput.nextOpensAt]);
-  const houseSeenFor = useRef<number | null>(null);
-  useEffect(() => {
-    const last = ledger.data?.house?.last_delta ?? null;
-    if (last === null || houseSeenFor.current === last) return;
-    houseSeenFor.current = last;
-    capture("house_headline_viewed", { sign: Math.sign(last) });
-  }, [ledger.data?.house?.last_delta]);
   const doRescue = useCallback(async () => {
     setRescueResult("waiting");
     const shieldsNow = () => qc.getQueryData<MeLedger>(["me", "ledger"])?.paid_shields ?? 0;
@@ -374,19 +386,29 @@ export default function Index() {
             </>
           )}
         </View>
+        {/* Last night, above the countdown (design 2026-09-25 §6.5). Two
+            reserved rows: the line wraps at iPhone width, and it rides the
+            record and a reveal, both of which land after first paint. */}
+        <View style={{ minHeight: scaledRow(ROW_H.meta, chromeScale) * 2, alignItems: "center", justifyContent: "center" }}>
+          {lastNight && reading && (
+            <Pressable accessibilityRole="button" accessibilityHint="Opens that round's result." hitSlop={{ top: 15, bottom: 15, left: 24, right: 24 }} onPress={() => leaveHome(() => router.push(`/reveal/${reading.date}`))}>
+              <Mono {...role.meta} color={colors.goldText} style={[role.meta.style, { textDecorationLine: "underline" }]}>{lastNight}</Mono>
+            </Pressable>
+          )}
+        </View>
         {/* The live line: what the oracle is doing, right now. */}
         <OracleClock round={arrival.kind === "waiting" ? null : round} allSealed={allSealed} loading={today.isLoading} active={cues.subtitle} nextQuestionClosesAt={availability?.earliestOpenLock ?? null} />
+        {/* The shift clock, under the countdown. The slot keeps the two rows
+            the house line reserved, so the temple does not move. */}
         <View style={{ minHeight: scaledRow(ROW_H.meta, chromeScale) * 2, alignItems: "center", justifyContent: "center" }}>
-          {houseLines(ledger.data?.house).map((line) => (
-            <Mono key={line} {...role.meta} color={colors.goldText}>{line}</Mono>
-          ))}
+          {shift && <Mono {...role.meta} color={colors.mutedInk}>{shift}</Mono>}
         </View>
       </View>
       <View style={{ gap: space(3) }}>
         <View style={{ minHeight: callSlotHeight(chromeScale), justifyContent: "flex-end", gap: space(3) }}>
           {slot.kind !== "none" && (
             <>
-              <DecodeLine active={booted} text={slot.line} {...role.line} color={colors.goldText} />
+              {!(slot.kind === "settled" && lastNight) && <DecodeLine active={booted} text={slot.line} {...role.line} color={colors.goldText} />}
               <GoldButton title={slot.cta} onPress={() => leaveHome(() => router.push(`/reveal/${slot.date}`))} />
             </>
           )}

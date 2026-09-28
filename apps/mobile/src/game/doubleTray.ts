@@ -4,9 +4,13 @@ import { isClosed, nextOpenQuestion } from "./questionState";
 // The tray after the fifth seal (design 2026-09-14 §5.3). Pure — node-tested.
 // One tile per sealed, staked call; the round screen decides when to show it
 // through `trayState`.
+export type LineOf = (questionId: string) => number | null;
+
 export type TrayTile = {
   id: string; slot: number; text: string; isBigOne: boolean; answer: boolean;
   stake: number; doubledStake: number; wins: number; doubledWins: number; locked: boolean;
+  // A hot take: the tile says agree and disagree.
+  room: boolean;
 };
 export type TrayState = "hidden" | "open" | "placed";
 
@@ -20,37 +24,48 @@ export const DOUBLE_FAILED = "THE DOUBLE DID NOT LAND";
 // The beat the placed tile holds before the stage moves to the crowd finale.
 export const TRAY_HOLD_MS = 900;
 
-export function trayTiles(questions: RoundToday["questions"], mine: MineToday["predictions"], now: number): TrayTile[] {
+export function trayTiles(questions: RoundToday["questions"], mine: MineToday["predictions"], lineOf: LineOf, now: number): TrayTile[] {
   const byId = new Map(mine.map((p) => [p.question_id, p]));
   return [...questions]
     .sort((a, b) => a.slot - b.slot)
     .flatMap((q) => {
       const p = byId.get(q.id);
-      // An unstaked call (no line committed, design §5.5) has nothing to
-      // double: no stake to grow and no odds to price the winnings at.
-      if (!p || p.stake === null || q.line_p_yes === null) return [];
+      // The line is read from the channel, which serves it only for a sealed
+      // question (design 2026-09-25 N5). An unstaked call (no line committed,
+      // design 2026-09-10 §5.5) has nothing to double either way.
+      const line = lineOf(q.id);
+      if (!p || p.stake === null || line === null) return [];
       // The server's double route stores `stake * 2` on the row it doubles, so
       // a placed call comes back from /today/mine ALREADY doubled. Price from
       // the base either way, or the beat between the tap and the hand-off
       // reads the stake doubled twice.
       const stake = p.doubled ? p.stake / FORTUNE.DOUBLE_MULT : p.stake;
-      const rate = odds(p.answer, q.line_p_yes);
+      const rate = odds(p.answer, line);
       const dbl = doubledStake(stake);
       return [{
         id: q.id, slot: q.slot, text: q.text, isBigOne: q.is_big_one, answer: p.answer,
         stake, doubledStake: dbl, wins: Math.round(stake * rate), doubledWins: Math.round(dbl * rate),
-        locked: isClosed(q, now),
+        locked: isClosed(q, now), room: q.crowd,
       }];
     });
 }
 
+// The hand is known once the player's rows have loaded and the channel has a
+// line for every one of them. Keyed on what has arrived, never on whether a
+// fetch is in flight: a background refetch must not blank an open tray.
+export function handKnown(input: { mineLoaded: boolean; sealedIds: ReadonlyArray<string>; hasLog: (id: string) => boolean; logFailed: boolean }): boolean {
+  if (!input.mineLoaded) return false;
+  if (input.logFailed) return true;
+  return input.sealedIds.every((id) => input.hasLog(id));
+}
+
 // Hidden while any card is still dealable, or when no sealed call is still
 // open to double; placed once the server has the double; open otherwise.
-export function trayState(questions: RoundToday["questions"], mine: MineToday["predictions"], doubleQuestionId: string | null, now: number): TrayState {
+export function trayState(questions: RoundToday["questions"], mine: MineToday["predictions"], doubleQuestionId: string | null, lineOf: LineOf, now: number): TrayState {
   if (doubleQuestionId !== null) return "placed";
   const sealed = new Set(mine.map((p) => p.question_id));
   if (nextOpenQuestion(questions, (id) => sealed.has(id), now)) return "hidden";
-  return trayTiles(questions, mine, now).some((t) => !t.locked) ? "open" : "hidden";
+  return trayTiles(questions, mine, lineOf, now).some((t) => !t.locked) ? "open" : "hidden";
 }
 
 // What the round's stage shows once the card is gone. `hasOpenCard` is read

@@ -32,7 +32,7 @@ const READING = [
 
 // The machine's own tokens, which stay capitalised inside a read sentence
 // because they are names rather than emphasis.
-const ACRONYMS = ["AI", "YES", "NO"];
+const ACRONYMS = ["AI", "YES", "NO", "AGREE", "DISAGREE"];
 
 describe("the reading register", () => {
   it("covers the rules a first-time player is actually shown", () => {

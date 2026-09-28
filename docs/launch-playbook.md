@@ -474,6 +474,22 @@ is the newest resolved question, because its shipped `ExhibitionSchema`
 requires a `context` and a crowd question never carries one — so "build 11
 renders an opinion round" covers the daily round, not practice.
 
+### 4.8 Build 14 — the night shift
+
+1. Deploy the API first. It is additive: three reveal fields and the ledger's
+   `room` block. Builds 12 and 13 ignore all of it.
+2. Build and submit:
+   `cd apps/mobile && eas build --profile production --platform ios --auto-submit`.
+3. Device pass on the TestFlight install, on top of §4.6: seal a hot take and
+   read the channel; place the double from the tray; open the reveal after noon
+   and expand a channel; share the night card and read the excerpt in Messages.
+   The seal-to-channel beat and the Reduce Motion behaviour were **not** covered
+   by the simulator pass (they need real gestures), so this device pass is the
+   first time either is seen.
+4. `line_p_yes` leaves `GET /v1/round/today` only after every tester is on
+   build 14. Builds 12 and 13 price the tray from it; removing it early hides
+   their tray. The change is plan 2's Task 15.
+
 ---
 
 ## 5. Validation debt

@@ -7,9 +7,10 @@ import { KEYS } from "../config/keys";
 // instead. Every other event below has a real client-side call site.
 export type AnalyticsEvent =
   | "arrival_viewed"
-  | "house_headline_viewed"
   | "resolution_evidence_opened"
   | "reading_opened"
+  | "log_opened"
+  | "channel_expanded"
   | "practice_started"
   | "practice_completed"
   | "practice_skipped"

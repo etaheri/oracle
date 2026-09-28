@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { Easing, FadeIn, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { Screen } from "../ui/Screen";
@@ -13,13 +13,14 @@ import { crowdAnticipation } from "../game/crowdAnticipation";
 import { isClosed, nextOpenQuestion } from "../game/questionState";
 import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
 import { DoubleTray } from "../ui/DoubleTray";
-import { trayTiles, trayState, trayStage, DOUBLE_FAILED, TRAY_HOLD_MS } from "../game/doubleTray";
+import { trayTiles, trayState, trayStage, handKnown, DOUBLE_FAILED, TRAY_HOLD_MS, TRAY_TITLE } from "../game/doubleTray";
 import { capture } from "../analytics/analytics";
+import { receiptLine } from "../game/stakeText";
 import { SleepsPanel } from "../ui/SleepsPanel";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
 import { numeral } from "../ui/CardChrome";
-import { useToday, useCrowdSoFar, useMineToday, useDouble } from "../api/hooks";
+import { useToday, useCrowdSoFar, useMineToday, useDouble, useTodayLog } from "../api/hooks";
 import { useRoundStore } from "../game/roundStore";
 import { useHydratePlayedState } from "../game/useHydratePlayedState";
 import { colors, space } from "../theme";
@@ -27,6 +28,10 @@ import { useChromeScale } from "../ui/useChromeScale";
 import { scaledRow } from "../game/typeScaling";
 import { PIPELINE_LINES } from "@oracle/core";
 import { useRouter } from "expo-router";
+import { ChannelLog } from "../ui/ChannelLog";
+import { QuietLink } from "../ui/Button";
+import { logIndex } from "../game/todayLog";
+import { summaryRow } from "../game/channel";
 
 // The throw UNCOVERS the stack — the next card was already on the table as
 // the deck's top, so the live card enters from exactly that resting pose: a
@@ -42,13 +47,13 @@ export default function Round() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const answers = useRoundStore((s) => s.answers);
-  // The last thrown card's id: its crowd verdict prints in the stationary
-  // footer while the next card is contemplated — every seal pays out
-  // immediately, and the full spread stays the finale.
-  const [lastSealedId, setLastSealedId] = useState<string | null>(null);
-  // The receipt the card handed back at the seal — "YES · STAKED 50 · WINS
-  // 93" — printed in the footer's slot while the next card is contemplated.
-  const [lastReceipt, setLastReceipt] = useState<string | null>(null);
+  // The last thrown card and the side it was thrown to. Its channel opens over
+  // the next card, its receipt and the room's verdict print in the footer.
+  const [lastSealed, setLastSealed] = useState<{ id: string; answer: boolean } | null>(null);
+  const lastSealedId = lastSealed?.id ?? null;
+  // The channel on the just-sealed take (design 2026-09-25 §6.2). It opens
+  // when the log lands and closes on a tap or on the next seal.
+  const [logOpen, setLogOpen] = useState(false);
   // Per-question early locks mean "closed" is time-dependent — recomputed
   // every 30s, not just at fetch time, so a card that locks mid-session
   // is skipped without a refetch.
@@ -69,6 +74,13 @@ export default function Round() {
   // covers the partial player who never returns to a finished spread.
   const crowd = useCrowdSoFar(anySealed);
   const mine = useMineToday(!!today.data);
+  // The channel for every take the player has sealed, and the line the tray
+  // prices the double from. Refetched by every seal (useSubmit).
+  const log = useTodayLog(anySealed);
+  const logs = useMemo(() => logIndex(log.data), [log.data]);
+  const lineOf = (id: string) => logs.get(id)?.line ?? null;
+  const lastLog = lastSealedId ? logs.get(lastSealedId) : undefined;
+  const lastRoom = (lastSealedId ? qs.find((q) => q.id === lastSealedId)?.crowd : false) ?? false;
   const double = useDouble();
   // After the double lands the tray holds for a beat, then hands over to the
   // crowd finale — the finale is the payoff, the tray is the decision.
@@ -86,28 +98,58 @@ export default function Round() {
     const c = (crowd.data?.questions ?? []).find((q) => q.id === lastSealedId);
     if (!entry || !c) return;
     announcedFor.current = lastSealedId;
-    AccessibilityInfo.announceForAccessibility(`The players: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count).line}`);
+    const room = qs.find((q) => q.id === lastSealedId)?.crowd ?? false;
+    AccessibilityInfo.announceForAccessibility(`The players: ${crowdVerdict(entry.answer, c.crowd_yes_pct, c.player_count, room).line}`);
   }, [lastSealedId, answers, crowd.data]);
   const chromeScale = useChromeScale();
   const minePreds = mine.data?.predictions ?? [];
   // The server's row is the truth; `placedId` only covers the beat between
   // the mutation landing and /today/mine coming back carrying it.
   const doubleId = mine.data?.double_question_id ?? placedId;
-  const tray = trayDone ? "placed" : trayState(qs, minePreds, doubleId, now);
-  const tiles = trayTiles(qs, minePreds, now);
+  // The hand is known once the player's rows have landed and the channel has a
+  // line for every one of them: the line rides the channel, which the fifth
+  // seal refetches, so the tray waits on it the way it waits on /today/mine or
+  // it opens with four tiles and grows a fifth. Keyed on what has ARRIVED, not
+  // on whether a fetch is in flight — gating on `isFetching` blanked an open
+  // tray on every background refetch and after every refused double.
+  //
+  // The one thing the fetch flags covered that coverage does not: on the fifth
+  // seal the local store says sealed before /today/mine has come back, so
+  // `minePreds` is a row short of the hand for one round trip and every line it
+  // names is present. Count the locally sealed questions and call the hand
+  // unknown while they outnumber the server's rows.
+  const locallySealed = qs.filter((q) => answers[q.id]?.sealed).length;
+  const known = handKnown({
+    mineLoaded: mine.data !== undefined || mine.isError,
+    sealedIds: minePreds.map((p) => p.question_id),
+    hasLog: (id) => logs.has(id),
+    logFailed: log.isError,
+  }) && (mine.isError || locallySealed <= minePreds.length);
+  const tray = trayDone ? "placed" : doubleId !== null || known ? trayState(qs, minePreds, doubleId, lineOf, now) : "hidden";
+  const tiles = trayTiles(qs, minePreds, lineOf, now);
   const current = nextOpenQuestion(qs, (id) => !!answers[id]?.sealed, now);
   // Card, tray, an empty beat, or the finale — see trayStage for why the
   // empty beat exists.
-  const stage = trayStage({
-    hasOpenCard: !!current,
-    tray,
-    // `isPending` too: between the query becoming enabled and its first
-    // fetch actually starting, `isFetching` is still false and the hand is
-    // no more known than it is mid-flight. Both go false on an error, so a
-    // failed /today/mine falls through to the finale rather than hanging.
-    mineSettled: !mine.isFetching && !mine.isPending,
-    holdPlaced: !trayDone && placedId !== null,
-  });
+  const stage = trayStage({ hasOpenCard: !!current, tray, mineSettled: known, holdPlaced: !trayDone && placedId !== null });
+  // The channel opens itself on the take just sealed — over the next card, or
+  // over the tray once the fifth is sealed and the Big One's floor would
+  // otherwise never be read. Never on the finale: the block is in that frame
+  // already. An empty floor has nothing to open for, and the footer's summary
+  // row is absent there too.
+  const openedLogFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastSealedId || !lastLog || !lastRoom || openedLogFor.current === lastSealedId) return;
+    if (stage !== "card" && stage !== "tray") return;
+    if (lastLog.log.length === 0) return;
+    openedLogFor.current = lastSealedId;
+    setLogOpen(true);
+    capture("log_opened", { question_id: lastSealedId, line: lastLog.line });
+  }, [lastSealedId, lastLog, lastRoom, stage]);
+  // The open panel takes the screen from the reader, so it says so — once, and
+  // however it was opened.
+  useEffect(() => {
+    if (logOpen) AccessibilityInfo.announceForAccessibility("The channel is open.");
+  }, [logOpen]);
   // The placed tile holds its DOUBLED mark for a beat, then the stage moves
   // on. In an effect, so leaving mid-beat cancels the timer with it.
   useEffect(() => {
@@ -148,7 +190,9 @@ export default function Round() {
   const crowdById = new Map((crowd.data?.questions ?? []).map((c) => [c.id, c]));
   const lastEntry = lastSealedId ? answers[lastSealedId] : undefined;
   const lastCrowd = lastSealedId ? crowdById.get(lastSealedId) : undefined;
-  const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct, lastCrowd.player_count) : null;
+  const verdict = lastEntry && lastCrowd ? crowdVerdict(lastEntry.answer, lastCrowd.crowd_yes_pct, lastCrowd.player_count, lastRoom) : null;
+  const lastReceipt = lastSealed ? receiptLine({ answer: lastSealed.answer, line: lastLog?.line ?? null, room: lastRoom }) : null;
+  const lastSummary = lastRoom && lastLog ? summaryRow(lastLog.log) : null;
   const anticipation = crowdAnticipation(
     Object.entries(answers).map(([questionId, entry]) => ({ questionId, answer: entry.answer, sealed: entry.sealed })),
     crowd.data?.questions ?? [],
@@ -171,8 +215,7 @@ export default function Round() {
                 height={height}
                 q={current}
                 roundLocksAt={today.data?.locks_at ?? null}
-                fortune={today.data?.fortune ?? null}
-                onSealed={(receipt) => { setLastSealedId(current.id); setLastReceipt(receipt); }}
+                onSealed={(answer) => { setLastSealed({ id: current.id, answer }); setLogOpen(false); }}
               />
             </Animated.View>
           </View>}</CardStage>
@@ -199,7 +242,29 @@ export default function Round() {
         ) : (
           <View style={{ flex: 1, gap: space(2) }}>
             {anticipation && <Mono {...role.caption} color={colors.goldText} style={[role.caption.style, { textAlign: "center" }]}>{anticipation}</Mono>}
-            <CrowdReveal round={today.data} />
+            <CrowdReveal round={today.data} logs={logs} />
+          </View>
+        )}
+        {/* The channel on the take just sealed (design 2026-09-25 §6.2). It
+            lies over the lower stage rather than resizing it: the next card is
+            already dealt beneath, and a card that changed height as the log
+            opened and closed would move under the player's thumb. A tap on the
+            stage above it, or the link, closes it. It lies over the tray as
+            well: the fifth take's floor has no other place to be read, since
+            the fifth seal is followed by the double, not by a sixth card.
+
+            The scrim and the panel share one modal wrapper, so a reader that
+            opens the channel is inside it and cannot wander back out into the
+            card and the numerals behind it. */}
+        {(current || stage === "tray") && logOpen && lastLog && lastSealedId && (
+          <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close the channel" onPress={() => setLogOpen(false)} style={StyleSheet.absoluteFill} />
+            <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "62%", backgroundColor: colors.museumWhite, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: space(3), gap: space(2) }}>
+              <ScrollView contentContainerStyle={{ paddingBottom: space(2) }} contentInsetAdjustmentBehavior="never" alwaysBounceVertical={false} showsVerticalScrollIndicator={false}>
+                <ChannelLog key={lastSealedId} date={today.data.date} log={lastLog.log} defaultOpen collapsible={false} />
+              </ScrollView>
+              <QuietLink title={current ? "DRAW THE NEXT CARD" : TRAY_TITLE} onPress={() => setLogOpen(false)} />
+            </View>
           </View>
         )}
       </View>
@@ -248,7 +313,7 @@ export default function Round() {
       </View>
       {/* One fixed-height footer slot: receipt, verdict, and hint trade
           places without nudging the layout above them. */}
-      <View style={{ minHeight: scaledRow(56, chromeScale), justifyContent: "center" }}>
+      <View style={{ minHeight: scaledRow(72, chromeScale), justifyContent: "center" }}>
         {current && lastSealedId && lastEntry ? (
           // The seal's payout, two rows: the receipt the card handed back —
           // side, stake, winnings — over the thrown card's verdict, printing
@@ -266,10 +331,15 @@ export default function Round() {
             ) : (
               <DecodeLine {...role.meta} text="COUNTING THE PLAYERS…" cursor color={colors.mutedInk} style={{ textAlign: "center" }}/>
             )}
+            {lastSummary && !logOpen && (
+              <Pressable accessibilityRole="button" accessibilityLabel="Open the channel" hitSlop={{ top: 12, bottom: 12, left: 24, right: 24 }} onPress={() => setLogOpen(true)}>
+                <Mono {...role.meta} color={colors.mutedInk} style={[role.meta.style, { textDecorationLine: "underline" }]}>{lastSummary}</Mono>
+              </Pressable>
+            )}
           </View>
         ) : current ? (
           <Mono {...role.supporting} color={colors.mutedInk} style={[role.supporting.style, { textAlign: "center" }]}>
-            The players' leaning is hidden until you seal.
+            {current.crowd ? "Nothing about the room shows until you seal." : "The players' leaning is hidden until you seal."}
           </Mono>
         ) : null}
       </View>

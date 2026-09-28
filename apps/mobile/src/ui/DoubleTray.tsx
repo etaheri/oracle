@@ -2,6 +2,7 @@ import { Pressable, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { TRAY_TITLE, TRAY_READ, type TrayTile } from "../game/doubleTray";
 import { formatFortune } from "../game/fortuneText";
+import { sideWord } from "../game/sideWords";
 import { numeral } from "./CardChrome";
 import { Mono, Ritual, Serif, role } from "./Text";
 import { colors, space, displayScale } from "../theme";
@@ -31,6 +32,7 @@ export function DoubleTray({ tiles, placedId, onPlace, pending, notice }: {
           const placed = placedId === t.id;
           const choosable = placedId === null && !t.locked && !pending;
           const tone = t.answer ? colors.ultramarine : colors.vermilion;
+          const word = sideWord(t.answer, t.room);
           const money = placed
             ? `STAKE ${formatFortune(t.doubledStake)} · WINS ${formatFortune(t.doubledWins)}`
             : `STAKE ${formatFortune(t.stake)} → ${formatFortune(t.doubledStake)} · WINS ${formatFortune(t.wins)} → ${formatFortune(t.doubledWins)}`;
@@ -39,7 +41,7 @@ export function DoubleTray({ tiles, placedId, onPlace, pending, notice }: {
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ disabled: !choosable, selected: placed }}
-                accessibilityLabel={`${t.isBigOne ? "The Big One, " : ""}question ${t.slot}. ${t.text} You said ${t.answer ? "yes" : "no"}, stake ${t.stake}, doubled ${t.doubledStake}${t.locked ? ", locked" : ""}`}
+                accessibilityLabel={`${t.isBigOne ? "The Big One, " : ""}question ${t.slot}. ${t.text} You said ${word.toLowerCase()}, stake ${t.stake}, doubled ${t.doubledStake}${t.locked ? ", locked" : ""}`}
                 disabled={!choosable}
                 onPress={() => onPlace(t)}
                 style={{ borderWidth: 1, borderColor: placed ? colors.agedGold : t.locked ? colors.lineSoft : colors.line, backgroundColor: placed ? colors.goldWash : "transparent", opacity: t.locked || (placedId !== null && !placed) ? 0.45 : 1, padding: space(3), gap: space(1), minHeight: 64 }}
@@ -47,7 +49,7 @@ export function DoubleTray({ tiles, placedId, onPlace, pending, notice }: {
                 <View style={{ flexDirection: "row", gap: space(2), alignItems: "baseline" }}>
                   <Ritual size={displayScale.slot} color={placed ? colors.goldText : colors.mutedInk} letterSpacing={1}>{numeral(t.slot)}</Ritual>
                   {t.isBigOne && <Mono size={9} color={colors.goldText} letterSpacing={3}>THE BIG ONE</Mono>}
-                  <Mono size={10} color={tone} letterSpacing={3} style={{ marginLeft: "auto" }}>{t.answer ? "YES" : "NO"}</Mono>
+                  <Mono size={10} color={tone} letterSpacing={3} style={{ marginLeft: "auto" }}>{word}</Mono>
                 </View>
                 <Serif size={displayScale.inline} color={colors.ink} numberOfLines={2} style={{ lineHeight: 21 }}>{t.text}</Serif>
                 <Mono size={9} color={placed ? colors.goldText : colors.mutedInk} letterSpacing={1}>{placed ? `${money} · DOUBLED` : money}</Mono>

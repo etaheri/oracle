@@ -10,9 +10,10 @@ export function crowdMovement(
   atSeal: { pct: number; count: number } | null | undefined,
   now: { pct: number; count: number } | null | undefined,
   final: boolean,
+  room = false,
 ): string | null {
   if (!atSeal || !now) return null;
   if (atSeal.count < VERDICT_MIN_PLAYERS || now.count < VERDICT_MIN_PLAYERS) return null;
   if (Math.abs(now.pct - atSeal.pct) < MOVEMENT_MIN_DELTA) return null;
-  return `WHEN YOU SEALED ${atSeal.pct}% SAID YES · ${final ? "IT ENDED AT" : "NOW"} ${now.pct}%`;
+  return `WHEN YOU SEALED ${atSeal.pct}% ${room ? "AGREED" : "SAID YES"} · ${final ? "IT ENDED AT" : "NOW"} ${now.pct}%`;
 }

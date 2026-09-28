@@ -9,24 +9,33 @@ export type PracticePrediction = { answer: boolean };
 // sentences, machine register for the receipt and the line.
 export function practiceResult(prediction: PracticePrediction, exhibition: Exhibition) {
   const out = practiceOutcome(prediction, exhibition);
-  const side = (a: boolean) => (a ? "YES" : "NO");
+  const room = exhibition.crowd;
   const verdict = out.delta > 0 ? `You took the Oracle for ${formatFortune(out.delta)}.` : `The Oracle took ${formatFortune(-out.delta)}.`;
-  const other = side(exhibition.outcome !== "yes");
-  const counterfactual = out.oppositeDelta >= 0
-    ? `Had it gone ${other}, the same call would have won ${formatFortune(out.oppositeDelta)}.`
-    : `Had it gone ${other}, the same call would have lost ${formatFortune(-out.oppositeDelta)}.`;
-  // The room's result on a past hot take (design 2026-09-22 §9.5): the
-  // majority's side and its share. A market question keeps the plain outcome.
-  const outcomeSide = side(exhibition.outcome === "yes");
+  const lost = out.oppositeDelta >= 0 ? `won ${formatFortune(out.oppositeDelta)}` : `lost ${formatFortune(-out.oppositeDelta)}`;
+  const otherWay = exhibition.outcome !== "yes";
+  const counterfactual = room
+    ? `Had the room ${otherWay ? "agreed" : "disagreed"}, the same call would have ${lost}.`
+    : `Had it gone ${otherWay ? "YES" : "NO"}, the same call would have ${lost}.`;
+  // The room's result on a past hot take: the majority's side and its share.
+  // A market question keeps the plain outcome.
+  const agreed = exhibition.outcome === "yes";
   const roomPct = exhibition.crowdYesPct;
-  const roomSidePct = roomPct === null ? null : exhibition.outcome === "yes" ? roomPct : 100 - roomPct;
-  const roomLine = roomSidePct === null ? `Actual outcome: ${outcomeSide}.` : `The room said ${outcomeSide}, ${roomSidePct}%.`;
+  const roomSidePct = roomPct === null ? null : agreed ? roomPct : 100 - roomPct;
+  // A hot take never prints YES or NO, share or no share: with nothing behind
+  // it the room simply agreed or disagreed.
+  const roomLine = room
+    ? roomSidePct === null
+      ? `The room ${agreed ? "agreed" : "disagreed"}.`
+      : `The room ${agreed ? "agreed" : "disagreed"}, ${roomSidePct}%.`
+    : roomSidePct === null
+      ? `Actual outcome: ${agreed ? "YES" : "NO"}.`
+      : `The room said ${agreed ? "YES" : "NO"}, ${roomSidePct}%.`;
   return {
     ...out,
-    receipt: receiptLine({ answer: prediction.answer, line: out.line }),
+    receipt: receiptLine({ answer: prediction.answer, line: out.line, room }),
     verdict,
     counterfactual,
     roomLine,
-    oracleLine: lineLabel(out.line)!,
+    oracleLine: lineLabel(out.line, room)!,
   };
 }

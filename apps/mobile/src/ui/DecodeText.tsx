@@ -20,6 +20,7 @@ export function DecodeLine({
   active = true,
   serif = false,
   dimColor,
+  prefix,
   size,
   color,
   letterSpacing,
@@ -40,6 +41,9 @@ export function DecodeLine({
   // Two-tone print: the unresolved static wears this color, the resolved
   // characters wear `color`. Omit for a single-tone line.
   dimColor?: string;
+  // Rendered ahead of the printed text and never decoded: a stamp and a nick
+  // hold still while the words after them resolve.
+  prefix?: React.ReactNode;
   size?: number;
   color?: string;
   letterSpacing?: number;
@@ -85,6 +89,7 @@ export function DecodeLine({
     // all. The blink cursor is dropped from the tree for the same reason — it
     // would otherwise be read as "underscore" every 530ms.
     <Face size={size} color={color} accessibilityLabel={text} {...(serif ? {} : { letterSpacing })} style={style} {...rest}>
+      {prefix}
       {dimColor ? shown.slice(0, revealed) : shown}
       {dimColor && <Text style={{ color: dimColor }}>{shown.slice(revealed)}</Text>}
       {cursor && (

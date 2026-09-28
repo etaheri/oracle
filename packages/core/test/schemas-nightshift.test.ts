@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RoundTodaySchema, TodayLogSchema, RevealSchema, StandingsSchema, ExhibitionSchema, CouncilEntrySchema } from "../src";
+import { RoundTodaySchema, TodayLogSchema, RevealSchema, StandingsSchema, ExhibitionSchema, CouncilEntrySchema, MeLedgerSchema } from "../src";
 
 const qid = "5d3f0d2a-6a3e-4a1f-9b8e-0c2a1b3c4d5e";
 const q = { id: qid, slot: 1, is_big_one: false, text: "cereal is a soup", category: "culture", source_name: "THE PLAYERS", resolution_criteria: "rules", locks_at: "2026-09-26T16:00:00.000Z", lock_healed: false };
@@ -35,5 +35,21 @@ describe("the night shift on the wire (design 2026-09-25 §11)", () => {
   it("Exhibition carries a log, defaulting to empty", () => {
     const e = ExhibitionSchema.parse({ id: "x", kind: "historical", question: "cereal is a soup", context: null, sourceName: "THE PLAYERS", roundDate: "2026-09-25", oraclePYes: 0.38, outcome: "yes", crowdYesPct: 62 });
     expect(e.log).toEqual([]);
+  });
+  it("a reveal question says whether it was a hot take, when it resolved, and when the caller sealed", () => {
+    const Question = RevealSchema.shape.questions.element;
+    const bare = { id: qid, slot: 1, text: "cereal is a soup", outcome: null, crowd_yes_pct: null, crowd_count: null, market_prob: null, source_name: "THE PLAYERS", source_url: null, evidence_quote: null, void_reason: null, oracle_p_yes: null };
+    const my = { answer: true, confidence: 75, points: null, brier: null };
+    expect(Question.parse({ ...bare, my: null })).toMatchObject({ crowd: false, resolved_at: null });
+    expect(Question.parse({ ...bare, my }).my!.sealed_at).toBeNull();
+    const full = Question.parse({ ...bare, crowd: true, resolved_at: "2026-09-26T16:01:00.000Z", my: { ...my, sealed_at: "2026-09-25T16:14:00.000Z" } });
+    expect(full).toMatchObject({ crowd: true, resolved_at: "2026-09-26T16:01:00.000Z" });
+    expect(full.my!.sealed_at).toBe("2026-09-25T16:14:00.000Z");
+  });
+  it("the record's room block defaults to null for an older server", () => {
+    const Room = MeLedgerSchema.shape.room;
+    expect(Room.parse(undefined)).toBeNull();
+    expect(Room.parse({ days: 9, days_read: 6, days_machines_missed: 3, read_rate_30d: null, calls_30d: 12 })).toMatchObject({ days: 9, read_rate_30d: null });
+    expect(() => Room.parse({ days: 9, days_read: 6, days_machines_missed: 3, read_rate_30d: 1.2, calls_30d: 12 })).toThrow();
   });
 });
