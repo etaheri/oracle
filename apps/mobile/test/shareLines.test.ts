@@ -19,6 +19,12 @@ describe("the share card's lines (design §8.3)", () => {
     expect(splitShareLine("A".repeat(50))).toEqual(["A".repeat(50), null]);
   });
 
+  it("says the Big One in agree and disagree on a hot take", () => {
+    expect(shareBigOneLine({ line: 0.35, answer: true, stake: 100, delta: 186, room: true })).toBe("THE ORACLE EXPECTED 35% TO AGREE · YOU AGREED FOR 100 · +186");
+    expect(shareBigOneLine({ line: 0.35, answer: false, stake: 100, delta: -100, room: true })).toBe("THE ORACLE EXPECTED 35% TO AGREE · YOU DISAGREED FOR 100 · −100");
+    expect(shareBigOneLine({ line: 0.35, answer: null, stake: null, delta: null, room: true })).toBe("THE ORACLE EXPECTED 35% TO AGREE · YOU SAT IT OUT");
+  });
+
   it("composes the share message around the fortune delta", () => {
     expect(fortuneShareMessage({ date: "2026-09-10", delta: 140, fortuneAfter: 1140, results: ["win", "loss", "win", "win", "void"] }, null))
       .toBe("🔮 OUTSEEN 2026-09-10 — I✓ II✗ III✓ IV✓ V∅ · +140 · FORTUNE 1,140 · can you beat the house?");

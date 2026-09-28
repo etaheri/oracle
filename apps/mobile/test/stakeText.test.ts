@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lineLabel, receiptLine, crowdCallLine, sealHint, SWIPE_HINT, TAP_HINT } from "../src/game/stakeText";
+import { lineLabel, receiptLine, crowdCallLine, sealHint, SWIPE_HINT, SWIPE_HINT_ROOM, TAP_HINT } from "../src/game/stakeText";
 
 describe("the card's estimate text (design 2026-09-22 §9)", () => {
   it("prints what the Oracle expected as a YES percentage, and nothing when there is no line", () => {
@@ -30,5 +30,24 @@ describe("the round screen's line per sealed call (design 2026-09-22 §9.2)", ()
   });
   it("says only whose side it is when no line was committed", () => {
     expect(crowdCallLine({ answer: true, line: null, doubled: false })).toBe("YOU: YES");
+  });
+});
+
+describe("the card's text on a hot take (design 2026-09-25 §7)", () => {
+  it("expects a share to agree", () => {
+    expect(lineLabel(0.38, true)).toBe("THE ORACLE EXPECTED 38% TO AGREE");
+    expect(lineLabel(null, true)).toBeNull();
+  });
+  it("writes the receipt in agree and disagree", () => {
+    expect(receiptLine({ answer: true, line: 0.38, room: true })).toBe("AGREE · THE ORACLE EXPECTED 38% TO AGREE");
+    expect(receiptLine({ answer: false, line: 0.38, doubled: true, room: true })).toBe("DISAGREE · THE ORACLE EXPECTED 38% TO AGREE · DOUBLED");
+    expect(receiptLine({ answer: false, line: null, room: true })).toBe("DISAGREE");
+    expect(crowdCallLine({ answer: true, line: null, doubled: false, room: true })).toBe("YOU: AGREE");
+  });
+  it("teaches the swipe in the same length as the market hint, so it still fits one line", () => {
+    expect(SWIPE_HINT_ROOM).toBe("RIGHT TO AGREE, LEFT TO DISAGREE");
+    expect(SWIPE_HINT_ROOM.length).toBeLessThanOrEqual(SWIPE_HINT.length);
+    expect(sealHint(false, true)).toBe(SWIPE_HINT_ROOM);
+    expect(sealHint(true, true)).toBe(TAP_HINT);
   });
 });

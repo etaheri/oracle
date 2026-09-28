@@ -4,11 +4,15 @@ import { patternLine, type QuestionResult } from "./sharePattern";
 
 // The share card's second line (design §8.3): the Oracle's line on the Big
 // One and what the player did about it.
-export function shareBigOneLine(input: { line: number | null; answer: boolean | null; stake: number | null; delta: number | null }): string | null {
+export function shareBigOneLine(input: { line: number | null; answer: boolean | null; stake: number | null; delta: number | null; room?: boolean }): string | null {
   if (input.line === null) return null;
-  const said = `THE ORACLE SAID ${Math.round(input.line * 100)}% YES`;
+  const room = input.room ?? false;
+  const pct = Math.round(input.line * 100);
+  const said = room ? `THE ORACLE EXPECTED ${pct}% TO AGREE` : `THE ORACLE SAID ${pct}% YES`;
   if (input.answer === null || input.stake === null) return `${said} · YOU SAT IT OUT`;
-  const took = `YOU TOOK ${input.answer ? "YES" : "NO"} FOR ${formatFortune(input.stake)}`;
+  const took = room
+    ? `YOU ${input.answer ? "AGREED" : "DISAGREED"} FOR ${formatFortune(input.stake)}`
+    : `YOU TOOK ${input.answer ? "YES" : "NO"} FOR ${formatFortune(input.stake)}`;
   return input.delta === null ? `${said} · ${took}` : `${said} · ${took} · ${signedFortune(input.delta)}`;
 }
 

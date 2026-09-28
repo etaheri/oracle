@@ -1,7 +1,8 @@
 import { FORTUNE, type Reveal } from "@oracle/core";
 import { formatFortune, signedFortune } from "./fortuneText";
-import { receiptLine } from "./stakeText";
+import { lineLabel, receiptLine } from "./stakeText";
 import { readingLine } from "./revealRows";
+import { sideWord, outcomeWord } from "./sideWords";
 
 type Question = Reveal["questions"][number];
 
@@ -35,8 +36,9 @@ export function fortuneHeadline(d: Reveal): FortuneHeadline {
 // has no money in it, so the receipt is the side and nothing more.
 export function stakeReceipt(q: Question): string | null {
   if (!q.my) return null;
-  const side = q.my.answer ? "YES" : "NO";
-  if (q.my.stake === null) return receiptLine({ answer: q.my.answer, line: null });
+  const room = q.crowd;
+  const side = sideWord(q.my.answer, room);
+  if (q.my.stake === null) return receiptLine({ answer: q.my.answer, line: null, room });
   const head = `${side} · STAKED ${formatFortune(q.my.stake)}`;
   // The double is the call's own news, so it rides the receipt in every
   // state -- pending included, where it is the only place the player can
@@ -77,14 +79,26 @@ export function oracleTake(q: Question): string | null {
   return null;
 }
 
+// The room's own verdict on a settled hot take (design 2026-09-25 §7). It
+// rides the gauge on the reveal; a market question, a void and an unread
+// question have none.
+export function roomVerdict(q: Question): string | null {
+  if (!q.crowd || (q.outcome !== "yes" && q.outcome !== "no") || q.crowd_yes_pct === null) return null;
+  const pct = Math.round(q.crowd_yes_pct);
+  return q.outcome === "yes" ? `THE ROOM AGREED · ${pct}%` : `THE ROOM DISAGREED · ${pct}% AGREED`;
+}
+
 export function lineContext(q: Question): string | null {
   if (q.line_p_yes === null) return null;
+  // On a hot take the room's share rides the gauge row above, so the line
+  // stands alone here.
+  if (q.crowd) return lineLabel(q.line_p_yes, true);
   const expected = `THE ORACLE EXPECTED ${Math.round(q.line_p_yes * 100)}% YES`;
   return q.crowd_yes_pct === null ? expected : `${expected} · THE ROOM SAID ${Math.round(q.crowd_yes_pct)}%`;
 }
 
 export function fortuneRowRight(q: Question): string {
-  if (!q.my) return q.outcome === "yes" ? "YES" : q.outcome === "no" ? "NO" : q.outcome === "void" ? "VOID" : "—";
+  if (!q.my) return q.outcome === "yes" || q.outcome === "no" ? outcomeWord(q.outcome, q.crowd) : q.outcome === "void" ? "VOID" : "—";
   if (q.my.delta === null) return "—";
   return signedFortune(q.my.delta);
 }

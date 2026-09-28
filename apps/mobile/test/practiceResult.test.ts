@@ -35,4 +35,14 @@ describe("practice on the practice fortune (design §8.3)", () => {
     expect(practiceResult({ answer: true }, { ...ex, kind: "historical", roundDate: "2026-09-23", crowdYesPct: 62 }).roomLine).toBe("The room said YES, 62%.");
     expect(practiceResult({ answer: true }, { ...ex, outcome: "no", crowdYesPct: 31 }).roomLine).toBe("The room said NO, 69%.");
   });
+
+  it("speaks a past hot take in agree and disagree (design 2026-09-25 §7)", () => {
+    const take = { ...ex, kind: "historical" as const, roundDate: "2026-09-23", crowd: true, crowdYesPct: 62 };
+    const r = practiceResult({ answer: true }, take);
+    expect(r.receipt).toBe("AGREE · THE ORACLE EXPECTED 70% TO AGREE");
+    expect(r.oracleLine).toBe("THE ORACLE EXPECTED 70% TO AGREE");
+    expect(r.roomLine).toBe("The room agreed, 62%.");
+    expect(r.counterfactual).toBe("Had the room disagreed, the same call would have lost 50.");
+    expect(practiceResult({ answer: true }, { ...take, outcome: "no", crowdYesPct: 31 }).roomLine).toBe("The room disagreed, 69%.");
+  });
 });
