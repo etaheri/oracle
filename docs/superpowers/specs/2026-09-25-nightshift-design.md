@@ -287,3 +287,18 @@ Three plans, in this order; each is shippable alone.
 ## 16. Out of scope
 
 The 7 PM lock. A weekly shared take. Cross-vendor members and the silent fourth member. Player-authored takes. A channel readable before the seal with the numbers redacted. Fortune's removal. Seasons. All recorded in the audit for later.
+
+## 17. As built, plan 1 (the pipeline)
+
+- **N5 amended.** `line_p_yes` stays on `GET /v1/round/today`, served only on the caller's own sealed questions. Build 12 prices its tray and receipt from it; removing it would have broken the live app the night this deployed. The leak is closed either way. Plan 2 removes the field once build 13 reads the log.
+- **§8.1 window.** `GET /v1/standings` is all-time by default (`window: null`, the dataset) and takes `?days=N` for the windowed view; the 30-day board in §8.2 is plan 3's and reads the same loader with `since`.
+- **§5.3 the gate.** Reactions run through `tasteTexts`, whose prompt screens "candidate questions"; its rules (derogatory, private individual, harm) are the ones that matter and it refuses on them. A reaction-specific gate prompt is a follow-up if refusals prove wrong-shaped.
+- **§6.1 tie order.** `buildLog` sorts by instant and keeps insertion order on ties, so a reaction and a lesson written in the same second print reaction first.
+- **§4.4 reroll.** A reroll keeps the slot's `unhinged` flag; a rerolled unhinged take is still the unhinged take. The reroll writes `seen_on` and never touches the flag.
+- Migration `0017_nightshift`; suites at merge: core 260, mobile 455, api 814.
+- **Tests and the clock.** `commit_oracle_forecast` and `commit_council` compare the round's opening to the database's real clock, so any test fixture with a past round date rots. `council-crowd.test.ts` now computes its date relative to today; `exhibition.test.ts` uses 2099 dates throughout.
+- **§6.2 the log route's reads.** `channelRows(db, qIds, { remarks })` skips the reactions and lessons queries when `remarks` is false; `/today/log` passes false because before lock both are always empty.
+- **§5.3 reaction order.** Wrong-side members are asked in `MODEL_MEMBER_IDS` order (sonnet, opus, haiku), so a round where two are wrong asks Sonnet before Haiku.
+- **§8.1 CSV.** The CSV gained `right_side` (1, 0, or empty for a 0.5 line) per member row rather than a `read_rate` column; the rate is a row aggregate and the CSV is the per-call dataset.
+- **N5 on build 12.** With `line_p_yes` null before the seal, build 12's card shows no estimate ladder before the seal and its first receipt reads bare YES/NO until the post-seal refetch lands. Both are correct under N5 and last until build 13.
+- **§8.1 players' Brier.** Blank, as the spec says; the crowd row keeps calls and house delta.

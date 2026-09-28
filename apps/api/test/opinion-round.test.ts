@@ -14,8 +14,16 @@ const DATE = "2026-09-23";
 const lock = noonET(addDays(DATE, 1));
 const CATS = ["markets", "sports", "weather", "culture", "news"] as const;
 
-function five(texts?: string[]) {
-  return { questions: CATS.map((category, i) => ({ slot: i + 1, category, text: texts?.[i] ?? `Is take ${i + 1} the right one?` })) };
+const TAKES = ["a car payment is a personality trait", "the nfl is better on the radio", "fall is the worst season and everyone is lying", "cereal is a soup", "nobody actually likes going to the airport early"];
+function five(texts?: string[], opts: { unhingedSlot?: number | null; seenOn?: boolean } = {}) {
+  const unhingedSlot = opts.unhingedSlot === undefined ? 4 : opts.unhingedSlot;
+  return {
+    questions: CATS.map((category, i) => ({
+      slot: i + 1, category, text: texts?.[i] ?? TAKES[i]!,
+      unhinged: i + 1 === unhingedSlot,
+      seen_on: opts.seenOn === false ? null : { label: i === 1 ? "the replies" : "r/unpopularopinion", url: i === 1 ? null : `https://reddit.com/r/unpopularopinion/t${i}` },
+    })),
+  };
 }
 
 // A canned Claude: the opinion call answers five questions; the taste call allows everything unless told otherwise.
@@ -60,9 +68,12 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
     expect(calls.map((c) => c.schemaName)).toEqual(["opinion_round", "taste_verdicts"]);
     const voice = calls[0]!;
     expect(voice.model).toBe("v");
-    expect(voice.webSearch).toBeUndefined();
+    expect(voice.webSearch).toEqual({ maxUses: 8 });
     expect(voice.effort).toBe("low");
     expect(voice.system).toContain(DATE);
+    expect(voice.system).toContain("Search first");
+    expect(voice.system).toContain("r/AmItheAsshole");
+    expect(voice.system).toContain("people who post");
     const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE), orderBy: (q, { asc }) => [asc(q.slot)] });
     expect(qs.length).toBe(5);
     expect(qs.map((q) => q.category)).toEqual([...CATS]);
@@ -78,13 +89,16 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
       expect(q.marketProb).toBeNull();
       expect(q.context).toBeNull();
       expect(q.isBigOne).toBe(q.slot === 5);
+      expect(q.unhinged).toBe(q.slot === 4);
+      expect(q.seenOnLabel).toBe(q.slot === 2 ? "the replies" : "r/unpopularopinion");
+      expect(q.seenOnUrl).toBe(q.slot === 2 ? null : `https://reddit.com/r/unpopularopinion/t${q.slot - 1}`);
     }
     const round = await deps.db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) });
     expect(round!.rulesVersion).toBe(3);
     expect(round!.candidatesWritten).toBe(0);
     expect(sent.length).toBe(1);
     expect(sent[0]).toContain(`${DATE}: opinion round authored · 5 questions · categories markets, sports, weather, culture, news`);
-    expect(sent[0]).toContain("1. [markets] Is take 1 the right one?");
+    expect(sent[0]).toContain("1. [markets] a car payment is a personality trait · seen on r/unpopularopinion");
   });
 
   it("passes the last 60 days of crowd texts to the prompt as the exclusion list", async () => {
@@ -112,22 +126,22 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
     const sent: string[] = [];
     const claude = claudeWith({
       calls,
-      refuse: ["Is take 2 the right one?"],
-      answer: (_c, n) => (n === 1 ? five() : five(["Is take 1 the right one?", "Is a clean take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"])),
+      refuse: [TAKES[1]!],
+      answer: (_c, n) => (n === 1 ? five() : five(["take 1 is the right one", "a clean take 2 is the right one", "take 3 is the right one", "take 4 is the right one", "take 5 is the right one"])),
     });
     const deps = await depsWith(claude, sent);
     const r = await runOpinionRound(deps, DATE);
     expect(r.published).toBe(true);
     expect(calls.map((c) => c.schemaName)).toEqual(["opinion_round", "taste_verdicts", "opinion_round", "taste_verdicts"]);
-    expect(calls[2]!.user).toContain("Is take 2 the right one?");
+    expect(calls[2]!.user).toContain(TAKES[1]);
     const q2 = await deps.db.query.questions.findFirst({ where: eq(schema.questions.roundDate, DATE), orderBy: (q, { asc }) => [asc(q.slot)], offset: 1 });
-    expect(q2!.text).toBe("Is a clean take 2 the right one?");
+    expect(q2!.text).toBe("a clean take 2 is the right one");
   });
 
   it("falls through to the bank when the taste gate refuses on both passes", async () => {
     const calls: StructuredCall[] = [];
     const sent: string[] = [];
-    const deps = await depsWith(claudeWith({ calls, refuse: ["take 2"] }), sent);
+    const deps = await depsWith(claudeWith({ calls, refuse: ["nfl"] }), sent);
     const r = await runOpinionRound(deps, DATE);
     expect(r.published).toBe(false);
     expect(r.reason).toBe("the taste gate refused a question on both passes");
@@ -138,7 +152,7 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
 
   it("fails validation twice, and gives up, on a set whose first four slots do not span four categories", async () => {
     const calls: StructuredCall[] = [];
-    const deps = await depsWith(claudeWith({ calls, answer: () => ({ questions: (["markets", "markets", "weather", "culture", "news"] as const).map((category, i) => ({ slot: i + 1, category, text: `Is take ${i + 1} the right one?` })) }) }), []);
+    const deps = await depsWith(claudeWith({ calls, answer: () => ({ questions: (["markets", "markets", "weather", "culture", "news"] as const).map((category, i) => ({ slot: i + 1, category, text: `take ${i + 1} is the right one`, unhinged: i + 1 === 4, seen_on: null })) }) }), []);
     const { draft, reason } = await buildOpinionDraft(deps, DATE);
     expect(draft).toBeNull();
     expect(reason).toMatch(/failed validation twice/);
@@ -151,9 +165,9 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
   // narrate entirely): a bad response is an expected outcome the retry loop
   // in buildOpinionDraft handles, naming the issue in the re-ask and giving
   // up on a second failure of either kind.
-  it("rejects a text over 120 characters, one without a question mark, one with an exclamation mark, and one opening with 'Do you think' -- failing validation twice and giving up", async () => {
-    for (const bad of ["x".repeat(118) + "ok?", "Is this fine", "Is this fine!?", "Do you think this is fine?"]) {
-      const deps = await depsWith(claudeWith({ calls: [], answer: () => five([bad, "Is take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"]) }), []);
+  it("rejects a text over 120 characters and one with an exclamation mark -- failing validation twice and giving up", async () => {
+    for (const bad of ["x".repeat(121), "this take is fine!"]) {
+      const deps = await depsWith(claudeWith({ calls: [], answer: () => five([bad, "take 2 is the right one", "take 3 is the right one", "take 4 is the right one", "take 5 is the right one"]) }), []);
       const { draft, reason } = await buildOpinionDraft(deps, DATE);
       expect(draft, bad).toBeNull();
       expect(reason, bad).toMatch(/failed validation twice/);
@@ -166,7 +180,7 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
     const bad121 = "x".repeat(120) + "?"; // 121 characters, over the 120 max
     const claude = claudeWith({
       calls,
-      answer: (_c, n) => (n === 1 ? five([bad121, "Is take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"]) : five()),
+      answer: (_c, n) => (n === 1 ? five([bad121, "take 2 is the right one", "take 3 is the right one", "take 4 is the right one", "take 5 is the right one"]) : five()),
     });
     const deps = await depsWith(claude, sent);
     const r = await runOpinionRound(deps, DATE);
@@ -182,7 +196,7 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
     const calls: StructuredCall[] = [];
     const sent: string[] = [];
     const bad121 = "x".repeat(120) + "?";
-    const claude = claudeWith({ calls, answer: () => five([bad121, "Is take 2 the right one?", "Is take 3 the right one?", "Is take 4 the right one?", "Is take 5 the right one?"]) });
+    const claude = claudeWith({ calls, answer: () => five([bad121, "take 2 is the right one", "take 3 is the right one", "take 4 is the right one", "take 5 is the right one"]) });
     const deps = await depsWith(claude, sent);
     const r = await runOpinionRound(deps, DATE);
     expect(r.published).toBe(false);
@@ -201,5 +215,44 @@ describe("runOpinionRound (design 2026-09-22 §4)", () => {
     expect(r.published).toBe(false);
     expect(r.reason).toBe("round not editable");
     expect(calls.length).toBe(2);
+  });
+});
+
+describe("the opinion round at version 2 (design 2026-09-25 §4.1)", () => {
+  it("refuses a question mark, then accepts the corrected set", async () => {
+    const calls: StructuredCall[] = [];
+    const deps = await depsWith(claudeWith({ calls, answer: (_c, n) => n === 1 ? five(["is cereal a soup?", ...TAKES.slice(1)]) : five() }), []);
+    const r = await runOpinionRound(deps, DATE);
+    expect(r.published).toBe(true);
+    expect(calls.filter((c) => c.schemaName === "opinion_round").length).toBe(2);
+    expect(calls[1]!.user).toContain("failed validation");
+    expect(calls[1]!.user).toMatch(/question mark|statement/i);
+  });
+  it("refuses a set with no unhinged take or two of them", async () => {
+    for (const unhingedSlot of [null, undefined] as const) {
+      const calls: StructuredCall[] = [];
+      const deps = await depsWith(claudeWith({ calls, answer: (_c, n) => n === 1 ? (unhingedSlot === null ? five(undefined, { unhingedSlot: null }) : { questions: five().questions.map((q) => ({ ...q, unhinged: true })) }) : five() }), []);
+      expect((await runOpinionRound(deps, DATE)).published).toBe(true);
+      expect(calls.filter((c) => c.schemaName === "opinion_round").length).toBe(2);
+    }
+  });
+  it("refuses 'hot take:' and 'unpopular opinion:' openers", async () => {
+    const calls: StructuredCall[] = [];
+    const deps = await depsWith(claudeWith({ calls, answer: (_c, n) => n === 1 ? five(["Hot take: cereal is a soup", ...TAKES.slice(1)]) : five() }), []);
+    expect((await runOpinionRound(deps, DATE)).published).toBe(true);
+    expect(calls.filter((c) => c.schemaName === "opinion_round").length).toBe(2);
+  });
+  it("accepts a null seen_on", async () => {
+    const deps = await depsWith(claudeWith({ calls: [], answer: () => five(undefined, { seenOn: false }) }), []);
+    expect((await runOpinionRound(deps, DATE)).published).toBe(true);
+    const qs = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE) });
+    expect(qs.every((q) => q.seenOnLabel === null && q.seenOnUrl === null)).toBe(true);
+  });
+  it("narrates the seen-on label per slot and marks the unhinged one", async () => {
+    const sent: string[] = [];
+    const deps = await depsWith(claudeWith({ calls: [] }), sent);
+    await runOpinionRound(deps, DATE);
+    expect(sent[0]).toContain("seen on r/unpopularopinion");
+    expect(sent[0]).toContain("[UNHINGED]");
   });
 });

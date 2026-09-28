@@ -29,7 +29,8 @@ import { sendPushes } from "../push/onesignal";
 import { DEFAULT_EXCHANGES } from "./market-round";
 import type { ExchangeSource } from "./exchanges/types";
 import { writeLessons } from "./council/lessons";
-import { siteUrlOf } from "./round-kind";
+import { writeReactions, type ReactionsOutcome } from "./council/reactions";
+import { siteUrlOf, crowdResolveMinOf } from "./round-kind";
 
 function evidenceOf(deps: PipelineDeps, a: ResolverVerdict, b: ResolverVerdict, disagreement: boolean) {
   return {
@@ -120,14 +121,6 @@ export async function resolveFromExchange(deps: PipelineDeps, questionId: string
 }
 
 /**
- * The crowd's floor (design 2026-09-22 T6): fewer sealed answers than this
- * and the question voids rather than pretend one player is a room. It is 1
- * this week, while the field is a handful; it rises to 20 once there are
- * twenty players. A constant, not a var, on purpose — it is a rule.
- */
-export const CROWD_RESOLVE_MIN = 1;
-
-/**
  * Crowd settlement (design 2026-09-22 §6.1): the players' own majority is the
  * outcome. No model, no exchange. YES above half, NO below, void on an exact
  * split or under the floor. Every crowd question is resolvable the moment the
@@ -148,7 +141,8 @@ export async function resolveFromCrowd(deps: PipelineDeps, questionId: string): 
 
   let outcome: "yes" | "no" | "void";
   let evidence: Record<string, unknown>;
-  if (n < CROWD_RESOLVE_MIN) {
+  const floor = crowdResolveMinOf(deps);
+  if (n < floor) {
     outcome = "void";
     evidence = { ...base, reason: PIPELINE_LINES.crowdTooFew };
   } else if (yes * 2 === n) {
@@ -257,12 +251,20 @@ export async function narrateResolution(
   deps: PipelineDeps,
   date: string,
   outcomes: ResolveOutcome[],
+  reactions: ReactionsOutcome[] = [],
 ): Promise<void> {
   const failed = outcomes.filter((o) => o.error);
   if (failed.length > 0) {
     await deps.telegram.send(
       `⚠ resolve failed (${date}): ${failed.map((f) => `${f.questionId}: ${f.error}`).join(" · ")}`,
     );
+  }
+  const attempted = reactions.filter((r) => r.written + r.dropped > 0 || r.error);
+  if (attempted.length > 0) {
+    const written = attempted.reduce((s, r) => s + r.written, 0);
+    const dropped = attempted.reduce((s, r) => s + r.dropped, 0);
+    const errs = attempted.filter((r) => r.error).map((r) => `${r.questionId}: ${r.error}`);
+    await deps.telegram.send(`reactions: ${written} written, ${dropped} dropped${errs.length ? ` · ⚠ ${errs.join(" · ")}` : ""}`);
   }
   // The trickle's own summary (audit finding B): resolveOne discarded
   // sendPushes's sent/skipped, so this channel reported failures but never a
@@ -294,10 +296,14 @@ export async function runResolution(
   questionIds: string[],
 ): Promise<ResolveOutcome[]> {
   const outcomes: ResolveOutcome[] = [];
+  const reactions: ReactionsOutcome[] = [];
   for (const questionId of questionIds) {
     outcomes.push(await resolveOne(deps, questionId));
+    // The night shift reacts before it learns (design 2026-09-25 §5.3): the
+    // reaction is in the moment, the lesson is the morning after.
+    reactions.push(await writeReactions(deps, questionId));
     await writeLessons(deps, questionId);
   }
-  await narrateResolution(deps, date, outcomes);
+  await narrateResolution(deps, date, outcomes, reactions);
   return outcomes;
 }

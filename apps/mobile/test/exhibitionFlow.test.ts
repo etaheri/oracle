@@ -21,6 +21,8 @@ const historical: Exhibition = {
   outcome: "yes",
   linePYes: null,
   crowdYesPct: null,
+  log: [],
+  crowd: false,
 };
 
 const replacement: Exhibition = {

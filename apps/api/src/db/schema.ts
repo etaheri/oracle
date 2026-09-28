@@ -134,6 +134,15 @@ export const questions = pgTable("questions", {
   // ticker, Polymarket first tag. Keys a member's lessons; null falls back to
   // the category.
   marketSeriesKey: text("market_series_key"),
+  // Where the argument came from (design 2026-09-25 §4.2): the community as
+  // people name it and the thread, when search found one. Null when the take
+  // was written from the day's mood. Not the source of the ANSWER, which is
+  // still the players.
+  seenOnLabel: text("seen_on_label"),
+  seenOnUrl: text("seen_on_url"),
+  // The one take a night that is absurd on its face (§4.1). Exactly one per
+  // opinion round; the card carries a modifier for it.
+  unhinged: boolean("unhinged").notNull().default(false),
 }, (t) => [index("questions_round_date_idx").on(t.roundDate)]);
 
 export const predictions = pgTable("predictions", {
@@ -289,3 +298,16 @@ export const lessons = pgTable("lessons", {
   uniqueIndex("lessons_member_question_idx").on(t.member, t.questionId),
   index("lessons_member_series_idx").on(t.member, t.seriesKey, t.resolvedAt),
 ]);
+
+// The night shift's reactions (design 2026-09-25 §5.3): one line per model
+// member on the wrong side of the room, written once at resolution, through
+// the taste gate. Winners write nothing, so a member without a row was
+// right, absent, or refused.
+export const reactions = pgTable("reactions", {
+  questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+  member: text("member").notNull(),
+  text: text("text").notNull(),
+  model: text("model"),
+  promptVersion: text("prompt_version"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.questionId, t.member] })]);

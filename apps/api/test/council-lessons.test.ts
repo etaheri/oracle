@@ -113,3 +113,14 @@ describe("the admin lessons routes", () => {
     expect((await app.request("/admin/lessons")).status).toBe(401);
   });
 });
+
+describe("the lesson's register (design 2026-09-25 §5.4)", () => {
+  it("names the member's title and asks for its own register", async () => {
+    const { db, q } = await settled("yes");
+    const calls: StructuredCall[] = [];
+    await writeLessons(makeDeps(db, { structured: async (c) => { calls.push(c); return { text: "L." }; } }), q.id);
+    expect(calls[0]!.system).toContain("in your own register");
+    expect(calls[0]!.user).toContain("MEMBER: SONNET, day shift");
+    expect(calls[0]!.user).toContain("REGISTER: You keep the channel on task");
+  });
+});

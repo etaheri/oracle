@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { medianLine, sideOf, onRightSide, memberBrier, memberHouseDelta, standingsRow, MEMBER_ORDER } from "../src/council";
+import { medianLine, sideOf, onRightSide, memberBrier, memberHouseDelta, standingsRow, MEMBER_ORDER, MEMBER_PROFILE, MODEL_MEMBER_IDS, readRate, READ_RATE_MIN_CALLS } from "../src/council";
 import { payout, clampLine } from "../src/fortune";
 
 describe("the median (spec §7)", () => {
@@ -75,5 +75,39 @@ describe("standings row", () => {
   });
   it("keeps the fixed member order", () => {
     expect(MEMBER_ORDER).toEqual(["sonnet", "opus", "haiku", "market"]);
+  });
+});
+
+describe("member profiles (design 2026-09-25 §5.1)", () => {
+  it("names every model member with a title and a register", () => {
+    for (const id of MODEL_MEMBER_IDS) {
+      const p = MEMBER_PROFILE[id];
+      expect(p.name).toBe(id.toUpperCase());
+      expect(p.title.length).toBeGreaterThan(0);
+      expect(p.register.length).toBeGreaterThan(20);
+    }
+    expect(MEMBER_PROFILE.haiku.title).toBe("night shift");
+    expect(MEMBER_PROFILE.sonnet.title).toBe("day shift");
+    expect(MEMBER_PROFILE.opus.title).toBe("senior forecaster");
+  });
+});
+
+describe("the read rate (design 2026-09-25 §8.1)", () => {
+  const call = (p: number, outcome: "yes" | "no") => ({ p, outcome });
+  it("is null under the minimum", () => {
+    expect(READ_RATE_MIN_CALLS).toBe(25);
+    expect(readRate(Array.from({ length: 24 }, () => call(0.9, "yes")))).toBeNull();
+  });
+  it("is the share of calls on the right side, with exactly 0.5 counted as a call on neither side", () => {
+    const calls = [
+      ...Array.from({ length: 20 }, () => call(0.9, "yes")),
+      ...Array.from({ length: 4 }, () => call(0.9, "no")),
+      call(0.5, "yes"),
+    ];
+    expect(readRate(calls)).toBeCloseTo(20 / 25, 6);
+  });
+  it("maps a player's side to 1 and 0", () => {
+    const calls = [...Array.from({ length: 25 }, (_, i) => call(i % 5 === 0 ? 0 : 1, "yes"))];
+    expect(readRate(calls)).toBeCloseTo(20 / 25, 6);
   });
 });

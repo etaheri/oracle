@@ -34,6 +34,7 @@ import { retrieveEvidence } from "./council/evidence";
 import { commitMember, type MemberResult } from "./council/member";
 import { commitCouncil } from "./council/commit";
 import { writeLessons } from "./council/lessons";
+import { writeReactions, type ReactionsOutcome } from "./council/reactions";
 import { roundKindOf, type RoundKind } from "./round-kind";
 import type { MarketCandidate } from "./exchanges/types";
 import type { PipelineDeps } from "./index";
@@ -159,12 +160,17 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowPa
     // additionally cut wall-clock but take peak Anthropic concurrency from two
     // to ten, which is a separate decision.
     const outcomes: ResolveOutcome[] = [];
+    const reactions: ReactionsOutcome[] = [];
     for (const questionId of questionIds) {
       outcomes.push(
         await durableStep(step, `resolve-${questionId}`, POLICY.noRetry, deps, () =>
           resolveOne(deps, questionId),
         ),
       );
+      // The night shift reacts before it learns (design 2026-09-25 §5.3): its
+      // own step, after the outcome is known, so a retried resolve never
+      // re-asks and a failed reaction never fails the resolution.
+      reactions.push(await durableStep(step, `reactions-${questionId}`, POLICY.model, deps, () => writeReactions(deps, questionId)));
       // Memory (design 2026-09-11 §8): its own step, after the outcome is
       // known, so a retried resolve never re-asks and a failed lesson never
       // fails the resolution. No-op below version 3 and on void.
@@ -172,7 +178,7 @@ export class ResolutionWorkflow extends WorkflowEntrypoint<WorkerEnv, WorkflowPa
     }
 
     await durableStep(step, "narrate", POLICY.narrate, deps, async () => {
-      await narrateResolution(deps, date, outcomes);
+      await narrateResolution(deps, date, outcomes, reactions);
       return { failed: outcomes.filter((o) => o.error).length };
     });
 

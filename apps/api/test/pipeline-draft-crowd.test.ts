@@ -62,3 +62,24 @@ describe("a crowd draft (design 2026-09-22 §4.2)", () => {
     await expect(upsertDraft(db, DATE, crowdDraft(), 2)).rejects.toThrow(/crowd question needs rules version 3/);
   });
 });
+
+describe("seen-on and unhinged (design 2026-09-25 §4.2)", () => {
+  it("writes where each take was seen and marks the unhinged one; absent fields default", async () => {
+    const { db } = await makeTestDb();
+    const draft = crowdDraft();
+    draft.questions[0]!.seen_on = { label: "r/AmItheAsshole", url: "https://reddit.com/r/AmItheAsshole/abc" };
+    draft.questions[1]!.seen_on = { label: "the replies", url: null };
+    draft.questions[2]!.unhinged = true;
+    await upsertDraft(db, DATE, draft, 3);
+    const qs = await db.query.questions.findMany({ where: eq(schema.questions.roundDate, DATE), orderBy: (q, { asc }) => [asc(q.slot)] });
+    expect(qs[0]).toMatchObject({ seenOnLabel: "r/AmItheAsshole", seenOnUrl: "https://reddit.com/r/AmItheAsshole/abc", unhinged: false });
+    expect(qs[1]).toMatchObject({ seenOnLabel: "the replies", seenOnUrl: null });
+    expect(qs[2]!.unhinged).toBe(true);
+    expect(qs[3]).toMatchObject({ seenOnLabel: null, seenOnUrl: null, unhinged: false });
+  });
+  it("refuses a seen-on with an empty label or a non-URL", () => {
+    const base = crowdDraft().questions[0]!;
+    expect(() => DraftSchema.parse({ questions: [{ ...base, seen_on: { label: "", url: null } }, ...crowdDraft().questions.slice(1)] })).toThrow();
+    expect(() => DraftSchema.parse({ questions: [{ ...base, seen_on: { label: "x", url: "not a url" } }, ...crowdDraft().questions.slice(1)] })).toThrow();
+  });
+});

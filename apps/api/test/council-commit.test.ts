@@ -59,7 +59,7 @@ describe("commitCouncil (spec §7)", () => {
     expect(market[0]!.model).toBeNull();
     const round = await db.query.rounds.findFirst({ where: eq(schema.rounds.date, DATE) });
     expect(round!.oracleForecastModel).toBe("council");
-    expect(round!.oraclePromptVersion).toBe("council-v1");
+    expect(round!.oraclePromptVersion).toBe("council-v2");
   });
 
   it("clamps the median to the market band", async () => {

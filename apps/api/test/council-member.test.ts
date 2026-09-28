@@ -140,6 +140,6 @@ describe("members", () => {
     const deps = makeDeps(null as unknown as TestDb, null);
     expect(memberModel(deps, "opus")).toBe("m-opus");
     expect(memberModel({ ...deps, councilModels: undefined }, "haiku")).toBe("claude-haiku-4-5-20251001");
-    expect(COUNCIL_PROMPT_VERSION).toBe("council-v1");
+    expect(COUNCIL_PROMPT_VERSION).toBe("council-v2");
   });
 });

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
 import { createApp } from "../src/app";
-import { StandingsSchema } from "@oracle/core";
+import { StandingsSchema, MEMBER_PROFILE } from "@oracle/core";
 import { loadSettledCalls, standings, standingsCsv, standingsHtml } from "../src/standings";
 
 const env = { DEVICE_TOKEN_SECRET: "test-secret", ADMIN_SECRET: "admin" };
@@ -59,10 +59,10 @@ describe("standings", () => {
     expect(sonnet.brier).toBeCloseTo((4 * 0.49 + 0.09) / 5, 10);
     // Sonnet's 0.30 sits inside the band around 0.40, so it prices as is. Player YES 50 at 0.30 pays 50 + round(50 × 0.7/0.3) = 167 → house −117 on four cards, +50 on the fifth.
     expect(sonnet.house_delta).toBe(-468 + 50);
-    expect(s.rows[2]).toEqual({ member: "haiku", calls: 0, brier: null, house_delta: 0 });
+    expect(s.rows[2]).toEqual({ member: "haiku", calls: 0, brier: null, house_delta: 0, read_rate: null, title: "night shift" });
     const crowd = s.rows[4]!;
     expect(crowd.calls).toBe(5);
-    expect(crowd.brier).toBeCloseTo((4 * 0.16 + 0.36) / 5, 10);
+    expect(crowd.brier).toBeNull();
   });
 });
 
@@ -71,9 +71,9 @@ describe("the CSV", () => {
     const { db } = await settledWorld();
     const csv = standingsCsv(await loadSettledCalls(db));
     const [header, ...rows] = csv.trim().split("\n");
-    expect(header).toBe("date,slot,question,market_source,market_id,market_prob,member,member_line,house_line,crowd_yes_pct,crowd_count,outcome");
+    expect(header).toBe("date,slot,question,market_source,market_id,market_prob,member,member_line,house_line,crowd_yes_pct,crowd_count,outcome,right_side");
     expect(rows.length).toBe(15);
-    expect(rows[0]).toBe("2026-09-10,1,Question 1?,kalshi,T1,0.4,sonnet,0.3,0.35,60,10,yes");
+    expect(rows[0]).toBe("2026-09-10,1,Question 1?,kalshi,T1,0.4,sonnet,0.3,0.35,60,10,yes,0");
     expect(csv).not.toMatch(/user|stake|payout/);
   });
   it("quotes a question containing a comma or a quote", async () => {
@@ -114,5 +114,72 @@ describe("the routes", () => {
   it("footnotes the crowd as the baseline on opinion rounds (design 2026-09-22 §7)", () => {
     const html = standingsHtml(standings([], new Date("2026-09-24T17:00:00Z")));
     expect(html).toContain("On opinion rounds the players are the answer, so their row is the baseline the machines are measured against.");
+  });
+});
+
+describe("the read rate on the standings (design 2026-09-25 §8.1)", () => {
+  // 30 settled calls: sonnet right on 18 of 30, opus on 12; the players' row has no rate.
+  async function thirty() {
+    const { db } = await makeTestDb();
+    for (let d = 0; d < 6; d++) {
+      const date = `2026-09-${String(10 + d).padStart(2, "0")}`;
+      const qs = await seedRound(db, { date, opensAt: new Date(`${date}T16:00:00Z`), locksAt: new Date(`${date}T17:00:00Z`) });
+      await db.update(schema.rounds).set({ rulesVersion: 3, status: "resolved" }).where(eq(schema.rounds.date, date));
+      for (const q of qs) {
+        const i = d * 5 + (q.slot - 1);
+        await db.update(schema.questions).set({ linePYes: "0.5", marketSource: "crowd", marketId: date, status: "resolved", outcome: "yes", crowdYesPct: "60", crowdCount: 30 }).where(eq(schema.questions.id, q.id));
+        await db.insert(schema.lines).values([
+          { questionId: q.id, member: "sonnet", pYes: i < 18 ? "0.7" : "0.3", committedAt: new Date(`${date}T13:00:00Z`) },
+          { questionId: q.id, member: "opus", pYes: i < 12 ? "0.7" : "0.3", committedAt: new Date(`${date}T13:00:00Z`) },
+        ]);
+      }
+    }
+    return db;
+  }
+  it("reports each model member's rate and title, and null for the players", async () => {
+    const db = await thirty();
+    const s = standings(await loadSettledCalls(db), new Date("2026-09-16T00:00:00Z"));
+    const row = (m: string) => s.rows.find((r) => r.member === m)!;
+    expect(row("sonnet").read_rate).toBeCloseTo(0.6, 6);
+    expect(row("opus").read_rate).toBeCloseTo(0.4, 6);
+    expect(row("sonnet").title).toBe(MEMBER_PROFILE.sonnet.title);
+    expect(row("haiku")).toMatchObject({ calls: 0, read_rate: null, title: "night shift" });
+    expect(row("market").title).toBeNull();
+    expect(row("crowd")).toMatchObject({ read_rate: null, title: null });
+    expect(s.window).toBeNull();
+  });
+  it("is null under 25 calls", async () => {
+    const { db } = await settledWorld();
+    const s = standings(await loadSettledCalls(db), new Date());
+    expect(s.rows.find((r) => r.member === "sonnet")!.read_rate).toBeNull();
+  });
+  it("?days=N windows the calls and reports the window; the HTML shows titles and a READ column; the CSV a right_side", async () => {
+    const db = await thirty();
+    const app = createApp({ db, env });
+    const all = StandingsSchema.parse(await (await app.request("/v1/standings")).json());
+    expect(all.questions).toBe(30);
+    const windowed = StandingsSchema.parse(await (await app.request("/v1/standings?days=3")).json());
+    expect(windowed.window).toBe(3);
+    expect(windowed.questions).toBeLessThan(30);
+    const atMax = StandingsSchema.parse(await (await app.request("/v1/standings?days=3650")).json());
+    expect(atMax.window).toBe(3650);
+    const html = await (await app.request("/standings")).text();
+    expect(html).toContain("night shift");
+    expect(html).toContain("<th>Read</th>");
+    const csv = await (await app.request("/v1/standings?format=csv")).text();
+    expect(csv.split("\n")[0]).toContain("right_side");
+    expect(csv.split("\n")[1]!.endsWith(",yes,1") || csv.split("\n")[1]!.endsWith(",yes,0")).toBe(true);
+  });
+  it("treats anything but a plain positive integer as no window", async () => {
+    const db = await thirty();
+    const app = createApp({ db, env });
+    const noParam = StandingsSchema.parse(await (await app.request("/v1/standings")).json());
+    expect(noParam.window).toBeNull();
+    expect(noParam.questions).toBe(30);
+    for (const days of ["0", "-1", "abc", "1e3", "+30", "0x10", "200000000", "3651"]) {
+      const s = StandingsSchema.parse(await (await app.request(`/v1/standings?days=${days}`)).json());
+      expect(s.window).toBeNull();
+      expect(s.questions).toBe(30);
+    }
   });
 });

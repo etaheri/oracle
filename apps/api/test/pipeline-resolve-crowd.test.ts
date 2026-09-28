@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { PIPELINE_LINES } from "@oracle/core";
 import { makeTestDb, seedRound } from "./helpers/db";
 import { schema } from "../src/db/client";
-import { resolveOne, resolveFromCrowd, CROWD_RESOLVE_MIN } from "../src/pipeline/resolve";
+import { resolveOne, resolveFromCrowd, runResolution } from "../src/pipeline/resolve";
 import { claimResolutionPushes } from "../src/push/compose";
 import { loadPipelineState } from "../src/pipeline/state";
 import { inlineStarter } from "../src/pipeline/workflows";
@@ -35,6 +35,7 @@ async function world(answers: boolean[], opts: { locked?: boolean; now?: string 
     now: () => new Date(opts.now ?? "2026-09-24T16:10:00Z"), workflows: inlineStarter(), siteUrl: "https://example.test",
     exchangeFeeds: [{ source: "kalshi", list: async () => [], read: async () => { throw new Error("no exchange read on a crowd question"); } }],
     marketFetch: (async () => { throw new Error("no network"); }) as unknown as typeof fetch,
+    crowdResolveMin: 1,
   };
   return { db, deps, qId: rows[0]!.id, users, calls };
 }
@@ -73,13 +74,19 @@ describe("resolveFromCrowd (design 2026-09-22 §6.1)", () => {
     const preds = await db.query.predictions.findMany({ where: eq(schema.predictions.questionId, qId) });
     expect(preds.every((p) => p.payout === 50)).toBe(true); // stake returned
   });
-  it("voids an empty room and honours the floor", async () => {
-    expect(CROWD_RESOLVE_MIN).toBe(1);
-    const { db, deps, qId } = await world([]);
+  it("voids when below the floor of 4 and honours the configured floor", async () => {
+    const { db, deps, qId } = await world([true, true, false]);
+    deps.crowdResolveMin = 4;
     expect(await resolveFromCrowd(deps, qId)).toBe(true);
     const q = await db.query.questions.findFirst({ where: eq(schema.questions.id, qId) });
     expect(q!.status).toBe("void");
-    expect(q!.resolutionEvidence).toMatchObject({ resolver: "crowd", reason: PIPELINE_LINES.crowdTooFew, crowd_count: 0 });
+    expect(q!.resolutionEvidence).toMatchObject({ resolver: "crowd", reason: PIPELINE_LINES.crowdTooFew, crowd_count: 3 });
+  });
+  it("voids a three-player room at the default floor of 20", async () => {
+    const { db, deps, qId } = await world([true, true, false]);
+    delete deps.crowdResolveMin;
+    expect(await resolveFromCrowd(deps, qId)).toBe(true);
+    expect((await db.query.questions.findFirst({ where: eq(schema.questions.id, qId) }))!.outcome).toBe("void");
   });
   it("does nothing before the lock, and nothing on an already-resolved row", async () => {
     const early = await world([true, true], { now: "2026-09-24T15:59:00Z" });
@@ -116,5 +123,32 @@ describe("the tick's view of a crowd question", () => {
     const st = await loadPipelineState(db, new Date("2026-09-24T16:10:00Z"), true);
     expect(st.lockedRound!.unresolvedIds).toContain(qId);
     expect(st.lockedRound!.modelIds).not.toContain(qId);
+  });
+});
+
+describe("reactions on the inline path (design 2026-09-25 §9)", () => {
+  it("writes reactions after the crowd resolves, before lessons, and narrates the count", async () => {
+    const { db, deps, qId } = await world([true, true, false]);
+    await db.insert(schema.lines).values([
+      { questionId: qId, member: "haiku", pYes: "0.31", committedAt: new Date("2026-09-23T13:00:00Z"), model: "m", promptVersion: "council-v2", reasoning: "no" },
+      { questionId: qId, member: "opus", pYes: "0.70", committedAt: new Date("2026-09-23T13:00:00Z"), model: "m", promptVersion: "council-v2", reasoning: "yes" },
+    ]);
+    const order: string[] = [];
+    const sent: string[] = [];
+    deps.telegram = { send: async (t) => { sent.push(t); } };
+    deps.claude = {
+      async structured(call) {
+        order.push(call.schemaName);
+        if (call.schemaName === "reaction") return { text: "ok the room is wrong" };
+        if (call.schemaName === "taste_verdicts") return { verdicts: [{ index: 0, allowed: true, reason: "" }] };
+        if (call.schemaName === "lesson") return { text: "L." };
+        throw new Error(`unexpected ${call.schemaName}`);
+      },
+    };
+    await runResolution(deps, DATE, [qId]);
+    expect(order).toEqual(["reaction", "taste_verdicts", "lesson", "lesson"]);
+    const rows = await db.query.reactions.findMany();
+    expect(rows.map((r) => r.member)).toEqual(["haiku"]);
+    expect(sent.some((t) => t.includes("reactions: 1 written, 0 dropped"))).toBe(true);
   });
 });

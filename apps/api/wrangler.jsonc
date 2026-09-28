@@ -31,7 +31,10 @@
     // markets. One switch, one deploy.
     "PIPELINE_ROUND_KIND": "opinion",
     // Where the crowd question's source link points (§4.2).
-    "SITE_URL": "https://outseen-site.etaheri.workers.dev"
+    "SITE_URL": "https://outseen-site.etaheri.workers.dev",
+    // The crowd floor (design 2026-09-25 N11). The rule is 20; it is 3 by
+    // hand while the field is a handful. Raise it in one deploy.
+    "CROWD_RESOLVE_MIN": "3",
   }
   // secrets (wrangler secret put) — this list is WorkerEnv in src/worker.ts;
   // keep the two in step.

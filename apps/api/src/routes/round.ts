@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { asc, and, count, countDistinct, eq, inArray, sum } from "drizzle-orm";
-import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal, onRightSide, MEMBER_ORDER } from "@oracle/core";
+import { ratingEligible, oracleQuestionPoints, CONSTANTS, dayPoints, dayReturn, weighDay, designation, disambiguate, ORACLE_DESIGNATION, oracleDayTotal, onRightSide, MEMBER_ORDER, buildLog, MODEL_MEMBER_IDS, type ModelMemberId } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema, type Db } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -22,6 +22,33 @@ async function openRound(db: Db, now: Date) {
   return null;
 }
 
+// The channel's rows for a set of questions (design 2026-09-25 §6.1): model
+// members only, ordered by commit; the market member never posts.
+//
+// Before lock, reactions and lessons are always empty (design 2026-09-25
+// §6.2), so a caller reading the channel pre-lock (/today/log) can skip both
+// queries with { remarks: false } rather than fetch and discard them.
+//
+// The reveal already reads `lines` itself (councilRows, below) to sort and
+// annotate every member including the market, so it skips this helper's own
+// lines query with { lines: false } rather than fetch the same rows twice.
+async function channelRows(db: Db, qIds: string[], opts: { remarks?: boolean; lines?: boolean } = {}) {
+  const remarks = opts.remarks ?? true;
+  const withLines = opts.lines ?? true;
+  if (qIds.length === 0) return { lines: [], reactions: [], lessons: [] };
+  const [lines, reactions, lessons] = await Promise.all([
+    withLines ? db.query.lines.findMany({ where: inArray(schema.lines.questionId, qIds) }) : Promise.resolve([]),
+    remarks ? db.query.reactions.findMany({ where: inArray(schema.reactions.questionId, qIds) }) : Promise.resolve([]),
+    remarks ? db.query.lessons.findMany({ where: inArray(schema.lessons.questionId, qIds) }) : Promise.resolve([]),
+  ]);
+  const isModel = (m: string): m is ModelMemberId => (MODEL_MEMBER_IDS as readonly string[]).includes(m);
+  return {
+    lines: lines.filter((l) => isModel(l.member)).map((l) => ({ questionId: l.questionId, member: l.member as ModelMemberId, pYes: Number(l.pYes), reasoning: l.reasoning, committedAt: l.committedAt.toISOString() })),
+    reactions: reactions.filter((r) => isModel(r.member)).map((r) => ({ questionId: r.questionId, member: r.member as ModelMemberId, text: r.text, createdAt: r.createdAt.toISOString() })),
+    lessons: lessons.filter((l) => isModel(l.member)).map((l) => ({ questionId: l.questionId, member: l.member as ModelMemberId, text: l.text, createdAt: l.createdAt.toISOString() })),
+  };
+}
+
 export const roundRoutes = new Hono<AppContext>()
   .use("*", deviceAuth)
   .get("/today", async (c) => {
@@ -41,10 +68,17 @@ export const roundRoutes = new Hono<AppContext>()
     // null while no round has settled. Both are read as aggregates: the row
     // set grows by one a day forever, and /today is the hottest route we
     // serve, so neither may become an unbounded select summed in JavaScript.
-    const [user, house] = await Promise.all([
+    // The line is a common signal before the seal (design 2026-09-22 T9) and
+    // the leak the hot-takes design accepted for a week closes here: it is
+    // served only on the caller's own sealed questions (design 2026-09-25 N5).
+    const [user, house, sealedRows] = await Promise.all([
       db.query.users.findFirst({ where: eq(schema.users.id, userId) }),
       houseSummary(db),
+      qIds.length
+        ? db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qIds)), columns: { questionId: true } })
+        : Promise.resolve([]),
     ]);
+    const sealed = new Set(sealedRows.map((p) => p.questionId));
     return c.json({
       date: round.date,
       rules_version: round.rulesVersion,
@@ -52,6 +86,8 @@ export const roundRoutes = new Hono<AppContext>()
       player_count: Number(players?.n ?? 0),
       fortune: user?.fortune ?? null,
       house,
+      // When the Council clocked in (design 2026-09-25 §6.5); null when it never committed.
+      council_committed_at: round.oracleCommittedAt?.toISOString() ?? null,
       questions: qs.map((q) => ({
         id: q.id,
         slot: q.slot,
@@ -69,7 +105,10 @@ export const roundRoutes = new Hono<AppContext>()
         // mean "struck", so historical rounds keep their meaning.
         struck: q.lockHealedAt !== null || q.withdrawnAt !== null,
         struck_reason: q.lockHealedAt !== null || q.withdrawnAt !== null ? (evidenceSummary(q.resolutionEvidence).reason ?? null) : null,
-        line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
+        line_p_yes: sealed.has(q.id) && q.linePYes !== null ? Number(q.linePYes) : null,
+        crowd: q.marketSource === "crowd",
+        seen_on: q.seenOnLabel === null ? null : { label: q.seenOnLabel, url: q.seenOnUrl },
+        unhinged: q.unhinged,
       })),
     });
   })
@@ -119,6 +158,32 @@ export const roundRoutes = new Hono<AppContext>()
       })),
     });
   })
+  // The channel after the seal (design 2026-09-25 §6.2). Only the caller's
+  // sealed questions; before lock there is no outcome, so every tone is mute.
+  .get("/today/log", async (c) => {
+    const { db } = c.get("deps");
+    const userId = c.get("userId");
+    const found = await openRound(db, new Date());
+    if (!found) return c.json({ error: "no open round" }, 404);
+    const { qs } = found;
+    const mine = qs.length
+      ? await db.query.predictions.findMany({ where: and(eq(schema.predictions.userId, userId), inArray(schema.predictions.questionId, qs.map((q) => q.id))), columns: { questionId: true } })
+      : [];
+    const sealedIds = mine.map((p) => p.questionId);
+    const rows = await channelRows(db, sealedIds, { remarks: false });
+    const questions = qs.filter((q) => sealedIds.includes(q.id)).map((q) => ({
+      question_id: q.id,
+      line_p_yes: q.linePYes === null ? null : Number(q.linePYes),
+      log: buildLog({
+        lines: rows.lines.filter((l) => l.questionId === q.id),
+        outcome: null,
+        crowd: { yesPct: null, count: null, resolvedAt: null, voidReason: null },
+        reactions: [],
+        lessons: [],
+      }),
+    }));
+    return c.json({ questions });
+  })
   .get("/next", async (c) => {
     const { db } = c.get("deps");
     const next = await db.query.rounds.findFirst({ where: eq(schema.rounds.status, "scheduled"), orderBy: [asc(schema.rounds.date)] });
@@ -166,12 +231,19 @@ export const roundRoutes = new Hono<AppContext>()
         reasoning: l.reasoning,
         cited: l.cited,
         lessons_received: l.lessonsReceived.length,
+        committed_at: l.committedAt.toISOString(),
       })),
     );
     const evidence = pack.map((e) => ({
       question_id: e.questionId, rank: e.rank, url: e.url, title: e.title, source: e.source,
       published_at: e.publishedAt === null ? null : e.publishedAt.toISOString(), highlight: e.highlight,
     }));
+    // The channel after lock (design 2026-09-25 §6.3): reactions and lessons,
+    // model members only. `lines` is skipped — councilRows above already has
+    // them.
+    const channel = await channelRows(db, qIds, { lines: false });
+    const reactions = channel.reactions.map((r) => ({ question_id: r.questionId, member: r.member, text: r.text, created_at: r.createdAt }));
+    const lessons = channel.lessons.map((l) => ({ question_id: l.questionId, member: l.member, text: l.text, created_at: l.createdAt }));
     const byQ = new Map(mine.map((p) => [p.questionId, p]));
     const perQuestionPoints = mine.map((p) => p.points ?? 0);
     const allFirstHour = mine.length === qs.length && mine.every((p) => p.firstHour);
@@ -233,6 +305,8 @@ export const roundRoutes = new Hono<AppContext>()
       candidates_rejected: round?.candidatesRejected ?? 0,
       council,
       evidence,
+      reactions,
+      lessons,
       questions: qs.map((q) => {
         const p = byQ.get(q.id);
         const ev = evidenceSummary(q.resolutionEvidence);
@@ -269,6 +343,8 @@ export const roundRoutes = new Hono<AppContext>()
           evidence_url: ev.quoteUrl,
           void_reason: q.outcome === "void" ? (ev.reason ?? "UNVERIFIABLE") : null,
           oracle_p_yes: q.oracleProbYes === null ? null : Number(q.oracleProbYes),
+          seen_on: q.seenOnLabel === null ? null : { label: q.seenOnLabel, url: q.seenOnUrl },
+          unhinged: q.unhinged,
         };
       }),
       ledger: {

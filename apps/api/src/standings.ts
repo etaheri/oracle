@@ -2,7 +2,7 @@
 // settled version 3 question, the crowd and the market beside them, and the
 // CSV that is the dataset. Nothing here names a player.
 import { and, asc, eq, gte, inArray, isNotNull } from "drizzle-orm";
-import { MEMBER_ORDER, standingsRow, type Standings, type StandingsCall } from "@oracle/core";
+import { MEMBER_ORDER, MEMBER_PROFILE, MODEL_MEMBER_IDS, onRightSide, readRate, standingsRow, type ModelMemberId, type Standings, type StandingsCall } from "@oracle/core";
 import { schema, type Db } from "./db/client";
 
 export interface SettledCall {
@@ -20,7 +20,7 @@ export interface SettledCall {
   predictions: { answer: boolean; stake: number }[];
 }
 
-export async function loadSettledCalls(db: Db): Promise<SettledCall[]> {
+export async function loadSettledCalls(db: Db, opts: { since?: Date } = {}): Promise<SettledCall[]> {
   const qs = await db
     .select({
       id: schema.questions.id, date: schema.questions.roundDate, slot: schema.questions.slot, text: schema.questions.text,
@@ -29,7 +29,7 @@ export async function loadSettledCalls(db: Db): Promise<SettledCall[]> {
     })
     .from(schema.questions)
     .innerJoin(schema.rounds, eq(schema.rounds.date, schema.questions.roundDate))
-    .where(and(gte(schema.rounds.rulesVersion, 3), isNotNull(schema.questions.linePYes), inArray(schema.questions.outcome, ["yes", "no"])))
+    .where(and(gte(schema.rounds.rulesVersion, 3), isNotNull(schema.questions.linePYes), inArray(schema.questions.outcome, ["yes", "no"]), ...(opts.since ? [gte(schema.questions.roundDate, opts.since.toISOString().slice(0, 10))] : [])))
     .orderBy(asc(schema.questions.roundDate), asc(schema.questions.slot));
   if (qs.length === 0) return [];
   const ids = qs.map((q) => q.id);
@@ -53,7 +53,7 @@ export async function loadSettledCalls(db: Db): Promise<SettledCall[]> {
   }));
 }
 
-export function standings(calls: SettledCall[], asOf: Date): Standings {
+export function standings(calls: SettledCall[], asOf: Date, window: number | null = null): Standings {
   const forMember = (member: string): StandingsCall[] =>
     calls.flatMap((c) => {
       const line = c.lines.find((l) => l.member === member);
@@ -62,13 +62,19 @@ export function standings(calls: SettledCall[], asOf: Date): Standings {
   const crowd: StandingsCall[] = calls.flatMap((c) =>
     c.crowdYesPct === null ? [] : [{ p: c.crowdYesPct / 100, marketProb: c.marketProb, outcome: c.outcome, predictions: c.predictions }],
   );
+  const titleOf = (m: string) => ((MODEL_MEMBER_IDS as readonly string[]).includes(m) ? MEMBER_PROFILE[m as ModelMemberId].title : null);
+  const rate = (xs: StandingsCall[]) => readRate(xs.map((x) => ({ p: x.p, outcome: x.outcome })));
   return {
     as_of: asOf.toISOString(),
     rounds: new Set(calls.map((c) => c.date)).size,
     questions: calls.length,
+    window,
     rows: [
-      ...MEMBER_ORDER.map((member) => ({ member, ...standingsRow(forMember(member)) })),
-      { member: "crowd" as const, ...standingsRow(crowd) },
+      ...MEMBER_ORDER.map((member) => { const xs = forMember(member); return { member, ...standingsRow(xs), read_rate: rate(xs), title: titleOf(member) }; }),
+      // The players' Brier is blank (spec §8.1): the crowd is the baseline on
+      // opinion rounds, not a scored member, so calls and house delta stand
+      // but brier does not.
+      { member: "crowd" as const, ...standingsRow(crowd), brier: null, read_rate: null, title: null },
     ],
   };
 }
@@ -79,13 +85,14 @@ function csvCell(v: string | number | null): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export const CSV_HEADER = "date,slot,question,market_source,market_id,market_prob,member,member_line,house_line,crowd_yes_pct,crowd_count,outcome";
+export const CSV_HEADER = "date,slot,question,market_source,market_id,market_prob,member,member_line,house_line,crowd_yes_pct,crowd_count,outcome,right_side";
 
 export function standingsCsv(calls: SettledCall[]): string {
   const rows = calls.flatMap((c) =>
-    [...c.lines].sort((a, b) => MEMBER_ORDER.indexOf(a.member as never) - MEMBER_ORDER.indexOf(b.member as never)).map((l) =>
-      [c.date, c.slot, c.text, c.marketSource, c.marketId, c.marketProb, l.member, l.pYes, c.linePYes, c.crowdYesPct, c.crowdCount, c.outcome].map(csvCell).join(","),
-    ),
+    [...c.lines].sort((a, b) => MEMBER_ORDER.indexOf(a.member as never) - MEMBER_ORDER.indexOf(b.member as never)).map((l) => {
+      const right = onRightSide(l.pYes, c.outcome);
+      return [c.date, c.slot, c.text, c.marketSource, c.marketId, c.marketProb, l.member, l.pYes, c.linePYes, c.crowdYesPct, c.crowdCount, c.outcome, right === null ? "" : right ? 1 : 0].map(csvCell).join(",");
+    }),
   );
   return [CSV_HEADER, ...rows].join("\n") + "\n";
 }
@@ -108,11 +115,12 @@ p{color:var(--muted);margin:0 0 18px}
 table{border-collapse:collapse;width:100%;margin:12px 0 24px}
 th{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
 td{padding:10px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
-td.n{text-align:right}a{color:var(--gold-text)}`;
+td.n{text-align:right}a{color:var(--gold-text)}
+.title{color:var(--muted);font-size:12px;margin-left:6px}`;
 
 export function standingsHtml(s: Standings): string {
   const rows = s.rows.map((r) =>
-    `<tr><td>${escapeHtml(NAMES[r.member] ?? r.member)}</td><td class="n">${r.calls}</td><td class="n">${r.brier === null ? "—" : r.brier.toFixed(3)}</td><td class="n">${r.house_delta > 0 ? "+" : ""}${r.house_delta}</td></tr>`,
+    `<tr><td>${escapeHtml(NAMES[r.member] ?? r.member)}${r.title ? ` <span class="title">${escapeHtml(r.title)}</span>` : ""}</td><td class="n">${r.calls}</td><td class="n">${r.read_rate === null ? "—" : `${Math.round(r.read_rate * 100)}%`}</td><td class="n">${r.brier === null ? "—" : r.brier.toFixed(3)}</td><td class="n">${r.house_delta > 0 ? "+" : ""}${r.house_delta}</td></tr>`,
   ).join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standings · Outsee</title><style>${STYLE}</style></head><body><div class="wrap"><a class="brand" href="https://outseen-site.etaheri.workers.dev/">Outsee</a><h1>Standings</h1><p>Each member of the Council commits a line on every question before it opens. Brier is the mean squared error of the line, lower is better; house delta is what the purse would have done with that member alone, at the stakes players actually placed. On opinion rounds the players are the answer, so their row is the baseline the machines are measured against.</p><table><thead><tr><th>Member</th><th>Calls</th><th>Brier</th><th>House delta</th></tr></thead><tbody>${rows}</tbody></table><p>${s.questions} questions over ${s.rounds} rounds, as of ${escapeHtml(s.as_of.slice(0, 10))}. <a href="/v1/standings?format=csv">Download the record as CSV</a> · <a href="/v1/standings">JSON</a></p></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Standings · Outsee</title><style>${STYLE}</style></head><body><div class="wrap"><a class="brand" href="https://outseen-site.etaheri.workers.dev/">Outsee</a><h1>Standings</h1><p>Each member of the Council commits a line on every question before it opens. Brier is the mean squared error of the line, lower is better; house delta is what the purse would have done with that member alone, at the stakes players actually placed. On opinion rounds the players are the answer, so their row is the baseline the machines are measured against. The players are people who post.</p><table><thead><tr><th>Member</th><th>Calls</th><th>Read</th><th>Brier</th><th>House delta</th></tr></thead><tbody>${rows}</tbody></table><p>${s.questions} questions over ${s.rounds} rounds, as of ${escapeHtml(s.as_of.slice(0, 10))}. <a href="/v1/standings?format=csv">Download the record as CSV</a> · <a href="/v1/standings">JSON</a></p></div></body></html>`;
 }

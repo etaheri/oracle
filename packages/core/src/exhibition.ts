@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { oracleQuestionPoints } from "./oracleRecord";
-import { ConfidenceSchema } from "./schemas";
+import { ConfidenceSchema, LogLineSchema } from "./schemas";
 import { clampLine, payout, stake, odds } from "./fortune";
 
 export const ExhibitionSchema = z.object({
@@ -22,6 +22,13 @@ export const ExhibitionSchema = z.object({
   // The room's share of YES at lock on a past hot take; null on a market
   // question and on the fictional fallback.
   crowdYesPct: z.number().int().min(0).max(100).nullable().default(null),
+  // The channel on a past hot take (design 2026-09-25 §11); empty on a market
+  // question and the fictional fallback.
+  log: z.array(LogLineSchema).default([]),
+  // Whether this exhibition is a past hot take (market_source "crowd"), so
+  // the practice card can render it as one; false on a market question and
+  // the fictional fallback.
+  crowd: z.boolean().default(false),
 });
 
 export type Exhibition = z.infer<typeof ExhibitionSchema>;

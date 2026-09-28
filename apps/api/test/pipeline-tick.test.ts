@@ -299,7 +299,10 @@ describe("runTick", () => {
     deps.claude = {
       async structured(call) {
         calls.push(call.schemaName);
-        if (call.schemaName === "opinion_round") return { questions: (["markets", "sports", "weather", "culture", "news"] as const).map((category, i) => ({ slot: i + 1, category, text: `Is take ${i + 1} the right one?` })) };
+        if (call.schemaName === "opinion_round") {
+          const takes = ["a car payment is a personality trait", "the nfl is better on the radio", "fall is the worst season and everyone is lying", "cereal is a soup", "nobody actually likes going to the airport early"];
+          return { questions: (["markets", "sports", "weather", "culture", "news"] as const).map((category, i) => ({ slot: i + 1, category, text: takes[i]!, unhinged: i + 1 === 4, seen_on: null })) };
+        }
         return { verdicts: [0, 1, 2, 3, 4].map((index) => ({ index, allowed: true, reason: "" })) };
       },
     };

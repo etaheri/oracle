@@ -33,6 +33,10 @@ export type CrowdSoFar = z.infer<typeof CrowdSoFarSchema>;
 
 export const QuestionContextSchema = z.object({ text: z.string().min(1).max(240), asOf: z.iso.datetime({ offset: true }), sourceUrl: z.string().url() });
 
+// Where a take was seen (design 2026-09-25 §4.2).
+export const SeenOnSchema = z.object({ label: z.string(), url: z.string().nullable() });
+export type SeenOn = z.infer<typeof SeenOnSchema>;
+
 export const RoundTodaySchema = z.object({
   rules_version: z.number().int().min(1).max(3).default(1),
   date: z.string(),
@@ -40,6 +44,8 @@ export const RoundTodaySchema = z.object({
   player_count: z.number().int(),
   fortune: z.number().int().nullable().default(null),
   house: z.object({ total: z.number().int(), last_delta: z.number().int().nullable() }).nullable().default(null),
+  // When the Council clocked in (design 2026-09-25 §6.5); null when it never committed.
+  council_committed_at: z.string().nullable().default(null),
   questions: z.array(
     z.object({
       id: z.string().uuid(),
@@ -62,6 +68,11 @@ export const RoundTodaySchema = z.object({
       // The printable reason when struck; null otherwise. Rendered verbatim.
       struck_reason: z.string().nullable().default(null),
       line_p_yes: z.number().min(0).max(1).nullable().default(null),
+      // A crowd question (design 2026-09-25 §7): the client keys every
+      // agree/disagree string on this, never on source_name.
+      crowd: z.boolean().default(false),
+      seen_on: SeenOnSchema.nullable().default(null),
+      unhinged: z.boolean().default(false),
     }),
   ),
 });
@@ -99,6 +110,7 @@ export const CouncilEntrySchema = z.object({
   reasoning: z.string().nullable(),
   cited: z.array(z.number().int()),
   lessons_received: z.number().int(),
+  committed_at: z.string().nullable().default(null),
 });
 export type CouncilEntry = z.infer<typeof CouncilEntrySchema>;
 export const EvidenceItemSchema = z.object({
@@ -111,6 +123,37 @@ export const EvidenceItemSchema = z.object({
   highlight: z.string(),
 });
 export type EvidenceItem = z.infer<typeof EvidenceItemSchema>;
+
+export const ChannelRemarkSchema = z.object({
+  question_id: z.string().uuid(),
+  member: z.enum(["sonnet", "opus", "haiku"]),
+  text: z.string(),
+  created_at: z.string(),
+});
+export type ChannelRemark = z.infer<typeof ChannelRemarkSchema>;
+
+// One line of #nightshift (design 2026-09-25 §6.1). Built by the API from
+// lines, reactions and lessons; rendered by the app in order.
+export const LogLineSchema = z.object({
+  at: z.string(),
+  kind: z.enum(["system", "say", "note"]),
+  member: z.enum(["sonnet", "opus", "haiku"]).nullable(),
+  text: z.string(),
+  p_yes: z.number().nullable(),
+  tone: z.enum(["win", "loss", "mute"]),
+});
+export type LogLine = z.infer<typeof LogLineSchema>;
+
+// The channel after the seal (design 2026-09-25 §6.2): only the caller's
+// sealed questions are present; unsealed ones are absent, not empty.
+export const TodayLogSchema = z.object({
+  questions: z.array(z.object({
+    question_id: z.string().uuid(),
+    line_p_yes: z.number().nullable(),
+    log: z.array(LogLineSchema),
+  })),
+});
+export type TodayLog = z.infer<typeof TodayLogSchema>;
 
 export const RevealSchema = z.object({
   rules_version: z.number().int().min(1).max(3).default(1),
@@ -136,6 +179,8 @@ export const RevealSchema = z.object({
   bust_fortune: z.number().int().nullable().default(null),
   council: z.array(CouncilEntrySchema).default([]),
   evidence: z.array(EvidenceItemSchema).default([]),
+  reactions: z.array(ChannelRemarkSchema).default([]),
+  lessons: z.array(ChannelRemarkSchema).default([]),
   questions: z.array(
     z.object({
       id: z.string().uuid(),
@@ -171,6 +216,8 @@ export const RevealSchema = z.object({
       evidence_url: z.string().nullable().optional(),
       void_reason: z.string().nullable(),
       oracle_p_yes: z.number().nullable(),
+      seen_on: SeenOnSchema.nullable().default(null),
+      unhinged: z.boolean().default(false),
     }),
   ),
   ledger: z.object({
@@ -239,11 +286,14 @@ export const StandingsSchema = z.object({
   as_of: z.string(),
   rounds: z.number().int(),
   questions: z.number().int(),
+  window: z.number().int().nullable().default(null),
   rows: z.array(z.object({
     member: z.enum(["sonnet", "opus", "haiku", "market", "crowd"]),
     calls: z.number().int(),
     brier: z.number().nullable(),
     house_delta: z.number().int(),
+    read_rate: z.number().nullable().default(null),
+    title: z.string().nullable().default(null),
   })),
 });
 export type Standings = z.infer<typeof StandingsSchema>;

@@ -4,7 +4,7 @@
 // call per model member per settled question; written once; a member's own.
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { MODEL_MEMBER_IDS, type ModelMemberId } from "@oracle/core";
+import { MEMBER_PROFILE, MODEL_MEMBER_IDS } from "@oracle/core";
 import { schema } from "../../db/client";
 import type { PipelineDeps } from "../index";
 import { BudgetExhausted } from "../spend";
@@ -20,9 +20,7 @@ const lessonJsonSchema = {
   required: ["text"], additionalProperties: false,
 };
 
-const SYSTEM = `You write one lesson for a forecaster reviewing its own settled call. State in two to four plain sentences whether the line was on the right side of the outcome, what in the reasoning held or failed, and one concrete adjustment for the next question in the same series. No preamble. Prompt version ${LESSON_PROMPT_VERSION}. Call the lesson tool exactly once.`;
-
-const NAMES: Record<ModelMemberId, string> = { sonnet: "Sonnet", opus: "Opus", haiku: "Haiku" };
+const SYSTEM = `You write one lesson for a forecaster reviewing its own settled call. State in two to four plain sentences whether the line was on the right side of the outcome, what in the reasoning held or failed, and one concrete adjustment for the next question in the same series, in your own register. No preamble. Prompt version ${LESSON_PROMPT_VERSION}. Call the lesson tool exactly once.`;
 
 export async function writeLessons(deps: PipelineDeps, questionId: string): Promise<LessonsOutcome> {
   let written = 0;
@@ -47,7 +45,8 @@ export async function writeLessons(deps: PipelineDeps, questionId: string): Prom
       if (!line) continue;
       if (have.has(member)) { skipped++; continue; }
       if (!deps.claude) { errors.push(`${member}: no claude client`); continue; }
-      const user = `MEMBER: ${NAMES[member]}\nQUESTION: ${q.text}\nRESOLVES BY: ${q.resolutionCriteria}\nSERIES: ${seriesKeyOf(q)}\nYOUR LINE: ${Number(line.pYes)} (probability of YES)\nYOUR REASONING: ${line.reasoning ?? "(none)"}\nOUTCOME: ${q.outcome.toUpperCase()}`;
+      const me = MEMBER_PROFILE[member];
+      const user = `MEMBER: ${me.name}, ${me.title}\nREGISTER: ${me.register}\nQUESTION: ${q.text}\nRESOLVES BY: ${q.resolutionCriteria}\nSERIES: ${seriesKeyOf(q)}\nYOUR LINE: ${Number(line.pYes)} (probability of YES)\nYOUR REASONING: ${line.reasoning ?? "(none)"}\nOUTCOME: ${q.outcome.toUpperCase()}`;
       try {
         const res = await deps.claude.structured({ model: lessonModel(deps), system: SYSTEM, user, schemaName: "lesson", schema: lessonJsonSchema });
         const parsed = LessonSchema.safeParse(res);

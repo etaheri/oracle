@@ -63,6 +63,11 @@ export const DraftQuestionSchema = z
       series_key: z.string().min(1).optional(),
       closes_at: z.iso.datetime({ offset: true }),
     }).optional(),
+    // Where the argument came from (design 2026-09-25 §4.2). Optional and
+    // undefaulted for the same reason context is: the bank, /reroll and the
+    // admin API post drafts that never carried it.
+    seen_on: z.object({ label: z.string().min(1).max(80), url: z.string().url().nullable() }).nullable().optional(),
+    unhinged: z.boolean().optional(),
   })
   .superRefine((q, ctx) => {
     // Weather's information arrives continuously, so "after-lock" is never
@@ -214,6 +219,9 @@ export async function upsertDraft(db: Db, date: string, draft: Draft, rulesVersi
       marketEventKey: q.market?.event_key ?? null,
       marketSeriesKey: q.market?.series_key ?? null,
       marketClosesAt: q.market ? new Date(q.market.closes_at) : null,
+      seenOnLabel: q.seen_on?.label ?? null,
+      seenOnUrl: q.seen_on?.url ?? null,
+      unhinged: q.unhinged ?? false,
       opensAt,
       locksAt,
       resolvesAt: q.resolves_at === RESOLVES_AFTER_LOCK ? null : new Date(q.resolves_at),

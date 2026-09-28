@@ -70,6 +70,40 @@ describe("resolution workflow step semantics", () => {
 		expect(err.message).toBe("boom");
 	});
 
+	it("runs a reactions step between resolve and lessons (design 2026-09-25 §9)", async () => {
+		// Same technique as the no-retry test above, adjusted for this step's
+		// policy: mock resolve-q1 to a success so the instance reaches the
+		// reactions step, then mock reactions-q1 with a step error and watch
+		// the instance go "errored" carrying exactly that message. An
+		// "errored" instance here is proof a step literally named
+		// "reactions-q1" exists on the path this Workflow drives between
+		// "resolve-q1" and "lessons-q1" — if it didn't, this mock would simply
+		// never fire and the instance would run past it to "lessons-q1"
+		// (unmocked, real, against this suite's unreachable DATABASE_URL) and
+		// land on "errored" with a DIFFERENT message, or hang if that too
+		// somehow succeeded.
+		//
+		// Unlike the no-retry test's resolve-q1 step (POLICY.noRetry, 0
+		// retries), reactions-q1 runs under POLICY.model, which retries twice.
+		// mockStepError's `times` is omitted here (rather than passed as 1) so
+		// the mock fires on every attempt, per its own doc comment below —
+		// with `times: 1` the second, unmocked attempt would run writeReactions
+		// for real, which swallows its own DB error and returns a normal
+		// (non-throwing) outcome, taking the instance to "complete" instead
+		// of "errored" and defeating this test, exactly as the candidates-step
+		// test further down in this file (also non-zero retries) omits it too.
+		await using instance = await introspectWorkflowInstance(env.RESOLUTION_WORKFLOW, "t-2b");
+		await instance.modify(async (m) => {
+			await m.disableRetryDelays();
+			await m.mockStepResult({ name: "resolve-q1" }, { questionId: "q1", resolved: true });
+			await m.mockStepError({ name: "reactions-q1" }, new Error("reactions boom"));
+		});
+		await env.RESOLUTION_WORKFLOW.create({ id: "t-2b", params: { date: "2026-09-08", questionIds: ["q1"] } });
+		await instance.waitForStatus("errored");
+		const err = await instance.getError();
+		expect(err.message).toBe("reactions boom");
+	});
+
 	it("stops the AuthoringWorkflow instance on a step failure instead of continuing past it (defect §1.3, partial)", async () => {
 		// What this DOES pin: a step failure halts run() — the instance reaches
 		// "errored" carrying exactly the failing step's message, rather than

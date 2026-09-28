@@ -14,37 +14,54 @@ import { tasteTexts } from "./taste";
 import { siteUrlOf } from "./round-kind";
 import { draftMessage } from "./author";
 
-export const OPINION_PROMPT_VERSION = "opinion-v1";
+export const OPINION_PROMPT_VERSION = "opinion-v2";
 // No question asked in the last 60 days (§4.1).
 export const RECENT_DAYS = 60;
 const MAX_CHARS = 120;
+const SEARCH_USES = 8;
+const REROLL_SEARCH_USES = 4;
 const CATEGORIES = ["markets", "sports", "weather", "culture", "news"] as const;
 type Category = (typeof CATEGORIES)[number];
 
-export interface OpinionEntry { slot: number; category: Category; text: string }
+export interface SeenOn { label: string; url: string | null }
+export interface OpinionEntry { slot: number; category: Category; text: string; unhinged: boolean; seen_on: SeenOn | null }
 export interface OpinionRoundResult { published: boolean; categories: string[]; texts: string[]; reason: string | null }
 
+// A take is a statement (design 2026-09-25 N1): never a question, never
+// prefaced with the label the card already carries.
 const TextSchema = z.string().min(10).max(MAX_CHARS)
-  .regex(/\?$/, "a question ends with a question mark")
+  .refine((t) => !/\?\s*$/.test(t), "a take is a statement, not a question: no question mark")
   .refine((t) => !t.includes("!"), "no exclamation marks")
-  .refine((t) => !/^\s*do you think\b/i.test(t), "no leading 'Do you think'");
+  .refine((t) => !/^\s*(hot take|unpopular opinion)\b/i.test(t), "never open with 'hot take' or 'unpopular opinion'");
 
-const EntrySchema = z.object({ slot: z.number().int().min(1).max(5), category: z.enum(CATEGORIES), text: TextSchema });
+const SeenOnSchema = z.object({ label: z.string().min(1).max(80), url: z.string().url().nullable() }).nullable();
+const EntrySchema = z.object({ slot: z.number().int().min(1).max(5), category: z.enum(CATEGORIES), text: TextSchema, unhinged: z.boolean(), seen_on: SeenOnSchema });
 
 const OpinionSchema = z.object({ questions: z.array(EntrySchema).length(5) })
   .refine((v) => new Set(v.questions.map((q) => q.slot)).size === 5, "slots must be exactly 1..5")
-  .refine((v) => new Set(v.questions.filter((q) => q.slot <= 4).map((q) => q.category)).size === 4, "slots 1 to 4 take four distinct categories");
+  .refine((v) => new Set(v.questions.filter((q) => q.slot <= 4).map((q) => q.category)).size === 4, "slots 1 to 4 take four distinct categories")
+  .refine((v) => v.questions.filter((q) => q.unhinged).length === 1, "exactly one take is unhinged");
 
-const SingleSchema = z.object({ category: z.enum(CATEGORIES), text: TextSchema });
+const SingleSchema = z.object({ category: z.enum(CATEGORIES), text: TextSchema, seen_on: SeenOnSchema });
 
+const seenOnJson = {
+  type: ["object", "null"],
+  properties: {
+    label: { type: "string", description: "The community as people name it: r/AmItheAsshole, the replies, a group chat." },
+    url: { type: ["string", "null"], description: "The thread, when search found one." },
+  },
+  required: ["label", "url"], additionalProperties: false,
+};
 const entryJson = {
   type: "object",
   properties: {
     slot: { type: "integer", minimum: 1, maximum: 5 },
     category: { type: "string", enum: [...CATEGORIES] },
-    text: { type: "string", description: `The question, plain English, one sentence, ending in a question mark, at most ${MAX_CHARS} characters.` },
+    text: { type: "string", description: `The take: a statement a person would post, one sentence, at most ${MAX_CHARS} characters, no question mark.` },
+    unhinged: { type: "boolean", description: "True on exactly one take: the absurd one people will still argue about." },
+    seen_on: seenOnJson,
   },
-  required: ["slot", "category", "text"], additionalProperties: false,
+  required: ["slot", "category", "text", "unhinged", "seen_on"], additionalProperties: false,
 };
 const opinionJsonSchema = {
   type: "object",
@@ -55,21 +72,26 @@ const singleJsonSchema = {
   type: "object",
   properties: {
     category: { type: "string", enum: [...CATEGORIES] },
-    text: { type: "string", description: `The question, plain English, one sentence, ending in a question mark, at most ${MAX_CHARS} characters.` },
+    text: { type: "string", description: `The take: a statement a person would post, one sentence, at most ${MAX_CHARS} characters, no question mark.` },
+    seen_on: seenOnJson,
   },
-  required: ["category", "text"], additionalProperties: false,
+  required: ["category", "text", "seen_on"], additionalProperties: false,
 };
 
-const RULES = `- Plain words, at most ${MAX_CHARS} characters, ending in a question mark. No exclamation marks. Never open with "Do you think".
-- No question about a death, a tragedy, a private individual, a named person's health, or anything derogatory. No question that asks the player to hope for harm. Politics is allowed as a subject, never as a side.
+const RULES = `- Write like a person posting, not like a survey. A take is a statement, at most ${MAX_CHARS} characters, ending in a full stop or nothing, never a question mark. Lowercase is allowed. No hashtags, no emoji, no exclamation marks. Never open with "Hot take:" or "Unpopular opinion:"; the card already says that.
+- No take about a death, a tragedy, a private individual, a named person's health, or anything derogatory. No take that asks the player to hope for harm. Politics is allowed as a subject, never as a side.
 - Categories, read loosely: markets is money and work; sports is sports and games; weather is the outdoors and the seasons; culture is food, film, music and manners; news is society and public life.`;
+
+const SEARCH = `Search first. Look at what is being argued on Reddit (r/unpopularopinion, r/AmItheAsshole, r/AskReddit, r/CasualConversation and the subreddit of whatever is in the news), on the day's trending topics, and in the comments under the day's viral posts. Prefer arguments from the last 48 hours. A take may be evergreen if the argument is live today. For each take, report where you saw it argued as seen_on; null when it came from the day's mood rather than one thread.`;
 
 function systemPrompt(date: string, recent: string[]): string {
   const asked = recent.length === 0 ? "None yet." : recent.map((t) => `- ${t}`).join("\n");
-  return `You write the daily round for ORACLE, a game where three AIs try to predict what the players think. Write five yes-or-no opinion questions for a general US audience for the round dated ${date}. People argue about them at dinner; no fact settles them; a person would want to know which way the room went.
-- Slots 1 to 4 take one each of four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the one everyone will have an opinion on, in any category.
+  return `You write the daily round for OUTSEE, a game where three AIs try to predict what the players think. The players are people who post. Find five things people are actually arguing about today, and write each as a hot take: a statement a person would post, that half the room will agree with and half will not, for the round dated ${date}.
+${SEARCH}
+- Slots 1 to 4 take one each of four different categories from markets, sports, weather, culture, news. Slot 5 is THE BIG ONE: the take everyone will have a view on, in any category.
+- Exactly one of the five is unhinged: absurd on its face, and people will still argue about it ("cereal is a soup", "the airport is the best part of the trip"). Mark it with unhinged: true and no other.
 ${RULES}
-- Do not ask anything already asked in the last ${RECENT_DAYS} days:
+- Do not post anything already posted in the last ${RECENT_DAYS} days:
 ${asked}
 Call the opinion_round tool exactly once with one entry per slot 1 through 5.`;
 }
@@ -105,6 +127,7 @@ async function askFive(deps: PipelineDeps, date: string, recent: string[], refus
     schemaName: "opinion_round",
     schema: opinionJsonSchema,
     effort: "low",
+    webSearch: { maxUses: SEARCH_USES },
   });
   const parsed = OpinionSchema.safeParse(response);
   if (!parsed.success) return { ok: false, issue: parsed.error.issues[0]?.message ?? "unknown" };
@@ -118,6 +141,8 @@ export function toOpinionDraft(deps: PipelineDeps, date: string, entries: Opinio
       slot: e.slot,
       category: e.category,
       text: e.text,
+      seen_on: e.seen_on,
+      unhinged: e.unhinged,
       resolution_criteria: CROWD_RESOLUTION_CRITERIA,
       source_name: "THE PLAYERS",
       source_url: `${siteUrlOf(deps)}/play`,
@@ -162,7 +187,7 @@ export async function commitOpinionDraft(deps: PipelineDeps, date: string, draft
 export function opinionResult(draft: Draft | null, reason: string | null): OpinionRoundResult {
   if (!draft) return { published: false, categories: [], texts: [], reason };
   const qs = [...draft.questions].sort((a, b) => a.slot - b.slot);
-  return { published: true, categories: qs.map((q) => q.category), texts: qs.map((q) => `${q.slot}. [${q.category}] ${q.text}`), reason: null };
+  return { published: true, categories: qs.map((q) => q.category), texts: qs.map((q) => `${q.slot}. [${q.category}]${q.unhinged ? " [UNHINGED]" : ""} ${q.text}${q.seen_on ? ` · seen on ${q.seen_on.label}` : ""}`), reason: null };
 }
 
 export async function narrateOpinionRound(deps: PipelineDeps, date: string, r: OpinionRoundResult): Promise<void> {
@@ -198,15 +223,16 @@ export async function rerollOpinionSlot(deps: PipelineDeps, date: string, slot: 
   const others = questions.filter((q) => q.slot !== slot).sort((a, b) => a.slot - b.slot);
   const recent = await recentCrowdTexts(deps.db, date);
   const isBigOne = slot === 5;
-  const system = `You write one replacement hot take for ORACLE's round dated ${date}, slot ${slot}${isBigOne ? " (THE BIG ONE: the one everyone will have an opinion on, in any category)" : ` (category: ${target.category})`}. It is a yes-or-no opinion question for a general US audience; people argue about it at dinner; no fact settles it.
+  const system = `You write one replacement hot take for OUTSEE's round dated ${date}, slot ${slot}${isBigOne ? " (THE BIG ONE: the take everyone will have a view on, in any category)" : ` (category: ${target.category})`}. The players are people who post. A hot take is a statement a person would post, that half the room will agree with and half will not.
+${SEARCH}
 ${RULES}
-${isBigOne ? "" : `- Keep the category ${target.category}.\n`}- Do not overlap these questions already in the round:\n${others.map((q) => `- [${q.category}] ${q.text}`).join("\n")}
-- Do not ask anything already asked in the last ${RECENT_DAYS} days:\n${recent.length === 0 ? "None yet." : recent.map((t) => `- ${t}`).join("\n")}
+${target.unhinged ? "- This slot is THE UNHINGED ONE: absurd on its face, and people will still argue about it. Keep it that way.\n" : ""}${isBigOne ? "" : `- Keep the category ${target.category}.\n`}- Do not overlap these takes already in the round:\n${others.map((q) => `- [${q.category}] ${q.text}`).join("\n")}
+- Do not post anything already posted in the last ${RECENT_DAYS} days:\n${recent.length === 0 ? "None yet." : recent.map((t) => `- ${t}`).join("\n")}
 Operator guidance: ${guidance || "none"}
 Call the opinion_question tool exactly once.`;
   const response = await deps.claude.structured({
     model: deps.models.voice, system, user: `Write the replacement for slot ${slot} now.`,
-    schemaName: "opinion_question", schema: singleJsonSchema, effort: "low",
+    schemaName: "opinion_question", schema: singleJsonSchema, effort: "low", webSearch: { maxUses: REROLL_SEARCH_USES },
   });
   const parsed = SingleSchema.safeParse(response);
   if (!parsed.success) throw new Error(`reroll: response failed validation: ${parsed.error.issues[0]?.message ?? "unknown"}`);
@@ -217,12 +243,20 @@ Call the opinion_question tool exactly once.`;
 
   const stillScheduled = await deps.db.query.questions.findFirst({ where: and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot)) });
   if (!stillScheduled || stillScheduled.status !== "scheduled") throw new Error(`draft already published for ${date}`);
+  // The slot's own unhinged flag is kept (a reroll of the unhinged take stays
+  // the unhinged take); no reroll can create a second one (§4.4).
   await deps.db.update(schema.questions)
-    .set({ text: parsed.data.text, category, context: null })
+    .set({ text: parsed.data.text, category, context: null, seenOnLabel: parsed.data.seen_on?.label ?? null, seenOnUrl: parsed.data.seen_on?.url ?? null })
     .where(and(eq(schema.questions.roundDate, date), eq(schema.questions.slot, slot), eq(schema.questions.status, "scheduled")));
 
   const updated = await deps.db.query.questions.findMany({ where: eq(schema.questions.roundDate, date) });
-  await deps.telegram.send(draftMessage(date, [...updated].sort((a, b) => a.slot - b.slot).map((row) => ({
+  const sorted = [...updated].sort((a, b) => a.slot - b.slot);
+  await deps.telegram.send(draftMessage(date, sorted.map((row) => ({
     slot: row.slot, category: row.category, text: row.text, resolution_criteria: row.resolutionCriteria, is_big_one: row.isBigOne, resolves_at: null,
   }))));
+  // draftMessage's shared signature (author.ts) has no room for seen_on or
+  // unhinged, so the reroll's provenance follows as its own line.
+  await deps.telegram.send(
+    `provenance: ${sorted.map((row) => `${row.slot}. ${row.unhinged ? "[UNHINGED] " : ""}${row.seenOnLabel ? `seen on ${row.seenOnLabel}` : "—"}`).join(" · ")}`,
+  );
 }

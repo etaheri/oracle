@@ -12,6 +12,8 @@ const exhibition = (overrides: Partial<Exhibition> = {}): Exhibition => ({
   outcome: "yes",
   linePYes: null,
   crowdYesPct: null,
+  log: [],
+  crowd: false,
   ...overrides,
 });
 

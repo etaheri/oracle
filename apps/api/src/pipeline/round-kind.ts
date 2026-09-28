@@ -26,3 +26,16 @@ export function parseSiteUrl(raw: string | undefined): string {
 export function siteUrlOf(deps: Pick<PipelineDeps, "siteUrl">): string {
   return deps.siteUrl ?? DEFAULT_SITE_URL;
 }
+
+// The crowd floor (design 2026-09-25 N11): an operating fact, set by hand
+// while the field is small. The code's default is the rule.
+export const DEFAULT_CROWD_RESOLVE_MIN = 20;
+
+export function parseCrowdResolveMin(raw: string | undefined): number {
+  if (raw === undefined || !/^[1-9]\d*$/.test(raw)) return DEFAULT_CROWD_RESOLVE_MIN;
+  return Number(raw);
+}
+
+export function crowdResolveMinOf(deps: Pick<PipelineDeps, "crowdResolveMin">): number {
+  return deps.crowdResolveMin ?? DEFAULT_CROWD_RESOLVE_MIN;
+}

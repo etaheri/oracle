@@ -6,7 +6,8 @@ type Q = RoundToday["questions"][number];
 const NOW = Date.parse("2026-09-14T17:00:00Z");
 const q = (slot: number, over: Partial<Q> = {}): Q => ({
   id: `q${slot}`, slot, is_big_one: slot === 5, text: `Will ${slot}?`, category: "WEATHER", source_name: "Kalshi",
-  resolution_criteria: "", context: null, locks_at: "2026-09-15T16:00:00Z", lock_healed: false, struck: false, struck_reason: null, line_p_yes: 0.35, ...over,
+  resolution_criteria: "", context: null, locks_at: "2026-09-15T16:00:00Z", lock_healed: false, struck: false, struck_reason: null, line_p_yes: 0.35,
+  crowd: false, seen_on: null, unhinged: false, ...over,
 });
 type P = MineToday["predictions"][number];
 const p = (slot: number, over: Partial<P> = {}): P => ({ question_id: `q${slot}`, answer: true, confidence: 75, crowd_yes_pct_at_seal: null, crowd_count_at_seal: null, stake: slot === 5 ? 100 : 50, doubled: false, ...over });
