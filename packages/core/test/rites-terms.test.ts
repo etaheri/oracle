@@ -39,18 +39,21 @@ describe("defined terms", () => {
 describe("the rules for hot takes (design 2026-09-22 §9.4)", () => {
   it("opens on the room, and settles on the players' majority", () => {
     expect(INTRO_LINES).toEqual([
-      "Five hot takes a day. The Oracle has already guessed what the room will say.",
-      "Swipe right for YES, left for NO. Nothing about the room shows until you seal.",
-      "You win when you land with the majority. After your fifth seal, place your double on the call you are surest of.",
+      "Five hot takes a day. Three machines have already guessed what the room will say.",
+      "Swipe right to agree, left to disagree. Nothing about the room shows until you seal.",
+      "You win when you land with the majority. After your fifth seal, read the channel and place your double.",
     ]);
     const game = RITES_V2_SECTIONS.find((s) => s.title === "The game")!;
-    expect(game.claims[0]).toBe("Five hot takes a day. Each is an opinion, and the answer is whatever most of the players say.");
-    expect(game.claims[1]).toBe("On every question the Oracle posts its line: the share of the room it expects to say YES. You see it once you seal.");
-    expect(game.claims[4]).toBe("A call with the majority wins the stake at the Oracle's odds; a call against it loses the stake.");
+    expect(game.claims).toHaveLength(8);
+    expect(game.claims[0]).toBe("Five hot takes a day. Each is a statement, and the answer is whatever most of the players say.");
+    expect(game.claims[1]).toBe("On every take the Oracle posts its line: the share of the room it expects to agree. You see it once you seal.");
+    expect(game.claims[2]).toBe("Swipe right to agree or left to disagree; the swipe is the seal.");
+    expect(game.claims[3]).toBe("After each seal you can read what the machines guessed and why. They cannot read you.");
+    expect(game.claims[5]).toBe("A call with the majority wins the stake at the Oracle's odds; a call against it loses the stake.");
     const results = RITES_V2_SECTIONS.find((s) => s.title === "Results and the board")!;
     expect(results.claims[0]).toBe("Questions settle on the players' majority at lock.");
     const timing = RITES_V2_SECTIONS.find((s) => s.title === "Timing and fairness")!;
     expect(timing.claims[1]).toBe("Results land at the next noon, when the round locks.");
-    expect(CURRENT_GAME_COPY.opponentChallenge).toBe("Can you read the room better?");
+    expect(CURRENT_GAME_COPY.opponentChallenge).toBe("Can you read the room before they do?");
   });
 });

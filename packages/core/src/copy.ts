@@ -343,9 +343,9 @@ export function provenanceLine(written: number, rejected: number): string | null
 // stake, a seal. That is the one gesture the app turns on, so a first-time
 // player has to meet it here before their first card.
 export const INTRO_LINES = [
-  "Five hot takes a day. The Oracle has already guessed what the room will say.",
-  "Swipe right for YES, left for NO. Nothing about the room shows until you seal.",
-  "You win when you land with the majority. After your fifth seal, place your double on the call you are surest of.",
+  "Five hot takes a day. Three machines have already guessed what the room will say.",
+  "Swipe right to agree, left to disagree. Nothing about the room shows until you seal.",
+  "You win when you land with the majority. After your fifth seal, read the channel and place your double.",
 ] as const;
 
 // RITES_LINES and OPENING_RITES_LINES above are the archived version-1 canon.
@@ -377,9 +377,10 @@ export const RITES_V2_SECTIONS = [
   // caps in the source AND in `defines` says the same thing twice, and the
   // two drift.
   rite("The game", ["line", "stake", "fortune", "big one", "double"], [
-    "Five hot takes a day. Each is an opinion, and the answer is whatever most of the players say.",
-    "On every question the Oracle posts its line: the share of the room it expects to say YES. You see it once you seal.",
-    "Swipe right for YES or left for NO; the swipe is the seal.",
+    "Five hot takes a day. Each is a statement, and the answer is whatever most of the players say.",
+    "On every take the Oracle posts its line: the share of the room it expects to agree. You see it once you seal.",
+    "Swipe right to agree or left to disagree; the swipe is the seal.",
+    "After each seal you can read what the machines guessed and why. They cannot read you.",
     "Every call stakes five percent of your fortune; the Big One stakes ten.",
     "A call with the majority wins the stake at the Oracle's odds; a call against it loses the stake.",
     `Your fortune starts at ${FORTUNE.FOUNDING.toLocaleString("en-US")}. If it falls under ${FORTUNE.BUST_UNDER} the house has taken it, and a new fortune of ${FORTUNE.FOUNDING.toLocaleString("en-US")} opens at noon.`,
