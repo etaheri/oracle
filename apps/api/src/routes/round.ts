@@ -335,6 +335,8 @@ export const roundRoutes = new Hono<AppContext>()
                 payout: p.payout,
                 delta: p.payout === null || p.stake === null ? null : p.payout - p.stake,
                 doubled: p.doubled,
+                // When the caller sealed (design 2026-09-25 §6.6).
+                sealed_at: p.createdAt.toISOString(),
               }
             : null,
           source_name: q.sourceName,
@@ -345,6 +347,8 @@ export const roundRoutes = new Hono<AppContext>()
           oracle_p_yes: q.oracleProbYes === null ? null : Number(q.oracleProbYes),
           seen_on: q.seenOnLabel === null ? null : { label: q.seenOnLabel, url: q.seenOnUrl },
           unhinged: q.unhinged,
+          crowd: q.marketSource === "crowd",
+          resolved_at: q.resolvedAt === null ? null : q.resolvedAt.toISOString(),
         };
       }),
       ledger: {

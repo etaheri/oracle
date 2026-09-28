@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { count, eq, inArray, isNotNull, lt, and } from "drizzle-orm";
-import { confidenceHistory, calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, FORTUNE, oracleBrierOf, oracleCallRight, oracleScore } from "@oracle/core";
+import { confidenceHistory, calculateDuel, ratingEligible, earnedMilestones, assignEpithet, contrarianApplies, CONSTANTS, FORTUNE, oracleBrierOf, oracleCallRight, oracleScore, roomRecord } from "@oracle/core";
 import type { AppContext } from "../app";
 import { schema } from "../db/client";
 import { deviceAuth } from "./auth";
@@ -55,6 +55,14 @@ export const meRoutes = new Hono<AppContext>()
     };
     const life = stats(resolved);
     const win = stats(resolved.filter((r) => r.inWindow));
+
+    // Reading the room (design 2026-09-25 §6.4): the caller's settled hot
+    // takes, against the line the machines posted on each.
+    const roomCalls = preds.flatMap((p) => {
+      const q = qById.get(p.questionId);
+      if (!q || q.marketSource !== "crowd" || (q.outcome !== "yes" && q.outcome !== "no")) return [];
+      return [{ date: q.roundDate, answer: p.answer, line: q.linePYes === null ? null : Number(q.linePYes), outcome: q.outcome as "yes" | "no", lockedAt: q.locksAt.getTime() }];
+    });
 
     const byDate = new Map<string, number>();
     for (const p of preds) {
@@ -234,6 +242,7 @@ export const meRoutes = new Hono<AppContext>()
       run_started_on: runStart,
       fortune_history: fortuneHistory,
       house,
+      room: roomRecord(roomCalls, Date.now()),
       oracle: {
         score: oracleScore(oracleBriers),
         calls_rated: oracleBriers.length,

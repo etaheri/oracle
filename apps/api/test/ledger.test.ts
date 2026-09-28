@@ -127,6 +127,29 @@ describe("GET /v1/me/ledger", () => {
     const spent = (await (await a("/v1/me/ledger")).json()) as Record<string, unknown>;
     expect(spent).toMatchObject({ free_shield_available: false, paid_shields: 2, shield_used_on: "2026-08-19" });
   });
+
+  it("reports the room block over the caller's settled hot takes (design 2026-09-25 §6.4)", async () => {
+    vi.useFakeTimers({ now: new Date("2026-08-20T17:00:00Z"), toFake: ["Date"] });
+    const { db } = await makeTestDb();
+    const app = createApp({ db, env });
+    const qs = await seedRound(db, { date: "2026-08-20", opensAt: new Date("2026-08-20T16:00:00Z"), locksAt: new Date("2026-08-21T16:00:00Z") });
+    // Slots 1 to 3 are hot takes with the line at 30%; slot 4 stays a market question.
+    for (const q of qs.slice(0, 3)) await db.update(schema.questions).set({ marketSource: "crowd", sourceName: "THE PLAYERS", linePYes: "0.30" }).where(eq(schema.questions.id, q.id));
+    const a = await player(app);
+    await a("/v1/predictions", { method: "POST", body: body(qs[0]!.id, true) });
+    await a("/v1/predictions", { method: "POST", body: body(qs[1]!.id, true) });
+    await a("/v1/predictions", { method: "POST", body: body(qs[2]!.id, false) });
+    await a("/v1/predictions", { method: "POST", body: body(qs[3]!.id, true) });
+    for (const q of qs.slice(0, 4)) await resolveQuestion(db, q.id, "yes");
+
+    const out = MeLedgerSchema.parse(await (await a("/v1/me/ledger")).json());
+    // With the room on two of three; the 30% line was on the wrong side of
+    // all three; the market question counts toward neither.
+    expect(out.room).toEqual({ days: 1, days_read: 1, days_machines_missed: 1, read_rate_30d: null, calls_30d: 3 });
+
+    const b = await player(app);
+    expect(MeLedgerSchema.parse(await (await b("/v1/me/ledger")).json()).room).toEqual({ days: 0, days_read: 0, days_machines_missed: 0, read_rate_30d: null, calls_30d: 0 });
+  });
 });
 
 describe("standing", () => {
