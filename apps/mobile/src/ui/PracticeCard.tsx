@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
-import { PRACTICE_FORTUNE, practiceLine, type Exhibition, type RoundToday } from "@oracle/core";
+import { practiceLine, type Exhibition, type RoundToday } from "@oracle/core";
 import { CardChrome } from "./CardChrome";
 import { DecodeLine } from "./DecodeText";
 import { practiceResult } from "../game/practiceResult";
@@ -62,14 +62,14 @@ export function PracticeCard({ exhibition, onCompleted }: { exhibition: Exhibiti
         {!revealed && <GoldButton title="REVEAL THE RESULT" onPress={() => {
           const next = revealExhibition(flow); setFlow(next.flow); if (next.completedNow) onCompleted();
         }} />}
-      </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} fortune={PRACTICE_FORTUNE} onSealed={() => {}}
+      </CardChrome> : <OracleCard height={height} key={attempt} q={question} roundLocksAt={null} onSealed={() => {}}
         practice={{ context: exhibition.context ?? undefined, stamp: "PRACTICE · UNRANKED", onSeal: (answer) => {
           setFlow(current => sealExhibition(current, { answer }));
         } }} />}
     </View>}</CardStage>
     <View style={{ minHeight: 48, gap: space(1), justifyContent: "center" }}>
       <Mono {...role.caption} style={[role.caption.style, { textAlign: "center" }]}>
-        {result ? "UNRANKED · YOUR FORTUNE, RECORD AND STREAK ARE UNCHANGED." : sealHint(reducedMotion)}
+        {result ? "UNRANKED · YOUR FORTUNE, RECORD AND STREAK ARE UNCHANGED." : sealHint(reducedMotion, exhibition.crowd)}
       </Mono>
     </View>
     {revealed && <QuietLink title="TRY THE OTHER SIDE" onPress={() => {

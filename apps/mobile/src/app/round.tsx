@@ -15,6 +15,7 @@ import { CrowdReveal, CrowdBar } from "../ui/CrowdReveal";
 import { DoubleTray } from "../ui/DoubleTray";
 import { trayTiles, trayState, trayStage, DOUBLE_FAILED, TRAY_HOLD_MS } from "../game/doubleTray";
 import { capture } from "../analytics/analytics";
+import { receiptLine } from "../game/stakeText";
 import { SleepsPanel } from "../ui/SleepsPanel";
 import { AsciiDust } from "../ui/TerminalPatina";
 import { DecodeLine } from "../ui/DecodeText";
@@ -171,8 +172,7 @@ export default function Round() {
                 height={height}
                 q={current}
                 roundLocksAt={today.data?.locks_at ?? null}
-                fortune={today.data?.fortune ?? null}
-                onSealed={(receipt) => { setLastSealedId(current.id); setLastReceipt(receipt); }}
+                onSealed={(answer) => { setLastSealedId(current.id); setLastReceipt(receiptLine({ answer, line: null, room: current.crowd })); }}
               />
             </Animated.View>
           </View>}</CardStage>
