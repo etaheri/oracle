@@ -28,12 +28,12 @@ function ChannelLine({ line, index }: { line: PrintLine; index: number }) {
       delayMs={index * LINE_STAGGER_MS}
       durationMs={LINE_PRINT_MS}
       color={line.kind === "say" ? colors.ink : colors.mutedInk}
-      accessibilityLabel={`${line.nick} ${line.body}`}
+      accessibilityLabel={`${line.stamp} ${line.nick} ${line.body}`}
       style={[base.style, LEFT, line.kind === "note" ? { opacity: 0.7 } : null]}
       prefix={
         <>
-          <Text style={{ color: colors.mutedInk }}>{`${line.stamp} `}</Text>
-          <Text style={{ color: toneColor(line.tone) }}>{`${line.nick} `}</Text>
+          <Text accessible={false} style={{ color: colors.mutedInk }}>{`${line.stamp} `}</Text>
+          <Text accessible={false} style={{ color: toneColor(line.tone) }}>{`${line.nick} `}</Text>
         </>
       }
     />
